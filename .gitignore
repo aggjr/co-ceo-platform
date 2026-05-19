@@ -1,0 +1,9 @@
+node_modules/
+dist/
+frontend/dist/
+coverage/
+reports/
+!reports/.gitkeep
+.env
+*.log
+.DS_Store

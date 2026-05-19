@@ -1,0 +1,26 @@
+-- Telemetria de uso (telas, ações) — insumo para produto e IA
+CREATE TABLE IF NOT EXISTS telemetry_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    organization_id VARCHAR(36) NULL,
+    contract_id VARCHAR(36) NULL,
+    role_id VARCHAR(36) NULL,
+    user_role_id VARCHAR(36) NULL,
+    impersonator_user_id VARCHAR(36) NULL,
+    event_type VARCHAR(50) NOT NULL,
+    event_name VARCHAR(100) NOT NULL,
+    module_code VARCHAR(50) NULL,
+    screen_path VARCHAR(255) NULL,
+    session_id VARCHAR(64) NULL,
+    metadata JSON NULL,
+    ip_address VARCHAR(45) NULL,
+    user_agent TEXT NULL,
+    client_timestamp TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_telemetry_org (organization_id),
+    INDEX idx_telemetry_user (user_id),
+    INDEX idx_telemetry_contract (contract_id),
+    INDEX idx_telemetry_event (event_type, event_name),
+    INDEX idx_telemetry_created (created_at),
+    INDEX idx_telemetry_session (session_id)
+);

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CO-CEO | Visão Lógica do Banco de Dados</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #06121E;
+            --bg-card: #0A1D30;
+            --text-main: #FFFFFF;
+            --text-muted: #94A3B8;
+            --border-color: rgba(255, 255, 255, 0.1);
+            
+            /* Paleta de Cores dos Módulos */
+            --mod-core: #3B82F6;    /* Azul: Core SaaS & Auth */
+            --mod-invest: #DAB177;  /* Dourado Foccus: Invest / Wealth */
+            --mod-cash: #10B981;    /* Verde: Cash / Financeiro */
+            --mod-ai: #8B5CF6;      /* Roxo: AI / Telemetria */
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: var(--bg-deep); color: var(--text-main); font-family: 'Montserrat', sans-serif; padding: 40px; }
+        
+        .container { max-width: 1400px; margin: 0 auto; }
+        
+        header { text-align: center; margin-bottom: 50px; border-bottom: 1px solid var(--border-color); padding-bottom: 30px; }
+        h1 { font-weight: 300; font-size: 32px; margin-bottom: 12px; }
+        h1 span { font-weight: 700; color: var(--mod-invest); }
+        .subtitle { color: var(--text-muted); font-size: 16px; max-width: 900px; margin: 0 auto; line-height: 1.6; }
+
+        /* Legenda de Módulos */
+        .legend-container { display: flex; justify-content: center; gap: 24px; margin-bottom: 60px; }
+        .legend-badge { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 20px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+        
+        .badge-core { color: var(--mod-core); border-color: rgba(59, 130, 246, 0.3); }
+        .badge-core .dot { background-color: var(--mod-core); box-shadow: 0 0 8px var(--mod-core); }
+        
+        .badge-invest { color: var(--mod-invest); border-color: rgba(218, 177, 119, 0.3); }
+        .badge-invest .dot { background-color: var(--mod-invest); box-shadow: 0 0 8px var(--mod-invest); }
+        
+        .badge-cash { color: var(--mod-cash); border-color: rgba(16, 185, 129, 0.3); }
+        .badge-cash .dot { background-color: var(--mod-cash); box-shadow: 0 0 8px var(--mod-cash); }
+        
+        .badge-ai { color: var(--mod-ai); border-color: rgba(139, 92, 246, 0.3); }
+        .badge-ai .dot { background-color: var(--mod-ai); box-shadow: 0 0 8px var(--mod-ai); }
+
+        /* Seções de Módulo */
+        .module-section { margin-bottom: 60px; padding: 30px; border-radius: 12px; border-width: 2px; border-style: solid; position: relative; background-color: rgba(10, 29, 48, 0.5); }
+        .module-section.core { border-color: rgba(59, 130, 246, 0.4); }
+        .module-section.invest { border-color: rgba(218, 177, 119, 0.4); }
+        
+        .module-title { font-size: 24px; font-weight: 700; position: absolute; top: -16px; left: 30px; padding: 0 16px; background-color: var(--bg-deep); }
+        .core .module-title { color: var(--mod-core); }
+        .invest .module-title { color: var(--mod-invest); }
+
+        /* Grid de Tabelas Lógicas */
+        .grid-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 30px; margin-top: 30px; }
+        
+        .table-card { background-color: var(--bg-card); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .table-header { padding: 12px 20px; font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 15px; display: flex; justify-content: space-between; }
+        .table-desc { padding: 12px 20px; font-size: 13px; color: var(--text-muted); border-bottom: 1px solid var(--border-color); line-height: 1.5; background-color: rgba(0,0,0,0.2); }
+        
+        .core .table-header { background-color: rgba(59, 130, 246, 0.15); color: #93C5FD; border-bottom: 2px solid var(--mod-core); }
+        .invest .table-header { background-color: rgba(218, 177, 119, 0.15); color: #FDE68A; border-bottom: 2px solid var(--mod-invest); }
+
+        /* Colunas SQL */
+        .sql-columns { padding: 10px 20px; }
+        .sql-row { display: flex; align-items: baseline; padding: 6px 0; border-bottom: 1px dashed rgba(255,255,255,0.05); font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+        .sql-row:last-child { border-bottom: none; }
+        
+        .col-key { width: 24px; color: var(--accent-gold); font-weight: bold; }
+        .col-name { width: 180px; color: #E2E8F0; }
+        .col-type { width: 120px; color: #64748B; font-size: 12px; }
+        .col-note { flex: 1; color: #94A3B8; font-family: 'Montserrat', sans-serif; font-size: 12px; font-style: italic; text-align: right; }
+        
+        .pk { color: #F59E0B; } /* Primary Key */
+        .fk { color: #38BDF8; } /* Foreign Key */
+        
+        /* Relações Visuais */
+        .relations-box { margin-top: 20px; padding: 15px 20px; background-color: rgba(0,0,0,0.3); border-top: 1px solid var(--border-color); font-size: 12px; color: #CBD5E1; }
+        .relations-box strong { color: var(--text-main); }
+        .rel-link { color: #38BDF8; font-family: 'JetBrains Mono', monospace; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>CO-CEO <span>VISÃO LÓGICA DO BANCO DE DADOS</span></h1>
+        <p class="subtitle">Mapeamento estrutural das entidades. Esta visão separa estritamente o Chassi do Sistema (CORE) das lógicas de negócios operacionais (INVEST). As tabelas do INVEST nascem conectadas à raiz multi-tenant (organizations) do CORE.</p>
+    </header>
+
+    <!-- Legenda -->
+    <div class="legend-container">
+        <div class="legend-badge badge-core"><div class="dot"></div>MÓDULO CORE (SAAS)</div>
+        <div class="legend-badge badge-invest"><div class="dot"></div>MÓDULO INVEST (WEALTH)</div>
+        <div class="legend-badge badge-cash"><div class="dot"></div>MÓDULO CASH (FINANCEIRO)</div>
+        <div class="legend-badge badge-ai"><div class="dot"></div>TELEMETRIA & AI</div>
+    </div>
+
+    <!-- MÓDULO CORE -->
+    <div class="module-section core">
+        <div class="module-title">1. MÓDULO CORE (Chassi SaaS)</div>
+        
+        <div class="grid-tables">
+            <!-- Table: organizations -->
+            <div class="table-card">
+                <div class="table-header">
+                    <span>organizations</span>
+                    <span>Multi-Tenant</span>
+                </div>
+                <div class="table-desc">Nó raiz de cliente (Holding) e seus descendentes. Garante o isolamento de dados no banco.</div>
+                <div class="sql-columns">
+                    <div class="sql-row"><span class="col-key pk">PK</span><span class="col-name">id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">UUID</span></div>
+                    <div class="sql-row"><span class="col-key fk">FK</span><span class="col-name">parent_id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">Aponta p/ outra organização (ou NULL)</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">name</span><span class="col-type">VARCHAR(255)</span><span class="col-note">Nome Fantasia</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">path</span><span class="col-type">TEXT</span><span class="col-note">Ex: /cliente_holding/filial/</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">storage_bytes_used</span><span class="col-type">BIGINT</span><span class="col-note">Métrica de faturamento SaaS</span></div>
+                </div>
+            </div>
+
+            <!-- Table: contracts -->
+            <div class="table-card">
+                <div class="table-header">
+                    <span>contracts</span>
+                    <span>Faturamento</span>
+                </div>
+                <div class="table-desc">Liga um CNPJ (Organização) aos gestores responsáveis pelos dois lados do balcão.</div>
+                <div class="sql-columns">
+                    <div class="sql-row"><span class="col-key pk">PK</span><span class="col-name">id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">UUID</span></div>
+                    <div class="sql-row"><span class="col-key fk">FK</span><span class="col-name">organization_id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">Tenant Associado</span></div>
+                    <div class="sql-row"><span class="col-key fk">FK</span><span class="col-name">client_manager_id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">Gestor (Lado Cliente)</span></div>
+                    <div class="sql-row"><span class="col-key fk">FK</span><span class="col-name">co_ceo_manager_id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">Sócio/KAM (Lado CO-CEO)</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">status</span><span class="col-type">ENUM</span><span class="col-note">active, suspended</span></div>
+                </div>
+                <div class="relations-box">
+                    <strong>Limites:</strong> Um nó-raiz em <span class="rel-link">organizations</span> só entra no sistema se existir aqui.
+                </div>
+            </div>
+
+            <!-- Table: contract_modules -->
+            <div class="table-card">
+                <div class="table-header">
+                    <span>contract_modules</span>
+                    <span>Paywall</span>
+                </div>
+                <div class="table-desc">As chaves da catraca. O que a organização está autorizada a acessar no menu.</div>
+                <div class="sql-columns">
+                    <div class="sql-row"><span class="col-key pk">PK</span><span class="col-name">contract_id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">FK -> contracts</span></div>
+                    <div class="sql-row"><span class="col-key pk">PK</span><span class="col-name">module_code</span><span class="col-type">VARCHAR(50)</span><span class="col-note">Ex: 'INVEST', 'CASH'</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">status</span><span class="col-type">ENUM</span><span class="col-note">active, trial</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MÓDULO INVEST -->
+    <div class="module-section invest">
+        <div class="module-title">2. MÓDULO INVEST (Family Office & Quant)</div>
+        
+        <div class="grid-tables">
+            <!-- Table: invest_assets -->
+            <div class="table-card">
+                <div class="table-header">
+                    <span>invest_assets</span>
+                    <span>Custódia Master</span>
+                </div>
+                <div class="table-desc">O cofre principal. Toda linha aqui pertence a um tenant (organization_id). Registra o estoque da ação mãe.</div>
+                <div class="sql-columns">
+                    <div class="sql-row"><span class="col-key pk">PK</span><span class="col-name">id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">UUID</span></div>
+                    <div class="sql-row"><span class="col-key fk">FK</span><span class="col-name">organization_id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">Herança Multi-Tenant do CORE</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">ticker</span><span class="col-type">VARCHAR(10)</span><span class="col-note">Ex: 'PRIO3', 'ITUB4'</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">total_quantity</span><span class="col-type">INT</span><span class="col-note">Estoque Físico Atual</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">managerial_avg_price</span><span class="col-type">DECIMAL(10,4)</span><span class="col-note">O Santo Graal (PM Gerencial)</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">strict_avg_price</span><span class="col-type">DECIMAL(10,4)</span><span class="col-note">Preço Médio CVM/B3</span></div>
+                </div>
+                <div class="relations-box">
+                    <strong>Pivot:</strong> Esta tabela é a "Matriz" para o cálculo da Pivot Table de resultados do Dashboard.
+                </div>
+            </div>
+
+            <!-- Table: invest_ledger_entries -->
+            <div class="table-card">
+                <div class="table-header">
+                    <span>invest_ledger_entries</span>
+                    <span>Livro-Razão</span>
+                </div>
+                <div class="table-desc">Registro cirúrgico de Bottom-Up. Tudo que entra ou sai de dinheiro que afeta o Preço Médio.</div>
+                <div class="sql-columns">
+                    <div class="sql-row"><span class="col-key pk">PK</span><span class="col-name">id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">UUID</span></div>
+                    <div class="sql-row"><span class="col-key fk">FK</span><span class="col-name">asset_id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">Aponta p/ PRIO3 (invest_assets)</span></div>
+                    <div class="sql-row"><span class="col-key fk">FK</span><span class="col-name">user_id</span><span class="col-type">VARCHAR(36)</span><span class="col-note">Quem boletou (CORE)</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">entry_type</span><span class="col-type">VARCHAR(50)</span><span class="col-note">SELL_PUT, DIVIDEND, RENT, BUY_STOCK</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">option_ticker</span><span class="col-type">VARCHAR(10)</span><span class="col-note">Ex: 'PRIOR560' (Se for Opção)</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">gross_amount</span><span class="col-type">DECIMAL(12,2)</span><span class="col-note">Valor R$ Total Bruto</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">fees_amount</span><span class="col-type">DECIMAL(10,2)</span><span class="col-note">Corretagem e Emolumentos</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">net_amount</span><span class="col-type">DECIMAL(12,2)</span><span class="col-note">O valor exato que altera o PM</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">operation_date</span><span class="col-type">DATE</span><span class="col-note">Data do Pregão</span></div>
+                </div>
+                <div class="relations-box">
+                    <strong>Trigger Lógico:</strong> Qualquer INSERT aqui força um recálculo na <span class="rel-link">invest_assets.managerial_avg_price</span>.
+                </div>
+            </div>
+
+            <!-- Table: invest_options_chain -->
+            <div class="table-card">
+                <div class="table-header">
+                    <span>invest_options_chain</span>
+                    <span>Robô EOD / Cache</span>
+                </div>
+                <div class="table-desc">Alimentada pelo Robô Noturno. Usada para cruzar com a Custódia e gerar o MTM e Sugestões da IA.</div>
+                <div class="sql-columns">
+                    <div class="sql-row"><span class="col-key pk">PK</span><span class="col-name">ticker</span><span class="col-type">VARCHAR(10)</span><span class="col-note">Ex: 'PRIOR560'</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">underlying_asset</span><span class="col-type">VARCHAR(10)</span><span class="col-note">Ex: 'PRIO3'</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">type</span><span class="col-type">ENUM</span><span class="col-note">CALL, PUT</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">strike_price</span><span class="col-type">DECIMAL(10,2)</span><span class="col-note">Preço Exercício</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">last_price</span><span class="col-type">DECIMAL(10,2)</span><span class="col-note">Preço de Fechamento B3</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">delta_approx</span><span class="col-type">DECIMAL(5,2)</span><span class="col-note">Delta (~30, ~20) para Ampulheta</span></div>
+                    <div class="sql-row"><span class="col-key"></span><span class="col-name">scraped_at</span><span class="col-type">TIMESTAMP</span><span class="col-note">Quando o robô atualizou (UI Badge)</span></div>
+                </div>
+                <div class="relations-box">
+                    <strong>Global:</strong> Esta tabela NÃO tem <span class="rel-link">organization_id</span>. É global. O robô baixa uma vez e todos os clientes do SaaS leem daqui.
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>

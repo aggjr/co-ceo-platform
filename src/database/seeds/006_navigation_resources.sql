@@ -1,0 +1,2 @@
+-- DEPRECATED: incorporado em 005_iam_catalog.ts (screen.cockpit.platform + grants).
+--   npx ts-node src/database/seeds/005_iam_catalog.ts

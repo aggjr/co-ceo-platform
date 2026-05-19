@@ -1,0 +1,6670 @@
+{
+  "generated_at": "2026-05-19T11:36:22.756Z",
+  "organization_id": "org-holding-001",
+  "from": "2026-01-01",
+  "to": "2026-12-31",
+  "series": [
+    {
+      "date": "2026-01-01",
+      "patrimonyGross": 1227550.32,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1227550.32,
+      "cash": -58758.79,
+      "positionsValue": 1078016.21,
+      "dailyReturn": null
+    },
+    {
+      "date": "2026-01-02",
+      "patrimonyGross": 1230781.65,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1230781.65,
+      "cash": -58758.79,
+      "positionsValue": 1081247.54,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-03",
+      "patrimonyGross": 1234012.97,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1234012.97,
+      "cash": -58758.79,
+      "positionsValue": 1084478.86,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-04",
+      "patrimonyGross": 1237244.29,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1237244.29,
+      "cash": -58758.79,
+      "positionsValue": 1087710.18,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-05",
+      "patrimonyGross": 1240475.61,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1240475.61,
+      "cash": -58758.79,
+      "positionsValue": 1090941.5,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-06",
+      "patrimonyGross": 1243706.94,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1243706.94,
+      "cash": -58758.79,
+      "positionsValue": 1094172.83,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-07",
+      "patrimonyGross": 1246938.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1246938.26,
+      "cash": -58758.79,
+      "positionsValue": 1097404.15,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-08",
+      "patrimonyGross": 1250169.58,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1250169.58,
+      "cash": -58758.79,
+      "positionsValue": 1100635.47,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-09",
+      "patrimonyGross": 1253400.9,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1253400.9,
+      "cash": -58758.79,
+      "positionsValue": 1103866.79,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-10",
+      "patrimonyGross": 1256632.23,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1256632.23,
+      "cash": -58758.79,
+      "positionsValue": 1107098.12,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-11",
+      "patrimonyGross": 1259863.55,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1259863.55,
+      "cash": -58758.79,
+      "positionsValue": 1110329.44,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-12",
+      "patrimonyGross": 1263094.87,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1263094.87,
+      "cash": -58758.79,
+      "positionsValue": 1113560.76,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-13",
+      "patrimonyGross": 1266326.19,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1266326.19,
+      "cash": -58758.79,
+      "positionsValue": 1116792.08,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-14",
+      "patrimonyGross": 1269557.52,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1269557.52,
+      "cash": -58758.79,
+      "positionsValue": 1120023.41,
+      "dailyReturn": 0.0026
+    },
+    {
+      "date": "2026-01-15",
+      "patrimonyGross": 1272788.84,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1272788.84,
+      "cash": -58758.79,
+      "positionsValue": 1123254.73,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-16",
+      "patrimonyGross": 1276020.16,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1276020.16,
+      "cash": -58758.79,
+      "positionsValue": 1126486.05,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-17",
+      "patrimonyGross": 1279251.48,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1279251.48,
+      "cash": -58758.79,
+      "positionsValue": 1129717.37,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-18",
+      "patrimonyGross": 1282482.81,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1282482.81,
+      "cash": -58758.79,
+      "positionsValue": 1132948.7,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-19",
+      "patrimonyGross": 1285714.13,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1285714.13,
+      "cash": -58762.23,
+      "positionsValue": 1136183.46,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-20",
+      "patrimonyGross": 1288945.45,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1288945.45,
+      "cash": -58762.23,
+      "positionsValue": 1139414.78,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-21",
+      "patrimonyGross": 1292176.77,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1292176.77,
+      "cash": -58761.05,
+      "positionsValue": 1142644.92,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-22",
+      "patrimonyGross": 1295408.1,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1295408.1,
+      "cash": -58761.05,
+      "positionsValue": 1145876.25,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-23",
+      "patrimonyGross": 1298639.42,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1298639.42,
+      "cash": -58761.05,
+      "positionsValue": 1149107.57,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-24",
+      "patrimonyGross": 1301870.74,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1301870.74,
+      "cash": -58761.05,
+      "positionsValue": 1152338.89,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-25",
+      "patrimonyGross": 1305102.06,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1305102.06,
+      "cash": -58761.05,
+      "positionsValue": 1155570.21,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-26",
+      "patrimonyGross": 1308333.39,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1308333.39,
+      "cash": -58761.05,
+      "positionsValue": 1158801.54,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-27",
+      "patrimonyGross": 1311564.71,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1311564.71,
+      "cash": -58761.05,
+      "positionsValue": 1162032.86,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-28",
+      "patrimonyGross": 1314796.03,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1314796.03,
+      "cash": -58761.05,
+      "positionsValue": 1165264.18,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-29",
+      "patrimonyGross": 1318027.35,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1318027.35,
+      "cash": -58761.05,
+      "positionsValue": 1168495.5,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-30",
+      "patrimonyGross": 1321258.68,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1321258.68,
+      "cash": -58761.05,
+      "positionsValue": 1171726.83,
+      "dailyReturn": 0.0025
+    },
+    {
+      "date": "2026-01-31",
+      "patrimonyGross": 1324490,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1324490,
+      "cash": -58761.05,
+      "positionsValue": 1174958.15,
+      "dailyReturn": 0.0024
+    },
+    {
+      "date": "2026-02-01",
+      "patrimonyGross": 1325285.04,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1325285.04,
+      "cash": -58761.05,
+      "positionsValue": 1175753.19,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-02",
+      "patrimonyGross": 1326080.07,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1326080.07,
+      "cash": -58761.05,
+      "positionsValue": 1176548.22,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-03",
+      "patrimonyGross": 1326875.11,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1326875.11,
+      "cash": -58761.05,
+      "positionsValue": 1177343.26,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-04",
+      "patrimonyGross": 1327670.14,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1327670.14,
+      "cash": -58761.05,
+      "positionsValue": 1178138.29,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-05",
+      "patrimonyGross": 1328465.18,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1328465.18,
+      "cash": -58761.05,
+      "positionsValue": 1178933.33,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-06",
+      "patrimonyGross": 1329260.21,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1329260.21,
+      "cash": -58761.05,
+      "positionsValue": 1179728.36,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-07",
+      "patrimonyGross": 1330055.25,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1330055.25,
+      "cash": -58761.05,
+      "positionsValue": 1180523.4,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-08",
+      "patrimonyGross": 1330850.29,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1330850.29,
+      "cash": -58761.05,
+      "positionsValue": 1181318.44,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-09",
+      "patrimonyGross": 1331645.32,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1331645.32,
+      "cash": -58761.05,
+      "positionsValue": 1182113.47,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-10",
+      "patrimonyGross": 1332440.36,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1332440.36,
+      "cash": -58761.05,
+      "positionsValue": 1182908.51,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-11",
+      "patrimonyGross": 1333235.39,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1333235.39,
+      "cash": -58761.05,
+      "positionsValue": 1183703.54,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-12",
+      "patrimonyGross": 1334030.43,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1334030.43,
+      "cash": -58761.05,
+      "positionsValue": 1184498.58,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-13",
+      "patrimonyGross": 1334825.46,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1334825.46,
+      "cash": -58761.05,
+      "positionsValue": 1185293.61,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-14",
+      "patrimonyGross": 1335620.5,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1335620.5,
+      "cash": -58761.05,
+      "positionsValue": 1186088.65,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-15",
+      "patrimonyGross": 1336415.54,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1336415.54,
+      "cash": -58761.05,
+      "positionsValue": 1186883.69,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-16",
+      "patrimonyGross": 1337210.57,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1337210.57,
+      "cash": -58761.05,
+      "positionsValue": 1187678.72,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-17",
+      "patrimonyGross": 1338005.61,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1338005.61,
+      "cash": -58761.05,
+      "positionsValue": 1188473.76,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-18",
+      "patrimonyGross": 1338800.64,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1338800.64,
+      "cash": -58761.05,
+      "positionsValue": 1189268.79,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-19",
+      "patrimonyGross": 1339595.68,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1339595.68,
+      "cash": -58761.05,
+      "positionsValue": 1190063.83,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-20",
+      "patrimonyGross": 1340390.71,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1340390.71,
+      "cash": -58761.05,
+      "positionsValue": 1190858.86,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-21",
+      "patrimonyGross": 1341185.75,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1341185.75,
+      "cash": -58761.05,
+      "positionsValue": 1191653.9,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-22",
+      "patrimonyGross": 1341980.79,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1341980.79,
+      "cash": -58761.05,
+      "positionsValue": 1192448.94,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-23",
+      "patrimonyGross": 1342775.82,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1342775.82,
+      "cash": -58761.05,
+      "positionsValue": 1193243.97,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-24",
+      "patrimonyGross": 1343570.86,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1343570.86,
+      "cash": -58761.05,
+      "positionsValue": 1194039.01,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-25",
+      "patrimonyGross": 1344365.89,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1344365.89,
+      "cash": -68761.05,
+      "positionsValue": 1204834.04,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-26",
+      "patrimonyGross": 1345160.93,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1345160.93,
+      "cash": -68761.05,
+      "positionsValue": 1205629.08,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-27",
+      "patrimonyGross": 1345955.96,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1345955.96,
+      "cash": -68761.05,
+      "positionsValue": 1206424.11,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-02-28",
+      "patrimonyGross": 1346751,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1346751,
+      "cash": -70971.18,
+      "positionsValue": 1209429.28,
+      "dailyReturn": 0.0006
+    },
+    {
+      "date": "2026-03-01",
+      "patrimonyGross": 1348905.23,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1348905.23,
+      "cash": -70971.18,
+      "positionsValue": 1211583.51,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-02",
+      "patrimonyGross": 1351059.45,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1351059.45,
+      "cash": -70971.18,
+      "positionsValue": 1213737.73,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-03",
+      "patrimonyGross": 1353213.68,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1353213.68,
+      "cash": -70971.18,
+      "positionsValue": 1215891.96,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-04",
+      "patrimonyGross": 1355367.9,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1355367.9,
+      "cash": -70971.18,
+      "positionsValue": 1218046.18,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-05",
+      "patrimonyGross": 1357522.13,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1357522.13,
+      "cash": -70971.18,
+      "positionsValue": 1220200.41,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-06",
+      "patrimonyGross": 1359676.35,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1359676.35,
+      "cash": -70971.18,
+      "positionsValue": 1222354.63,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-07",
+      "patrimonyGross": 1361830.58,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1361830.58,
+      "cash": -70971.18,
+      "positionsValue": 1224508.86,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-08",
+      "patrimonyGross": 1363984.81,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1363984.81,
+      "cash": -70971.18,
+      "positionsValue": 1226663.09,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-09",
+      "patrimonyGross": 1366139.03,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1366139.03,
+      "cash": -70971.18,
+      "positionsValue": 1228817.31,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-10",
+      "patrimonyGross": 1368293.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1368293.26,
+      "cash": -70971.18,
+      "positionsValue": 1230971.54,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-11",
+      "patrimonyGross": 1370447.48,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1370447.48,
+      "cash": -70971.18,
+      "positionsValue": 1233125.76,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-12",
+      "patrimonyGross": 1372601.71,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1372601.71,
+      "cash": -70971.18,
+      "positionsValue": 1235279.99,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-13",
+      "patrimonyGross": 1374755.94,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1374755.94,
+      "cash": -70971.18,
+      "positionsValue": 1237434.22,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-14",
+      "patrimonyGross": 1376910.16,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1376910.16,
+      "cash": -70971.18,
+      "positionsValue": 1239588.44,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-15",
+      "patrimonyGross": 1379064.39,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1379064.39,
+      "cash": -70971.18,
+      "positionsValue": 1241742.67,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-16",
+      "patrimonyGross": 1381218.61,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1381218.61,
+      "cash": -70971.18,
+      "positionsValue": 1243896.89,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-17",
+      "patrimonyGross": 1383372.84,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1383372.84,
+      "cash": -75971.18,
+      "positionsValue": 1251051.12,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-18",
+      "patrimonyGross": 1385527.06,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1385527.06,
+      "cash": -75972.2,
+      "positionsValue": 1253206.36,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-19",
+      "patrimonyGross": 1387681.29,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1387681.29,
+      "cash": -75972.22,
+      "positionsValue": 1255360.61,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-20",
+      "patrimonyGross": 1389835.52,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1389835.52,
+      "cash": -75972.81,
+      "positionsValue": 1257515.43,
+      "dailyReturn": 0.0016
+    },
+    {
+      "date": "2026-03-21",
+      "patrimonyGross": 1391989.74,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1391989.74,
+      "cash": -75972.81,
+      "positionsValue": 1259669.65,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-22",
+      "patrimonyGross": 1394143.97,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1394143.97,
+      "cash": -75972.81,
+      "positionsValue": 1261823.88,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-23",
+      "patrimonyGross": 1396298.19,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1396298.19,
+      "cash": -75972.88,
+      "positionsValue": 1263978.17,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-24",
+      "patrimonyGross": 1398452.42,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1398452.42,
+      "cash": -75973.3,
+      "positionsValue": 1266132.82,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-25",
+      "patrimonyGross": 1400606.65,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1400606.65,
+      "cash": -75973.3,
+      "positionsValue": 1268287.05,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-26",
+      "patrimonyGross": 1402760.87,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1402760.87,
+      "cash": -75973.58,
+      "positionsValue": 1270441.55,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-27",
+      "patrimonyGross": 1404915.1,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1404915.1,
+      "cash": -75974.58,
+      "positionsValue": 1272596.78,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-28",
+      "patrimonyGross": 1407069.32,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1407069.32,
+      "cash": -75974.58,
+      "positionsValue": 1274751,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-29",
+      "patrimonyGross": 1409223.55,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1409223.55,
+      "cash": -75974.58,
+      "positionsValue": 1276905.23,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-30",
+      "patrimonyGross": 1411377.77,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1411377.77,
+      "cash": -75974.69,
+      "positionsValue": 1279059.56,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-03-31",
+      "patrimonyGross": 1413532,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1413532,
+      "cash": -75974.69,
+      "positionsValue": 1281213.79,
+      "dailyReturn": 0.0015
+    },
+    {
+      "date": "2026-04-01",
+      "patrimonyGross": 1416871.03,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1416871.03,
+      "cash": -75974.86,
+      "positionsValue": 1284552.99,
+      "dailyReturn": 0.0024
+    },
+    {
+      "date": "2026-04-02",
+      "patrimonyGross": 1420210.07,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1420210.07,
+      "cash": -75974.86,
+      "positionsValue": 1287892.03,
+      "dailyReturn": 0.0024
+    },
+    {
+      "date": "2026-04-03",
+      "patrimonyGross": 1423549.1,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1423549.1,
+      "cash": -75974.86,
+      "positionsValue": 1291231.06,
+      "dailyReturn": 0.0024
+    },
+    {
+      "date": "2026-04-04",
+      "patrimonyGross": 1426888.13,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1426888.13,
+      "cash": -75974.86,
+      "positionsValue": 1294570.09,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-05",
+      "patrimonyGross": 1430227.17,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1430227.17,
+      "cash": -75974.86,
+      "positionsValue": 1297909.13,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-06",
+      "patrimonyGross": 1433566.2,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1433566.2,
+      "cash": -75974.86,
+      "positionsValue": 1301248.16,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-07",
+      "patrimonyGross": 1436905.23,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1436905.23,
+      "cash": -75974.86,
+      "positionsValue": 1304587.19,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-08",
+      "patrimonyGross": 1440244.27,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1440244.27,
+      "cash": -75974.86,
+      "positionsValue": 1307926.23,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-09",
+      "patrimonyGross": 1443583.3,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1443583.3,
+      "cash": -75974.86,
+      "positionsValue": 1311265.26,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-10",
+      "patrimonyGross": 1446922.33,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1446922.33,
+      "cash": -75974.86,
+      "positionsValue": 1314604.29,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-11",
+      "patrimonyGross": 1450261.37,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1450261.37,
+      "cash": -75974.86,
+      "positionsValue": 1317943.33,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-12",
+      "patrimonyGross": 1453600.4,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1453600.4,
+      "cash": -75974.86,
+      "positionsValue": 1321282.36,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-13",
+      "patrimonyGross": 1456939.43,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1456939.43,
+      "cash": -75974.86,
+      "positionsValue": 1324621.39,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-14",
+      "patrimonyGross": 1460278.47,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1460278.47,
+      "cash": -75974.86,
+      "positionsValue": 1327960.43,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-15",
+      "patrimonyGross": 1463617.5,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1463617.5,
+      "cash": -75974.86,
+      "positionsValue": 1331299.46,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-16",
+      "patrimonyGross": 1466956.53,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1466956.53,
+      "cash": -75974.86,
+      "positionsValue": 1334638.49,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-17",
+      "patrimonyGross": 1470295.57,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1470295.57,
+      "cash": -75974.86,
+      "positionsValue": 1337977.53,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-18",
+      "patrimonyGross": 1473634.6,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1473634.6,
+      "cash": -75974.86,
+      "positionsValue": 1341316.56,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-19",
+      "patrimonyGross": 1476973.63,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1476973.63,
+      "cash": -75974.86,
+      "positionsValue": 1344655.59,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-20",
+      "patrimonyGross": 1480312.67,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1480312.67,
+      "cash": -75974.86,
+      "positionsValue": 1347994.63,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-21",
+      "patrimonyGross": 1483651.7,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1483651.7,
+      "cash": -75974.86,
+      "positionsValue": 1351333.66,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-22",
+      "patrimonyGross": 1486990.73,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1486990.73,
+      "cash": -87469.76,
+      "positionsValue": 1366167.59,
+      "dailyReturn": 0.0023
+    },
+    {
+      "date": "2026-04-23",
+      "patrimonyGross": 1490329.77,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1490329.77,
+      "cash": -90030.74,
+      "positionsValue": 1372067.61,
+      "dailyReturn": 0.0022
+    },
+    {
+      "date": "2026-04-24",
+      "patrimonyGross": 1493668.8,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1493668.8,
+      "cash": -90030.74,
+      "positionsValue": 1375406.64,
+      "dailyReturn": 0.0022
+    },
+    {
+      "date": "2026-04-25",
+      "patrimonyGross": 1497007.83,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1497007.83,
+      "cash": -90030.74,
+      "positionsValue": 1378745.67,
+      "dailyReturn": 0.0022
+    },
+    {
+      "date": "2026-04-26",
+      "patrimonyGross": 1500346.87,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1500346.87,
+      "cash": -90030.74,
+      "positionsValue": 1382084.71,
+      "dailyReturn": 0.0022
+    },
+    {
+      "date": "2026-04-27",
+      "patrimonyGross": 1503685.9,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1503685.9,
+      "cash": -90031.87,
+      "positionsValue": 1385424.87,
+      "dailyReturn": 0.0022
+    },
+    {
+      "date": "2026-04-28",
+      "patrimonyGross": 1507024.93,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1507024.93,
+      "cash": -90032.13,
+      "positionsValue": 1388764.16,
+      "dailyReturn": 0.0022
+    },
+    {
+      "date": "2026-04-29",
+      "patrimonyGross": 1510363.97,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1510363.97,
+      "cash": -90032.34,
+      "positionsValue": 1392103.41,
+      "dailyReturn": 0.0022
+    },
+    {
+      "date": "2026-04-30",
+      "patrimonyGross": 1513703,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1513703,
+      "cash": -1025621.84,
+      "positionsValue": 2331031.94,
+      "dailyReturn": 0.0022
+    },
+    {
+      "date": "2026-05-01",
+      "patrimonyGross": 1513486.79,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1513486.79,
+      "cash": -1025621.84,
+      "positionsValue": 2330815.73,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-02",
+      "patrimonyGross": 1513270.58,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1513270.58,
+      "cash": -1025621.84,
+      "positionsValue": 2330599.52,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-03",
+      "patrimonyGross": 1513054.38,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1513054.38,
+      "cash": -1025621.84,
+      "positionsValue": 2330383.32,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-04",
+      "patrimonyGross": 1512838.17,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1512838.17,
+      "cash": -1026477.79,
+      "positionsValue": 2331023.06,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-05",
+      "patrimonyGross": 1512621.96,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1512621.96,
+      "cash": -1026477.79,
+      "positionsValue": 2330806.85,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-06",
+      "patrimonyGross": 1512405.75,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1512405.75,
+      "cash": -1026477.79,
+      "positionsValue": 2330590.64,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-07",
+      "patrimonyGross": 1512189.55,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1512189.55,
+      "cash": -1026477.79,
+      "positionsValue": 2330374.44,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-08",
+      "patrimonyGross": 1511973.34,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1511973.34,
+      "cash": -1026477.79,
+      "positionsValue": 2330158.23,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-09",
+      "patrimonyGross": 1511757.13,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1511757.13,
+      "cash": -1026477.79,
+      "positionsValue": 2329942.02,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-10",
+      "patrimonyGross": 1511540.92,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1511540.92,
+      "cash": -1026477.79,
+      "positionsValue": 2329725.81,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-11",
+      "patrimonyGross": 1511324.71,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1511324.71,
+      "cash": -1026477.79,
+      "positionsValue": 2329509.6,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-12",
+      "patrimonyGross": 1511108.51,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1511108.51,
+      "cash": -1026478.93,
+      "positionsValue": 2329294.54,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-13",
+      "patrimonyGross": 1510892.3,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1510892.3,
+      "cash": -1026478.93,
+      "positionsValue": 2329078.33,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-14",
+      "patrimonyGross": 1510676.09,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1510676.09,
+      "cash": -1026478.93,
+      "positionsValue": 2328862.12,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-15",
+      "patrimonyGross": 1510459.88,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1510459.88,
+      "cash": -1026478.93,
+      "positionsValue": 2328645.91,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-16",
+      "patrimonyGross": 1510243.68,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1510243.68,
+      "cash": -1026478.93,
+      "positionsValue": 2328429.71,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-17",
+      "patrimonyGross": 1510027.47,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1510027.47,
+      "cash": -1026478.93,
+      "positionsValue": 2328213.5,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-18",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": -0.0001
+    },
+    {
+      "date": "2026-05-19",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-20",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-21",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-22",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-23",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-24",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-25",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-26",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-27",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-28",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-29",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-30",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-05-31",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-01",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-02",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-03",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-04",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-05",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-06",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-07",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-08",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-09",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-10",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-11",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-12",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-13",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-14",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-15",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-16",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-17",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-18",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-19",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-20",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-21",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-22",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-23",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-24",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-25",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-26",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-27",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-28",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-29",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-06-30",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-01",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-02",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-03",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-04",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-05",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-06",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-07",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-08",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-09",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-10",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-11",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-12",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-13",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-14",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-15",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-16",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-17",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-18",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-19",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-20",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-21",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-22",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-23",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-24",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-25",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-26",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-27",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-28",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-29",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-30",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-07-31",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-01",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-02",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-03",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-04",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-05",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-06",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-07",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-08",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-09",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-10",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-11",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-12",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-13",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-14",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-15",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-16",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-17",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-18",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-19",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-20",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-21",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-22",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-23",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-24",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-25",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-26",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-27",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-28",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-29",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-30",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-08-31",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-01",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-02",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-03",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-04",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-05",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-06",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-07",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-08",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-09",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-10",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-11",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-12",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-13",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-14",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-15",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-16",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-17",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-18",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-19",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-20",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-21",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-22",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-23",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-24",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-25",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-26",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-27",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-28",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-29",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-09-30",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-01",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-02",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-03",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-04",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-05",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-06",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-07",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-08",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-09",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-10",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-11",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-12",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-13",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-14",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-15",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-16",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-17",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-18",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-19",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-20",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-21",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-22",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-23",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-24",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-25",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-26",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-27",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-28",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-29",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-30",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-10-31",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-01",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-02",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-03",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-04",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-05",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-06",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-07",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-08",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-09",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-10",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-11",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-12",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-13",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-14",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-15",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-16",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-17",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-18",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-19",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-20",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-21",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-22",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-23",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-24",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-25",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-26",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-27",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-28",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-29",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-11-30",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-01",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-02",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-03",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-04",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-05",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-06",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-07",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-08",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-09",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-10",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-11",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-12",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-13",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-14",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-15",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-16",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-17",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-18",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-19",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-20",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-21",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-22",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-23",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-24",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-25",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-26",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-27",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-28",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-29",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-30",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    },
+    {
+      "date": "2026-12-31",
+      "patrimonyGross": 1509811.26,
+      "pendingSettlements": 0,
+      "scheduledCashPending": 0,
+      "patrimony": 1509811.26,
+      "cash": -1033208.22,
+      "positionsValue": 2334726.58,
+      "dailyReturn": 0
+    }
+  ],
+  "sharpe": {
+    "sharpe": 9.194,
+    "annualized": true,
+    "tradingDaysPerYear": 252,
+    "riskFreeAnnual": 0,
+    "observationDays": 364,
+    "meanDailyReturn": 0.000602,
+    "stdDailyReturn": 0.00104
+  },
+  "performance": {
+    "from": "2026-01-01",
+    "to": "2026-12-31",
+    "startPatrimony": 1227550.32,
+    "endPatrimony": 1509811.26,
+    "periodGainBrl": 200321.26,
+    "periodReturnSimple": 0.2299,
+    "periodReturnTwr": 0.1525,
+    "modifiedDietzReturn": 0.2446,
+    "totalExternalFlows": -15000,
+    "externalFlows": [
+      {
+        "date": "2026-02-25",
+        "amount": -10000,
+        "operation": "capital_withdrawal"
+      },
+      {
+        "date": "2026-03-17",
+        "amount": -5000,
+        "operation": "capital_withdrawal"
+      }
+    ],
+    "points": [
+      {
+        "date": "2026-01-01",
+        "patrimony": 1227550.32,
+        "externalFlow": 0,
+        "dailyReturnSimple": null,
+        "dailyReturnAdjusted": null,
+        "cumulativeReturnTwr": 0
+      },
+      {
+        "date": "2026-01-02",
+        "patrimony": 1230781.65,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0026
+      },
+      {
+        "date": "2026-01-03",
+        "patrimony": 1234012.97,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0052
+      },
+      {
+        "date": "2026-01-04",
+        "patrimony": 1237244.29,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0078
+      },
+      {
+        "date": "2026-01-05",
+        "patrimony": 1240475.61,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0104
+      },
+      {
+        "date": "2026-01-06",
+        "patrimony": 1243706.94,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0131
+      },
+      {
+        "date": "2026-01-07",
+        "patrimony": 1246938.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0157
+      },
+      {
+        "date": "2026-01-08",
+        "patrimony": 1250169.58,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0183
+      },
+      {
+        "date": "2026-01-09",
+        "patrimony": 1253400.9,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.021
+      },
+      {
+        "date": "2026-01-10",
+        "patrimony": 1256632.23,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0236
+      },
+      {
+        "date": "2026-01-11",
+        "patrimony": 1259863.55,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0263
+      },
+      {
+        "date": "2026-01-12",
+        "patrimony": 1263094.87,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.029
+      },
+      {
+        "date": "2026-01-13",
+        "patrimony": 1266326.19,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0317
+      },
+      {
+        "date": "2026-01-14",
+        "patrimony": 1269557.52,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0026,
+        "dailyReturnAdjusted": 0.0026,
+        "cumulativeReturnTwr": 0.0343
+      },
+      {
+        "date": "2026-01-15",
+        "patrimony": 1272788.84,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0369
+      },
+      {
+        "date": "2026-01-16",
+        "patrimony": 1276020.16,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0395
+      },
+      {
+        "date": "2026-01-17",
+        "patrimony": 1279251.48,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0421
+      },
+      {
+        "date": "2026-01-18",
+        "patrimony": 1282482.81,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0447
+      },
+      {
+        "date": "2026-01-19",
+        "patrimony": 1285714.13,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0473
+      },
+      {
+        "date": "2026-01-20",
+        "patrimony": 1288945.45,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0499
+      },
+      {
+        "date": "2026-01-21",
+        "patrimony": 1292176.77,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0526
+      },
+      {
+        "date": "2026-01-22",
+        "patrimony": 1295408.1,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0552
+      },
+      {
+        "date": "2026-01-23",
+        "patrimony": 1298639.42,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0578
+      },
+      {
+        "date": "2026-01-24",
+        "patrimony": 1301870.74,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0605
+      },
+      {
+        "date": "2026-01-25",
+        "patrimony": 1305102.06,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0631
+      },
+      {
+        "date": "2026-01-26",
+        "patrimony": 1308333.39,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0658
+      },
+      {
+        "date": "2026-01-27",
+        "patrimony": 1311564.71,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0685
+      },
+      {
+        "date": "2026-01-28",
+        "patrimony": 1314796.03,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0711
+      },
+      {
+        "date": "2026-01-29",
+        "patrimony": 1318027.35,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0738
+      },
+      {
+        "date": "2026-01-30",
+        "patrimony": 1321258.68,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0025,
+        "dailyReturnAdjusted": 0.0025,
+        "cumulativeReturnTwr": 0.0765
+      },
+      {
+        "date": "2026-01-31",
+        "patrimony": 1324490,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0024,
+        "dailyReturnAdjusted": 0.0024,
+        "cumulativeReturnTwr": 0.0791
+      },
+      {
+        "date": "2026-02-01",
+        "patrimony": 1325285.04,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0797
+      },
+      {
+        "date": "2026-02-02",
+        "patrimony": 1326080.07,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0804
+      },
+      {
+        "date": "2026-02-03",
+        "patrimony": 1326875.11,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.081
+      },
+      {
+        "date": "2026-02-04",
+        "patrimony": 1327670.14,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0817
+      },
+      {
+        "date": "2026-02-05",
+        "patrimony": 1328465.18,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0823
+      },
+      {
+        "date": "2026-02-06",
+        "patrimony": 1329260.21,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.083
+      },
+      {
+        "date": "2026-02-07",
+        "patrimony": 1330055.25,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0836
+      },
+      {
+        "date": "2026-02-08",
+        "patrimony": 1330850.29,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0843
+      },
+      {
+        "date": "2026-02-09",
+        "patrimony": 1331645.32,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0849
+      },
+      {
+        "date": "2026-02-10",
+        "patrimony": 1332440.36,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0856
+      },
+      {
+        "date": "2026-02-11",
+        "patrimony": 1333235.39,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0862
+      },
+      {
+        "date": "2026-02-12",
+        "patrimony": 1334030.43,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0869
+      },
+      {
+        "date": "2026-02-13",
+        "patrimony": 1334825.46,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0875
+      },
+      {
+        "date": "2026-02-14",
+        "patrimony": 1335620.5,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0882
+      },
+      {
+        "date": "2026-02-15",
+        "patrimony": 1336415.54,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0888
+      },
+      {
+        "date": "2026-02-16",
+        "patrimony": 1337210.57,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0895
+      },
+      {
+        "date": "2026-02-17",
+        "patrimony": 1338005.61,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0901
+      },
+      {
+        "date": "2026-02-18",
+        "patrimony": 1338800.64,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0908
+      },
+      {
+        "date": "2026-02-19",
+        "patrimony": 1339595.68,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0914
+      },
+      {
+        "date": "2026-02-20",
+        "patrimony": 1340390.71,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0921
+      },
+      {
+        "date": "2026-02-21",
+        "patrimony": 1341185.75,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0928
+      },
+      {
+        "date": "2026-02-22",
+        "patrimony": 1341980.79,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0934
+      },
+      {
+        "date": "2026-02-23",
+        "patrimony": 1342775.82,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0941
+      },
+      {
+        "date": "2026-02-24",
+        "patrimony": 1343570.86,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.0947
+      },
+      {
+        "date": "2026-02-25",
+        "patrimony": 1344365.89,
+        "externalFlow": -10000,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.008,
+        "cumulativeReturnTwr": 0.1035
+      },
+      {
+        "date": "2026-02-26",
+        "patrimony": 1345160.93,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.1041
+      },
+      {
+        "date": "2026-02-27",
+        "patrimony": 1345955.96,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.1048
+      },
+      {
+        "date": "2026-02-28",
+        "patrimony": 1346751,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0006,
+        "dailyReturnAdjusted": 0.0006,
+        "cumulativeReturnTwr": 0.1055
+      },
+      {
+        "date": "2026-03-01",
+        "patrimony": 1348905.23,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1072
+      },
+      {
+        "date": "2026-03-02",
+        "patrimony": 1351059.45,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.109
+      },
+      {
+        "date": "2026-03-03",
+        "patrimony": 1353213.68,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1108
+      },
+      {
+        "date": "2026-03-04",
+        "patrimony": 1355367.9,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1126
+      },
+      {
+        "date": "2026-03-05",
+        "patrimony": 1357522.13,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1143
+      },
+      {
+        "date": "2026-03-06",
+        "patrimony": 1359676.35,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1161
+      },
+      {
+        "date": "2026-03-07",
+        "patrimony": 1361830.58,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1179
+      },
+      {
+        "date": "2026-03-08",
+        "patrimony": 1363984.81,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1197
+      },
+      {
+        "date": "2026-03-09",
+        "patrimony": 1366139.03,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1215
+      },
+      {
+        "date": "2026-03-10",
+        "patrimony": 1368293.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1233
+      },
+      {
+        "date": "2026-03-11",
+        "patrimony": 1370447.48,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1251
+      },
+      {
+        "date": "2026-03-12",
+        "patrimony": 1372601.71,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1269
+      },
+      {
+        "date": "2026-03-13",
+        "patrimony": 1374755.94,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1287
+      },
+      {
+        "date": "2026-03-14",
+        "patrimony": 1376910.16,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1305
+      },
+      {
+        "date": "2026-03-15",
+        "patrimony": 1379064.39,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1323
+      },
+      {
+        "date": "2026-03-16",
+        "patrimony": 1381218.61,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1341
+      },
+      {
+        "date": "2026-03-17",
+        "patrimony": 1383372.84,
+        "externalFlow": -5000,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0052,
+        "cumulativeReturnTwr": 0.14
+      },
+      {
+        "date": "2026-03-18",
+        "patrimony": 1385527.06,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1418
+      },
+      {
+        "date": "2026-03-19",
+        "patrimony": 1387681.29,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1437
+      },
+      {
+        "date": "2026-03-20",
+        "patrimony": 1389835.52,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0016,
+        "dailyReturnAdjusted": 0.0016,
+        "cumulativeReturnTwr": 0.1455
+      },
+      {
+        "date": "2026-03-21",
+        "patrimony": 1391989.74,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1472
+      },
+      {
+        "date": "2026-03-22",
+        "patrimony": 1394143.97,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1489
+      },
+      {
+        "date": "2026-03-23",
+        "patrimony": 1396298.19,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1506
+      },
+      {
+        "date": "2026-03-24",
+        "patrimony": 1398452.42,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1524
+      },
+      {
+        "date": "2026-03-25",
+        "patrimony": 1400606.65,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1541
+      },
+      {
+        "date": "2026-03-26",
+        "patrimony": 1402760.87,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1558
+      },
+      {
+        "date": "2026-03-27",
+        "patrimony": 1404915.1,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1576
+      },
+      {
+        "date": "2026-03-28",
+        "patrimony": 1407069.32,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1593
+      },
+      {
+        "date": "2026-03-29",
+        "patrimony": 1409223.55,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.161
+      },
+      {
+        "date": "2026-03-30",
+        "patrimony": 1411377.77,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1628
+      },
+      {
+        "date": "2026-03-31",
+        "patrimony": 1413532,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0015,
+        "dailyReturnAdjusted": 0.0015,
+        "cumulativeReturnTwr": 0.1645
+      },
+      {
+        "date": "2026-04-01",
+        "patrimony": 1416871.03,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0024,
+        "dailyReturnAdjusted": 0.0024,
+        "cumulativeReturnTwr": 0.1673
+      },
+      {
+        "date": "2026-04-02",
+        "patrimony": 1420210.07,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0024,
+        "dailyReturnAdjusted": 0.0024,
+        "cumulativeReturnTwr": 0.1701
+      },
+      {
+        "date": "2026-04-03",
+        "patrimony": 1423549.1,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0024,
+        "dailyReturnAdjusted": 0.0024,
+        "cumulativeReturnTwr": 0.1729
+      },
+      {
+        "date": "2026-04-04",
+        "patrimony": 1426888.13,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.1756
+      },
+      {
+        "date": "2026-04-05",
+        "patrimony": 1430227.17,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.1783
+      },
+      {
+        "date": "2026-04-06",
+        "patrimony": 1433566.2,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.181
+      },
+      {
+        "date": "2026-04-07",
+        "patrimony": 1436905.23,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.1838
+      },
+      {
+        "date": "2026-04-08",
+        "patrimony": 1440244.27,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.1865
+      },
+      {
+        "date": "2026-04-09",
+        "patrimony": 1443583.3,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.1892
+      },
+      {
+        "date": "2026-04-10",
+        "patrimony": 1446922.33,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.1919
+      },
+      {
+        "date": "2026-04-11",
+        "patrimony": 1450261.37,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.1947
+      },
+      {
+        "date": "2026-04-12",
+        "patrimony": 1453600.4,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.1974
+      },
+      {
+        "date": "2026-04-13",
+        "patrimony": 1456939.43,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.2002
+      },
+      {
+        "date": "2026-04-14",
+        "patrimony": 1460278.47,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.203
+      },
+      {
+        "date": "2026-04-15",
+        "patrimony": 1463617.5,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.2057
+      },
+      {
+        "date": "2026-04-16",
+        "patrimony": 1466956.53,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.2085
+      },
+      {
+        "date": "2026-04-17",
+        "patrimony": 1470295.57,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.2113
+      },
+      {
+        "date": "2026-04-18",
+        "patrimony": 1473634.6,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.2141
+      },
+      {
+        "date": "2026-04-19",
+        "patrimony": 1476973.63,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.2169
+      },
+      {
+        "date": "2026-04-20",
+        "patrimony": 1480312.67,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.2196
+      },
+      {
+        "date": "2026-04-21",
+        "patrimony": 1483651.7,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.2225
+      },
+      {
+        "date": "2026-04-22",
+        "patrimony": 1486990.73,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0023,
+        "dailyReturnAdjusted": 0.0023,
+        "cumulativeReturnTwr": 0.2253
+      },
+      {
+        "date": "2026-04-23",
+        "patrimony": 1490329.77,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0022,
+        "dailyReturnAdjusted": 0.0022,
+        "cumulativeReturnTwr": 0.228
+      },
+      {
+        "date": "2026-04-24",
+        "patrimony": 1493668.8,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0022,
+        "dailyReturnAdjusted": 0.0022,
+        "cumulativeReturnTwr": 0.2307
+      },
+      {
+        "date": "2026-04-25",
+        "patrimony": 1497007.83,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0022,
+        "dailyReturnAdjusted": 0.0022,
+        "cumulativeReturnTwr": 0.2334
+      },
+      {
+        "date": "2026-04-26",
+        "patrimony": 1500346.87,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0022,
+        "dailyReturnAdjusted": 0.0022,
+        "cumulativeReturnTwr": 0.2361
+      },
+      {
+        "date": "2026-04-27",
+        "patrimony": 1503685.9,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0022,
+        "dailyReturnAdjusted": 0.0022,
+        "cumulativeReturnTwr": 0.2388
+      },
+      {
+        "date": "2026-04-28",
+        "patrimony": 1507024.93,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0022,
+        "dailyReturnAdjusted": 0.0022,
+        "cumulativeReturnTwr": 0.2415
+      },
+      {
+        "date": "2026-04-29",
+        "patrimony": 1510363.97,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0022,
+        "dailyReturnAdjusted": 0.0022,
+        "cumulativeReturnTwr": 0.2443
+      },
+      {
+        "date": "2026-04-30",
+        "patrimony": 1513703,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0.0022,
+        "dailyReturnAdjusted": 0.0022,
+        "cumulativeReturnTwr": 0.247
+      },
+      {
+        "date": "2026-05-01",
+        "patrimony": 1513486.79,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2469
+      },
+      {
+        "date": "2026-05-02",
+        "patrimony": 1513270.58,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2467
+      },
+      {
+        "date": "2026-05-03",
+        "patrimony": 1513054.38,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2466
+      },
+      {
+        "date": "2026-05-04",
+        "patrimony": 1512838.17,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2465
+      },
+      {
+        "date": "2026-05-05",
+        "patrimony": 1512621.96,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2464
+      },
+      {
+        "date": "2026-05-06",
+        "patrimony": 1512405.75,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2462
+      },
+      {
+        "date": "2026-05-07",
+        "patrimony": 1512189.55,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2461
+      },
+      {
+        "date": "2026-05-08",
+        "patrimony": 1511973.34,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.246
+      },
+      {
+        "date": "2026-05-09",
+        "patrimony": 1511757.13,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2459
+      },
+      {
+        "date": "2026-05-10",
+        "patrimony": 1511540.92,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2458
+      },
+      {
+        "date": "2026-05-11",
+        "patrimony": 1511324.71,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2456
+      },
+      {
+        "date": "2026-05-12",
+        "patrimony": 1511108.51,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2455
+      },
+      {
+        "date": "2026-05-13",
+        "patrimony": 1510892.3,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2454
+      },
+      {
+        "date": "2026-05-14",
+        "patrimony": 1510676.09,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2453
+      },
+      {
+        "date": "2026-05-15",
+        "patrimony": 1510459.88,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2451
+      },
+      {
+        "date": "2026-05-16",
+        "patrimony": 1510243.68,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.245
+      },
+      {
+        "date": "2026-05-17",
+        "patrimony": 1510027.47,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2449
+      },
+      {
+        "date": "2026-05-18",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": -0.0001,
+        "dailyReturnAdjusted": -0.0001,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-19",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-20",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-21",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-22",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-23",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-24",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-25",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-26",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-27",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-28",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-29",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-30",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-05-31",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-01",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-02",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-03",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-04",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-05",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-06",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-07",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-08",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-09",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-10",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-11",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-12",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-13",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-14",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-15",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-16",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-17",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-18",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-19",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-20",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-21",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-22",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-23",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-24",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-25",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-26",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-27",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-28",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-29",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-06-30",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-01",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-02",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-03",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-04",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-05",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-06",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-07",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-08",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-09",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-10",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-11",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-12",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-13",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-14",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-15",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-16",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-17",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-18",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-19",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-20",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-21",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-22",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-23",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-24",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-25",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-26",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-27",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-28",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-29",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-30",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-07-31",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-01",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-02",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-03",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-04",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-05",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-06",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-07",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-08",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-09",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-10",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-11",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-12",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-13",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-14",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-15",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-16",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-17",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-18",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-19",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-20",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-21",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-22",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-23",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-24",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-25",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-26",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-27",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-28",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-29",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-30",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-08-31",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-01",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-02",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-03",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-04",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-05",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-06",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-07",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-08",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-09",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-10",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-11",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-12",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-13",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-14",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-15",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-16",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-17",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-18",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-19",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-20",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-21",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-22",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-23",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-24",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-25",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-26",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-27",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-28",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-29",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-09-30",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-01",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-02",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-03",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-04",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-05",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-06",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-07",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-08",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-09",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-10",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-11",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-12",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-13",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-14",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-15",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-16",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-17",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-18",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-19",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-20",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-21",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-22",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-23",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-24",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-25",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-26",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-27",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-28",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-29",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-30",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-10-31",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-01",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-02",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-03",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-04",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-05",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-06",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-07",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-08",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-09",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-10",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-11",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-12",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-13",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-14",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-15",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-16",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-17",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-18",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-19",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-20",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-21",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-22",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-23",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-24",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-25",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-26",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-27",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-28",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-29",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-11-30",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-01",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-02",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-03",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-04",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-05",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-06",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-07",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-08",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-09",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-10",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-11",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-12",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-13",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-14",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-15",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-16",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-17",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-18",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-19",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-20",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-21",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-22",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-23",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-24",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-25",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-26",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-27",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-28",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-29",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-30",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      },
+      {
+        "date": "2026-12-31",
+        "patrimony": 1509811.26,
+        "externalFlow": 0,
+        "dailyReturnSimple": 0,
+        "dailyReturnAdjusted": 0,
+        "cumulativeReturnTwr": 0.2448
+      }
+    ],
+    "periodReturnTwrDaily": 0.2448,
+    "monthAnchorTwr": 0.1525,
+    "monthAnchorBreakdown": [
+      {
+        "periodEnd": "2026-02-28",
+        "startPatrimony": 1324490,
+        "endPatrimony": 1346751,
+        "externalFlows": -10000,
+        "periodReturn": 0.0244
+      },
+      {
+        "periodEnd": "2026-03-31",
+        "startPatrimony": 1346751,
+        "endPatrimony": 1413532,
+        "externalFlows": -5000,
+        "periodReturn": 0.0533
+      },
+      {
+        "periodEnd": "2026-04-30",
+        "startPatrimony": 1413532,
+        "endPatrimony": 1513703,
+        "externalFlows": 0,
+        "periodReturn": 0.0709
+      },
+      {
+        "periodEnd": "2026-05-18",
+        "startPatrimony": 1513703,
+        "endPatrimony": 1509811.26,
+        "externalFlows": 0,
+        "periodReturn": -0.0026
+      },
+      {
+        "periodEnd": "2026-05-19",
+        "startPatrimony": 1509811.26,
+        "endPatrimony": 1509811.26,
+        "externalFlows": 0,
+        "periodReturn": 0
+      },
+      {
+        "periodEnd": "2026-05-31",
+        "startPatrimony": 1509811.26,
+        "endPatrimony": 1509811.26,
+        "externalFlows": 0,
+        "periodReturn": 0
+      },
+      {
+        "periodEnd": "2026-12-31",
+        "startPatrimony": 1509811.26,
+        "endPatrimony": 1509811.26,
+        "externalFlows": 0,
+        "periodReturn": 0
+      }
+    ]
+  },
+  "meta": {
+    "method": "mtm_btg_calibrated",
+    "stock_cash_settlement_days": 0,
+    "note": "Patrimônio econômico: posições × cotação atual + caixa (sem ajustes CASH-RECON). TWR diário: só capital_deposit/withdrawal como fluxo externo. Cotações históricas diárias ainda não importadas — rentab. pode divergir do BTG."
+  }
+}

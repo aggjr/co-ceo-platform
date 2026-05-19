@@ -1,0 +1,17 @@
+:root {
+  --color-primary: #00425f;
+  --color-secondary: #202451;
+  --color-accent: #dab177;
+  --color-accent-hover: #c59d65;
+  --color-bg: #0b1120;
+  --color-surface: #1e293b;
+  --color-surface-hover: #112942;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-text: #ffffff;
+  --color-text-muted: #94a3b8;
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --font: 'Montserrat', system-ui, sans-serif;
+  --radius: 12px;
+  --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+}

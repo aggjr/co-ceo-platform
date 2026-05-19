@@ -1,0 +1,38 @@
+.sgp-page .sgp-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.sgp-page .sgp-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-muted, #94a3b8);
+}
+
+.sgp-up {
+  color: #4ade80;
+}
+
+.sgp-down {
+  color: #f87171;
+}
+
+.sgp-total-col {
+  font-weight: 600;
+}
+
+tr.sgp-totals-row td {
+  border-top: 2px solid rgba(218, 177, 119, 0.45);
+  background: rgba(218, 177, 119, 0.08);
+  font-weight: 600;
+}
+
+.sgp-page .coceo-excel-grid-host .table-wrapper,
+.sgp-page .excel-table {
+  min-width: 1400px;
+}

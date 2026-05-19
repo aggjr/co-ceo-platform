@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "model": "risk-by-functionality",
+  "summary": "Cada unidade tem meta própria conforme criticidade e funcionalidades que o código afeta. Não existe meta global única de 80%.",
+  "units": {
+    "core.dal": {
+      "lifecycle": "active",
+      "criticality": "P0",
+      "rationale": "Gateway e DAL interferem em persistência, audit, hodômetro e isolamento de todos os módulos.",
+      "functionalities": [
+        { "id": "tenant-isolation", "label": "Isolamento hierárquico (path)" },
+        { "id": "audit-trail", "label": "Audit_logs na mesma transação" },
+        { "id": "storage-meter", "label": "Hodômetro de armazenamento" },
+        { "id": "soft-delete", "label": "Soft delete transacional" }
+      ],
+      "targets": {
+        "lineCoveragePct": 85,
+        "minTestCases": 10,
+        "minTestFiles": 4
+      }
+    },
+    "core.auth": {
+      "lifecycle": "active",
+      "criticality": "P0",
+      "rationale": "Auth, JWT, impersonation e RBAC bloqueiam ou liberam todo o produto.",
+      "functionalities": [
+        { "id": "login", "label": "Login e contexto de sessão" },
+        { "id": "impersonation", "label": "Emulação (cliente e plataforma)" },
+        { "id": "rbac", "label": "Permissões e papéis (RBAC)" },
+        { "id": "api-security", "label": "Middleware de proteção de rotas" }
+      ],
+      "targets": {
+        "lineCoveragePct": 80,
+        "minTestCases": 10,
+        "minTestFiles": 5
+      }
+    },
+    "core.telemetry": {
+      "lifecycle": "active",
+      "criticality": "P2",
+      "rationale": "Telemetria não altera dados de negócio; falha não impede operação, mas afeta observabilidade.",
+      "functionalities": [
+        { "id": "usage-tracking", "label": "Rastreio de uso de telas/ações" }
+      ],
+      "targets": {
+        "lineCoveragePct": 60,
+        "minTestCases": 2,
+        "minTestFiles": 1
+      }
+    },
+    "cockpit.api": {
+      "lifecycle": "active",
+      "criticality": "P1",
+      "rationale": "Cockpit expõe IAM, contratos e árvore organizacional para admin cliente e plataforma.",
+      "functionalities": [
+        { "id": "cockpit-iam", "label": "IAM e matriz de acesso" },
+        { "id": "org-tree", "label": "Árvore organizacional" },
+        { "id": "contract-admin", "label": "Gestão de contratos (plataforma)" }
+      ],
+      "targets": {
+        "lineCoveragePct": 70,
+        "minTestCases": 5,
+        "minTestFiles": 2
+      }
+    },
+    "core.quality": {
+      "lifecycle": "active",
+      "criticality": "P2",
+      "rationale": "Painel e scripts de regressão — falha não derruba produção, mas impede visibilidade de qualidade.",
+      "functionalities": [
+        { "id": "regression-report", "label": "Relatório regression-latest.json" },
+        { "id": "coverage-policy", "label": "Metas por unidade (coverage-policy)" },
+        { "id": "impact-analysis", "label": "Reteste parcial por git diff" },
+        { "id": "quality-dashboard", "label": "API / Cockpit Qualidade" }
+      ],
+      "targets": {
+        "lineCoveragePct": 50,
+        "minTestCases": 6,
+        "minTestFiles": 2
+      }
+    },
+    "invest": {
+      "lifecycle": "planned",
+      "criticality": "P1",
+      "rationale": "INVEST em construção — metas entram em vigor no go-live do módulo.",
+      "functionalities": [
+        { "id": "ledger", "label": "Livro razão / preço médio" },
+        { "id": "custody", "label": "Custódia" },
+        { "id": "snapshots", "label": "Snapshots diários" }
+      ],
+      "targets": {
+        "lineCoveragePct": 75,
+        "minTestCases": 8,
+        "minTestFiles": 3
+      }
+    }
+  }
+}

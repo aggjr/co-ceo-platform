@@ -1,0 +1,4 @@
+-- DEPRECATED: use o seed TypeScript (CoCeoDataGateway + SYSTEM_INSTALLER):
+--   npx ts-node src/database/seeds/005_iam_catalog.ts
+--
+-- Este arquivo permanece apenas como referência histórica. Não execute INSERTs diretos em produção.

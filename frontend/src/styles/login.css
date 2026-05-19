@@ -1,0 +1,200 @@
+/* Visual oficial — espelhado de src/frontend/login_preview.html */
+.login-screen,
+.login-screen * {
+  box-sizing: border-box;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.login-screen {
+  --color-primary: #00425f;
+  --color-secondary: #202451;
+  --color-accent: #dab177;
+  --color-bg: #0b1120;
+  --color-text: #ffffff;
+  --color-text-muted: #cbd5e1;
+  min-height: 100vh;
+  background: radial-gradient(circle at 10% 10%, #1e293b, var(--color-bg) 60%);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.login-screen .bg-shape {
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 66, 95, 0.2) 0%, rgba(0, 0, 0, 0) 70%);
+  top: -100px;
+  right: -100px;
+  z-index: 0;
+}
+
+.login-screen .card-version {
+  margin: 24px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.login-screen .login-card {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(218, 177, 119, 0.15);
+  border-radius: 16px;
+  padding: 50px 40px;
+  width: 100%;
+  max-width: 420px;
+  z-index: 10;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.login-screen .logo-container {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.login-screen .logo {
+  font-size: 38px;
+  font-weight: 800;
+  color: var(--color-text);
+  letter-spacing: 3px;
+  margin-bottom: 5px;
+}
+
+.login-screen .logo span {
+  color: var(--color-accent);
+}
+
+.login-screen .subtitle {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.login-screen .form-group {
+  margin-bottom: 22px;
+  position: relative;
+}
+
+.login-screen .form-group label {
+  display: block;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.login-screen .form-control {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--color-text);
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  outline: none;
+  font-family: inherit;
+}
+
+.login-screen .form-control::placeholder {
+  color: #94a3b8;
+  opacity: 0.7;
+}
+
+.login-screen .form-control:focus {
+  border-color: var(--color-accent);
+  background: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 0 0 3px rgba(218, 177, 119, 0.1);
+}
+
+.login-screen .password-toggle {
+  position: absolute;
+  right: 15px;
+  top: 36px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+
+.login-screen .password-toggle:hover {
+  color: var(--color-accent);
+}
+
+.login-screen .btn-login {
+  width: 100%;
+  background: linear-gradient(90deg, var(--color-primary) 0%, #005a80 100%);
+  color: white;
+  border: none;
+  padding: 14px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 66, 95, 0.4);
+  letter-spacing: 1px;
+  font-family: inherit;
+}
+
+.login-screen .btn-login:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 66, 95, 0.6);
+  background: linear-gradient(90deg, #005a80 0%, var(--color-primary) 100%);
+}
+
+.login-screen .btn-login:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.login-screen .card-footer {
+  margin-top: 30px;
+  margin-bottom: 0;
+  text-align: center;
+  font-size: 13px;
+}
+
+.login-screen .card-footer a {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  transition: color 0.2s;
+  font-weight: 500;
+}
+
+.login-screen .card-footer a:hover {
+  color: var(--color-accent);
+}
+
+.login-screen .separator {
+  color: rgba(255, 255, 255, 0.1);
+  margin: 0 10px;
+}
+
+.login-screen .login-error {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fecaca;
+  font-size: 13px;
+}
+
+.login-screen #context-form {
+  margin-top: 8px;
+}

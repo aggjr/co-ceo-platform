@@ -1,0 +1,258 @@
+/**
+ * Consultas SELECT pré-aprovadas — único caminho para leituras complexas (joins).
+ * Não adicionar SQL dinâmico fora deste catálogo.
+ */
+export type GatewayReadQueryKey =
+  | 'auth_user_by_email'
+  | 'auth_user_contexts'
+  | 'auth_user_context_by_id'
+  | 'auth_role_permissions'
+  | 'quality_regression_runs'
+  | 'cockpit_list_contracts'
+  | 'cockpit_contract_by_id'
+  | 'cockpit_contract_members'
+  | 'cockpit_contract_roles'
+  | 'cockpit_contract_modules'
+  | 'cockpit_contract_impersonation_targets'
+  | 'cockpit_contract_iam_audit'
+  | 'cockpit_role_permissions'
+  | 'cockpit_role_resources'
+  | 'cockpit_role_field_policies'
+  | 'cockpit_platform_org_tree'
+  | 'cockpit_client_org_tree'
+  | 'cockpit_impersonation_targets'
+  | 'cockpit_contract_team'
+  | 'invest_ledger_with_assets'
+  | 'invest_ledger_note_refs'
+  | 'invest_portfolio_daily_range'
+  | 'invest_portfolio_daily_before';
+
+export interface GatewayReadQueryDef {
+  sql: string;
+  /** Exige escopo global (plataforma co-CEO). */
+  requiresGlobalScope?: boolean;
+  /** Somente SYSTEM_INSTALLER (login, seeds, resolução de permissões internas). */
+  bootstrapOnly?: boolean;
+}
+
+export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryDef> = {
+  auth_user_by_email: {
+    bootstrapOnly: true,
+    sql: `SELECT id, email, password_hash, full_name, is_active
+          FROM users WHERE email = ? AND deleted_at IS NULL`,
+  },
+  auth_user_contexts: {
+    bootstrapOnly: true,
+    sql: `SELECT ur.id AS user_role_id, ur.is_primary, ur.contract_id, ur.organization_id,
+                 r.id AS role_id, r.code AS role_code, r.name AS role_name, r.scope, r.perm_version,
+                 o.name AS organization_name,
+                 c.id AS contract_exists,
+                 org_root.name AS contract_org_name
+          FROM user_roles ur
+          INNER JOIN roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
+          LEFT JOIN organizations o ON o.id = ur.organization_id
+          LEFT JOIN contracts c ON c.id = ur.contract_id AND c.deleted_at IS NULL
+          LEFT JOIN organizations org_root ON org_root.id = c.organization_id
+          WHERE ur.user_id = ? AND ur.deleted_at IS NULL
+          ORDER BY ur.is_primary DESC, r.name`,
+  },
+  auth_user_context_by_id: {
+    bootstrapOnly: true,
+    sql: `SELECT ur.id AS user_role_id, ur.is_primary, ur.contract_id, ur.organization_id,
+                 r.id AS role_id, r.code AS role_code, r.name AS role_name, r.scope, r.perm_version,
+                 o.name AS organization_name, org_root.name AS contract_org_name
+          FROM user_roles ur
+          INNER JOIN roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
+          LEFT JOIN organizations o ON o.id = ur.organization_id
+          LEFT JOIN contracts c ON c.id = ur.contract_id
+          LEFT JOIN organizations org_root ON org_root.id = c.organization_id
+          WHERE ur.id = ? AND ur.deleted_at IS NULL`,
+  },
+  auth_role_permissions: {
+    bootstrapOnly: true,
+    sql: `SELECT p.code FROM role_permissions rp
+          INNER JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = ?`,
+  },
+  quality_regression_runs: {
+    bootstrapOnly: true,
+    sql: `SELECT id, run_mode, status, triggered_by_user_id, git_branch, git_commit,
+                 total_tests, passed, failed, skipped, coverage_lines_pct, impact_skipped, created_at
+          FROM quality_test_runs
+          ORDER BY created_at DESC
+          LIMIT ?`,
+  },
+  cockpit_list_contracts: {
+    sql: `SELECT c.id, c.organization_id, c.status, c.contract_start_date,
+                 o.name AS organization_name, o.storage_bytes_used, o.plan_storage_limit_bytes
+          FROM contracts c
+          INNER JOIN organizations o ON o.id = c.organization_id
+          WHERE c.deleted_at IS NULL
+          ORDER BY o.name`,
+    requiresGlobalScope: true,
+  },
+  cockpit_contract_by_id: {
+    sql: `SELECT c.*, o.name AS organization_name, o.storage_bytes_used, o.plan_storage_limit_bytes
+          FROM contracts c
+          INNER JOIN organizations o ON o.id = c.organization_id
+          WHERE c.id = ? AND c.deleted_at IS NULL`,
+  },
+  cockpit_contract_members: {
+    sql: `SELECT cu.*, u.email, u.full_name
+          FROM contract_users cu
+          INNER JOIN users u ON u.id = cu.user_id
+          WHERE cu.contract_id = ?`,
+  },
+  cockpit_contract_roles: {
+    sql: `SELECT DISTINCT r.id, r.code, r.name, r.scope
+          FROM user_roles ur
+          INNER JOIN roles r ON r.id = ur.role_id
+          WHERE ur.contract_id = ? AND ur.deleted_at IS NULL`,
+  },
+  cockpit_contract_modules: {
+    sql: `SELECT module_code, status FROM contract_modules WHERE contract_id = ?`,
+  },
+  cockpit_contract_impersonation_targets: {
+    sql: `SELECT ur.id AS user_role_id, u.id AS user_id, u.email, u.full_name,
+                 r.name AS role_name, ur.organization_id
+          FROM user_roles ur
+          INNER JOIN users u ON u.id = ur.user_id AND u.deleted_at IS NULL
+          INNER JOIN roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
+          WHERE ur.contract_id = ? AND ur.deleted_at IS NULL
+          ORDER BY u.full_name`,
+  },
+  cockpit_contract_iam_audit: {
+    sql: `SELECT * FROM iam_config_audit WHERE contract_id = ?
+          ORDER BY created_at DESC LIMIT 50`,
+  },
+  cockpit_role_permissions: {
+    sql: `SELECT p.code FROM role_permissions rp
+          INNER JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = ?`,
+  },
+  cockpit_role_resources: {
+    sql: `SELECT ar.resource_key, ar.resource_type, ar.label, rrg.effect
+          FROM role_resource_grants rrg
+          INNER JOIN access_resources ar ON ar.id = rrg.resource_id
+          WHERE rrg.role_id = ?`,
+  },
+  cockpit_role_field_policies: {
+    sql: `SELECT table_name, field_name, permission_type, organization_id
+          FROM field_permissions WHERE role_id = ?`,
+  },
+  cockpit_platform_org_tree: {
+    sql: `SELECT o.id, o.parent_id, o.name, o.type, o.path,
+                 c.id AS contract_id,
+                 root.name AS contract_root_name
+          FROM contracts c
+          INNER JOIN organizations root ON root.id = c.organization_id AND root.deleted_at IS NULL
+          INNER JOIN organizations o ON (o.path = root.path OR o.path LIKE CONCAT(root.path, '%'))
+            AND o.deleted_at IS NULL
+          WHERE c.deleted_at IS NULL
+          ORDER BY c.id, o.path`,
+    requiresGlobalScope: true,
+  },
+  cockpit_client_org_tree: {
+    sql: `SELECT o.id, o.parent_id, o.name, o.type, o.path,
+                 ? AS contract_id,
+                 root.name AS contract_root_name
+          FROM contracts c
+          INNER JOIN organizations root ON root.id = c.organization_id
+          INNER JOIN organizations o ON (o.path = ? OR o.path LIKE CONCAT(?, '%')) AND o.deleted_at IS NULL
+          WHERE c.id = ? AND c.deleted_at IS NULL
+          ORDER BY o.path`,
+  },
+  cockpit_impersonation_targets: {
+    sql: `SELECT ur.id AS user_role_id, u.id AS user_id, u.email, u.full_name,
+                 r.name AS role_name, r.code AS role_code, ur.organization_id
+          FROM user_roles ur
+          INNER JOIN users u ON u.id = ur.user_id AND u.deleted_at IS NULL AND u.is_active = TRUE
+          INNER JOIN roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
+          WHERE ur.contract_id = ?
+            AND ur.deleted_at IS NULL
+            AND (
+              ur.organization_id = ?
+              OR (
+                ur.organization_id IS NULL
+                AND EXISTS (
+                  SELECT 1 FROM contract_users cu
+                  WHERE cu.contract_id = ur.contract_id
+                    AND cu.user_id = ur.user_id
+                    AND cu.default_organization_id = ?
+                )
+              )
+              OR (
+                ur.organization_id IS NOT NULL
+                AND EXISTS (
+                  SELECT 1 FROM organizations anchor
+                  INNER JOIN organizations member ON member.id = ur.organization_id
+                    AND member.deleted_at IS NULL
+                  WHERE anchor.id = ?
+                    AND anchor.deleted_at IS NULL
+                    AND (member.path = anchor.path OR member.path LIKE CONCAT(anchor.path, '%'))
+                )
+              )
+            )
+            AND (? IS NULL OR u.id <> ?)
+            AND (
+              ? = FALSE
+              OR ur.role_id NOT IN (
+                SELECT rp.role_id
+                FROM role_permissions rp
+                INNER JOIN permissions p ON p.id = rp.permission_id
+                WHERE p.code = 'cockpit:impersonate:execute'
+              )
+            )
+          ORDER BY u.full_name, u.email`,
+  },
+  cockpit_contract_team: {
+    sql: `SELECT cu.user_id, cu.status, cu.default_organization_id, u.email, u.full_name,
+                 GROUP_CONCAT(DISTINCT r.name SEPARATOR ', ') AS roles
+          FROM contract_users cu
+          INNER JOIN users u ON u.id = cu.user_id
+          LEFT JOIN user_roles ur ON ur.user_id = cu.user_id AND ur.contract_id = cu.contract_id AND ur.deleted_at IS NULL
+          LEFT JOIN roles r ON r.id = ur.role_id
+          WHERE cu.contract_id = ?
+          GROUP BY cu.user_id, cu.status, cu.default_organization_id, u.email, u.full_name`,
+  },
+  invest_ledger_with_assets: {
+    sql: `SELECT e.id, e.organization_id, e.asset_id, e.underlying_ticker, e.transaction_date,
+                 e.transaction_type, e.quantity, e.unit_price, e.total_gross_value,
+                 e.brokerage_fee, e.b3_fees, e.irrf_tax, e.total_net_value,
+                 e.impacts_managerial_price, e.broker_note_ref, e.notes, e.created_at,
+                 a.asset_ticker, a.asset_type
+          FROM invest_ledger_entries e
+          INNER JOIN invest_assets a ON a.id = e.asset_id AND a.deleted_at IS NULL
+          WHERE e.organization_id = ?
+            AND e.transaction_date >= ?
+            AND e.transaction_date <= ?
+            AND e.deleted_at IS NULL
+          ORDER BY e.transaction_date ASC, e.created_at ASC`,
+  },
+  invest_ledger_note_refs: {
+    sql: `SELECT DISTINCT broker_note_ref
+          FROM invest_ledger_entries
+          WHERE organization_id = ?
+            AND broker_note_ref IS NOT NULL
+            AND broker_note_ref <> ''
+            AND deleted_at IS NULL`,
+  },
+  invest_portfolio_daily_range: {
+    sql: `SELECT id, organization_id, snapshot_date, patrimony, patrimony_gross, cash,
+                 positions_value, pending_settlements, fixed_income_total, external_flow,
+                 daily_return_simple, daily_return_twr, cumulative_twr, quotes_as_of, source, metadata
+          FROM invest_portfolio_daily
+          WHERE organization_id = ?
+            AND snapshot_date >= ?
+            AND snapshot_date <= ?
+          ORDER BY snapshot_date ASC`,
+  },
+  invest_portfolio_daily_before: {
+    sql: `SELECT id, organization_id, snapshot_date, patrimony, patrimony_gross, cash,
+                 positions_value, pending_settlements, fixed_income_total, external_flow,
+                 daily_return_simple, daily_return_twr, cumulative_twr, quotes_as_of, source, metadata
+          FROM invest_portfolio_daily
+          WHERE organization_id = ?
+            AND snapshot_date < ?
+          ORDER BY snapshot_date DESC
+          LIMIT 1`,
+  },
+};

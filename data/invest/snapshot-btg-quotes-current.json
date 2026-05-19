@@ -1,0 +1,219 @@
+{
+  "as_of": "2026-05-19",
+  "source": "Necton/BTG — captura 19/05/2026 (liquidações D+1 finalizadas)",
+  "patrimonio_total": 1509811.26,
+  "conta_investimento": 2765.56,
+  "total_investido": 1507045.7,
+  "lancamentos_futuros": 0,
+  "saldo_garantias_b3": 205627.57,
+  "renda_variavel": {
+    "total": 1304461.89,
+    "acoes": {
+      "total": 1304466,
+      "items": [
+        {
+          "ticker": "BBAS3",
+          "name": "BRASIL ON NM",
+          "quantity": 6000,
+          "avg_price": 21.03,
+          "last_price": 20.42,
+          "market_value": 122520,
+          "pnl_pct": -2.89
+        },
+        {
+          "ticker": "ITUB4",
+          "name": "ITAUUNIBANCOPN N1",
+          "quantity": 5100,
+          "avg_price": 41.2,
+          "last_price": 39.62,
+          "market_value": 202062,
+          "pnl_pct": -3.84
+        },
+        {
+          "ticker": "PRIO3",
+          "name": "PRIO ON NM",
+          "quantity": 12700,
+          "avg_price": 62.98,
+          "last_price": 68.82,
+          "market_value": 874014,
+          "pnl_pct": 9.27
+        },
+        {
+          "ticker": "WEGE3",
+          "name": "WEG ON NM",
+          "quantity": 2500,
+          "avg_price": 44.61,
+          "last_price": 42.34,
+          "market_value": 105850,
+          "pnl_pct": -5.08
+        }
+      ]
+    },
+    "opcoes": {
+      "total_market_value": -5709.09,
+      "count": 13,
+      "expiry_common": "2026-06-19",
+      "items": [
+        {
+          "ticker": "ITUBR416",
+          "underlying": "ITUB4",
+          "type": "put_sell",
+          "quantity": -700,
+          "strike": 37.9,
+          "last_price": 0.35,
+          "avg_premium": 0.26,
+          "market_value": -245,
+          "pnl_pct": -35.99
+        },
+        {
+          "ticker": "ITUBR424",
+          "underlying": "ITUB4",
+          "type": "put_sell",
+          "quantity": -900,
+          "strike": 38.63,
+          "last_price": 0.56,
+          "avg_premium": 0.38,
+          "market_value": -504,
+          "pnl_pct": -48.29
+        },
+        {
+          "ticker": "ITUBR431",
+          "underlying": "ITUB4",
+          "type": "put_sell",
+          "quantity": -700,
+          "strike": 39.36,
+          "last_price": 0.78,
+          "avg_premium": 0.55,
+          "market_value": -546,
+          "pnl_pct": -42.63
+        },
+        {
+          "ticker": "ITUBR436",
+          "underlying": "ITUB4",
+          "type": "put_sell",
+          "quantity": -300,
+          "strike": 39.84,
+          "last_price": 1.03,
+          "avg_premium": 0.68,
+          "market_value": -309,
+          "pnl_pct": -50.67
+        },
+        {
+          "ticker": "PRIOR407",
+          "underlying": "PRIO3",
+          "type": "put_sell",
+          "quantity": -6500,
+          "strike": 40.75,
+          "last_price": 0.01,
+          "avg_premium": 2.2,
+          "market_value": -55.12,
+          "pnl_pct": 99.61
+        },
+        {
+          "ticker": "PRIOR560",
+          "underlying": "PRIO3",
+          "type": "put_sell",
+          "quantity": -500,
+          "strike": 56,
+          "last_price": 0.28,
+          "avg_premium": 0.73,
+          "market_value": -140,
+          "pnl_pct": 61.42
+        },
+        {
+          "ticker": "PRIOR580",
+          "underlying": "PRIO3",
+          "type": "put_sell",
+          "quantity": -900,
+          "strike": 58,
+          "last_price": 0.38,
+          "avg_premium": 1.09,
+          "market_value": -342,
+          "pnl_pct": 65.03
+        },
+        {
+          "ticker": "PRIOR590",
+          "underlying": "PRIO3",
+          "type": "put_sell",
+          "quantity": -700,
+          "strike": 59,
+          "last_price": 0.43,
+          "avg_premium": 1.33,
+          "market_value": -301,
+          "pnl_pct": 67.57
+        },
+        {
+          "ticker": "PRIOR605",
+          "underlying": "PRIO3",
+          "type": "put_sell",
+          "quantity": -300,
+          "strike": 60.5,
+          "last_price": 0.6,
+          "avg_premium": 1.76,
+          "market_value": -180,
+          "pnl_pct": 65.95
+        },
+        {
+          "ticker": "WEGER41",
+          "underlying": "WEGE3",
+          "type": "put_sell",
+          "quantity": -500,
+          "strike": 41.03,
+          "last_price": 0.59,
+          "avg_premium": 0.38,
+          "market_value": -295,
+          "pnl_pct": -56.82
+        },
+        {
+          "ticker": "WEGER417",
+          "underlying": "WEGE3",
+          "type": "put_sell",
+          "quantity": -900,
+          "strike": 41.78,
+          "last_price": 1.05,
+          "avg_premium": 0.52,
+          "market_value": -945,
+          "pnl_pct": -102.91
+        },
+        {
+          "ticker": "WEGER435",
+          "underlying": "WEGE3",
+          "type": "put_sell",
+          "quantity": -300,
+          "strike": 43.53,
+          "last_price": 1.86,
+          "avg_premium": 0.94,
+          "market_value": -558,
+          "pnl_pct": -97.17
+        },
+        {
+          "ticker": "WEGER448",
+          "underlying": "WEGE3",
+          "type": "put_sell",
+          "quantity": -700,
+          "strike": 42.78,
+          "last_price": 1.51,
+          "avg_premium": 0.75,
+          "market_value": -1057,
+          "pnl_pct": -102.25
+        }
+      ]
+    }
+  },
+  "renda_fixa": {
+    "total": 208292.9,
+    "pnl_12m_pct": 14.05
+  },
+  "reconciliation_note": "Patrimônio BTG 19/05 = fechamento financeiro reprocessado de 18/05. Conta investimento líquida; lançamentos futuros zerados.",
+  "pending_settlement_import": {
+    "date": "2026-05-19",
+    "ticker": "CAIXA-BTG",
+    "asset_type": "cash",
+    "operation": "pending_settlement",
+    "quantity": 0,
+    "unit_price": 0,
+    "total_net_value": 0,
+    "impacts_managerial_price": false,
+    "notes": "Lançamentos futuros BTG — zerado em 19/05/2026 (reprocessamento concluído)"
+  }
+}

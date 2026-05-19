@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CO-CEO | DER Lógico Unificado (CORE + INVEST)</title>
+    <style>
+        body {
+            background-color: #06121E; 
+            color: #FFFFFF;
+            font-family: monospace;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-family: sans-serif; color: #DAB177; }
+        .header p { font-family: sans-serif; color: #94A3B8; max-width: 800px; margin: 0 auto; line-height: 1.5;}
+        
+        .explanation-box {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3B82F6;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+            font-family: sans-serif;
+            max-width: 900px;
+        }
+        .explanation-box h3 { color: #3B82F6; margin-top: 0; }
+        .explanation-box p { color: #CBD5E1; font-size: 14px; line-height: 1.6; }
+
+        .mermaid {
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>DER Lógico Canônico (CORE + INVEST)</h1>
+        <p>Visão Arquitetural com Snapshot Diário e Interface entre Módulos</p>
+    </div>
+
+    <div class="explanation-box">
+        <h3>Sua Dúvida: Onde está o controle do Módulo?</h3>
+        <p>Você tocou num dos maiores debates de Arquitetura SaaS. A resposta é: <strong>O Controle está na Camada de Aplicação (A Catraca).</strong><br><br>
+        Fisicamente, tabelas como <code>INVEST_ASSETS</code> apontam direto para <code>ORGANIZATIONS</code> para garantir altíssima performance (evitar fazer 4 <i>JOINs</i> a cada consulta). <br>
+        <strong>MAS,</strong> nenhuma linha de código do sistema acessa o bloco INVEST sem antes passar pela tabela <strong>CONTRACT_MODULES</strong>. Se o CNPJ do cliente não possuir o <code>module_code = 'INVEST'</code> ativo nessa tabela, o Chassi (Backend) bloqueia o acesso à parede do banco de dados. A tabela <code>CONTRACT_MODULES</code> é a verdadeira "Catraca" que liga o Core aos Módulos Opcionais.</p>
+    </div>
+
+    <!-- O motor do Mermaid irá renderizar o gráfico dentro desta div -->
+    <div class="mermaid">
+        erDiagram
+            %% ==========================================
+            %% NÚCLEO CORE (SAAS E AUTENTICAÇÃO)
+            %% "O Chassi" que todo cliente recebe
+            %% ==========================================
+            ORGANIZATIONS ||--o{ ORGANIZATIONS : "parent_id (Árvore N-Nível)"
+            ORGANIZATIONS ||--o{ CONTRACTS : "Assina"
+            USERS ||--o{ CONTRACTS : "Gerencia"
+            CONTRACTS ||--o{ CONTRACT_MODULES : "Acessa"
+            MODULES ||--o{ CONTRACT_MODULES : "Libera"
+
+            %% ==========================================
+            %% A PONTE DE INTEGRAÇÃO (INTERFACE CORE -> INVEST)
+            %% É aqui que os módulos se conectam
+            %% ==========================================
+            ORGANIZATIONS ||--o{ INVEST_ASSETS : "Possui Custódia"
+            ORGANIZATIONS ||--o{ INVEST_DAILY_SNAPSHOTS : "Grava Histórico Fechamento"
+            USERS ||--o{ INVEST_LEDGER_ENTRIES : "Registra Operação"
+
+            %% ==========================================
+            %% MÓDULO INVEST (WEALTH MANAGEMENT)
+            %% O que é vendido no pacote Invest
+            %% ==========================================
+            INVEST_ASSETS ||--o{ INVEST_LEDGER_ENTRIES : "Recebe lançamentos (Livro-Razão)"
+            INVEST_ASSETS ||--o{ INVEST_DAILY_SNAPSHOTS : "Origina a Foto Diária"
+            
+            INVEST_OPTIONS_CHAIN
+
+            %% DICIONÁRIO DE ATRIBUTOS (CORE)
+            ORGANIZATIONS {
+                varchar(36) id PK
+                varchar(36) parent_id FK
+                varchar(255) name
+                text path "Isolamento Multi-Tenant"
+            }
+            USERS {
+                varchar(36) id PK
+                varchar(255) email
+            }
+            CONTRACTS {
+                varchar(36) id PK
+                varchar(36) organization_id FK
+            }
+
+            %% DICIONÁRIO DE ATRIBUTOS (INVEST)
+            INVEST_ASSETS {
+                varchar(36) id PK
+                varchar(36) organization_id FK "PONTE PARA O CORE"
+                varchar(10) ticker "Ex: PRIO3"
+                int total_quantity
+                decimal strict_avg_price 
+                decimal managerial_avg_price "PM Gerencial"
+            }
+
+            INVEST_LEDGER_ENTRIES {
+                varchar(36) id PK
+                varchar(36) asset_id FK "Aponta p/ Custódia"
+                varchar(36) user_id FK "PONTE PARA O CORE (Usuário)"
+                varchar(50) entry_type "SELL_PUT, DIVIDEND"
+                decimal net_amount "Liquidez da Operação"
+                date operation_date
+            }
+
+            %% NOVA TABELA DE ANÁLISE TEMPORAL (TIME-SERIES)
+            INVEST_DAILY_SNAPSHOTS {
+                varchar(36) id PK
+                varchar(36) organization_id FK "PONTE PARA O CORE"
+                varchar(36) asset_id FK
+                date snapshot_date "Ex: 2026-05-17 (Fechamento)"
+                int closing_quantity "Qtd no dia"
+                decimal closing_market_price "Preço Tela B3"
+                decimal managerial_avg_price_historical "PM Gerencial do dia"
+                decimal total_equity_value "Patrimônio (MTM)"
+            }
+
+            INVEST_OPTIONS_CHAIN {
+                varchar(10) ticker PK "Ex: PRIOR560"
+                decimal strike_price
+                decimal last_price
+                decimal delta_approx 
+            }
+    </div>
+
+    <!-- Importando o renderizador Mermaid JS via CDN -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ 
+            startOnLoad: true, 
+            theme: 'dark',
+            securityLevel: 'loose'
+        });
+    </script>
+</body>
+</html>

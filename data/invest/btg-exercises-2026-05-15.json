@@ -1,0 +1,35 @@
+{
+  "exercise_date": "2026-05-15",
+  "source": "BTG — Ordens executadas (ticker …E / …F = exercício no strike)",
+  "orders": [
+    { "ticker": "BBASQ223E", "direction": "C", "quantity": 300, "avgPrice": 22.0 },
+    { "ticker": "BBASQ220E", "direction": "C", "quantity": 600, "avgPrice": 21.75 },
+    { "ticker": "BBASQ218E", "direction": "C", "quantity": 1400, "avgPrice": 21.5 },
+    { "ticker": "BBASQ215E", "direction": "C", "quantity": 1200, "avgPrice": 21.25 },
+    { "ticker": "BBASQ213E", "direction": "C", "quantity": 1600, "avgPrice": 21.0 },
+    { "ticker": "BBASQ210E", "direction": "C", "quantity": 100, "avgPrice": 20.75 },
+    { "ticker": "BBASQ210E", "direction": "C", "quantity": 800, "avgPrice": 20.75 },
+
+    { "ticker": "ITUBQ413F", "direction": "C", "quantity": 1200, "avgPrice": 41.43, "date": "2026-05-15" },
+    { "ticker": "ITUBQ445E", "direction": "C", "quantity": 900, "avgPrice": 40.72 },
+    { "ticker": "ITUBQ436E", "direction": "V", "quantity": 300, "avgPrice": 39.99 },
+    { "ticker": "ITUBQ434E", "direction": "C", "quantity": 500, "avgPrice": 39.75 },
+    { "ticker": "ITUBQ42E", "direction": "C", "quantity": 1200, "avgPrice": 41.93 },
+    { "ticker": "ITUBQ425E", "direction": "C", "quantity": 700, "avgPrice": 42.43 },
+    { "ticker": "ITUBQ415E", "direction": "C", "quantity": 300, "avgPrice": 40.93 },
+    { "ticker": "ITUBQ1F", "direction": "C", "quantity": 600, "avgPrice": 42.93 },
+
+    { "ticker": "WEGEQ480E", "direction": "C", "quantity": 500, "avgPrice": 45.96 },
+    { "ticker": "WEGEQ465E", "direction": "C", "quantity": 100, "avgPrice": 46.46 },
+    { "ticker": "WEGEQ465E", "direction": "C", "quantity": 200, "avgPrice": 46.46 },
+    { "ticker": "WEGEQ455E", "direction": "C", "quantity": 900, "avgPrice": 45.46 },
+    { "ticker": "WEGEQ447E", "direction": "C", "quantity": 400, "avgPrice": 44.71 },
+    { "ticker": "WEGEQ447E", "direction": "C", "quantity": 100, "avgPrice": 44.71 },
+    { "ticker": "WEGEQ435E", "direction": "C", "quantity": 300, "avgPrice": 43.46 }
+  ],
+  "notes": {
+    "wege3_total_shares_from_e": 2500,
+    "itub4_net_shares": "5100 (inclui ITUBQ413F 1200 e ITUBQ436E V -300)",
+    "bbas3_total_shares": 6000
+  }
+}

@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CO-CEO | INVEST - Family Office</title>
+    <!-- Fonte Montserrat (Padronizada no projeto) -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js para os gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            /* Paleta Dark Premium (Baseada no Azul Foccus) */
+            --bg-deep: #06121E;         /* Fundo escuro profundo (Azul marinho quase preto) */
+            --bg-card: #0A1D30;         /* Fundo dos cards */
+            --bg-card-hover: #112942;   /* Fundo dos cards (Hover) */
+            --primary-blue: #00425F;    /* Azul Oficial */
+            --accent-gold: #DAB177;     /* Dourado Foccus */
+            --accent-gold-hover: #C59D65;
+            --text-main: #FFFFFF;       /* Branco alto contraste */
+            --text-muted: #94A3B8;      /* Cinza azulado para textos secundários */
+            --positive: #10B981;        /* Verde sucesso */
+            --negative: #EF4444;        /* Vermelho risco/drawdown */
+            --border-color: rgba(255, 255, 255, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Topbar de Navegação */
+        .topbar {
+            height: 70px;
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--text-main);
+        }
+
+        .logo span {
+            color: var(--accent-gold);
+        }
+
+        .sync-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--positive);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .sync-badge .dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--positive);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--positive);
+        }
+
+        /* Container Principal */
+        .dashboard-container {
+            padding: 32px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            max-width: 1600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Cabeçalho do Dashboard */
+        .dash-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .net-worth {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .net-worth .label {
+            font-size: 14px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .net-worth .value {
+            font-size: 36px;
+            font-weight: 300;
+        }
+
+        .net-worth .yield {
+            font-size: 14px;
+            color: var(--positive);
+            font-weight: 500;
+        }
+
+        /* Grade de Cards */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+        }
+
+        .metric-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(218, 177, 119, 0.3);
+        }
+
+        .metric-card .title {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .metric-card .value {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .metric-card .sub-value {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* Main Content Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        .panel {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Simulador Ampulheta */
+        .hourglass-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-group label {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .form-input {
+            background-color: var(--bg-deep);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--accent-gold);
+        }
+
+        .btn-gold {
+            background-color: var(--accent-gold);
+            color: #000;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 8px;
+        }
+
+        .btn-gold:hover {
+            background-color: var(--accent-gold-hover);
+        }
+
+        /* Lista de Lotes (Resultado Ampulheta) */
+        .lots-list {
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 24px;
+        }
+
+        .lot-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-deep);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-gold);
+        }
+
+        .lot-item.delta-20 { border-left-color: var(--positive); }
+        .lot-item.delta-30 { border-left-color: var(--negative); }
+
+        .lot-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .lot-strike { font-weight: 600; font-size: 14px; }
+        .lot-delta { font-size: 11px; color: var(--text-muted); }
+        .lot-qty { font-weight: 700; font-size: 16px; }
+
+    </style>
+</head>
+<body>
+
+    <!-- Topbar Padrão CO-CEO -->
+    <header class="topbar">
+        <div style="display: flex; align-items: center; gap: 32px;">
+            <div class="logo">CO-CEO <span>CORE</span></div>
+            <div style="font-size: 14px; color: var(--text-muted); font-weight: 500; border-left: 1px solid var(--border-color); padding-left: 32px;">
+                Módulo: <span style="color: var(--text-main); font-weight: 600;">INVEST (Wealth Management)</span>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 24px;">
+            <!-- Indicador de Sincronia -->
+            <div class="sync-badge">
+                <div class="dot"></div>
+                B3 Validado: 17/05 19:35
+            </div>
+
+            <!-- Contexto do Usuário (N-Nível) -->
+            <div style="display: flex; align-items: center; gap: 16px; border-left: 1px solid var(--border-color); padding-left: 24px;">
+                <div style="text-align: right;">
+                    <div style="font-size: 12px; color: var(--accent-gold); font-weight: 600; text-transform: uppercase;">Holding Financeira Gonçalves</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">aggomes@gmail.com (Super Admin)</div>
+                </div>
+                <div style="width: 40px; height: 40px; border-radius: 50%; background-color: rgba(218, 177, 119, 0.1); border: 1px solid var(--accent-gold); display: flex; justify-content: center; align-items: center; font-weight: 600; color: var(--accent-gold);">
+                    AG
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="dashboard-container">
+        
+        <!-- Header -->
+        <div class="dash-header">
+            <div class="net-worth">
+                <span class="label">Patrimônio Líquido (Holding)</span>
+                <span class="value">R$ 1.522.090,39</span>
+                <span class="yield">+ R$ 437.188,69 (39,26%) em 6 meses</span>
+            </div>
+            <!-- Pode ter botões de ação aqui no futuro (Ex: Importar CSV) -->
+        </div>
+
+        <!-- Metrics Cards -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <span class="title">Índice Sharpe (Anualizado)</span>
+                <span class="value" style="color: var(--accent-gold);">5.21</span>
+                <span class="sub-value">Excelência Absoluta (> 3.0)</span>
+            </div>
+            <div class="metric-card">
+                <span class="title">Drawdown Máximo (Sua Carteira)</span>
+                <span class="value" style="color: var(--positive);">-2.1%</span>
+                <span class="sub-value">Curva suave de crescimento</span>
+            </div>
+            <div class="metric-card">
+                <span class="title">Drawdown PRIO3 (Mesmo período)</span>
+                <span class="value" style="color: var(--negative);">-18.4%</span>
+                <span class="sub-value">Alta volatilidade/Risco de cauda</span>
+            </div>
+            <div class="metric-card">
+                <span class="title">Caixa Livre (Renda Fixa)</span>
+                <span class="value">R$ 624.542,46</span>
+                <span class="sub-value">Margem de segurança do Notional</span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-grid">
+            <!-- Chart Panel -->
+            <div class="panel">
+                <div class="panel-title">
+                    Performance vs Risco (O Argumento Definitivo)
+                </div>
+                <div style="height: 400px; width: 100%;">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Ampulheta Screener -->
+            <div class="panel">
+                <div class="panel-title">
+                    Motor Quant: Ampulheta
+                </div>
+                <div class="hourglass-form">
+                    <div class="form-group">
+                        <label>Ativo Objeto</label>
+                        <input type="text" class="form-input" value="PRIO3" placeholder="Ex: PETR4">
+                    </div>
+                    <div class="form-group">
+                        <label>Alocação de Caixa (Risco Notional)</label>
+                        <input type="text" class="form-input" value="R$ 100.000,00">
+                    </div>
+                    <button class="btn-gold" onclick="simulateHourglass()">Gerar Matriz de Venda (EOD)</button>
+                </div>
+
+                <!-- Resultados Ocultos inicialmente, mostrados no JS -->
+                <div class="lots-list" id="lotsResult" style="display: none;">
+                    <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 8px;">Ordens Otimizadas para Venda Coberta (PUT):</div>
+                    
+                    <div class="lot-item delta-30">
+                        <div class="lot-details">
+                            <span class="lot-strike">PRIOR590 (Strike R$ 59,00)</span>
+                            <span class="lot-delta">Delta ~30 | R$ 1,33</span>
+                        </div>
+                        <span class="lot-qty">-300 un</span>
+                    </div>
+
+                    <div class="lot-item">
+                        <div class="lot-details">
+                            <span class="lot-strike">PRIOR580 (Strike R$ 58,00)</span>
+                            <span class="lot-delta">Delta ~25 | R$ 1,09</span>
+                        </div>
+                        <span class="lot-qty">-700 un</span>
+                    </div>
+
+                    <div class="lot-item delta-20">
+                        <div class="lot-details">
+                            <span class="lot-strike">PRIOR560 (Strike R$ 56,00)</span>
+                            <span class="lot-delta">Delta ~20 | R$ 0,73</span>
+                        </div>
+                        <span class="lot-qty">-900 un</span>
+                    </div>
+
+                    <div class="lot-item">
+                        <div class="lot-details">
+                            <span class="lot-strike">PRIOR530 (Strike R$ 53,00)</span>
+                            <span class="lot-delta">Delta ~15 | R$ 0,40</span>
+                        </div>
+                        <span class="lot-qty">-500 un</span>
+                    </div>
+
+                    <div style="margin-top: 12px; padding: 12px; background: rgba(218, 177, 119, 0.1); border-radius: 8px; border: 1px solid rgba(218, 177, 119, 0.3);">
+                        <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px;">
+                            <span style="color: var(--text-muted);">Prêmio Imediato:</span>
+                            <span style="font-weight: 600; color: var(--positive);">+ R$ 2.020,00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-size: 13px;">
+                            <span style="color: var(--text-muted);">Preço Médio Gerencial (Exercício):</span>
+                            <span style="font-weight: 600; color: var(--accent-gold);">R$ 55,20</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Script do Gráfico -->
+    <script>
+        // Inicializa o gráfico de performance
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        
+        // Dados simulados para provar a tese matemática
+        const labels = ['Mês 1', 'Mês 2', 'Mês 3', 'Mês 4', 'Mês 5', 'Mês 6'];
+        
+        // Curva da Carteira (Crescimento constante, Venda de Opções)
+        const portfolioData = [0, 8, 19, 21, 36, 39.26];
+        
+        // Curva da PRIO3 (Alta rentabilidade, mas com drawdown assustador no meio)
+        const prio3Data = [0, 25, 10, 45, 30, 70]; 
+        
+        // Curva do CDI
+        const cdiData = [0, 1, 2.1, 3.2, 4.3, 6];
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Sua Carteira (Suave / Sem Susto)',
+                        data: portfolioData,
+                        borderColor: '#DAB177', // Dourado
+                        backgroundColor: 'rgba(218, 177, 119, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'PRIO3 (Buy & Hold / Risco de Cauda)',
+                        data: prio3Data,
+                        borderColor: '#EF4444', // Vermelho (perigo/volatilidade)
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        tension: 0.2
+                    },
+                    {
+                        label: 'CDI',
+                        data: cdiData,
+                        borderColor: '#94A3B8',
+                        borderWidth: 2,
+                        borderDash: [2, 2],
+                        tension: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#94A3B8',
+                            font: { family: 'Montserrat' },
+                            padding: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#0A1D30',
+                        titleColor: '#DAB177',
+                        bodyColor: '#FFFFFF',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: '#94A3B8',
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#94A3B8'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Função para simular o clique do botão da Ampulheta
+        function simulateHourglass() {
+            const btn = document.querySelector('.btn-gold');
+            btn.innerText = 'Processando Dados EOD...';
+            btn.style.opacity = '0.7';
+            
+            setTimeout(() => {
+                btn.innerText = 'Gerar Matriz de Venda (EOD)';
+                btn.style.opacity = '1';
+                document.getElementById('lotsResult').style.display = 'flex';
+            }, 800);
+        }
+    </script>
+</body>
+</html>

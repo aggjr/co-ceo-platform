@@ -1,0 +1,163 @@
+.excel-table-section {
+  margin-bottom: 28px;
+}
+
+.excel-table-section:last-child {
+  margin-bottom: 0;
+}
+
+.excel-table-caption {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  color: var(--color-accent);
+  letter-spacing: 0.03em;
+}
+
+.excel-table-wrap {
+  overflow: auto;
+  border: 1px solid rgba(218, 177, 119, 0.25);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 720px;
+}
+
+.excel-table th,
+.excel-table td {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  padding: 8px 10px;
+  vertical-align: top;
+}
+
+.excel-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #0f172a;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.excel-table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.excel-table tbody tr:hover td {
+  background: rgba(218, 177, 119, 0.08);
+}
+
+.excel-table th.num,
+.excel-table td.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.excel-table-empty {
+  text-align: center !important;
+  padding: 16px !important;
+}
+
+.excel-table-caption-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+
+.excel-table-caption-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.excel-row-count {
+  font-size: 12px;
+}
+
+.excel-clear-filters-btn {
+  background: transparent;
+  border: 1px solid rgba(218, 177, 119, 0.35);
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.excel-clear-filters-btn:hover {
+  background: rgba(218, 177, 119, 0.1);
+}
+
+.excel-table--interactive thead .excel-filter-row th {
+  top: 0;
+  z-index: 2;
+  padding: 4px 6px;
+  background: #0c1220;
+}
+
+.excel-table--interactive thead .excel-header-row th {
+  top: 34px;
+  z-index: 2;
+}
+
+.excel-filter-input {
+  width: 100%;
+  min-width: 56px;
+  box-sizing: border-box;
+  background: #1e293b;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: var(--color-text);
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.excel-filter-input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.excel-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: inherit;
+}
+
+.excel-sort-btn:hover {
+  color: var(--color-accent);
+}
+
+.excel-sort-btn.is-sorted {
+  color: var(--color-accent);
+}
+
+.excel-sort-btn.num {
+  justify-content: flex-end;
+}
+
+.excel-sort-icon {
+  font-size: 10px;
+  opacity: 0.75;
+}

@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "fullRetestTriggers": [
+    "src/core/dal/**",
+    "src/database/migrations/**",
+    "package.json",
+    "package-lock.json"
+  ],
+  "paths": {
+    "src/core/dal/**": {
+      "tags": ["core", "dal", "security"],
+      "testPatterns": ["tests/unit/core/**"]
+    },
+    "src/core/auth/**": {
+      "tags": ["core", "auth", "security"],
+      "testPatterns": ["tests/unit/auth/**"]
+    },
+    "src/middlewares/**": {
+      "tags": ["core", "auth", "security"],
+      "testPatterns": ["tests/middlewares/**"]
+    },
+    "src/controllers/AuthController.ts": {
+      "tags": ["core", "auth"],
+      "testPatterns": ["tests/unit/auth/**", "tests/middlewares/AuthMiddleware.test.ts"]
+    },
+    "src/controllers/CockpitController.ts": {
+      "tags": ["cockpit"],
+      "testPatterns": ["tests/unit/auth/**", "tests/middlewares/**"]
+    },
+    "src/core/quality/**": {
+      "tags": ["quality", "regression"],
+      "testPatterns": ["tests/unit/quality/**"]
+    },
+    "scripts/run-regression.js": {
+      "tags": ["quality", "regression"],
+      "testPatterns": ["tests/unit/quality/**"]
+    },
+    "scripts/lib/coverage-policy-eval.js": {
+      "tags": ["quality"],
+      "testPatterns": ["tests/unit/quality/**"]
+    },
+    "src/core/telemetry/**": {
+      "tags": ["core", "telemetry"],
+      "testPatterns": ["tests/unit/core/TelemetryService.test.ts"]
+    },
+    "src/modules/invest/**": {
+      "tags": ["invest"],
+      "testPatterns": ["tests/unit/invest/**"]
+    }
+  }
+}

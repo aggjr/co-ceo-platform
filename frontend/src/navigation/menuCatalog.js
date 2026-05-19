@@ -1,0 +1,87 @@
+/**
+ * Catálogo de navegação — 1º nível = módulo; subitens ligados a rotas e access_resources.
+ * Visibilidade filtrada em buildVisibleMenu.js (IAM + contract_modules).
+ */
+export const MENU_CATALOG = [
+  {
+    id: 'cockpit',
+    label: 'Cockpit',
+    moduleCode: 'CORE',
+    items: [
+      {
+        label: 'Contratos',
+        path: '/cockpit/platform',
+        resourceKey: 'screen.cockpit.platform',
+        platformOnly: true,
+      },
+      {
+        label: 'Qualidade',
+        path: '/cockpit/platform/quality',
+        resourceKey: 'screen.cockpit.quality',
+        platformOnly: true,
+      },
+      {
+        label: 'Visão global',
+        path: '/cockpit',
+        resourceKey: 'screen.cockpit.dashboard',
+        platformOnly: true,
+      },
+      {
+        label: 'Minha organização',
+        path: '/cockpit/client',
+        resourceKey: 'screen.cockpit.dashboard',
+        clientOnly: true,
+      },
+      {
+        label: 'Equipe',
+        path: '/cockpit/client/team',
+        resourceKey: 'screen.cockpit.team',
+        clientOnly: true,
+      },
+      {
+        label: 'Papéis',
+        path: '/cockpit/client/roles',
+        resourceKey: 'screen.cockpit.roles',
+        clientOnly: true,
+      },
+      {
+        label: 'Armazenamento',
+        path: '/cockpit/client/storage',
+        resourceKey: 'screen.cockpit.storage',
+        clientOnly: true,
+      },
+    ],
+  },
+  {
+    id: 'invest',
+    label: 'INVEST',
+    moduleCode: 'INVEST',
+    items: [
+      {
+        label: 'Patrimônio diário',
+        path: '/invest',
+        resourceKey: 'screen.invest.dashboard',
+      },
+      {
+        label: 'Portfólio',
+        path: '/invest/portfolio',
+        resourceKey: 'screen.invest.portfolio',
+      },
+      {
+        label: 'Resultado',
+        path: '/invest/resultado',
+        resourceKey: 'screen.invest.results',
+      },
+      {
+        label: 'Ganhos por ação',
+        path: '/invest/ganhos-por-acao',
+        resourceKey: 'screen.invest.results',
+      },
+      {
+        label: 'Transações finalizadas',
+        path: '/invest/transacoes-finalizadas',
+        resourceKey: 'screen.invest.portfolio',
+      },
+    ],
+  },
+];

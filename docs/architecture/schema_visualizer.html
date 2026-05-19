@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>co-CEO Core - Schema Visualizer</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --text-color: #1e293b;
+            --primary: #00425F;
+            --secondary: #DAB177;
+            --accent: #202451;
+            --card-bg: #ffffff;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px 40px;
+        }
+        h1, h2 { color: var(--primary); }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            padding: 20px 30px;
+            margin-bottom: 30px;
+            border-left: 5px solid var(--secondary);
+        }
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+        }
+        .mermaid {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: center;
+        }
+        .badge {
+            background-color: var(--accent);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+    <!-- Importa o renderizador Mermaid -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Modelagem Arquitetural do Banco de Dados <span class="badge">co-CEO Core</span></h1>
+        
+        <div class="card">
+            <h2>💡 Nova Adição: Telemetria e Monitoramento de Uso</h2>
+            <p>Conforme solicitado, incluímos a tabela <strong><code>telemetry_events</code></strong>. É fundamental entender que:</p>
+            <ul>
+                <li><strong>audit_logs:</strong> Foco em <em>Compliance</em>. Grava apenas ações que mutaram os dados (INSERT, UPDATE, DELETE) com um DIFF de JSON.</li>
+                <li><strong>telemetry_events:</strong> Foco em <em>Produto e UX</em>. Grava <strong>visualizações de página, cliques, tempo de sessão e navegação entre módulos</strong>. Isso gera os KPIs de engajamento sem sujar as tabelas de negócio e compliance. (Nota: no futuro, em altíssima escala, essa tabela geralmente é migrada para um banco NoSQL temporal como Elasticsearch ou ClickHouse).</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>Diagrama Entidade-Relacionamento (ERD)</h2>
+            <p>Visão simplificada dos relacionamentos. (Aguarde o diagrama renderizar abaixo)</p>
+            <div class="mermaid">
+                erDiagram
+                    organizations ||--o{ organizations : "parent_id (Árvore/Path)"
+                    organizations ||--o{ user_roles : "has"
+                    organizations ||--o{ audit_logs : "context"
+                    organizations ||--o{ telemetry_events : "context"
+
+                    users ||--o{ user_roles : "granted_to"
+                    users ||--o{ telemetry_events : "performs"
+                    
+                    roles ||--o{ user_roles : "assigns"
+                    roles ||--o{ role_permissions : "contains"
+                    
+                    permissions ||--o{ role_permissions : "belongs_to"
+
+                    audit_logs {
+                        bigint id PK
+                        string table_name
+                        string action
+                        json old_payload
+                        json new_payload
+                        string actor_user_id FK
+                    }
+
+                    telemetry_events {
+                        bigint id PK
+                        string event_type
+                        string module
+                        string screen
+                        json metadata
+                        string user_id FK
+                    }
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Script SQL Consolidado</h2>
+            <pre><code class="language-sql">-- ====================================================================================
+-- co-CEO Core Database Schema (v1.1 - N-Level Hierarchy + Telemetry)
+-- ====================================================================================
+
+-- 1. ESTRUTURA HIERÁRQUICA INFINITA (MATERIALIZED PATH)
+CREATE TABLE organizations (
+    id VARCHAR(36) PRIMARY KEY,
+    parent_id VARCHAR(36) NULL,           -- NULL = Raiz Máxima
+    name VARCHAR(255) NOT NULL,
+    type VARCHAR(50) NOT NULL,            -- 'brand', 'region', 'franchisee', 'store'
+    document VARCHAR(50),
+    path TEXT NOT NULL,                   -- Pulo do Gato: "/root_id/node1_id/node2_id/"
+    status ENUM('active', 'suspended', 'closed') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (parent_id) REFERENCES organizations(id) ON DELETE RESTRICT
+);
+
+-- 2. IDENTIDADE E USUÁRIOS
+CREATE TABLE users (
+    id VARCHAR(36) PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    preferred_name VARCHAR(100),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 3. RBAC (ROLE-BASED ACCESS CONTROL)
+CREATE TABLE roles (
+    id VARCHAR(36) PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    scope ENUM('global', 'node') NOT NULL, 
+    description VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE permissions (
+    id VARCHAR(36) PRIMARY KEY,
+    module VARCHAR(50) NOT NULL,          -- 'core', 'cash', 'stockspin'
+    code VARCHAR(100) UNIQUE NOT NULL     -- 'cash:incomes:write'
+);
+
+CREATE TABLE role_permissions (
+    role_id VARCHAR(36) NOT NULL,
+    permission_id VARCHAR(36) NOT NULL,
+    PRIMARY KEY (role_id, permission_id),
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+);
+
+-- 4. O VÍNCULO MÁGICO (USUÁRIO + ROLE + CONTEXTO)
+CREATE TABLE user_roles (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    role_id VARCHAR(36) NOT NULL,
+    organization_id VARCHAR(36) NULL,     -- Se NULL e role for global, vê TUDO.
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE RESTRICT,
+    FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+);
+
+-- 5. TRILHA DE AUDITORIA ESTRITA (LOG DE MUTAÇÃO DE DADOS)
+CREATE TABLE audit_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY, 
+    table_name VARCHAR(100) NOT NULL,
+    record_id VARCHAR(36) NOT NULL,
+    action ENUM('INSERT', 'UPDATE', 'DELETE', 'SOFT_DELETE') NOT NULL,
+    organization_id VARCHAR(36) NULL,
+    actor_user_id VARCHAR(36) NOT NULL,
+    impersonator_user_id VARCHAR(36) NULL,
+    old_payload JSON NULL,
+    new_payload JSON NULL,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_audit_record (table_name, record_id),
+    INDEX idx_audit_org (organization_id),
+    INDEX idx_audit_actor (actor_user_id)
+);
+
+-- 6. NOVO: TELEMETRIA E USO DA PLATAFORMA (PRODUTO)
+CREATE TABLE telemetry_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    organization_id VARCHAR(36) NULL,     -- Onde o usuário estava navegando
+    user_id VARCHAR(36) NOT NULL,         -- Quem clicou/visualizou
+    session_id VARCHAR(100),              -- Identificador único do login atual
+    
+    event_type VARCHAR(50) NOT NULL,      -- 'page_view', 'button_click', 'module_open'
+    module VARCHAR(50) NOT NULL,          -- 'cash', 'stockspin', 'core_admin'
+    screen VARCHAR(100) NOT NULL,         -- 'dashboard', 'settings', 'reports'
+    action_detail VARCHAR(255),           -- 'Clicou em exportar PDF', 'Abriu modal'
+    
+    metadata JSON NULL,                   -- { "duration_ms": 1200, "browser": "Chrome" }
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Índices cruciais para relatórios analíticos de uso rápidos
+    INDEX idx_telem_org (organization_id),
+    INDEX idx_telem_user (user_id),
+    INDEX idx_telem_module_screen (module, screen),
+    INDEX idx_telem_date (created_at)
+);
+            </code></pre>
+        </div>
+    </div>
+</body>
+</html>

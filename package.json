@@ -1,0 +1,53 @@
+{
+  "name": "co-ceo-core",
+  "version": "0.0.1",
+  "description": "co-CEO Platform Core API",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node ./node_modules/typescript/bin/tsc && node ./node_modules/vite/bin/vite.js build --config frontend/vite.config.js && node dist/index.js",
+    "dev": "concurrently -n api,web -c blue,green \"node ./node_modules/nodemon/bin/nodemon.js --exec \\\"node ./node_modules/ts-node/dist/bin.js\\\" src/index.ts\" \"node ./node_modules/vite/bin/vite.js --config frontend/vite.config.js\"",
+    "dev:api": "nodemon --exec ts-node src/index.ts",
+    "dev:web": "vite --config frontend/vite.config.js",
+    "build": "node scripts/bump-version.js && tsc && node ./node_modules/vite/bin/vite.js build --config frontend/vite.config.js",
+    "build:web": "vite build --config frontend/vite.config.js",
+    "test": "jest",
+    "test:unit": "jest --selectProjects unit-core unit-middleware",
+    "test:catalog:sync": "node scripts/sync-test-catalog.js",
+    "test:impact:plan": "node scripts/test-impact.js",
+    "test:regression": "node scripts/run-regression.js --mode=full",
+    "test:regression:impact": "node scripts/run-regression.js --mode=impact",
+    "test:regression:persist": "node scripts/run-regression.js --mode=full --persist",
+    "test:full": "npm run test:regression",
+    "seed:iam": "node ./node_modules/ts-node/dist/bin.js src/database/seeds/005_iam_catalog.ts",
+    "seed:admin": "node ./node_modules/ts-node/dist/bin.js src/database/seeds/001_super_admin.ts",
+    "seed:holding": "node ./node_modules/ts-node/dist/bin.js src/database/seeds/002_holding_contract.ts",
+    "seed:invest-access": "node ./node_modules/ts-node/dist/bin.js scripts/grant-invest-access-holding.ts",
+    "seed:portfolio": "node ./node_modules/ts-node/dist/bin.js src/database/seeds/007_invest_portfolio_demo.ts",
+    "record:patrimony:daily": "node ./node_modules/ts-node/dist/bin.js scripts/record-daily-patrimony.ts",
+    "fetch:b3:quotes": "node ./node_modules/ts-node/dist/bin.js scripts/fetch-b3-quotes.ts",
+    "invest:daily-close": "node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "chart.js": "^4.5.1",
+    "dotenv": "^16.6.1",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.22.3"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^20.19.41",
+    "concurrently": "^9.1.2",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "vite": "^6.2.0",
+    "xlsx": "^0.18.5"
+  }
+}

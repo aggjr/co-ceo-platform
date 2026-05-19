@@ -1,0 +1,38 @@
+{
+  "as_of": "2026-05-18",
+  "source_label": "myProfit — fechamento 18/05/2026 (captura)",
+  "note": "Preço médio do myProfit ≈ modo B3. PM gerencial será recalculado pelo livro-razão + ordens.",
+  "stocks": [
+    {
+      "ticker": "BBAS3",
+      "quantity": 6000,
+      "myprofit_avg_price": 21.03,
+      "last_price": 20.43,
+      "weight_pct": 9.36
+    },
+    {
+      "ticker": "ITUB4",
+      "quantity": 5100,
+      "myprofit_avg_price": 41.2,
+      "last_price": 39.57,
+      "weight_pct": 15.4
+    },
+    {
+      "ticker": "PRIO3",
+      "quantity": 12700,
+      "myprofit_avg_price": 62.98,
+      "last_price": 68.9,
+      "weight_pct": 66.7
+    },
+    {
+      "ticker": "WEGE3",
+      "quantity": 2500,
+      "myprofit_avg_price": 44.61,
+      "last_price": 42.47,
+      "weight_pct": 8.1
+    }
+  ],
+  "open_options_ref": "snapshot-btg-quotes-current.json",
+  "patrimonio_btg": 1512959.05,
+  "conta_btg": 455988.46
+}

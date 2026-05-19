@@ -1,0 +1,93 @@
+.pivot-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.pivot-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.pivot-toolbar input[type='date'] {
+  background: #1e293b;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.pivot-table-wrap {
+  overflow-x: auto;
+}
+
+.pivot-table {
+  font-size: 12px;
+  min-width: 1100px;
+}
+
+.pivot-table th,
+.pivot-table td {
+  white-space: nowrap;
+}
+
+.pivot-table th.num,
+.pivot-table td.num {
+  text-align: right;
+}
+
+.pivot-total-col {
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.pivot-totals-row td {
+  border-top: 2px solid rgba(218, 177, 119, 0.35);
+  font-weight: 700;
+  background: rgba(218, 177, 119, 0.06);
+}
+
+.import-panel textarea {
+  width: 100%;
+  min-height: 200px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  background: #0f172a;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+}
+
+.import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.import-actions button {
+  background: var(--color-accent);
+  color: var(--color-bg);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.import-actions button.secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text);
+}
+
+.import-status {
+  margin-top: 12px;
+  font-size: 13px;
+}

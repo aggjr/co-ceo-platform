@@ -1,0 +1,362 @@
+.portfolio-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.portfolio-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.portfolio-filter-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.portfolio-filter-select {
+  min-width: 160px;
+  background: #1e293b;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.portfolio-filter-active {
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.portfolio-excel-section {
+  margin-bottom: 28px;
+}
+
+.portfolio-excel-section:last-child {
+  margin-bottom: 0;
+}
+
+.portfolio-excel-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  color: var(--color-accent);
+  letter-spacing: 0.03em;
+}
+
+.portfolio-excel-section .excel-table thead .excel-header-row th {
+  position: sticky;
+  top: 0;
+  background: #0f172a;
+  z-index: 2;
+}
+
+.portfolio-excel-section .excel-table thead .excel-filter-row th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #0f172a;
+}
+
+.portfolio-toolbar h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.portfolio-view-toggle {
+  display: inline-flex;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(218, 177, 119, 0.35);
+}
+
+.portfolio-view-toggle button {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.portfolio-view-toggle button:hover {
+  color: var(--color-text);
+}
+
+.portfolio-view-toggle button.is-active {
+  background: rgba(218, 177, 119, 0.18);
+  color: var(--color-accent);
+}
+
+.portfolio-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.portfolio-kpi {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.portfolio-kpi-label {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.portfolio-kpi strong {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.portfolio-kpi-sub {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.portfolio-pnl--up {
+  color: #10b981;
+}
+
+.portfolio-pnl--down {
+  color: #ef4444;
+}
+
+.portfolio-table th.num,
+.portfolio-table td.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.portfolio-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.portfolio-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 18px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+@media (hover: hover) {
+  .portfolio-card:hover {
+    border-color: rgba(218, 177, 119, 0.35);
+    background: rgba(218, 177, 119, 0.06);
+  }
+}
+
+.portfolio-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.portfolio-card-ticker {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--color-accent);
+}
+
+.portfolio-card-name {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.portfolio-card-type {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(218, 177, 119, 0.12);
+  color: var(--color-accent);
+  white-space: nowrap;
+}
+
+.portfolio-card-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.portfolio-card-metrics dt {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.portfolio-card-metrics dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.portfolio-card-sector {
+  margin: 14px 0 0;
+  font-size: 12px;
+}
+
+.portfolio-hint {
+  margin-top: 16px;
+  font-size: 13px;
+}
+
+/* ExcelTable oficial (coceo) — tema escuro INVEST */
+.portfolio-excel-section .coceo-excel-grid-host {
+  --row-hover-bg: #edd8bb;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper {
+  border-color: rgba(218, 177, 119, 0.25);
+  background: rgba(15, 23, 42, 0.6);
+  max-height: min(70vh, 640px);
+}
+
+/* Hover de linha — padrão CASH (#edd8bb), incluindo colunas sticky */
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row td {
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td {
+  background-color: var(--row-hover-bg, #edd8bb) !important;
+  color: #0f172a !important;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td[style*='position: sticky'] {
+  background-color: var(--row-hover-bg, #edd8bb) !important;
+  color: #0f172a !important;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .muted,
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td span {
+  color: #334155 !important;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-pnl--up {
+  color: #047857 !important;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-pnl--down {
+  color: #b91c1c !important;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table thead tr {
+  background: linear-gradient(135deg, #0f2740 0%, #1e3a5f 100%);
+}
+
+.portfolio-excel-section .excel-table-caption {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--color-accent);
+}
+
+.portfolio-excel-section .table-footer-summary {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0;
+  padding: 10px 12px !important;
+  font-size: 12px;
+  color: #e2e8f0 !important;
+  background: rgba(15, 23, 42, 0.95) !important;
+  border-top: 1px solid rgba(218, 177, 119, 0.35) !important;
+  border-radius: 0 0 8px 8px;
+}
+
+.portfolio-excel-section .table-footer-summary strong {
+  color: var(--color-accent, #dab177);
+}
+
+.portfolio-excel-section .excel-footer-aggregate {
+  color: #e2e8f0;
+}
+
+.portfolio-excel-section .excel-footer-aggregate .portfolio-pnl--up {
+  color: #34d399;
+}
+
+.portfolio-excel-section .excel-footer-aggregate .portfolio-pnl--down {
+  color: #f87171;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host tr.excel-column-totals-row td {
+  background: rgba(15, 23, 42, 0.98) !important;
+  border-top: 2px solid rgba(218, 177, 119, 0.45);
+  font-weight: 600;
+  color: #e2e8f0 !important;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host tr.excel-column-totals-row td .portfolio-footer-total {
+  font-weight: 700;
+  color: var(--color-accent, #dab177);
+}
+
+.portfolio-excel-section .coceo-excel-grid-host tr.excel-column-totals-row td .portfolio-pnl--up {
+  color: #34d399 !important;
+}
+
+.portfolio-excel-section .coceo-excel-grid-host tr.excel-column-totals-row td .portfolio-pnl--down {
+  color: #f87171 !important;
+}
+
+.portfolio-excel-section .portfolio-option-itm {
+  color: #f87171 !important;
+  font-weight: 700;
+}
+
+.portfolio-excel-section .portfolio-calls-uncovered {
+  color: #f87171 !important;
+  font-weight: 700;
+}
+
+.portfolio-excel-section .portfolio-option-type--call {
+  color: #60a5fa;
+}
+
+.portfolio-excel-section .portfolio-option-type--put {
+  color: #c4b5fd;
+}
+
+.portfolio-excel-section .portfolio-options-call-total strong {
+  color: #60a5fa;
+  font-weight: 700;
+}
+
+.portfolio-excel-section .portfolio-call-premium-pending {
+  color: #34d399;
+  font-weight: 600;
+}
+
+.portfolio-excel-section .table-footer-summary .excel-footer-right {
+  display: none;
+}

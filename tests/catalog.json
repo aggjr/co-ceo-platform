@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-19",
+  "description": "Mapa de unidades de código → arquivos de teste. Atualize com npm run test:catalog:sync",
+  "units": [
+    {
+      "id": "core.dal",
+      "label": "Gateway / DAL",
+      "layer": "unit",
+      "tags": [
+        "core",
+        "dal",
+        "security"
+      ],
+      "sourcePaths": [
+        "src/core/dal/**"
+      ],
+      "testFiles": [
+        "tests/unit/core/GatewayError.test.ts",
+        "tests/unit/core/GatewayJunction.test.ts",
+        "tests/unit/core/SecurityScope.test.ts",
+        "tests/unit/core/StorageMeter.test.ts",
+        "tests/unit/core/TableRegistry.test.ts"
+      ],
+      "testCaseCount": 14
+    },
+    {
+      "id": "core.auth",
+      "label": "Autenticação e autorização",
+      "layer": "unit",
+      "tags": [
+        "core",
+        "auth",
+        "security"
+      ],
+      "sourcePaths": [
+        "src/core/auth/**",
+        "src/middlewares/**"
+      ],
+      "testFiles": [
+        "tests/middlewares/AuthMiddleware.test.ts",
+        "tests/middlewares/RequireAnyPermission.test.ts",
+        "tests/unit/auth/AuthRepositoryGateway.test.ts",
+        "tests/unit/auth/ClientImpersonation.test.ts",
+        "tests/unit/auth/LoginContext.test.ts"
+      ],
+      "testCaseCount": 11
+    },
+    {
+      "id": "core.telemetry",
+      "label": "Telemetria",
+      "layer": "unit",
+      "tags": [
+        "core",
+        "telemetry"
+      ],
+      "sourcePaths": [
+        "src/core/telemetry/**",
+        "src/controllers/TelemetryController.ts"
+      ],
+      "testFiles": [
+        "tests/unit/core/TelemetryService.test.ts"
+      ],
+      "testCaseCount": 3
+    },
+    {
+      "id": "core.quality",
+      "label": "Qualidade / Regressão",
+      "layer": "unit",
+      "tags": [
+        "quality",
+        "regression"
+      ],
+      "sourcePaths": [
+        "src/core/quality/**",
+        "src/controllers/QualityController.ts",
+        "scripts/lib/coverage-policy-eval.js",
+        "scripts/run-regression.js"
+      ],
+      "testFiles": [
+        "tests/unit/quality/CoveragePolicyEval.test.ts",
+        "tests/unit/quality/QualityRegressionService.test.ts",
+        "tests/unit/quality/RegressionInfrastructure.test.ts"
+      ],
+      "testCaseCount": 11
+    },
+    {
+      "id": "cockpit.api",
+      "label": "API Cockpit",
+      "layer": "module",
+      "tags": [
+        "cockpit"
+      ],
+      "sourcePaths": [
+        "src/controllers/CockpitController.ts",
+        "src/core/auth/CockpitReadRepository.ts"
+      ],
+      "testFiles": [],
+      "testCaseCount": 0
+    },
+    {
+      "id": "invest",
+      "label": "Módulo INVEST",
+      "layer": "module",
+      "tags": [
+        "invest"
+      ],
+      "sourcePaths": [
+        "src/modules/invest/**"
+      ],
+      "testFiles": [],
+      "testCaseCount": 0
+    }
+  ],
+  "stats": {
+    "totalTestFiles": 30,
+    "totalUnits": 6,
+    "unitsWithTests": 4,
+    "unitsWithoutTests": 2
+  }
+}

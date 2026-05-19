@@ -1,0 +1,53 @@
+{
+  "opening_date": "2026-01-01",
+  "source_label": "myProfit IR 2025 — posição 31/12/2025 (bolsa_pai_2025.pdf)",
+  "opening_positions": [
+    {
+      "ticker": "PRIO3",
+      "asset_type": "stock",
+      "quantity": 5400,
+      "avg_price": 38.3305,
+      "underlying_ticker": "PRIO3"
+    },
+    {
+      "ticker": "CDB-BTG-20240802",
+      "asset_type": "fixed_income",
+      "quantity": 1,
+      "avg_price": 238562.62,
+      "notes": "CDB Pós 102,5% CDI venc. 02/08/2024 — valor situação 31/12/2025"
+    },
+    {
+      "ticker": "TESOURO-SELIC-2031",
+      "asset_type": "fixed_income",
+      "quantity": 58,
+      "avg_price": 17236.4623,
+      "notes": "Tesouro Selic 2031 — 58 títulos"
+    }
+  ],
+  "opening_short_options": [
+    {
+      "ticker": "PRIOA407",
+      "operation": "call_sell",
+      "quantity": 5400,
+      "unit_price": 0.5293,
+      "underlying_ticker": "PRIO3",
+      "notes": "Short call — valor ônus 31/12/2025 R$ 2.858,22"
+    },
+    {
+      "ticker": "PRIOQ43",
+      "operation": "put_sell",
+      "quantity": 31200,
+      "unit_price": 3.69,
+      "underlying_ticker": "PRIO3",
+      "notes": "Short put — valor ônus 31/12/2025 R$ 115.128,00"
+    },
+    {
+      "ticker": "PRIOR407",
+      "operation": "put_sell",
+      "quantity": 6300,
+      "unit_price": 2.2603,
+      "underlying_ticker": "PRIO3",
+      "notes": "Short put — valor ônus 31/12/2025 R$ 14.239,89"
+    }
+  ]
+}

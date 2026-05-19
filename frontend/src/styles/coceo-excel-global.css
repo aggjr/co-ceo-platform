@@ -1,0 +1,49 @@
+/* Estilos globais para ExcelTable oficial em qualquer módulo */
+:root {
+  --coceo-row-hover-bg: #edd8bb;
+}
+
+.coceo-excel-mount-body,
+.portfolio-excel-section {
+  margin-top: 8px;
+}
+
+.coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td {
+  background-color: var(--row-hover-bg, var(--coceo-row-hover-bg)) !important;
+}
+
+.coceo-excel-grid-host .table-wrapper {
+  max-height: min(72vh, 720px);
+}
+
+.card .coceo-excel-grid-host .table-wrapper {
+  background: #fff;
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+.card .coceo-excel-grid-host .table-wrapper table thead tr {
+  background: linear-gradient(135deg, #00425f 0%, #2f6c81 100%);
+  color: #fff;
+}
+
+.coceo-excel-grid-host .excel-table-caption,
+.portfolio-excel-section .excel-table-caption {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.coceo-excel-grid-host .table-footer-summary {
+  font-size: 12px;
+  color: var(--color-text-muted, #64748b);
+  padding: 8px 2px 0;
+}
+
+.sgp-totals-row td,
+.pivot-totals-row td {
+  font-weight: 700;
+}
+
+.quality-section .coceo-excel-grid-host .table-wrapper {
+  margin-top: 8px;
+}

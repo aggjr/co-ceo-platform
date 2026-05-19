@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CO-CEO | Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-primary: #00425F;
+            --color-secondary: #202451;
+            --color-accent: #DAB177;
+            --color-bg: #0b1120;
+            --color-surface: rgba(32, 36, 81, 0.4);
+            --color-text: #ffffff;
+            --color-text-muted: #cbd5e1; /* Clareado para melhor contraste */
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Montserrat', sans-serif; }
+
+        body {
+            /* Fundo escuro com gradiente radial sutil simulando o conceito gerado pela IA */
+            background: radial-gradient(circle at 10% 10%, #1e293b, var(--color-bg) 60%);
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Elemento de design geométrico no fundo */
+        .bg-shape {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0, 66, 95, 0.2) 0%, rgba(0,0,0,0) 70%);
+            top: -100px;
+            right: -100px;
+            z-index: 0;
+        }
+
+        .login-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(218, 177, 119, 0.15);
+            border-radius: 16px;
+            padding: 50px 40px;
+            width: 100%;
+            max-width: 420px;
+            z-index: 10;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .logo-container {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo {
+            font-size: 38px;
+            font-weight: 800;
+            color: var(--color-text);
+            letter-spacing: 3px;
+            margin-bottom: 5px;
+        }
+        
+        .logo span {
+            color: var(--color-accent);
+        }
+
+        .subtitle {
+            color: var(--color-text-muted);
+            font-size: 13px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group {
+            margin-bottom: 22px;
+            position: relative;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--color-text-muted);
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--color-text);
+            padding: 14px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .form-control::placeholder {
+            color: #94a3b8; /* Cor do texto de dica (placeholder) */
+            opacity: 0.7;
+        }
+
+        .form-control:focus {
+            border-color: var(--color-accent);
+            background: rgba(15, 23, 42, 0.9);
+            box-shadow: 0 0 0 3px rgba(218, 177, 119, 0.1);
+        }
+
+        /* Toggle Password Eye Icon */
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 36px;
+            color: var(--color-text-muted);
+            cursor: pointer;
+            font-size: 16px;
+            user-select: none;
+            transition: color 0.2s;
+        }
+        .password-toggle:hover {
+            color: var(--color-accent);
+        }
+
+        .btn-login {
+            width: 100%;
+            background: linear-gradient(90deg, var(--color-primary) 0%, #005a80 100%);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 66, 95, 0.4);
+            letter-spacing: 1px;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 66, 95, 0.6);
+            background: linear-gradient(90deg, #005a80 0%, var(--color-primary) 100%);
+        }
+
+        .card-footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        .card-footer a {
+            color: var(--color-text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+            font-weight: 500;
+        }
+
+        .card-footer a:hover {
+            color: var(--color-accent);
+        }
+        
+        .separator {
+            color: rgba(255,255,255,0.1);
+            margin: 0 10px;
+        }
+
+        .version {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-shape"></div>
+
+    <div class="version">V0.0.1</div>
+
+    <div class="login-card">
+        <div class="logo-container">
+            <div class="logo">CO<span>-</span>CEO</div>
+            <div class="subtitle">Decisão, estoque e operações</div>
+        </div>
+
+        <form onsubmit="event.preventDefault(); document.getElementById('btn-login').innerHTML = 'Autenticando...'; setTimeout(() => window.location.href='super_admin_preview.html', 800);">
+            
+            <div class="form-group">
+                <label for="email">E-mail corporativo</label>
+                <input type="email" id="email" class="form-control" placeholder="admin@coceo.com.br" required autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Senha de acesso</label>
+                <input type="password" id="password" class="form-control" placeholder="••••••••" required>
+                <span class="password-toggle" id="toggle-pwd" title="Mostrar senha">
+                    <svg id="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px; display: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <svg id="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                </span>
+            </div>
+
+            <button type="submit" class="btn-login" id="btn-login">ACESSAR PLATAFORMA</button>
+            
+        </form>
+
+        <div class="card-footer">
+            <a href="#">Esqueceu a senha?</a>
+            <span class="separator">|</span>
+            <a href="#">Suporte</a>
+        </div>
+    </div>
+
+    <script>
+        // Lógica de mostrar/ocultar senha
+        const togglePwd = document.getElementById('toggle-pwd');
+        const pwdInput = document.getElementById('password');
+        const eyeOpen = document.getElementById('eye-open');
+        const eyeClosed = document.getElementById('eye-closed');
+
+        togglePwd.addEventListener('click', () => {
+            if (pwdInput.type === 'password') {
+                pwdInput.type = 'text';
+                eyeClosed.style.display = 'none';
+                eyeOpen.style.display = 'block';
+                togglePwd.title = 'Ocultar senha';
+            } else {
+                pwdInput.type = 'password';
+                eyeOpen.style.display = 'none';
+                eyeClosed.style.display = 'block';
+                togglePwd.title = 'Mostrar senha';
+            }
+        });
+    </script>
+</body>
+</html>
