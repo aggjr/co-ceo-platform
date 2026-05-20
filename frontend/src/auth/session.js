@@ -130,10 +130,6 @@ export function resetAuthOnPageReload() {
   return true;
 }
 
-export function isAuthenticated() {
-  return !!getToken() || !!getImpersonationToken();
-}
-
 /** Decodifica payload JWT (sem validar assinatura — só UI). */
 export function decodeJwt(token) {
   try {
@@ -144,8 +140,40 @@ export function decodeJwt(token) {
   }
 }
 
+/** JWT expirado (com margem de 5s). */
+export function isTokenExpired(token) {
+  if (!token) return true;
+  const payload = decodeJwt(token);
+  if (!payload?.exp) return false;
+  return payload.exp * 1000 < Date.now() + 5000;
+}
+
+/**
+ * Token Bearer válido para API: personificação só se não expirou;
+ * senão usa sessão principal. Remove tokens expirados do storage.
+ */
+export function getBearerToken() {
+  const imp = getImpersonationToken();
+  if (imp) {
+    if (!isTokenExpired(imp)) return imp;
+    clearImpersonationToken();
+    sessionStorage.removeItem(IMPERSONATOR_META_KEY);
+  }
+  const main = getToken();
+  if (main) {
+    if (!isTokenExpired(main)) return main;
+    clearToken();
+    localStorage.removeItem(USER_KEY);
+  }
+  return null;
+}
+
+export function isAuthenticated() {
+  return !!getBearerToken();
+}
+
 export function getActiveContext() {
-  const token = getImpersonationToken() || getToken();
+  const token = getBearerToken();
   return token ? decodeJwt(token) : null;
 }
 

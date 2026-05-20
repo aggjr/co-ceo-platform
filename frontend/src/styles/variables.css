@@ -14,4 +14,7 @@
   --font: 'Montserrat', system-ui, sans-serif;
   --radius: 12px;
   --shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --glass-bg: rgba(30, 41, 59, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.05);
 }

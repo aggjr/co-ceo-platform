@@ -74,13 +74,28 @@ function mountMembersGrid(host, members) {
 }
 
 export async function PlatformCockpitPage(container) {
+  console.log('[PlatformCockpitPage] init');
   if (!isAuthenticated() || !isGlobalSession()) {
+    console.log('[PlatformCockpitPage] auth failed, redirecting to /login');
     navigate('/login');
     return;
   }
 
-  const contractsRes = await apiRequest('/api/cockpit/platform/contracts');
-  const contracts = contractsRes.contracts || [];
+  let contracts = [];
+  try {
+    const contractsRes = await apiRequest('/api/cockpit/platform/contracts');
+    contracts = contractsRes.contracts || [];
+  } catch (err) {
+    const msg =
+      err?.status === 401
+        ? 'Sessão expirada. Faça login novamente — os dados do cliente continuam no banco.'
+        : err?.message || 'Não foi possível carregar os contratos.';
+    await renderShell(container, {
+      title: 'Cockpit — Plataforma',
+      contentHtml: `<div class="error-banner">${msg}</div>`,
+    });
+    return;
+  }
 
   let selectedId = contracts[0]?.id || null;
   let iamData = null;
@@ -90,12 +105,19 @@ export async function PlatformCockpitPage(container) {
       iamData = null;
       return;
     }
+    console.log(`[PlatformCockpitPage] loading IAM for contract: ${contractId}`);
     iamData = await apiRequest(`/api/cockpit/platform/contracts/${contractId}/iam`);
+    console.log('[PlatformCockpitPage] IAM loaded:', iamData);
   };
 
-  if (selectedId) await loadIam(selectedId);
+  if (selectedId) {
+    await loadIam(selectedId);
+  } else {
+    console.log('[PlatformCockpitPage] no selected contract ID');
+  }
 
   const render = async () => {
+    console.log('[PlatformCockpitPage] render start');
     const contractOptions = contracts
       .map(
         (c) =>

@@ -60,10 +60,11 @@ async function main() {
   );
   console.log('Custódia chave:', JSON.stringify(assets, null, 2));
 
-  const [[{ n }]] = await pool.query(
+  const [countRows] = await pool.query(
     'SELECT COUNT(1) AS n FROM invest_ledger_entries WHERE organization_id = ?',
     [ORG_ID]
   );
+  const n = Number((countRows as any)[0]?.n ?? 0);
   console.log('Total ledger:', n);
 
   await pool.end();

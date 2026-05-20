@@ -95,7 +95,7 @@ export class CustodyCorrectionService {
     });
 
     try {
-      await this.gateway.delete(ctx, 'invest_assets', String(row.id));
+      await this.gateway.softDelete(ctx, 'invest_assets', String(row.id));
     } catch {
       /* liquidated basta */
     }
@@ -112,7 +112,7 @@ export class CustodyCorrectionService {
       const ref = e.broker_note_ref ? String(e.broker_note_ref) : '';
       if (!isObsoleteCorrectionRef(ref)) continue;
       try {
-        await this.gateway.delete(ctx, 'invest_ledger_entries', e.id);
+        await this.gateway.softDelete(ctx, 'invest_ledger_entries', e.id);
         n += 1;
       } catch {
         await this.gateway.update(ctx, 'invest_ledger_entries', e.id, {

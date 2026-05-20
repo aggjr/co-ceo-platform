@@ -61,10 +61,10 @@
 .table-wrapper {
     overflow: auto;
     flex: 1;
-    border: 1px solid var(--color-border-light);
+    border: 1px solid var(--color-border-light, rgba(255, 255, 255, 0.12));
     border-radius: 12px;
-    background: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    background: var(--coceo-table-wrapper-bg, #ffffff);
+    box-shadow: var(--coceo-table-wrapper-shadow, 0 2px 8px rgba(0, 0, 0, 0.05));
 }
 
 /* ===== TABLE HEADER ===== */

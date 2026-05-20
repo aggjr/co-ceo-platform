@@ -286,3 +286,25 @@ tr:hover td {
   padding: 48px 24px;
   color: var(--color-text-muted);
 }
+
+/* Melhorias de Design Premium (Mantendo as Cores Originais) */
+.card-glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  transition: var(--transition);
+}
+
+.card-glass:hover {
+  border-color: rgba(218, 177, 119, 0.25);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6);
+}
+
+.nav-link, .btn-logout, .nav-module-toggle, .btn-primary, .btn-ghost, .btn-entrar {
+  transition: var(--transition) !important;
+}
+

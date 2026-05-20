@@ -37,7 +37,11 @@
   font-size: 13px;
 }
 
+/* Tema escuro INVEST — evita faixa branca à direita em tabelas estreitas (caixa, renda fixa) */
 .portfolio-excel-section {
+  --coceo-table-wrapper-bg: rgba(15, 23, 42, 0.92);
+  --coceo-table-wrapper-border: rgba(218, 177, 119, 0.25);
+  --coceo-table-wrapper-shadow: none;
   margin-bottom: 28px;
 }
 
@@ -236,10 +240,16 @@
   --row-hover-bg: #edd8bb;
 }
 
+.card .portfolio-excel-section .coceo-excel-grid-host .table-wrapper,
 .portfolio-excel-section .coceo-excel-grid-host .table-wrapper {
-  border-color: rgba(218, 177, 119, 0.25);
-  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(218, 177, 119, 0.25) !important;
+  background: rgba(15, 23, 42, 0.92) !important;
+  box-shadow: none !important;
   max-height: min(70vh, 640px);
+}
+
+.portfolio-excel-section .coceo-excel-grid-host .coceo-excel-mount-body {
+  background: transparent;
 }
 
 /* Hover de linha — padrão CASH (#edd8bb), incluindo colunas sticky */

@@ -105,6 +105,24 @@ const TABLES: TableDefinition[] = [
       'created_at',
     ]),
   }),
+  def('database_usage_telemetry', 'system', {
+    softDelete: false,
+    countsTowardStorage: false,
+    blockedWritableColumns: new Set([
+      ...DEFAULT_BLOCKED,
+      'user_id',
+      'organization_id',
+      'contract_id',
+      'impersonator_user_id',
+      'operation_type',
+      'target_table',
+      'query_key',
+      'bytes_in',
+      'bytes_out',
+      'rows_affected',
+      'duration_ms',
+    ]),
+  }),
 ];
 
 const BY_NAME = new Map(TABLES.map((t) => [t.name, t]));

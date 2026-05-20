@@ -1,35 +1,5 @@
-import './styles/loader.css';
-import './styles/coceo-excel-table.css';
-import './styles/coceo-excel-global.css';
-import { consumeImpersonationHandoff, resetAuthOnPageReload } from './auth/session.js';
-import { registerRoute, startRouter } from './router.js';
-import { initTelemetry } from './telemetry/index.js';
-import { LoginPage } from './pages/LoginPage.js';
-import { CockpitWelcomePage } from './pages/CockpitWelcomePage.js';
-import { PlatformCockpitPage } from './pages/PlatformCockpitPage.js';
-import { ClientCockpitPage } from './pages/ClientCockpitPage.js';
-import { InvestDashboardPage } from './pages/InvestDashboardPage.js';
-import { InvestPortfolioPage } from './pages/InvestPortfolioPage.js';
-import { InvestResultadoPage } from './pages/InvestResultadoPage.js';
-import { InvestStockGainPivotPage } from './pages/InvestStockGainPivotPage.js';
-import { InvestClosedTradesPage } from './pages/InvestClosedTradesPage.js';
-import { QualityRegressionPage } from './pages/QualityRegressionPage.js';
-
-registerRoute('/login', LoginPage);
-registerRoute('/cockpit', CockpitWelcomePage);
-registerRoute('/cockpit/platform', PlatformCockpitPage);
-registerRoute('/cockpit/platform/quality', QualityRegressionPage);
-registerRoute('/cockpit/client', ClientCockpitPage);
-registerRoute('/cockpit/client/team', ClientCockpitPage);
-registerRoute('/cockpit/client/roles', ClientCockpitPage);
-registerRoute('/cockpit/client/storage', ClientCockpitPage);
-registerRoute('/invest', InvestDashboardPage);
-registerRoute('/invest/portfolio', InvestPortfolioPage);
-registerRoute('/invest/resultado', InvestResultadoPage);
-registerRoute('/invest/ganhos-por-acao', InvestStockGainPivotPage);
-registerRoute('/invest/transacoes-finalizadas', InvestClosedTradesPage);
-
-consumeImpersonationHandoff();
-resetAuthOnPageReload();
-initTelemetry();
-startRouter();
+/**
+ * @deprecated Entry legado. Produção usa `main.tsx` (Solid + LegacyRouteHost).
+ * Mantido para referência e scripts que ainda importam este arquivo.
+ */
+import './main.tsx';

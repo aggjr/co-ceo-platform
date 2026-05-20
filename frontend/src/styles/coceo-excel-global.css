@@ -17,8 +17,8 @@
 }
 
 .card .coceo-excel-grid-host .table-wrapper {
-  background: #fff;
-  border-color: rgba(15, 23, 42, 0.12);
+  background: var(--coceo-table-wrapper-bg, #fff);
+  border-color: var(--coceo-table-wrapper-border, rgba(15, 23, 42, 0.12));
 }
 
 .card .coceo-excel-grid-host .table-wrapper table thead tr {

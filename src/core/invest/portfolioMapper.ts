@@ -19,6 +19,10 @@ import {
   isTesouroDiretoTicker,
   TESOURO_SELIC_2031_TICKER,
 } from './tesouroDirectLedger';
+import {
+  resolveBrokerShareQuantity,
+  sanitizeEquityThreePrices,
+} from './equityBrokerQuantity';
 
 const OPTION_ASSET_TYPES = new Set(['option_call', 'option_put']);
 
@@ -195,17 +199,10 @@ export function enrichPortfolioRow(
   const meta = parseMetadata(row.metadata);
   const qty = Number(row.current_quantity ?? 0);
   const avg = Number(row.managerial_avg_price ?? 0);
-  const prices =
+  let prices =
     threePrices ??
     ({ strict: avg, b3: avg, managerial: avg } satisfies ThreeAvgPrices);
-  const displayAvg = prices.managerial > 0 ? prices.managerial : avg;
   const metaLast = Number(meta.last_price ?? 0);
-  const lastPrice = metaLast > 0 ? metaLast : displayAvg;
-  const updatedQuote = metaLast > 0 ? metaLast : null;
-  const pmB3 = prices.b3 > 0 ? prices.b3 : displayAvg;
-  let marketValue = qty * lastPrice;
-  const costBasis = qty * displayAvg;
-  let pnl = marketValue - costBasis;
   const ticker = String(row.asset_ticker ?? '').trim().toUpperCase();
   let assetType = String(row.asset_type ?? '').trim();
   const inferred = inferAssetType(ticker);
@@ -219,6 +216,14 @@ export function enrichPortfolioRow(
   } else if (!assetType || (assetType === 'stock' && isFixedIncomeTicker(ticker))) {
     assetType = inferred;
   }
+  prices = sanitizeEquityThreePrices(assetType, prices, avg, metaLast);
+  const displayAvg = prices.managerial > 0 ? prices.managerial : avg;
+  const lastPrice = metaLast > 0 ? metaLast : displayAvg;
+  const updatedQuote = metaLast > 0 ? metaLast : null;
+  const pmB3 = prices.b3 > 0 ? prices.b3 : displayAvg;
+  let marketValue = qty * lastPrice;
+  const costBasis = qty * displayAvg;
+  let pnl = marketValue - costBasis;
   const optionLike = isOptionTicker(ticker) || isOptionAssetType(assetType);
   if (optionLike && !isOptionAssetType(assetType)) {
     const inferredSide = inferOptionMonthFromTicker(ticker)?.optionSide;
@@ -347,8 +352,16 @@ export function mergeLedgerCustodyIntoAssetRows(
     if (isGhostAssetTicker(key) || key.startsWith('CDB-')) continue;
     const hit = byTicker.get(key);
     if (hit) {
-      hit.current_quantity = la.quantity;
-      hit.managerial_avg_price = la.avgPrice;
+      const assetType = String(hit.asset_type ?? la.assetType);
+      const snapQty = Number(hit.current_quantity ?? 0);
+      hit.current_quantity = resolveBrokerShareQuantity(snapQty, la.quantity, assetType);
+      const snapPm = Number(hit.managerial_avg_price ?? 0);
+      const useLedgerPm =
+        la.avgPrice > 0 &&
+        (snapPm <= 0 || la.avgPrice <= snapPm * 5 || la.avgPrice >= snapPm / 5);
+      if (useLedgerPm) {
+        hit.managerial_avg_price = la.avgPrice;
+      }
       hit.status = 'active';
       const meta = parseMetadata(hit.metadata);
       if (la.underlying && !meta.underlying_ticker) {

@@ -1,5 +1,12 @@
 import { trackScreenView } from './telemetry/index.js';
 
+/** Quando o shell Solid está ativo, navegação delega ao @solidjs/router. */
+let solidNavigate = null;
+
+export function bindSolidNavigate(fn) {
+  solidNavigate = fn;
+}
+
 const routes = new Map();
 
 export function registerRoute(path, handler) {
@@ -19,6 +26,13 @@ export function currentPath() {
 
 export function navigate(path) {
   const target = normalizePath(path);
+  if (solidNavigate) {
+    solidNavigate(target);
+    if (target === currentPath()) {
+      window.dispatchEvent(new CustomEvent('coceo:route-refresh'));
+    }
+    return;
+  }
   if (target === currentPath()) {
     dispatch();
     return;

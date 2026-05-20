@@ -2,8 +2,7 @@
  * Parser de linhas do extrato BTG (texto extraído do PDF).
  * Ignora liquidações agregadas de bolsa — o detalhe vem do myProfit / notas.
  */
-import { TESOURO_SELIC_2031_TICKER } from './tesouroDirectLedger';
-import { TESOURO_SELIC_2031_TICKER } from './tesouroDirectLedger';
+const LFT_TICKER_RE = /LFT\s+(\d{2})\/(\d{2})\/(\d{4})/i;
 
 export type BtgParsedLine = {
   date: string;
@@ -67,7 +66,13 @@ export type BtgLedgerMapping = {
 };
 
 const CASH_TICKER = 'CAIXA-BTG';
-const LFT_TICKER = TESOURO_SELIC_2031_TICKER;
+
+function parseLftTicker(description: string): string {
+  const match = description.match(LFT_TICKER_RE);
+  if (!match) return 'LFT-20310301';
+  const [, dd, mm, yyyy] = match;
+  return `LFT-${yyyy}${mm}${dd}`;
+}
 
 /** Classifica linha do extrato → operação do livro-razão INVEST. */
 export function classifyBtgDescription(description: string): BtgLedgerMapping {
@@ -118,7 +123,7 @@ export function classifyBtgDescription(description: string): BtgLedgerMapping {
   if (d.includes('COMPRA DE TESOURO DIRETO')) {
     return {
       operation: 'buy',
-      ticker: LFT_TICKER,
+      ticker: parseLftTicker(description),
       asset_type: 'fixed_income',
       notes: description,
     };
@@ -126,7 +131,7 @@ export function classifyBtgDescription(description: string): BtgLedgerMapping {
   if (d.includes('VENDA DE TESOURO DIRETO')) {
     return {
       operation: 'sell',
-      ticker: LFT_TICKER,
+      ticker: parseLftTicker(description),
       asset_type: 'fixed_income',
       notes: description,
     };
@@ -186,6 +191,26 @@ export function classifyBtgDescription(description: string): BtgLedgerMapping {
   return { operation: 'skip', ticker: CASH_TICKER, skip: true, notes: description };
 }
 
+export function getBtgOperationSign(operation: string, description: string): number {
+  const d = description.toUpperCase();
+  if (['buy', 'capital_withdrawal', 'penalty_b3'].includes(operation)) {
+    return -1;
+  }
+  if (['sell', 'capital_deposit', 'cash_yield'].includes(operation)) {
+    return 1;
+  }
+  if (operation === 'fee') {
+    return d.includes('REEMBOLSO') ? 1 : -1;
+  }
+  if (operation === 'securities_lending') {
+    if (d.includes('REMUNERAÇÃO') || d.includes('REMUNERACAO')) {
+      return 1;
+    }
+    return -1;
+  }
+  return 1;
+}
+
 export function btgLinesToImportEntries(
   lines: string[],
   openingBalance?: number
@@ -231,19 +256,8 @@ export function btgLinesToImportEntries(
     const map = classifyBtgDescription(parsed.description);
     if (map.skip || map.operation === 'skip') continue;
 
-    let net = parsed.signedCash;
-    if (map.operation === 'buy' || map.operation === 'sell') {
-      net = map.operation === 'buy' ? -Math.abs(parsed.movementAmount) : Math.abs(parsed.movementAmount);
-    }
-    if (map.operation === 'capital_withdrawal') {
-      net = -Math.abs(parsed.movementAmount);
-    }
-    if (map.operation === 'fee' || map.operation === 'penalty_b3') {
-      net = -Math.abs(parsed.movementAmount);
-      if (parsed.description.toUpperCase().includes('REEMBOLSO')) {
-        net = Math.abs(parsed.movementAmount);
-      }
-    }
+    const sign = getBtgOperationSign(map.operation, parsed.description);
+    const net = sign * Math.abs(parsed.movementAmount);
 
     const qty =
       map.operation === 'buy' || map.operation === 'sell'

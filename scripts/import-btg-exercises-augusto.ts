@@ -66,6 +66,7 @@ async function main() {
     ticker: String(r.asset_ticker),
     operation: String(r.transaction_type) as LedgerImportLine['operation'],
     quantity: Math.abs(Number(r.quantity)),
+    unit_price: Number(r.unit_price ?? 0),
     total_net_value: Number(r.total_net_value),
   }));
 
@@ -80,6 +81,7 @@ async function main() {
         ticker: e.ticker,
         operation: e.operation,
         quantity: e.quantity,
+        unit_price: e.unit_price ?? 0,
         total_net_value: e.total_net_value,
       });
     }

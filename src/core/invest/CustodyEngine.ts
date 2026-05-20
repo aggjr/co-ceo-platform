@@ -4,6 +4,10 @@ import {
   isTesouroDiretoTicker,
   normalizeTesouroLedgerQuantity,
 } from './tesouroDirectLedger';
+import {
+  isBrokerEquityAssetType,
+  normalizeLedgerEquityQuantity,
+} from './equityBrokerQuantity';
 
 function isFixedIncomeAsset(assetType: string, ticker: string): boolean {
   return assetType === 'fixed_income' || isFixedIncomeTicker(ticker);
@@ -178,13 +182,20 @@ export function rebuildCustodyFromLedger(entries: LedgerEvent[]): CustodyRebuild
     if (Math.abs(s.qty) < 1e-9) continue;
     if (s.qty < 0 && !allowsShortPosition(s.assetType, s.ticker)) continue;
     const absQty = Math.abs(s.qty);
+    let quantity = Math.round(s.qty * 10000) / 10000;
+    let avgPrice = Math.round((absQty > 0 ? s.totalCost / absQty : 0) * 10000) / 10000;
+    if (isBrokerEquityAssetType(s.assetType)) {
+      const norm = normalizeLedgerEquityQuantity(quantity, avgPrice);
+      quantity = norm.quantity;
+      avgPrice = norm.avgPrice;
+    }
     assets.push({
       assetId: s.assetId,
       ticker: s.ticker,
       assetType: s.assetType,
       underlying: s.underlying,
-      quantity: Math.round(s.qty * 10000) / 10000,
-      avgPrice: Math.round((absQty > 0 ? s.totalCost / absQty : 0) * 10000) / 10000,
+      quantity,
+      avgPrice,
     });
   }
 

@@ -3,6 +3,7 @@ import {
   classifyBtgDescription,
   parseBtgMovementLine,
   parseBrNumber,
+  getBtgOperationSign,
 } from '../../../src/core/invest/BtgExtractLineParser';
 
 describe('BtgExtractLineParser', () => {
@@ -45,5 +46,27 @@ describe('BtgExtractLineParser', () => {
       true
     );
     expect(entries.some((e) => e.notes?.includes('LIQ BOLSA (Operacoes)'))).toBe(false);
+  });
+
+  it('getBtgOperationSign maps correctly', () => {
+    expect(getBtgOperationSign('cash_yield', 'Rendimento Disponível')).toBe(1);
+    expect(getBtgOperationSign('capital_withdrawal', 'TED ENVIADA')).toBe(-1);
+    expect(getBtgOperationSign('securities_lending', 'TAXA REMUNERAÇÃO - BTC PRIO3')).toBe(1);
+    expect(getBtgOperationSign('securities_lending', 'TAXA EMOLUMENTOS - BTC PRIO3')).toBe(-1);
+    expect(getBtgOperationSign('fee', 'REEMBOLSO DE CUSTÓDIA')).toBe(1);
+    expect(getBtgOperationSign('fee', 'CUSTÓDIA')).toBe(-1);
+  });
+
+  it('btgLinesToImportEntries calculates correct cash yield amount without delta bug', () => {
+    const entries = btgLinesToImportEntries(
+      [
+        'Saldo Inicial 963.975,75',
+        '30/04/2026 Rendimento Disponível - Saldo Remunerado 28.386,27\t0,25',
+      ],
+      963975.75
+    );
+    const yieldEntry = entries.find((e) => e.operation === 'cash_yield');
+    expect(yieldEntry).toBeDefined();
+    expect(yieldEntry?.total_net_value).toBeCloseTo(0.25);
   });
 });
