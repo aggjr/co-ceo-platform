@@ -1,10 +1,8 @@
 import { rebuildCustodyFromLedger } from '../../../src/core/invest/CustodyEngine';
 import {
-  BTG_CASH_STATEMENT_BALANCE_2026_05_19,
   cashBalanceFromLedger,
   resolveCashInvestDisplayBalance,
 } from '../../../src/core/invest/cashInvestLedger';
-import { BTG_EXTRACT_2026_05_18_19 } from '../../../src/core/invest/btgExtractMay182026';
 
 describe('cashInvestLedger', () => {
   it('saldo caixa = soma total_net_value (não qty×preço)', () => {
@@ -38,19 +36,55 @@ describe('cashInvestLedger', () => {
     expect(cash?.quantity).toBeCloseTo(balance, 0);
   });
 
-  it('usa âncora do extrato quando livro está incoerente', () => {
-    const junk = [
+  it('saldo exibido = livro razão (sem âncora externa)', () => {
+    const entries = [
       {
         asset_id: 'c',
         asset_ticker: 'CAIXA-BTG',
         asset_type: 'cash',
         transaction_type: 'opening_balance',
-        quantity: 58759,
-        unit_price: 1,
-        total_net_value: 58759,
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 10_000,
         transaction_date: '2026-01-01',
       },
+      {
+        asset_id: 'c',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'fee',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: -2_500,
+        transaction_date: '2026-02-10',
+      },
     ];
-    expect(resolveCashInvestDisplayBalance(junk)).toBe(BTG_CASH_STATEMENT_BALANCE_2026_05_19);
+    expect(resolveCashInvestDisplayBalance(entries, '2026-02-10')).toBeCloseTo(7_500, 2);
+  });
+
+  it('lançamentos posteriores à data de corte são ignorados', () => {
+    const entries = [
+      {
+        asset_id: 'c',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'capital_deposit',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 1_000,
+        transaction_date: '2026-03-01',
+      },
+      {
+        asset_id: 'c',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'capital_deposit',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 5_000,
+        transaction_date: '2026-04-01',
+      },
+    ];
+    expect(cashBalanceFromLedger(entries, '2026-03-15')).toBeCloseTo(1_000, 2);
   });
 });

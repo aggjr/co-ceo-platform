@@ -8,11 +8,7 @@ import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import { CoCeoDataGateway } from '../src/core/dal';
 import { installerContext } from '../src/database/seeds/lib/installerContext';
-import {
-  mapBrokerOrderToLedger,
-  stripOptionExerciseSuffix,
-} from '../src/core/invest/brokerOrderMapper';
-import { sumPutSellPremiumForExercise } from '../src/core/invest/exercisePremium';
+import { mapBrokerOrderToLedger } from '../src/core/invest/brokerOrderMapper';
 import { LedgerImportService } from '../src/core/invest/LedgerImportService';
 import type { LedgerImportLine } from '../src/core/invest/ledgerTypes';
 import { buildThreeAvgPricesByUnderlying } from '../src/core/invest/portfolioThreePrices';
@@ -56,58 +52,21 @@ async function main() {
   const ledger = new LedgerImportService(gateway);
   const ctx = { ...installerContext(), organizationId: ORG_ID, scope: 'node' as const };
 
-  const historyRows = await gateway.readQuery(ctx, 'invest_ledger_with_assets', [
-    ORG_ID,
-    '2000-01-01',
-    '2099-12-31',
-  ]);
-  const premiumHistory: LedgerImportLine[] = historyRows.map((r) => ({
-    date: String(r.transaction_date).slice(0, 10),
-    ticker: String(r.asset_ticker),
-    operation: String(r.transaction_type) as LedgerImportLine['operation'],
-    quantity: Math.abs(Number(r.quantity)),
-    unit_price: Number(r.unit_price ?? 0),
-    total_net_value: Number(r.total_net_value),
-  }));
-
-  const myprofitPath = path.join(__dirname, '..', 'data', 'invest', 'myprofit-augusto-h1-2026.json');
-  if (fs.existsSync(myprofitPath)) {
-    const mp = JSON.parse(fs.readFileSync(myprofitPath, 'utf8')) as {
-      entries?: LedgerImportLine[];
-    };
-    for (const e of mp.entries || []) {
-      premiumHistory.push({
-        date: e.date,
-        ticker: e.ticker,
-        operation: e.operation,
-        quantity: e.quantity,
-        unit_price: e.unit_price ?? 0,
-        total_net_value: e.total_net_value,
-      });
-    }
-  }
-
+  // Ajuste B3 do prêmio da PUT no exercício é responsabilidade da engine de 3 preços
+  // (livro razão guarda apenas a operação bruta — compra/venda no papel ao strike).
   const entries: LedgerImportLine[] = [];
   let seq = 0;
   for (const o of data.orders) {
     seq += 1;
     const orderDate = o.date || date;
-    const optionTicker = stripOptionExerciseSuffix(o.ticker);
-    const premium =
-      o.direction === 'C'
-        ? sumPutSellPremiumForExercise(premiumHistory, optionTicker, o.quantity)
-        : 0;
-    const mapped = mapBrokerOrderToLedger(
-      {
-        ticker: o.ticker,
-        direction: o.direction,
-        quantity: o.quantity,
-        avgPrice: o.avgPrice,
-        date: orderDate,
-        broker_note_ref: `${BATCH_PREFIX}#${seq}#${o.ticker}`,
-      },
-      { putPremiumNetForB3: premium > 0 ? premium : undefined }
-    );
+    const mapped = mapBrokerOrderToLedger({
+      ticker: o.ticker,
+      direction: o.direction,
+      quantity: o.quantity,
+      avgPrice: o.avgPrice,
+      date: orderDate,
+      broker_note_ref: `${BATCH_PREFIX}#${seq}#${o.ticker}`,
+    });
     entries.push(...mapped);
   }
 

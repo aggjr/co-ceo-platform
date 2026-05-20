@@ -13,27 +13,17 @@ export type CallCoverageOptionRow = {
   assetType?: string;
 };
 
-/** Quantidade em unidades da corretora (sem conversão por lote). */
+/** Quantidade absoluta de opções (livro razão guarda CALL vendida com sinal negativo). */
 export function optionQtyAbs(quantity: number): number {
   const abs = Math.abs(Number(quantity));
   return Number.isFinite(abs) ? abs : 0;
 }
 
-/** @deprecated alias — mesma unidade da corretora (ex.: 12.700 ações = 12.700 CALLs cobertos). */
-export function optionQtyToContracts(quantity: number): number {
-  return optionQtyAbs(quantity);
-}
-
-/** Capacidade de cobertura em ações (1 unidade de CALL = 1 ação na mesma unidade). */
+/** Capacidade de cobertura: cada ação cobre uma CALL vendida. */
 export function equityCallCoverageCapacity(shareQty: number): number {
   const q = Number(shareQty);
   if (!Number.isFinite(q) || q <= 0) return 0;
   return q;
-}
-
-/** @deprecated alias */
-export function equityMaxCallContracts(shareQty: number): number {
-  return equityCallCoverageCapacity(shareQty);
 }
 
 /** B3: 5ª letra A–L = CALL; M–X = PUT. */

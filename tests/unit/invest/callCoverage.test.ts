@@ -3,20 +3,19 @@ import {
   buildShortCallPremiumPendingByUnderlying,
   buildShortCallsSoldByUnderlying,
   collectCallCoverageOptionRows,
-  equityMaxCallContracts,
+  equityCallCoverageCapacity,
   formatOptionTypeLabel,
-  optionQtyToContracts,
+  optionQtyAbs,
   resolveOptionSide,
   sumShortCallQtyAbs,
 } from '../../../src/core/invest/callCoverage';
-import { PRIOF_CALL_PREMIUM_TOTAL_2026_05_18 } from '../../../src/core/invest/priofCallSellsMay182026';
 
 describe('call coverage (ações × CALL vendida)', () => {
-  it('usa unidades da corretora sem dividir por lote', () => {
-    expect(optionQtyToContracts(4)).toBe(4);
-    expect(optionQtyToContracts(-6500)).toBe(6500);
-    expect(optionQtyToContracts(500)).toBe(500);
-    expect(optionQtyToContracts(-900)).toBe(900);
+  it('quantidade absoluta preserva a unidade do livro razão (sem lotes)', () => {
+    expect(optionQtyAbs(4)).toBe(4);
+    expect(optionQtyAbs(-6500)).toBe(6500);
+    expect(optionQtyAbs(500)).toBe(500);
+    expect(optionQtyAbs(-900)).toBe(900);
   });
 
   it('classifica tipo B3: A–L CALL, M–X PUT', () => {
@@ -55,7 +54,7 @@ describe('call coverage (ações × CALL vendida)', () => {
     expect(sumShortCallQtyAbs(options)).toBe(1400);
   });
 
-  it('CALLs sobrando negativo indica descoberto', () => {
+  it('cobertura: cada ação cobre uma CALL vendida na mesma unidade', () => {
     const equities = [
       {
         ticker: 'PRIO3',
@@ -77,7 +76,7 @@ describe('call coverage (ações × CALL vendida)', () => {
       callsSold: number;
       callsRemaining: number;
     };
-    expect(equityMaxCallContracts(12700)).toBe(12700);
+    expect(equityCallCoverageCapacity(12700)).toBe(12700);
     expect(row.callsSold).toBe(900);
     expect(row.callsRemaining).toBe(11800);
   });
@@ -126,6 +125,5 @@ describe('call coverage (ações × CALL vendida)', () => {
     expect(sumShortCallQtyAbs(coverage)).toBe(1400);
     const prem = buildShortCallPremiumPendingByUnderlying(ledgerEvents);
     expect(prem.get('PRIO3')).toBe(1556);
-    expect(PRIOF_CALL_PREMIUM_TOTAL_2026_05_18).toBe(3094);
   });
 });

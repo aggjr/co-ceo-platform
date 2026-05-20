@@ -84,7 +84,6 @@ export function isInvalidOpenCustodyPosition(item) {
 export function filterOpenPortfolioItems(items) {
   return (items || []).filter(
     (item) =>
-      !isGhostAssetTicker(item.ticker) &&
       !isZeroOpenOption(item) &&
       !isExpiredOption(item) &&
       !isInvalidOpenCustodyPosition(item)
@@ -106,22 +105,21 @@ import {
   buildShortCallPremiumPendingByUnderlying,
   buildShortCallsSoldByUnderlying,
   collectCallCoverageOptionRows,
-  equityMaxCallContracts,
+  equityCallCoverageCapacity,
   formatOptionTypeLabel,
-  optionQtyToContracts,
+  optionQtyAbs,
   resolveOptionSide,
   sumShortCallQtyAbs,
 } from '../../../src/core/invest/callCoverage.ts';
-import { isGhostAssetTicker } from '../../../src/core/invest/custodyCorrections.ts';
 
 export {
   attachCallCoverageToEquities,
   buildShortCallPremiumPendingByUnderlying,
   buildShortCallsSoldByUnderlying,
   collectCallCoverageOptionRows,
-  equityMaxCallContracts,
+  equityCallCoverageCapacity,
   formatOptionTypeLabel,
-  optionQtyToContracts,
+  optionQtyAbs,
   resolveOptionSide,
   sumShortCallQtyAbs,
 };

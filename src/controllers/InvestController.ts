@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
 import { FieldPolicyService } from '../core/auth/FieldPolicyService';
 import { CoCeoDataGateway } from '../core/dal';
-import { CustodyCorrectionService } from '../core/invest/CustodyCorrectionService';
 import { LedgerImportService } from '../core/invest/LedgerImportService';
-import { isGhostAssetTicker } from '../core/invest/custodyCorrections';
 import { PIVOT_COLUMN_LABELS } from '../core/invest/ledgerTypes';
 import { buildPnLPivot } from '../core/invest/PnLPivotEngine';
 import {
@@ -37,7 +35,6 @@ import {
   enrichPortfolioRow,
   attachUnderlyingMarketData,
   consolidateTesouroPortfolioItems,
-  filterGhostPortfolioItems,
   mergeLedgerCustodyIntoAssetRows,
   partitionPortfolioPositions,
   summarizePortfolio,
@@ -50,14 +47,12 @@ import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
 
 export class InvestController {
   private readonly ledger: LedgerImportService;
-  private readonly custodyCorrections: CustodyCorrectionService;
   private readonly patrimonyStore: PatrimonyDailyStore;
   private readonly patrimonyRecorder: PatrimonyDailyRecorder;
   private readonly quoteSync: InvestQuoteSyncService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
-    this.custodyCorrections = new CustodyCorrectionService(gateway, this.ledger);
     this.patrimonyStore = new PatrimonyDailyStore(gateway);
     this.patrimonyRecorder = new PatrimonyDailyRecorder(gateway);
     this.quoteSync = new InvestQuoteSyncService(gateway);
@@ -73,16 +68,10 @@ export class InvestController {
       });
     }
 
-    for (const ghostTicker of ['CDB-BTG-20240802'] as const) {
-      await this.custodyCorrections.purgeAsset(ctx, ghostTicker).catch(() => undefined);
-    }
-
-    const rows = (
-      await this.gateway.findWhere(ctx, 'invest_assets', {
-        organization_id: ctx.organizationId,
-        status: 'active',
-      })
-    ).filter((row) => !isGhostAssetTicker(String(row.asset_ticker ?? '')));
+    const rows = await this.gateway.findWhere(ctx, 'invest_assets', {
+      organization_id: ctx.organizationId,
+      status: 'active',
+    });
 
     const today = new Date().toISOString().slice(0, 10);
     const ledgerEvents = await this.ledger.listLedgerEvents(
@@ -91,12 +80,9 @@ export class InvestController {
       today
     );
     const { assets: ledgerCustody } = rebuildCustodyFromLedger(ledgerEvents);
-    const ledgerCustodyOpen = ledgerCustody.filter(
-      (a) => !isGhostAssetTicker(a.ticker)
-    );
     const rowsMerged = mergeLedgerCustodyIntoAssetRows(
       rows as Record<string, unknown>[],
-      ledgerCustodyOpen
+      ledgerCustody
     );
     const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
 
@@ -145,8 +131,7 @@ export class InvestController {
       premiumByUnderlying
     );
     const cashBalance = resolveCashInvestDisplayBalance(ledgerEvents, today);
-    const withoutGhost = filterGhostPortfolioItems(withCallCoverage);
-    const withCash = applyCashInvestBalanceToItems(withoutGhost, cashBalance);
+    const withCash = applyCashInvestBalanceToItems(withCallCoverage, cashBalance);
 
     return res.json({
       success: true,
@@ -458,23 +443,4 @@ export class InvestController {
     }
   };
 
-  /** Correções autorizadas: remove CDB fantasma, venda 47 LFT, crédito prêmio PRIOF. */
-  applyCustodyCorrections = async (req: Request, res: Response) => {
-    const ctx = req.userContext!;
-    if (!ctx.organizationId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Selecione uma organização (personifique a holding).',
-      });
-    }
-    try {
-      const result = await this.custodyCorrections.applyAuthorizedCorrections(ctx);
-      return res.json({ success: true, ...result });
-    } catch (err: unknown) {
-      const status = (err as { httpStatus?: number }).httpStatus ?? 500;
-      const message =
-        err instanceof Error ? err.message : 'Falha ao aplicar correções de custódia.';
-      return res.status(status).json({ success: false, error: message });
-    }
-  };
 }

@@ -14,15 +14,10 @@ import {
 import { resolveOptionStrike, type OptionStrikeSource } from './optionStrike';
 import type { ThreeAvgPrices } from './portfolioThreePrices';
 import { isCashInvestTicker } from './cashInvestLedger';
-import { isGhostAssetTicker } from './custodyCorrections';
 import {
   isTesouroDiretoTicker,
   TESOURO_SELIC_2031_TICKER,
 } from './tesouroDirectLedger';
-import {
-  resolveBrokerShareQuantity,
-  sanitizeEquityThreePrices,
-} from './equityBrokerQuantity';
 
 const OPTION_ASSET_TYPES = new Set(['option_call', 'option_put']);
 
@@ -199,7 +194,7 @@ export function enrichPortfolioRow(
   const meta = parseMetadata(row.metadata);
   const qty = Number(row.current_quantity ?? 0);
   const avg = Number(row.managerial_avg_price ?? 0);
-  let prices =
+  const prices =
     threePrices ??
     ({ strict: avg, b3: avg, managerial: avg } satisfies ThreeAvgPrices);
   const metaLast = Number(meta.last_price ?? 0);
@@ -216,7 +211,6 @@ export function enrichPortfolioRow(
   } else if (!assetType || (assetType === 'stock' && isFixedIncomeTicker(ticker))) {
     assetType = inferred;
   }
-  prices = sanitizeEquityThreePrices(assetType, prices, avg, metaLast);
   const displayAvg = prices.managerial > 0 ? prices.managerial : avg;
   const lastPrice = metaLast > 0 ? metaLast : displayAvg;
   const updatedQuote = metaLast > 0 ? metaLast : null;
@@ -232,7 +226,7 @@ export function enrichPortfolioRow(
   const optionMonth = optionLike ? inferOptionMonthFromTicker(ticker) : null;
   const optionExpiryDate = optionMonth ? inferOptionExpiryDate(ticker) : null;
   const strikeResolved = optionLike
-    ? resolveOptionStrike({ meta, ticker, managerialAvgPrice: displayAvg })
+    ? resolveOptionStrike({ meta, ticker })
     : { strike: null, source: null };
   const optionStrike = strikeResolved.strike;
   const premiumReceived =
@@ -349,17 +343,10 @@ export function mergeLedgerCustodyIntoAssetRows(
 
   for (const la of ledgerAssets) {
     const key = la.ticker.toUpperCase();
-    if (isGhostAssetTicker(key) || key.startsWith('CDB-')) continue;
     const hit = byTicker.get(key);
     if (hit) {
-      const assetType = String(hit.asset_type ?? la.assetType);
-      const snapQty = Number(hit.current_quantity ?? 0);
-      hit.current_quantity = resolveBrokerShareQuantity(snapQty, la.quantity, assetType);
-      const snapPm = Number(hit.managerial_avg_price ?? 0);
-      const useLedgerPm =
-        la.avgPrice > 0 &&
-        (snapPm <= 0 || la.avgPrice <= snapPm * 5 || la.avgPrice >= snapPm / 5);
-      if (useLedgerPm) {
+      hit.current_quantity = la.quantity;
+      if (la.avgPrice > 0) {
         hit.managerial_avg_price = la.avgPrice;
       }
       hit.status = 'active';
@@ -450,10 +437,6 @@ export function applyCashInvestBalanceToItems(
       pnlPct: 0,
     };
   });
-}
-
-export function filterGhostPortfolioItems(items: PortfolioItemDto[]): PortfolioItemDto[] {
-  return items.filter((item) => !isGhostAssetTicker(item.ticker));
 }
 
 export function applyAllocationPercents(items: PortfolioItemDto[]): PortfolioItemDto[] {

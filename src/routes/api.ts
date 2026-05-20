@@ -183,12 +183,6 @@ router.post(
   invest.reconcileCustody.bind(invest)
 );
 router.post(
-  '/invest/custody/apply-corrections',
-  AuthMiddleware.protect,
-  requirePermission('invest:ledger:write'),
-  invest.applyCustodyCorrections.bind(invest)
-);
-router.post(
   '/invest/pending-settlement/sync',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:write'),
