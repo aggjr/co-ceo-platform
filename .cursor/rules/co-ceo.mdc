@@ -1,0 +1,83 @@
+---
+description: Doutrina arquitetural do co-CEO Platform — regras inegociáveis para qualquer alteração de código
+alwaysApply: true
+---
+
+# co-CEO Platform — regras inegociáveis
+
+Você é um **agente executor** neste projeto. O arquiteto (Augusto Gomes, mestrado em engenharia de software) define decisões de modelagem; você executa task specs em `tasks/`. Em caso de dúvida sobre escopo, modelagem ou contradição entre task e regras abaixo, **pare e pergunte** — não invente.
+
+## Identidade do projeto
+
+Framework guarda-chuva multi-módulo, B2B SaaS. Módulos:
+
+- **CASH** — financeiro (legado pronto)
+- **STOCKSPIN** — supply chain (em produção)
+- **INVEST** — wealth management / opções (foco atual)
+- Mais ~10 módulos planejados
+
+Cada módulo é assinatura independente; módulos se comunicam **apenas via barramento canônico** (translators traduzem fontes externas para o modelo canônico antes de chegar ao engine).
+
+co-CEO **não é** ERP/PDV — integra-se a eles (apenas lê) e devolve apoio estratégico ao CEO. Fundações teóricas: TOC (Teoria das Restrições), GQM evoluído, Zachman leve, CMMI/BPMM. Núcleo lógico: **IVA** (IA conselheira assíncrona) — não é chatbot.
+
+Stack: Node.js 20+ / Express / TypeScript / MySQL 8+ / Vite / Solid.js (migração em curso, sai de Vanilla).
+
+## O que NUNCA fazer
+
+1. **Hardcode de dados de domínio** — strikes de opção, catálogos de ativos, parâmetros financeiros, âncoras de saldo. Nada disso vai em código. Vem do banco / livro razão / barramento.
+2. **Patches com data no nome de arquivo** — `btgExtractMay182026.ts`, `corrections-2026-05.ts` e similares. Correção é lançamento normal no livro razão.
+3. **Conceito de "lote" / multiplicador no INVEST** — quantidade é a do livro razão. 12.700 CALLs operam 12.700 ações. Prêmio R$ 0,50 × 12.700 = R$ 6.350. Sem multiplicador, sem normalização, sem heurística `× 100`.
+4. **FIFO / LIFO** — não existe. Os 3 preços (Estrito/B3/Gerencial) são **recalculados sobre o lote inteiro** a cada nova entrada.
+5. **Regra de negócio em `.docx`** — fica em código com comentários estruturados que gerem doc automaticamente.
+6. **Parser de fornecedor direto no engine** — BTG/MyProfit/extratos sempre via translator → barramento canônico → engine.
+7. **Acesso direto ao MySQL** — toda mutação/leitura de negócio passa pelo `CoCeoDataGateway` em `src/core/dal/`. Nada de `pool.query(...)` em controller/service.
+8. **`git commit --amend`** — sempre commit novo, mesmo após falha de hook (corrige a causa, novo commit).
+9. **Pular hooks** (`--no-verify`, `--no-gpg-sign`) — investigue e conserte a falha.
+10. **Inventar quando a spec é ambígua** — pause e descreva o conflito no PR.
+11. **Refatorar fora do escopo da task** — bug fix não vira limpeza geral; uma feature não vira reescrita.
+12. **Adicionar dependências sem autorização explícita na task spec.**
+
+## INVEST — modelo de domínio canônico
+
+**Fonte única:** livro razão (`invest_ledger_entries`). A tabela `invest_assets` é **projeção / view materializada idempotente** derivada do livro, não fonte concorrente.
+
+Toda operação no livro contém: ativo, compra/venda, tipo (`stock` / `option_call` / `option_put` / `fii` / `fixed_income` / `cash`), quantidade (em ações/unidades), valor da negociação, custos (emolumentos/taxas/IRRF) e `option_strike` quando opção.
+
+### Os três preços de uma posição
+
+Recalculados sobre o **lote inteiro** a cada nova entrada (lote unificado fica com um único valor de cada preço):
+
+| Preço | Cálculo |
+|---|---|
+| **Estrito** | Custo de compra sem descontar prêmio de opção + soma de emolumentos/taxas/custos. Custo absoluto de aquisição. |
+| **B3** | Como Estrito, mas **abate o prêmio da PUT** quando a compra foi via exercício de PUT (bate com PM exibido pela B3). |
+| **Gerencial** | Abate **todas** as PUTs que afetaram a ação (exercidas ou não) + abate **CALLs vendidas e não realizadas** durante a custódia. PM "verdadeiro". |
+
+### Idempotência
+
+Tentativa de inserir lançamentos com **mesma data + mesmo ativo + mesmos valores** = provável duplicação. O sistema deve pedir confirmação ou extrato que valide o livro caixa correto — nunca inserir silenciosamente.
+
+## Fluxo de trabalho ao receber uma task
+
+1. **Leia a task inteira** em `tasks/wave-N/NN-foo.md` antes de tocar código.
+2. Identifique o **critério de aceite** (comando de teste / verificação). Esse é o contrato. Sem ele verde, a task não está pronta.
+3. Crie um branch `feat/...` ou `refactor/...` ou `fix/...`.
+4. Faça as alterações estritamente no escopo da task. Resista à tentação de "melhorar enquanto está aqui".
+5. Rode `tsc --noEmit` e o critério de aceite. Conserte tudo até ficar verde.
+6. Commit em português, padrão `tipo(escopo): assunto curto`. Tipos: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`. Corpo do commit explica o **porquê**.
+7. Abra PR referenciando o caminho da task spec.
+
+## Quando parar e devolver para o arquiteto
+
+- Task spec contradiz alguma regra deste documento.
+- Spec menciona arquivo/função que não existe (confirme com busca antes de assumir que precisa criar).
+- Decisão de modelagem de domínio aparece no meio da task — isso é do arquiteto, não do executor.
+- Critério de aceite continua vermelho após 2 tentativas honestas — descreva o que tentou e o erro exato.
+- A spec exige adicionar dependência ou criar nova tabela/migração sem instrução explícita.
+
+## Convenções rápidas
+
+- **Comentários no código**: só quando o "por quê" não é óbvio do "o quê". Não comente o que o código já diz. Sem docstrings longas.
+- **Sem emojis** em código ou commit, a menos que explicitamente pedido.
+- **Sem novos arquivos `*.md`** fora de `docs/` e `tasks/` sem autorização.
+- **Português** em mensagens de commit, comentários explicativos e mensagens de erro do usuário final. Identificadores de código em inglês.
