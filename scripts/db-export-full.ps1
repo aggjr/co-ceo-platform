@@ -38,6 +38,11 @@ $dumpArgs = @(
 if ($dbPass) { $dumpArgs = @("-h$dbHost", "-u$dbUser", "-p$dbPass") + $dumpArgs[2..($dumpArgs.Length - 1)] }
 
 Write-Host "Exportando $dbName de ${dbHost}..."
-& $mysqldump @dumpArgs 2>$null | Set-Content -Path $outFile -Encoding utf8
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$dumpText = & $mysqldump @dumpArgs 2>&1 | ForEach-Object { $_.ToString() } | Where-Object { $_ -notmatch 'mysqldump: \[Warning\]' }
+$ErrorActionPreference = $prevEap
+if (-not $dumpText -or $dumpText.Count -lt 5) { Write-Error "Dump vazio ou falhou." }
+$dumpText | Set-Content -Path $outFile -Encoding utf8
 $mb = [math]::Round((Get-Item $outFile).Length / 1MB, 2)
 Write-Host "OK: $outFile ($mb MB)"
