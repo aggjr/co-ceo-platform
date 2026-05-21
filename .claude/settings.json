@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node ./node_modules/typescript/bin/tsc --noEmit)",
+      "Bash(node ./node_modules/jest/bin/jest.js *)",
+      "Bash(node ./node_modules/ts-node/dist/bin.js scripts/*)",
+      "Bash(node ./node_modules/vite/bin/vite.js build *)",
+      "Bash(npm run *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
+    ]
+  }
+}
