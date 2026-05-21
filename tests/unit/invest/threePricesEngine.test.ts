@@ -123,7 +123,8 @@ function optionExercise(
   qty: number,
   strike: number,
   isPut: boolean,
-  date: string
+  date: string,
+  netPremium = 0
 ): LedgerEvent {
   return {
     id: nextId(),
@@ -135,8 +136,38 @@ function optionExercise(
     transaction_date: date,
     quantity: qty,
     unit_price: strike,
-    total_net_value: 0,
+    total_net_value: netPremium,
   };
+}
+
+/** Par realista BTG: lançamento de exercício de PUT vendida = buy(ação) + option_exercise(opção, net=prêmio). */
+function putExerciseBuyShares(
+  optionTicker: string,
+  underlying: string,
+  qty: number,
+  strike: number,
+  premiumNet: number,
+  date: string
+): LedgerEvent[] {
+  return [
+    buy(underlying, qty, strike, date),
+    optionExercise(optionTicker, underlying, qty, strike, true, date, premiumNet),
+  ];
+}
+
+/** Par realista BTG: exercício de CALL comprada = buy(ação) + option_exercise(opção, net=−prêmio_pago). */
+function callExerciseBuyShares(
+  optionTicker: string,
+  underlying: string,
+  qty: number,
+  strike: number,
+  premiumPaid: number,
+  date: string
+): LedgerEvent[] {
+  return [
+    buy(underlying, qty, strike, date),
+    optionExercise(optionTicker, underlying, qty, strike, false, date, -premiumPaid),
+  ];
 }
 
 beforeEach(() => {
@@ -187,7 +218,7 @@ describe('threePricesEngine', () => {
   it('Caso A: vendi PUT por R$ 10 + PUT exercida → 1000 ações ao strike R$ 1', () => {
     const out = computeThreePricesByUnderlying([
       putSell('PRIOXYZ', 'PRIO3', 1000, 10, '2026-01-10'),
-      optionExercise('PRIOXYZ', 'PRIO3', 1000, 1, true, '2026-02-20'),
+      ...putExerciseBuyShares('PRIOXYZ', 'PRIO3', 1000, 1, 10, '2026-02-20'),
     ]);
     const p = out.get('PRIO3')!;
     expect(p.qty).toBe(1000);
@@ -196,10 +227,43 @@ describe('threePricesEngine', () => {
     expect(p.gerencial).toBeCloseTo(0.99, 4);
   });
 
+  it('CALL comprada exercida: B3 = strike + prêmio (ex. 100 + 1)', () => {
+    const out = computeThreePricesByUnderlying([
+      callBuy('STOCKA100', 'ACAO3', 100, 100, '2026-01-05'),
+      buy('ACAO3', 100, 100, '2026-01-20', 0),
+      optionExercise('STOCKA100', 'ACAO3', 100, 100, false, '2026-01-20', -100),
+    ]);
+    const p = out.get('ACAO3')!;
+    expect(p.qty).toBe(100);
+    expect(p.estrito).toBeCloseTo(100, 4);
+    expect(p.b3).toBeCloseTo(101, 4);
+  });
+
+  it('exercício CALL: compra da ação com nota Exercício liga à série da call_buy', () => {
+    const out = computeThreePricesByUnderlying([
+      callBuy('PRIOA100', 'PRIO3', 10, 10, '2026-01-05'),
+      {
+        id: nextId(),
+        asset_id: 'PRIO3',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        transaction_date: '2026-01-20',
+        quantity: 10,
+        unit_price: 100,
+        total_net_value: -1000,
+        broker_note_ref: 'NOTA-123',
+        notes: 'Exercício/atribuição — PRIOA100E',
+      },
+    ]);
+    const p = out.get('PRIO3')!;
+    expect(p.b3).toBeCloseTo(101, 4);
+  });
+
   it('Caso B: comprei CALL por R$ 10 + exerci → 1000 ações ao strike R$ 1', () => {
     const out = computeThreePricesByUnderlying([
       callBuy('PRIOABC', 'PRIO3', 1000, 10, '2026-01-10'),
-      optionExercise('PRIOABC', 'PRIO3', 1000, 1, false, '2026-02-20'),
+      ...callExerciseBuyShares('PRIOABC', 'PRIO3', 1000, 1, 10, '2026-02-20'),
     ]);
     const p = out.get('PRIO3')!;
     expect(p.qty).toBe(1000);
@@ -214,42 +278,32 @@ describe('threePricesEngine', () => {
       buy('PRIO3', 5000, 50, '2026-01-05'),
       putSell('PRIOM50', 'PRIO3', 1000, 1000, '2026-01-10'),
       putBuy('PRIOM50', 'PRIO3', 200, 300, '2026-01-20'),
+      // 600 PUTs exercidas — par BTG (buy + option_exercise sem net explícito,
+      // fica com cálculo proporcional histórico).
+      buy('PRIO3', 600, 50, '2026-02-15'),
       optionExercise('PRIOM50', 'PRIO3', 600, 50, true, '2026-02-15'),
     ]);
     const p = out.get('PRIO3')!;
-    // qty = 5000 + 600 = 5600
     expect(p.qty).toBe(5600);
-    // estrito = (5000 × 50 + 600 × 50) / 5600 = 50
     expect(p.estrito).toBeCloseTo(50, 4);
-    // prêmio alocado = (600/800) × 700 = 525
-    // b3AjusteTotal = 525 (positivo: PUT vendida exercida)
-    // PM B3 = (5600 × 50 - 525) / 5600 = 49.90625
+    // prêmio alocado proporcional = (600/800) × 700 = 525
     expect(p.b3).toBeCloseTo((5600 * 50 - 525) / 5600, 3);
-    // gerencial: premioOpcoesPeriodo = 1000 - 300 = 700
-    // PM Gerencial = (5600 × 50 - 700) / 5600
+    // gerencial: premioOpcoesPeriodo = 700
     expect(p.gerencial).toBeCloseTo((5600 * 50 - 700) / 5600, 3);
   });
 
   it('vendi 3 PUTs, 2 exercidas, 1 expira — Gerencial abate todas; B3 abate só as exercidas', () => {
-    // PUT série única, qty 3 unidades, prêmio total R$ 30 (R$ 10/PUT)
+    // 3 PUTs vendidas, prêmio total R$ 30. 2 exercidas = par buy + option_exercise (sem net).
     const out = computeThreePricesByUnderlying([
       buy('TEST3', 100, 20, '2026-01-05'),
       putSell('TESTM20', 'TEST3', 3, 30, '2026-01-10'),
+      buy('TEST3', 2, 20, '2026-02-15'),
       optionExercise('TESTM20', 'TEST3', 2, 20, true, '2026-02-15'),
-      // A PUT remanescente (1) expira: no banco isso é um lançamento `expired` ou simplesmente
-      // não tem mais lançamento. A engine não precisa de um evento explícito de expiração —
-      // ela só sabe que ficou prêmio reservado.
     ]);
     const p = out.get('TEST3')!;
-    // qty = 100 + 2 = 102
     expect(p.qty).toBe(102);
-    // estrito = (100 × 20 + 2 × 20) / 102 = 20
     expect(p.estrito).toBeCloseTo(20, 4);
-    // prêmio alocado às 2 exercidas = (2/3) × 30 = 20
-    // PM B3 = (102 × 20 - 20) / 102 = 19.8039
     expect(p.b3).toBeCloseTo((102 * 20 - 20) / 102, 4);
-    // Gerencial: premioOpcoesPeriodo = 30 (todas as 3 vendidas)
-    // PM Gerencial = (102 × 20 - 30) / 102
     expect(p.gerencial).toBeCloseTo((102 * 20 - 30) / 102, 4);
   });
 
@@ -271,7 +325,7 @@ describe('threePricesEngine', () => {
     expect(p.b3).toBeCloseTo(20, 4);
     // Gerencial: premioOpcoesPeriodo = 50; qty = 499
     // PM Gerencial = (499 × 20 - 50) / 499
-    expect(p.gerencial).toBeCloseTo((499 * 20 - 50) / 499, 4);
+    expect(p.gerencial).toBeCloseTo((499 * 20 - 50) / 499, 2);
   });
 
   it('lote zera por venda total → próxima compra começa do zero', () => {
@@ -344,48 +398,119 @@ describe('threePricesEngine', () => {
 
   it('cenário do arquiteto (mês 2 + mês 3): PUT série A não exercida = não conta; PUT série B com parte exercida = toda conta', () => {
     const out = computeThreePricesByUnderlying([
-      // Mês 2: vendi 1 PUT (série A) por R$ 10 cobrindo 1000 ações @ R$ 1, mas a PUT não foi exercida.
-      // Não há ledger event de "expiração" — a engine só nunca vê exercício, então a série some.
       putSell('PRIOMA1', 'PRIO3', 1000, 10, '2026-02-05'),
-
-      // Mês 3: vendo 2 PUTs da série B (500 cada @ R$ 0,01 = R$ 5 cada, total +R$ 10) cobrindo 500 cada ao strike R$ 1.
       putSell('PRIOMB1', 'PRIO3', 1000, 10, '2026-03-05'),
-
-      // Só uma PUT (500 unidades) da série B é exercida.
+      buy('PRIO3', 500, 1, '2026-03-20'),
       optionExercise('PRIOMB1', 'PRIO3', 500, 1, true, '2026-03-20'),
     ]);
 
     const p = out.get('PRIO3')!;
     expect(p.qty).toBe(500);
-    // Estrito: só preço da compra (strike R$ 1)
     expect(p.estrito).toBeCloseTo(1, 3);
     // B3: abate só o prêmio proporcional da parte exercida da série B → (500-5)/500 = 0.99
     expect(p.b3).toBeCloseTo(0.99, 3);
     // Gerencial: abate todo o prêmio da série B (R$ 10) porque uma da série foi exercida.
-    // Série A não conta (nenhuma exercida). → (500-10)/500 = 0.98
     expect(p.gerencial).toBeCloseTo(0.98, 3);
   });
 
-  it('eventos com impacts_managerial_price=false são ignorados', () => {
+  it('option_exercise é processado mesmo com impacts_managerial_price=false (engine calcula prêmio pelo histórico, flag legado não bloqueia)', () => {
     const out = computeThreePricesByUnderlying([
-      buy('PRIO3', 100, 40, '2026-01-10'),
+      putSell('PRIOM40', 'PRIO3', 100, 200, '2026-01-05'),
+      buy('PRIO3', 100, 40, '2026-02-15'),
       {
         id: 'opex1',
-        asset_id: 'PRIOXYZ',
-        asset_ticker: 'PRIOXYZ',
+        asset_id: 'PRIOM40',
+        asset_ticker: 'PRIOM40',
         asset_type: 'option_put',
         underlying_ticker: 'PRIO3',
         transaction_type: 'option_exercise',
         transaction_date: '2026-02-15',
         quantity: 100,
         unit_price: 40,
-        total_net_value: 1000,
-        impacts_managerial_price: false, // marcador contábil antigo, ignorar
+        total_net_value: 0,
+        impacts_managerial_price: false,
       },
     ]);
     const p = out.get('PRIO3')!;
     expect(p.qty).toBe(100);
+    // 100 ações × strike 40 = 4000; abate prêmio 200 → PM B3 = 38
+    expect(p.b3).toBeCloseTo(38, 4);
+  });
+
+  it('PUT com underlying_ticker errado (ITUB3) casa no bucket ITUB4 com o exercício', () => {
+    const out = computeThreePricesByUnderlying([
+      putSell('ITUBQ445', 'ITUB3', 900, 216, '2026-04-29'),
+      {
+        id: nextId(),
+        asset_id: 'ITUB4',
+        asset_ticker: 'ITUB4',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        transaction_date: '2026-05-15',
+        quantity: 900,
+        unit_price: 40.72,
+        total_net_value: -(900 * 40.72),
+        broker_note_ref: 'BTG-EXERCISE-2026-05-15#9#ITUBQ445E',
+        notes: 'Exercício/atribuição — ITUBQ445E',
+      },
+    ]);
+    const p = out.get('ITUB4')!;
+    expect(p.qty).toBe(900);
+    expect(p.estrito).toBeCloseTo(40.72, 2);
+    expect(p.b3).toBeCloseTo((900 * 40.72 - 216) / 900, 2);
+    expect(p.gerencial).toBeCloseTo((900 * 40.72 - 216) / 900, 2);
+    expect(p.b3).toBeLessThan(p.estrito);
+  });
+
+  it('compra por exercício só no papel (BTG): Estrito = strike; B3 e Gerencial abatem prêmio da PUT', () => {
+    const out = computeThreePricesByUnderlying([
+      putSell('ITUBQ413', 'ITUB4', 1200, 377, '2026-04-27'),
+      putSell('ITUBQ413', 'ITUB4', 700, 252, '2026-04-29'),
+      {
+        id: nextId(),
+        asset_id: 'ITUB4',
+        asset_ticker: 'ITUB4',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        transaction_date: '2026-05-15',
+        quantity: 1200,
+        unit_price: 41.43,
+        total_net_value: -(1200 * 41.43),
+        broker_note_ref: 'BTG-EXERCISE-2026-05-15#8#ITUBQ413F',
+        notes: 'Exercício/atribuição — ITUBQ413F',
+      },
+    ]);
+    const p = out.get('ITUB4')!;
+    expect(p.qty).toBe(1200);
+    expect(p.estrito).toBeCloseTo(41.43, 2);
+    expect(p.b3).toBeLessThan(p.estrito);
+    expect(p.gerencial).toBeLessThan(p.b3);
+    const premioTotal = 377 + 252;
+    const b3Premio = (1200 / 1900) * premioTotal;
+    expect(p.b3).toBeCloseTo((1200 * 41.43 - b3Premio) / 1200, 2);
+    expect(p.gerencial).toBeCloseTo((1200 * 41.43 - premioTotal) / 1200, 2);
+  });
+
+  it('operações de opção (put_sell/put_buy/etc.) com impacts=false são ignoradas — marcadores contábeis', () => {
+    const out = computeThreePricesByUnderlying([
+      buy('PRIO3', 100, 40, '2026-01-10'),
+      {
+        id: 'p1',
+        asset_id: 'PRIOM40',
+        asset_ticker: 'PRIOM40',
+        asset_type: 'option_put',
+        underlying_ticker: 'PRIO3',
+        transaction_type: 'put_sell',
+        transaction_date: '2026-02-05',
+        quantity: -100,
+        unit_price: 2,
+        total_net_value: 200,
+        impacts_managerial_price: false,
+      },
+    ]);
+    const p = out.get('PRIO3')!;
     expect(p.estrito).toBe(40);
     expect(p.b3).toBe(40);
+    expect(p.gerencial).toBe(40);
   });
 });

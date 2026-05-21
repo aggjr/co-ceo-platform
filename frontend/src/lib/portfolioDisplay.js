@@ -62,6 +62,17 @@ function todayIsoLocal() {
   return `${y}-${m}-${day}`;
 }
 
+/** Opções abertas com data de vencimento estritamente após hoje. */
+export function filterOptionsVencimentoAfterToday(items) {
+  const today = todayIsoLocal();
+  return filterOpenPortfolioItems(items).filter((item) => {
+    if (!isOptionLike(item)) return false;
+    const exp = String(item.optionExpiryDate || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(exp)) return true;
+    return exp > today;
+  });
+}
+
 /** Opção com vencimento anterior a hoje — não aparece na tabela de opções abertas. */
 export function isExpiredOption(item) {
   if (!isOptionLike(item)) return false;
@@ -971,6 +982,266 @@ const EXCEL_SHEETS = [
     emptyFiltered: 'Nenhum caixa para este filtro.',
   },
 ];
+
+/** Conta corrente + CDB + Tesouro/LFT e demais RF de baixo risco — bloco “dinheiro em caixa”. */
+export function collectCashLikeCustodyItems(items) {
+  const openItems = filterOpenPortfolioItems(items);
+  const { cash, fixedIncome } = splitPortfolioBySheet(openItems);
+  return [...cash, ...fixedIncome].sort(
+    (a, b) => (Number(b.marketValue) || 0) - (Number(a.marketValue) || 0)
+  );
+}
+
+/** Patrimônio = ações/FIIs + opções (venc. &gt; hoje) + caixa / baixo risco + trânsito. */
+export function computePortfolioPatrimonyFromTables(
+  items,
+  underlyingFilter = '',
+  { cashStatementBalance = 0, cashInTransit = null } = {}
+) {
+  const openItems = filterOpenPortfolioItems(items);
+  const filtered = filterByUnderlying(openItems, underlyingFilter);
+  const { equities } = splitPortfolioBySheet(filtered);
+  const options = filterOptionsVencimentoAfterToday(filtered);
+  const cashLike = collectCashLikeCustodyItems(openItems);
+  const equitiesMv = equities.reduce((s, i) => s + (Number(i.marketValue) || 0), 0);
+  const optionsMv = options.reduce((s, i) => s + (Number(i.marketValue) || 0), 0);
+  const cashPositionsMv = cashLike.reduce((s, i) => s + (Number(i.marketValue) || 0), 0);
+  const inTransitNet = Number(cashInTransit?.inTransitNet) || 0;
+  const cashMv = Math.round((cashPositionsMv + inTransitNet) * 100) / 100;
+  const total = Math.round((equitiesMv + optionsMv + cashMv) * 100) / 100;
+  return {
+    equitiesMv: Math.round(equitiesMv * 100) / 100,
+    optionsMv: Math.round(optionsMv * 100) / 100,
+    cashMv,
+    cashPositionsMv: Math.round(cashPositionsMv * 100) / 100,
+    inTransitNet: Math.round(inTransitNet * 100) / 100,
+    total,
+    equityCount: equities.length,
+    optionsCount: options.length,
+    cashLikeCount: cashLike.length,
+  };
+}
+
+export function renderPortfolioPatrimonyHeader(totals) {
+  return `
+    <div class="portfolio-patrimony-total card" style="margin-bottom:16px;padding:16px 20px;background:rgba(218,177,119,0.12);border:1px solid rgba(218,177,119,0.35);border-radius:8px">
+      <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 24px;margin-bottom:12px">
+        <span class="portfolio-kpi-label" style="font-size:13px">Patrimônio total (cliente)</span>
+        <strong style="font-size:26px;letter-spacing:-0.02em">${formatBrl(totals.total)}</strong>
+      </div>
+      <div class="portfolio-kpis" style="margin:0">
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">Ações e FIIs (mercado)</span>
+          <strong>${formatBrl(totals.equitiesMv)}</strong>
+          <span class="portfolio-kpi-sub muted">${totals.equityCount} linha(s)</span>
+        </div>
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">Opções venc. &gt; hoje (mercado)</span>
+          <strong>${formatBrl(totals.optionsMv)}</strong>
+          <span class="portfolio-kpi-sub muted">${totals.optionsCount} linha(s)</span>
+        </div>
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">Caixa e baixo risco</span>
+          <strong>${formatBrl(totals.cashMv)}</strong>
+          <span class="portfolio-kpi-sub muted">${totals.cashLikeCount} posição(ões) + trânsito</span>
+        </div>
+      </div>
+      <p class="muted" style="margin:12px 0 0;font-size:12px">
+        Caixa e baixo risco: conta corrente, CDB, Tesouro e títulos públicos (sem risco de mercado como ações/opções), mais valores em trânsito.
+      </p>
+    </div>
+  `;
+}
+
+function renderCashLikePortfolioSection(items, cashStatementBalance, cashInTransit) {
+  const cashLike = collectCashLikeCustodyItems(items);
+  const positionsMv = cashLike.reduce((s, i) => s + (Number(i.marketValue) || 0), 0);
+  const inTransitNet = Number(cashInTransit?.inTransitNet) || 0;
+
+  const custodyTable =
+    cashLike.length > 0
+      ? renderTableSection('Baixo risco (conta, CDB, Tesouro…)', cashLike, {
+          showUnderlying: false,
+          emptyLabel: 'Nenhuma posição de caixa ou baixo risco.',
+          sheetKey: 'fixedIncome',
+          allOptions: [],
+          coverageOptions: [],
+        })
+      : '<p class="muted" style="margin:8px 0 16px">Nenhuma posição de caixa ou baixo risco na custódia.</p>';
+
+  const cashInner = renderCashTransitInner(cashStatementBalance, cashInTransit);
+
+  return `
+    <div class="portfolio-cash-block" style="margin-top:20px">
+      <h3 style="font-size:15px;margin:0 0 12px">Caixa e baixo risco</h3>
+      <p class="muted" style="margin:0 0 12px;font-size:13px">
+        Conta corrente, CDB e Tesouro/títulos do governo — aplicações de baixo risco, fora do risco de mercado de ações e opções.
+      </p>
+      <div class="portfolio-kpis" style="margin-bottom:12px">
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">Total posições (mercado)</span>
+          <strong>${formatBrl(positionsMv)}</strong>
+        </div>
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">Em trânsito (líquido)</span>
+          <strong class="${inTransitNet >= 0 ? 'is-positive' : 'is-negative'}">${formatBrl(inTransitNet)}</strong>
+        </div>
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">Subtotal caixa / baixo risco</span>
+          <strong>${formatBrl(positionsMv + inTransitNet)}</strong>
+        </div>
+      </div>
+      ${custodyTable}
+      ${cashInner}
+    </div>
+  `;
+}
+
+function renderCashTransitInner(cashStatementBalance, cashInTransit) {
+  const settled = Number(cashStatementBalance) || 0;
+  const transit = cashInTransit || {};
+  const inTransitNet = Number(transit.inTransitNet) || 0;
+  const receivables = Number(transit.receivables) || 0;
+  const payables = Number(transit.payables) || 0;
+  const including = Number(transit.cashIncludingTransit) || settled + inTransitNet;
+  const lines = Array.isArray(transit.lines) ? transit.lines : [];
+
+  const rowsHtml = lines.length
+    ? lines
+        .map((ln) => {
+          const amt = Number(ln.amount) || 0;
+          const cls = amt >= 0 ? 'is-positive' : 'is-negative';
+          return `<tr>
+            <td>${String(ln.tradeDate || '—').slice(0, 10)}</td>
+            <td>${String(ln.settleDate || '—').slice(0, 10)}</td>
+            <td>${ln.ticker || '—'}</td>
+            <td>${ln.transactionType || '—'}</td>
+            <td class="num ${cls}">${formatBrl(amt)}</td>
+            <td class="muted">${ln.rule || '—'}</td>
+          </tr>`;
+        })
+        .join('')
+    : '<tr><td colspan="6" class="muted">Nenhum valor em trânsito aberto.</td></tr>';
+
+  return `
+    <div class="portfolio-cash-transit-inner">
+      <h4 style="font-size:14px;margin:16px 0 10px;font-weight:600">Conta corrente e trânsito</h4>
+      <div class="portfolio-kpis" style="margin-bottom:12px">
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">Saldo em caixa (liquidado)</span>
+          <strong>${formatBrl(settled)}</strong>
+        </div>
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">Em trânsito (líquido)</span>
+          <strong class="${inTransitNet >= 0 ? 'is-positive' : 'is-negative'}">${formatBrl(inTransitNet)}</strong>
+        </div>
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">A receber</span>
+          <strong>${formatBrl(receivables)}</strong>
+        </div>
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">A pagar</span>
+          <strong>${formatBrl(Math.abs(payables))}</strong>
+        </div>
+        <div class="portfolio-kpi">
+          <span class="portfolio-kpi-label">Caixa + trânsito</span>
+          <strong>${formatBrl(including)}</strong>
+        </div>
+      </div>
+      <div class="table-wrapper" style="max-height:280px;overflow:auto">
+        <table class="portfolio-cash-table" style="width:100%;font-size:13px;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th>Data neg.</th>
+              <th>Liquidação</th>
+              <th>Ativo</th>
+              <th>Tipo</th>
+              <th class="num">Valor</th>
+              <th>Regra</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+/** Tela Portfólio: ações/FIIs, opções (venc. &gt; hoje), caixa/trânsito. */
+export function renderInvestPortfolioPage(
+  items,
+  underlyingFilter = '',
+  { cashStatementBalance = 0, cashInTransit = null } = {}
+) {
+  clearCoCeoExcelMounts();
+  portfolioTableSeq = 0;
+  const openItems = filterOpenPortfolioItems(items);
+  const filtered = filterByUnderlying(openItems, underlyingFilter);
+  const { equities } = splitPortfolioBySheet(filtered);
+  const options = filterOptionsVencimentoAfterToday(filtered);
+  const coverageOptions = collectCallCoverageOptionRows(openItems, null);
+
+  const filterNote = underlyingFilter
+    ? `<p class="portfolio-filter-active muted">Filtro: <strong>${underlyingFilter}</strong></p>`
+    : '';
+
+  const equitySection = renderTableSection('Ações e FIIs', equities, {
+    showUnderlying: false,
+    emptyLabel: underlyingFilter
+      ? 'Nenhuma ação/FII para este filtro.'
+      : 'Nenhuma ação ou FII na custódia.',
+    sheetKey: 'equities',
+    allOptions: [],
+    coverageOptions,
+  });
+
+  const optionsSection = renderTableSection('Opções com vencimento &gt; hoje', options, {
+    showUnderlying: true,
+    showExpiryColumn: true,
+    emptyLabel: underlyingFilter
+      ? 'Nenhuma opção com vencimento futuro para este filtro.'
+      : 'Nenhuma opção com vencimento após hoje.',
+    sheetKey: 'options',
+    allOptions: options,
+    coverageOptions,
+  });
+
+  const cashSection = renderCashLikePortfolioSection(
+    items,
+    cashStatementBalance,
+    cashInTransit
+  );
+
+  return `${filterNote}${equitySection}${optionsSection}${cashSection}`;
+}
+
+/** Somente ações e FIIs em custódia aberta (legado). */
+export function renderEquityPortfolioTable(items, underlyingFilter = '') {
+  clearCoCeoExcelMounts();
+  portfolioTableSeq = 0;
+  const openItems = filterOpenPortfolioItems(items);
+  const filtered = filterByUnderlying(openItems, underlyingFilter);
+  const { equities } = splitPortfolioBySheet(filtered);
+  const coverageOptions = collectCallCoverageOptionRows(openItems, null);
+
+  if (!equities.length) {
+    return '<p class="empty-state">Nenhuma ação ou FII na custódia aberta.</p>';
+  }
+
+  const filterNote = underlyingFilter
+    ? `<p class="portfolio-filter-active muted">Filtro: <strong>${underlyingFilter}</strong></p>`
+    : '';
+
+  return `${filterNote}${renderTableSection('Ações e FIIs', equities, {
+    showUnderlying: false,
+    emptyLabel: underlyingFilter
+      ? 'Nenhuma ação/FII para este filtro.'
+      : 'Nenhuma ação ou FII na custódia.',
+    sheetKey: 'equities',
+    allOptions: [],
+    coverageOptions,
+  })}`;
+}
 
 export function renderPortfolioExcelTables(items, underlyingFilter = '') {
   clearCoCeoExcelMounts();

@@ -5,9 +5,12 @@ import './styles/coceo-excel-table.css';
 import './styles/coceo-excel-global.css';
 import './styles/invest-portfolio.css';
 import { consumeImpersonationHandoff, resetAuthOnPageReload } from './auth/session.js';
+import { refreshSessionState } from './shell/shellState';
 import { initTelemetry } from './telemetry/index.js';
 
-consumeImpersonationHandoff();
+if (consumeImpersonationHandoff()) {
+  refreshSessionState();
+}
 resetAuthOnPageReload();
 initTelemetry();
 

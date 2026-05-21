@@ -174,9 +174,22 @@ export function ImpersonationBar() {
         scope: ctx?.scope,
       };
 
-      openImpersonationTab(res.token, impersonatorMeta);
+      const redirectPath = window.location.pathname.startsWith('/invest')
+        ? window.location.pathname
+        : '/invest/portfolio';
+
+      const openedNewTab = openImpersonationTab(res.token, impersonatorMeta, {
+        redirectPath,
+      });
+
+      setStatusText(
+        openedNewTab
+          ? 'Sessão emulada aberta em nova aba. Confira a aba do Portfólio INVEST.'
+          : 'Pop-up bloqueado — abrindo simulação nesta aba…'
+      );
     } catch (err: any) {
-      setStatusText(err.message || 'Falha na simulação');
+      const msg = err?.message || err?.body?.error || 'Falha na simulação';
+      setStatusText(msg);
     } finally {
       setSubmitting(false);
     }

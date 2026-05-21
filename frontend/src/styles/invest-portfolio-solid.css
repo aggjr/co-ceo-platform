@@ -1,0 +1,186 @@
+.ip-page {
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: #e6e9ee;
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+.ip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.ip-header h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 600;
+  color: #f5d27e;
+  letter-spacing: 0.2px;
+}
+
+.ip-muted {
+  color: #9aa3b2;
+  margin: 4px 0;
+}
+
+.ip-muted.small {
+  font-size: 12px;
+}
+
+.ip-muted.center {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.ip-btn {
+  background: #1f2a3a;
+  color: #e6e9ee;
+  border: 1px solid #2c3a52;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ip-btn:hover {
+  background: #283448;
+}
+
+.ip-card {
+  background: #15202f;
+  border: 1px solid #243349;
+  border-radius: 10px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.ip-card h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.ip-error {
+  background: #3a1c1c;
+  color: #f4a4a4;
+  border: 1px solid #5a2a2a;
+  padding: 12px 14px;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+.ip-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ip-summary-cell {
+  background: #15202f;
+  border: 1px solid #243349;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ip-label {
+  color: #9aa3b2;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ip-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6e9ee;
+}
+
+.ip-value.pos {
+  color: #6cd084;
+}
+
+.ip-value.neg {
+  color: #f08a8a;
+}
+
+.ip-table-wrap {
+  overflow-x: auto;
+}
+
+.ip-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.ip-table thead th {
+  background: #1a2536;
+  color: #c8cfdb;
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid #2c3a52;
+  white-space: nowrap;
+}
+
+.ip-table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #1e2a3e;
+  white-space: nowrap;
+}
+
+.ip-table tbody tr:hover {
+  background: #1a2536;
+}
+
+.ip-table tfoot td {
+  padding: 12px;
+  border-top: 2px solid #2c3a52;
+  background: #1a2536;
+}
+
+.ip-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ip-table .pos {
+  color: #6cd084;
+}
+
+.ip-table .neg {
+  color: #f08a8a;
+}
+
+.ip-tag {
+  display: inline-block;
+  background: #283448;
+  color: #9aa3b2;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+
+.ip-warn {
+  color: #f08a8a;
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+@media (max-width: 1200px) {
+  .ip-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

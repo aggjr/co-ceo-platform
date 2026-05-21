@@ -58,7 +58,7 @@ export const MENU_CATALOG = [
     moduleCode: 'INVEST',
     items: [
       {
-        label: 'Patrimônio diário',
+        label: 'Resultado Histórico',
         path: '/invest',
         resourceKey: 'screen.invest.dashboard',
       },
@@ -68,19 +68,19 @@ export const MENU_CATALOG = [
         resourceKey: 'screen.invest.portfolio',
       },
       {
-        label: 'Resultado',
-        path: '/invest/resultado',
-        resourceKey: 'screen.invest.results',
-      },
-      {
-        label: 'Ganhos por ação',
+        label: 'Resultados por ação',
         path: '/invest/ganhos-por-acao',
         resourceKey: 'screen.invest.results',
       },
       {
-        label: 'Transações finalizadas',
-        path: '/invest/transacoes-finalizadas',
-        resourceKey: 'screen.invest.portfolio',
+        label: 'Notas de corretagem',
+        path: '/invest/notas-corretagem',
+        resourceKey: 'screen.invest.results',
+      },
+      {
+        label: 'Extratos de conta',
+        path: '/invest/extratos',
+        resourceKey: 'screen.invest.results',
       },
     ],
   },

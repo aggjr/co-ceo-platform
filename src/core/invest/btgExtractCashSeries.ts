@@ -22,10 +22,9 @@ export type BtgExtractSourceSpec = {
   openingBalance?: number;
 };
 
+/** Extrato único jan–mai/2026 (PDF → Extrato-normalized.txt). Arquivos 1_2/3_4/6 mantidos só como referência. */
 export const BTG_EXTRACT_SOURCES: BtgExtractSourceSpec[] = [
-  { file: '1_2.txt', periodLabel: '2026-01..02', openingBalance: 58758.79 },
-  { file: '3_4.txt', periodLabel: '2026-03..04', openingBalance: 7130.37 },
-  { file: '6.txt', periodLabel: '2026-05', openingBalance: 28386.02 },
+  { file: 'Extrato-normalized.txt', periodLabel: '2026-01..05' },
 ];
 
 export function defaultBtgExtractDir(): string {

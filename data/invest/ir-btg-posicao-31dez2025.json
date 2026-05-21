@@ -1,0 +1,39 @@
+{
+  "source": "IR BTG 2025 (PDFs Downloads)",
+  "data_base": "2025-12-31",
+  "conta": "004176105",
+  "renda_fixa_saldo_2025": [
+    { "produto": "CDB Saldo Remunerado", "saldo_2024": 559.45, "saldo_2025": 58758.79, "rendimento_liquido_2025": 68.13 },
+    { "produto": "Tesouro Selic LFT", "saldo_2024": 0, "saldo_2025": 1000341.65, "rendimento_liquido_2025": 8538.65 },
+    { "produto": "Tesouro Pre-Fixado LTN", "saldo_2024": 0, "saldo_2025": 0, "rendimento_liquido_2025": 2875.63 },
+    { "produto": "ETF Tesouro Selic", "saldo_2024": 0, "saldo_2025": 0, "rendimento_liquido_2025": 329.02 }
+  ],
+  "acoes_31dez2025": [
+    { "ticker": "PRIO3", "quantity": 5400, "avg_price": 38.33, "valor_custo": 206982 }
+  ],
+  "opcoes_31dez2025": [
+    { "ticker": "PRIOA407", "quantity": -5400 },
+    { "ticker": "PRIOA440", "quantity_2024": -33000, "quantity_2025": null },
+    { "ticker": "PRIOA450W4", "quantity_2024": -10800, "quantity_2025": null },
+    { "ticker": "PRIOG465", "quantity_2024": 200, "quantity_2025": null },
+    { "ticker": "PRIOM407", "quantity_2024": -200, "quantity_2025": null },
+    { "ticker": "PRIOO550", "quantity": -6000 },
+    { "ticker": "PRIOP500", "quantity": -5000 },
+    { "ticker": "PRIOQ43", "quantity": -31200 },
+    { "ticker": "PRIOR407", "quantity": -6300 }
+  ],
+  "dividas_onus_saldo_2025": 0,
+  "soma_rf_saldo_2025": 1059100.44,
+  "soma_acoes_custo": 206982,
+  "soma_longos_ir": 1266082.44,
+  "target_patrimony_app_2026_01_01": 1212435.41,
+  "excesso_longos_vs_patrimonio": 53647.03,
+  "formula_patrimonio": "patrimonio = soma_longos + caixa - onus_opcoes_vendidas",
+  "onus_implied_se_caixa_zero": 53647.03,
+  "notas": [
+    "Longos (RF+PRIO) MAIOR que patrimonio e esperado: opcoes vendidas entram como valor negativo.",
+    "PDFs nao trazem saldo conta corrente nem preco das shorts no auxiliar.",
+    "Com caixa ~78579 e onus ~132226 (referencia abertura antiga) fecha: 1266082+78579-132226=1212435.",
+    "Informe IR usa custo historico (regime de caixa), nao patrimonio a mercado do app."
+  ]
+}

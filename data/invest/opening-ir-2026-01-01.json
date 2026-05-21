@@ -1,0 +1,56 @@
+{
+  "opening_date": "2026-01-01",
+  "source_label": "IR BTG 2025 — consolidado + auxiliar RV 31/12/2025",
+  "target_patrimony": 1212435.41,
+  "opening_positions": [
+    {
+      "ticker": "PRIO3",
+      "asset_type": "stock",
+      "quantity": 5400,
+      "avg_price": 38.33,
+      "underlying_ticker": "PRIO3",
+      "notes": "IR auxiliar — qtd e PM 31/12/2025"
+    },
+    {
+      "ticker": "CDB-SR-BTG",
+      "asset_type": "fixed_income",
+      "quantity": 1,
+      "avg_price": 58758.79,
+      "notes": "IR consolidado — CDB Saldo Remunerado, saldo 31/12/2025"
+    },
+    {
+      "ticker": "TESOURO-LFT-BTG",
+      "asset_type": "fixed_income",
+      "quantity": 1,
+      "avg_price": 1000341.65,
+      "notes": "IR consolidado — Tesouro Selic (LFT), saldo 31/12/2025 (custo IR)"
+    }
+  ],
+  "opening_short_options": [
+    {
+      "ticker": "PRIOQ43",
+      "operation": "put_sell",
+      "quantity": 31200,
+      "unit_price": 1.426748,
+      "underlying_ticker": "PRIO3",
+      "notes": "Abertura proporcional: Total atual BTG -102.960 (82,98%) → ônus R$ 44.514,54"
+    },
+    {
+      "ticker": "PRIOR407",
+      "operation": "put_sell",
+      "quantity": 6300,
+      "unit_price": 0.912254,
+      "underlying_ticker": "PRIO3",
+      "notes": "Abertura proporcional: Total atual BTG -13.293 (10,71%) → ônus R$ 5.747,20"
+    },
+    {
+      "ticker": "PRIOA407",
+      "operation": "call_sell",
+      "quantity": 5400,
+      "unit_price": 0.626905,
+      "underlying_ticker": "PRIO3",
+      "notes": "Abertura proporcional: Total atual BTG -7.830 (6,31%) → ônus R$ 3.385,28"
+    }
+  ],
+  "opening_notes": "Ônus das 3 shorts escalados por Total atual BTG (124.083) para fechar patrimônio 1.212.435,41 sem caixa; fator 0,432348"
+}

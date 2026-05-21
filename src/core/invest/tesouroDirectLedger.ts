@@ -50,3 +50,26 @@ export function normalizeTesouroLedgerQuantity(line: {
   const pu = estimateTesouroPu(line.date);
   return { quantity: brl / pu, unit_price: pu };
 }
+
+/**
+ * Normalização de quantidade/preço no import: só Tesouro passa por PU estimado.
+ * Ações, opções e demais ativos mantêm quantity e unit_price do lançamento.
+ */
+export function normalizeLedgerLineQuantity(
+  ticker: string,
+  line: {
+    quantity: number;
+    unit_price: number;
+    total_net_value?: number | null;
+    date?: string | null;
+  }
+): { quantity: number; unit_price: number } {
+  const t = ticker.trim().toUpperCase();
+  if (!isTesouroDiretoTicker(t)) {
+    return {
+      quantity: Number(line.quantity),
+      unit_price: Number(line.unit_price),
+    };
+  }
+  return normalizeTesouroLedgerQuantity(line);
+}

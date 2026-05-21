@@ -5,9 +5,9 @@ import { PlatformCockpitPage } from '../pages/PlatformCockpitPage.js';
 import { ClientCockpitPage } from '../pages/ClientCockpitPage.js';
 import { InvestDashboardPage } from '../pages/InvestDashboardPage.js';
 import { InvestPortfolioPage } from '../pages/InvestPortfolioPage.js';
-import { InvestResultadoPage } from '../pages/InvestResultadoPage.js';
 import { InvestStockGainPivotPage } from '../pages/InvestStockGainPivotPage.js';
-import { InvestClosedTradesPage } from '../pages/InvestClosedTradesPage.js';
+import { InvestBrokerageNotesPage } from '../pages/InvestBrokerageNotesPage.js';
+import { InvestExtratosPage } from '../pages/InvestExtratosPage.js';
 import { QualityRegressionPage } from '../pages/QualityRegressionPage.js';
 
 export type LegacyRouteDef = {
@@ -27,7 +27,10 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/cockpit/client/storage', loader: ClientCockpitPage },
   { path: '/invest', loader: InvestDashboardPage },
   { path: '/invest/portfolio', loader: InvestPortfolioPage },
-  { path: '/invest/resultado', loader: InvestResultadoPage },
+  { path: '/invest/carteira-acoes-fiis', loader: InvestPortfolioPage },
+  { path: '/invest/resultado', loader: InvestPortfolioPage },
   { path: '/invest/ganhos-por-acao', loader: InvestStockGainPivotPage },
-  { path: '/invest/transacoes-finalizadas', loader: InvestClosedTradesPage },
+  { path: '/invest/notas-corretagem', loader: InvestBrokerageNotesPage },
+  { path: '/invest/extratos', loader: InvestExtratosPage },
+  { path: '/invest/transacoes-finalizadas', loader: InvestPortfolioPage },
 ];

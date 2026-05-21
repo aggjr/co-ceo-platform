@@ -41,13 +41,14 @@ export function inferAssetType(ticker: string): string {
 
 /** Ticker da ação mãe para opções (heurística). */
 export function inferUnderlyingTicker(ticker: string, explicit?: string): string {
-  if (explicit?.trim()) return explicit.trim().toUpperCase();
   const t = ticker.trim().toUpperCase();
   const assetType = inferAssetType(t);
   if (assetType === 'option_call' || assetType === 'option_put') {
     const root = t.slice(0, 4);
+    // MyProfit/BTG às vezes gravam ITUB3 em PUT de ITUB4; o mapa canônico prevalece.
     if (UNDERLYING_BY_ROOT[root]) return UNDERLYING_BY_ROOT[root];
     return root + (t.endsWith('11') ? '11' : '3');
   }
+  if (explicit?.trim()) return explicit.trim().toUpperCase();
   return t;
 }

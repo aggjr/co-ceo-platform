@@ -15,4 +15,10 @@ describe('settlementCalendar', () => {
   it('dividend settles same day', () => {
     expect(cashSettlementDate('2026-05-12', 'stock', 'dividend')).toBe('2026-05-12');
   });
+
+  it('put_sell premium settles D+1', () => {
+    expect(cashSettlementDate('2026-05-15', 'option_put', 'put_sell', 'ITUBQ445')).toBe(
+      '2026-05-18'
+    );
+  });
 });

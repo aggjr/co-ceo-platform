@@ -1,4 +1,6 @@
 /**
+ * @deprecated Use scripts/import-btg-orders-augusto.ts (somente notas B3_BTG Pactual).
+ *
  * Importa movimentações myProfit (jan–mai/2026) sem duplicar notas já no ledger.
  * Uso: npx ts-node scripts/import-myprofit-augusto.ts [caminho.xlsx]
  */
@@ -17,6 +19,9 @@ const DEFAULT_XLSX =
   'c:/Users/aggjr/Downloads/myProfit - Relatório Histórico de investimentos - 122025-052026.xlsx';
 
 async function main() {
+  console.warn(
+    'AVISO: import-myprofit-augusto está obsoleto. Use: npx ts-node scripts/import-btg-orders-augusto.ts'
+  );
   const filePath = path.resolve(process.argv[2] || DEFAULT_XLSX);
   const fromArg = process.argv.find((a) => a.startsWith('--from='));
   const allDates = process.argv.includes('--all-dates');

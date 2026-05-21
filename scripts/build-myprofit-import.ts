@@ -1,4 +1,6 @@
 /**
+ * @deprecated Use scripts/build-btg-orders-import.ts (somente BTG Pactual).
+ *
  * Gera JSON de lançamentos a partir do Excel myProfit.
  * Uso: npx ts-node scripts/build-myprofit-import.ts [caminho.xlsx]
  */
@@ -10,6 +12,9 @@ const DEFAULT_XLSX =
   'c:/Users/aggjr/Downloads/myProfit - Relatório Histórico de investimentos - 122025-052026.xlsx';
 
 function main() {
+  console.warn(
+    'AVISO: build-myprofit-import está obsoleto. Use: npx ts-node scripts/build-btg-orders-import.ts'
+  );
   const inPath = path.resolve(process.argv[2] || DEFAULT_XLSX);
   const entries = parseMyProfitHistoricalFile(inPath, { fromDate: '2026-01-01' });
   const outPath = path.join(__dirname, '..', 'data', 'invest', 'myprofit-augusto-h1-2026.json');

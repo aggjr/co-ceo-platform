@@ -35,7 +35,16 @@ function formatPct(n) {
   return `${sign}${(n * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
 }
 
-export function renderHoldingPatrimonySummary(series, performance, btgReference) {
+function renderCashTransitBlock(cashInTransit) {
+  if (!cashInTransit) return '';
+  return `<div class="holding-summary-side muted" style="margin-top:8px;text-align:left">
+    <span>Conta corrente: <strong>${formatBrl(cashInTransit.settledCashBalance)}</strong></span>
+    <span>Em trânsito: <strong>${formatBrl(cashInTransit.inTransitNet)}</strong>
+      (receber ${formatBrl(cashInTransit.receivables)} · pagar ${formatBrl(Math.abs(cashInTransit.payables || 0))})</span>
+  </div>`;
+}
+
+export function renderHoldingPatrimonySummary(series, performance, btgReference, cashInTransit) {
   const today = new Date().toISOString().slice(0, 10);
   const clipped = (series || []).filter((p) => String(p.date).slice(0, 10) <= today);
   if (!clipped.length) {
@@ -91,6 +100,7 @@ export function renderHoldingPatrimonySummary(series, performance, btgReference)
       <div class="holding-summary-side muted">
         <span>${formatDateBr(first.date)} → ${formatDateBr(last.date)}</span>
         <span>${series.length} dias</span>
+        ${renderCashTransitBlock(cashInTransit)}
       </div>
     </div>
   `;
@@ -112,6 +122,7 @@ export function renderHoldingPatrimonySummary(series, performance, btgReference)
       <div class="holding-summary-side muted">
         <span>${formatDateBr(first.date)} → ${formatDateBr(last.date)}</span>
         <span>${clipped.length} dias · calibrado BTG</span>
+        ${renderCashTransitBlock(cashInTransit)}
       </div>
     </div>
   `;

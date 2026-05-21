@@ -188,6 +188,12 @@ router.post(
   requirePermission('invest:ledger:write'),
   invest.syncPendingSettlements.bind(invest)
 );
+router.get(
+  '/invest/brokerage-notes/review',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.listBrokerageNotesReview.bind(invest)
+);
 
 // --- Core ---
 router.get('/core/storage', AuthMiddleware.protect, requirePermission('cockpit:storage:read'), async (req, res) => {

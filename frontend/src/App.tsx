@@ -4,11 +4,14 @@ import { legacyPage } from './legacy/LegacyRouteHost';
 import { LEGACY_ROUTES } from './legacy/legacyRoutes';
 import { NavigateBridge } from './shell/NavigateBridge';
 import { protectedLegacy } from './shell/protectedLegacy';
-
 const PUBLIC_ROUTES = new Set(['/login']);
+/** Rotas já migradas para Solid puro — não passar pelo LegacyRouteHost. */
+const SOLID_ROUTES = new Set<string>([]);
 
 export function App() {
-  const authRoutes = LEGACY_ROUTES.filter((r) => !PUBLIC_ROUTES.has(r.path));
+  const authRoutes = LEGACY_ROUTES.filter(
+    (r) => !PUBLIC_ROUTES.has(r.path) && !SOLID_ROUTES.has(r.path)
+  );
   const loginRoute = LEGACY_ROUTES.find((r) => r.path === '/login');
 
   return (

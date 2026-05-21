@@ -250,9 +250,17 @@ export async function mountImpersonationBar(container) {
         body: { targetUserId, userRoleId },
       });
       const impersonatorMeta = await buildImpersonatorMeta();
-      openImpersonationTab(res.token, impersonatorMeta);
+      const redirectPath = window.location.pathname.startsWith('/invest')
+        ? window.location.pathname
+        : '/invest/portfolio';
+      const openedNewTab = openImpersonationTab(res.token, impersonatorMeta, {
+        redirectPath,
+      });
+      statusEl.textContent = openedNewTab
+        ? 'Sessão emulada aberta em nova aba. Confira a aba do Portfólio INVEST.'
+        : 'Pop-up bloqueado — abrindo simulação nesta aba…';
     } catch (err) {
-      statusEl.textContent = err.message || 'Falha na simulação';
+      statusEl.textContent = err.message || err.body?.error || 'Falha na simulação';
     } finally {
       enterBtn.disabled = !userSelect.value;
     }

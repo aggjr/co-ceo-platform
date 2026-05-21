@@ -5,23 +5,28 @@ import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import {
-  filterOpenPortfolioItems,
+  computePortfolioPatrimonyFromTables,
   getUnderlyingFilter,
   mountPortfolioExcelTables,
-  renderPortfolioExcelTables,
-  renderPortfolioSummary,
+  renderInvestPortfolioPage,
+  renderPortfolioPatrimonyHeader,
   renderUnderlyingFilterSelect,
   setUnderlyingFilter,
 } from '../lib/portfolioDisplay.js';
 
-function bindPortfolioView(container, items) {
+function bindPortfolioView(container, items, cashMeta) {
+  const patrimonyHost = container.querySelector('#portfolio-patrimony-host');
   const host = container.querySelector('#portfolio-positions');
   const filterEl = container.querySelector('#portfolio-underlying-filter');
   if (!host) return;
 
   const paint = () => {
     const underlying = getUnderlyingFilter();
-    host.innerHTML = renderPortfolioExcelTables(items, underlying);
+    const totals = computePortfolioPatrimonyFromTables(items, underlying, cashMeta);
+    if (patrimonyHost) {
+      patrimonyHost.innerHTML = renderPortfolioPatrimonyHeader(totals);
+    }
+    host.innerHTML = renderInvestPortfolioPage(items, underlying, cashMeta);
     mountPortfolioExcelTables(host);
   };
 
@@ -40,14 +45,13 @@ export async function InvestPortfolioPage(container) {
   }
 
   const underlyingFilter = getUnderlyingFilter();
-  let body = '<p class="muted">Carregando custódia...</p>';
+  let body = '<p class="muted">Carregando portfólio...</p>';
 
   if (isGlobalSession()) {
     body = `
       <div class="card">
         <h2 style="font-size:16px;margin-bottom:8px">Portfólio</h2>
-        <p class="muted">Na visão plataforma, personifique o titular da holding para ver a carteira com dados reais.</p>
-        <p class="portfolio-hint muted">Use <strong>Personificar</strong> no topo e selecione o usuário da organização.</p>
+        <p class="muted">Personifique o titular da holding para ver a carteira.</p>
       </div>
     `;
     await renderShell(container, { title: 'INVEST — Portfólio', contentHtml: body });
@@ -55,34 +59,36 @@ export async function InvestPortfolioPage(container) {
   }
 
   try {
-    const patrimonyFrom = '2026-01-01';
-    const patrimonyTo = new Date().toISOString().slice(0, 10);
-    const [data, patrimony] = await Promise.all([
-      apiRequest('/api/invest/portfolio'),
-      apiRequest(
-        `/api/invest/patrimony-daily?from=${encodeURIComponent(patrimonyFrom)}&to=${encodeURIComponent(patrimonyTo)}`
-      ).catch(() => null),
-    ]);
-    const items = filterOpenPortfolioItems(data.items || []);
-    const summaryHtml = renderPortfolioSummary(data.summary, patrimony?.performance);
+    const data = await apiRequest('/api/invest/portfolio');
+    const items = data.items || [];
+    const cashMeta = {
+      cashStatementBalance: data.cashStatementBalance ?? 0,
+      cashInTransit: data.cashInTransit ?? null,
+    };
+
     body = `
-      ${summaryHtml}
       <div class="card">
         <div class="portfolio-toolbar">
           <div>
-            <h2>Custódia</h2>
-            <p class="muted" style="margin:4px 0 0">Quatro planilhas interativas: filtre e ordene por coluna (como Excel).</p>
+            <h2>Portfólio</h2>
+            <p class="muted" style="margin:4px 0 0">
+              Ações/FIIs e opções com risco de mercado; caixa e baixo risco (conta, CDB, Tesouro) + trânsito.
+            </p>
           </div>
           <div class="portfolio-toolbar-actions">
             ${renderUnderlyingFilterSelect(items, underlyingFilter)}
           </div>
         </div>
+        <div id="portfolio-patrimony-host"></div>
         <div id="portfolio-positions"></div>
-        <p class="portfolio-hint muted">Opções vencidas não aparecem na custódia aberta. Quantidade zerada em <a href="/invest/transacoes-finalizadas" data-link>Transações finalizadas</a>. Importe notas em <a href="/invest/resultado" data-link>Resultado</a>.</p>
       </div>
     `;
-    await renderShell(container, { title: 'INVEST — Portfólio', contentHtml: body });
-    bindPortfolioView(container, items);
+
+    await renderShell(container, {
+      title: 'INVEST — Portfólio',
+      contentHtml: body,
+    });
+    bindPortfolioView(container, items, cashMeta);
   } catch (err) {
     body = `<div class="error-banner">${err.message || 'Não foi possível carregar o portfólio.'}</div>`;
     await renderShell(container, { title: 'INVEST — Portfólio', contentHtml: body });

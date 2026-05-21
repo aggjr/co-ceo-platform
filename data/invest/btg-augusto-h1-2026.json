@@ -1,11 +1,11 @@
 {
   "opening_date": "2026-01-01",
-  "source_label": "BTG extratos jan–mai/2026 (PDF) + abertura myProfit 31/12/2025",
+  "source_label": "BTG extrato conta corrente 01/01–21/05/2026 (Extrato.pdf emitido 21/05/2026)",
   "opening_positions": [],
   "entries": [],
   "monthly_statements": [
     {
-      "month": "2026-01..02",
+      "month": "2026-01..05",
       "broker": "BTG",
       "entries": [
         {
@@ -149,26 +149,10 @@
           "operation": "capital_withdrawal",
           "quantity": 0,
           "unit_price": 0,
-          "total_net_value": -10000,
+          "total_net_value": -1478.99,
           "asset_type": "cash",
           "notes": "TED ENVIADA - AUGUSTO GONCALVES GOMES"
         },
-        {
-          "date": "2026-02-28",
-          "ticker": "CAIXA-BTG",
-          "operation": "cash_yield",
-          "quantity": 0,
-          "unit_price": 0,
-          "total_net_value": 0.04,
-          "asset_type": "cash",
-          "notes": "Remuneração saldo em conta"
-        }
-      ]
-    },
-    {
-      "month": "2026-03..04",
-      "broker": "BTG",
-      "entries": [
         {
           "date": "2026-03-09",
           "ticker": "LFT-20310301",
@@ -193,9 +177,9 @@
           "date": "2026-03-18",
           "ticker": "LFT-20310301",
           "operation": "buy",
-          "quantity": 63.41,
+          "quantity": 11854.73,
           "unit_price": 1,
-          "total_net_value": -63.41,
+          "total_net_value": -11854.73,
           "asset_type": "fixed_income",
           "notes": "Compra de Tesouro Direto: LFT 01/03/2031"
         },
@@ -233,9 +217,9 @@
           "date": "2026-03-23",
           "ticker": "LFT-20310301",
           "operation": "buy",
-          "quantity": 106.75,
+          "quantity": 12987.88,
           "unit_price": 1,
-          "total_net_value": -106.75,
+          "total_net_value": -12987.88,
           "asset_type": "fixed_income",
           "notes": "Compra de Tesouro Direto: LFT 01/03/2031"
         },
@@ -335,7 +319,7 @@
           "operation": "fee",
           "quantity": 0,
           "unit_price": 0,
-          "total_net_value": -593.85,
+          "total_net_value": -543342.74,
           "asset_type": "cash",
           "notes": "IRRF cobrado sobre operacao de Tesouro Direto: LFT"
         },
@@ -375,7 +359,7 @@
           "operation": "fee",
           "quantity": 0,
           "unit_price": 0,
-          "total_net_value": -2499.44,
+          "total_net_value": -694100.15,
           "asset_type": "cash",
           "notes": "IRRF cobrado sobre operacao de Tesouro Direto: LFT"
         },
@@ -405,7 +389,7 @@
           "operation": "fee",
           "quantity": 0,
           "unit_price": 0,
-          "total_net_value": -548.5,
+          "total_net_value": -693509.26,
           "asset_type": "cash",
           "notes": "Taxa de custodia sobre operacao de Tesouro Direto:"
         },
@@ -475,7 +459,7 @@
           "operation": "fee",
           "quantity": 0,
           "unit_price": 0,
-          "total_net_value": -147.96,
+          "total_net_value": -18997.79,
           "asset_type": "cash",
           "notes": "Taxa de custodia sobre operacao de Tesouro Direto:"
         },
@@ -529,22 +513,6 @@
           "asset_type": "cash",
           "notes": "IRRF - LEI 11.033/04 - OPÇÃO (VENDAS)"
         },
-        {
-          "date": "2026-04-30",
-          "ticker": "CAIXA-BTG",
-          "operation": "cash_yield",
-          "quantity": 0,
-          "unit_price": 0,
-          "total_net_value": 0.25,
-          "asset_type": "cash",
-          "notes": "Remuneração saldo em conta"
-        }
-      ]
-    },
-    {
-      "month": "2026-05",
-      "broker": "BTG",
-      "entries": [
         {
           "date": "2026-05-04",
           "ticker": "CAIXA-BTG",
@@ -657,7 +625,7 @@
           "operation": "fee",
           "quantity": 0,
           "unit_price": 0,
-          "total_net_value": -711.34,
+          "total_net_value": -121419.41,
           "asset_type": "cash",
           "notes": "IRRF cobrado sobre operacao de Tesouro Direto: LFT"
         },
@@ -697,7 +665,7 @@
           "operation": "fee",
           "quantity": 0,
           "unit_price": 0,
-          "total_net_value": -595.59,
+          "total_net_value": -177545.61,
           "asset_type": "cash",
           "notes": "IRRF cobrado sobre operacao de Tesouro Direto: LFT"
         },
@@ -727,17 +695,37 @@
           "operation": "fee",
           "quantity": 0,
           "unit_price": 0,
-          "total_net_value": -358.11,
+          "total_net_value": -456240.57,
           "asset_type": "cash",
           "notes": "Taxa de custodia sobre operacao de Tesouro Direto:"
         },
         {
-          "date": "2026-05-18",
+          "date": "2026-05-20",
+          "ticker": "CAIXA-BTG",
+          "operation": "fee",
+          "quantity": 0,
+          "unit_price": 0,
+          "total_net_value": -0.15,
+          "asset_type": "cash",
+          "notes": "IRRF - LEI 11.033/04 - OPÇÃO (VENDAS)"
+        },
+        {
+          "date": "2026-05-21",
+          "ticker": "CAIXA-BTG",
+          "operation": "fee",
+          "quantity": 0,
+          "unit_price": 0,
+          "total_net_value": -0.02,
+          "asset_type": "cash",
+          "notes": "IRRF - LEI 11.033/04 - OPÇÃO (VENDAS)"
+        },
+        {
+          "date": "2026-05-21",
           "ticker": "CAIXA-BTG",
           "operation": "cash_yield",
           "quantity": 0,
           "unit_price": 0,
-          "total_net_value": 3.85,
+          "total_net_value": 0.01,
           "asset_type": "cash",
           "notes": "Remuneração saldo em conta"
         }

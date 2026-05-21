@@ -50,6 +50,24 @@ describe('brokerOrderMapper', () => {
     expect(lines).toHaveLength(1);
   });
 
+  it('adds B3 option_exercise line when call premium is known', () => {
+    const lines = mapBrokerOrderToLedger(
+      {
+        ticker: 'PRIOA100E',
+        direction: 'C',
+        quantity: 100,
+        avgPrice: 100,
+        date: '2026-01-20',
+      },
+      { callPremiumNetForB3: 100 }
+    );
+    expect(lines).toHaveLength(2);
+    expect(lines[0].operation).toBe('buy');
+    expect(lines[1].operation).toBe('option_exercise');
+    expect(lines[1].ticker).toBe('PRIOA100');
+    expect(lines[1].total_net_value).toBe(-100);
+  });
+
   it('adds B3 option_exercise line when put premium is known', () => {
     const lines = mapBrokerOrderToLedger(
       {

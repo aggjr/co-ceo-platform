@@ -127,7 +127,7 @@ function bindPage(container) {
 
       const columns = buildColumns(columnLabels, columnOrder);
       host.innerHTML = renderExcelTableShell({
-        caption: 'Ganhos por ação (pivot)',
+        caption: 'Resultados por ação (pivot)',
         columns,
         tableId: TABLE_ID,
       });
@@ -156,7 +156,7 @@ export async function InvestStockGainPivotPage(container) {
 
   if (isGlobalSession()) {
     await renderShell(container, {
-      title: 'INVEST — Ganhos por ação',
+      title: 'INVEST — Resultados por ação',
       contentHtml: `
         <div class="card">
           <h2 style="font-size:16px">Pivot por ação</h2>
@@ -171,7 +171,7 @@ export async function InvestStockGainPivotPage(container) {
     <div class="card sgp-page">
       <div class="sgp-toolbar">
         <div>
-          <h2 style="font-size:16px;margin:0">Ganhos por ação</h2>
+          <h2 style="font-size:16px;margin:0">Resultados por ação</h2>
           <p class="muted" style="margin:4px 0 0">Preço estrito (PM), opções, proventos, trade, day trade, taxas e ganho aproximado por papel.</p>
         </div>
         <label>De <input type="date" id="sgp-from" value="${defaultFrom()}" /></label>
@@ -184,7 +184,7 @@ export async function InvestStockGainPivotPage(container) {
   `;
 
   await renderShell(container, {
-    title: 'INVEST — Ganhos por ação',
+    title: 'INVEST — Resultados por ação',
     contentHtml: content,
   });
   bindPage(container);

@@ -146,7 +146,13 @@ export class AuthService {
       throw Object.assign(new Error('Sem permissão para emular usuários.'), { httpStatus: 403 });
     }
 
-    if (canPlatform && impersonator.scope === 'global') {
+    if (canPlatform) {
+      if (impersonator.scope !== 'global') {
+        throw Object.assign(
+          new Error('Personificação exige sessão plataforma (escopo global). Faça logout e entre como admin@coceo.com.br.'),
+          { httpStatus: 403 }
+        );
+      }
       return this.selectContext(targetUserId, userRoleId, impersonator.userId);
     }
 

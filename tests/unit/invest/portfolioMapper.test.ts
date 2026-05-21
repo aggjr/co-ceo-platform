@@ -21,7 +21,8 @@ describe('portfolioMapper', () => {
       metadata: JSON.stringify({ name: 'PetroRio', last_price: 50 }),
       status: 'active',
     });
-    expect(row.marketValue).toBe(4000);
+    expect(row.costBasis).toBe(4000);
+    expect(row.marketValue).toBe(5000);
     expect(row.name).toBe('PetroRio');
   });
 
@@ -48,7 +49,8 @@ describe('portfolioMapper', () => {
     expect(items[0].allocationPct).toBe(50);
     expect(items[1].allocationPct).toBe(50);
     const summary = summarizePortfolio(items);
-    expect(summary.totalMarketValue).toBe(200);
+    expect(summary.totalMarketValue).toBe(400);
+    expect(summary.totalCostBasis).toBe(200);
   });
 
   it('opção zerada por ticker (tipo errado no cadastro) também fecha', () => {
@@ -194,7 +196,8 @@ describe('portfolioMapper', () => {
     );
     expect(equityResultFromB3Quote(64.38, 68.82, 12700)).toBeCloseTo(56388, 0);
     expect(row.pnl).toBeCloseTo(56388, 0);
-    expect(row.marketValue).toBeCloseTo(64.38 * 12700, 0);
+    expect(row.costBasis).toBeCloseTo(64.38 * 12700, 0);
+    expect(row.marketValue).toBeCloseTo(68.82 * 12700, 0);
     expect(row.updatedQuote).toBe(68.82);
   });
 

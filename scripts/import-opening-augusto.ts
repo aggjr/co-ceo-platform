@@ -1,6 +1,7 @@
 /**
- * Importa saldos de abertura 01/01/2026 (myProfit 31/12/2025) sem duplicar extratos.
+ * Importa saldos de abertura 01/01/2026 (ex.: DIRPF 31/12/2025) sem duplicar extratos.
  * Uso: npx ts-node scripts/import-opening-augusto.ts
+ *      npx ts-node scripts/import-opening-augusto.ts data/invest/opening-ir-2026-01-01.json
  */
 import fs from 'fs';
 import path from 'path';
@@ -14,9 +15,16 @@ import type { OpeningImportPayload } from '../src/core/invest/ledgerTypes';
 dotenv.config();
 
 const ORG_ID = process.env.PORTFOLIO_ORG_ID || 'org-holding-001';
+const DEFAULT_OPENING = path.join(
+  __dirname,
+  '..',
+  'data',
+  'invest',
+  'opening-ir-2026-01-01.json'
+);
 
 async function main() {
-  const file = path.join(__dirname, '..', 'data', 'invest', 'opening-myprofit-2025-12-31.json');
+  const file = path.resolve(process.argv[2] || DEFAULT_OPENING);
   const payload = JSON.parse(fs.readFileSync(file, 'utf8')) as OpeningImportPayload;
 
   const pool = mysql.createPool({
@@ -32,7 +40,13 @@ async function main() {
   const ledger = new LedgerImportService(gateway);
   const ctx = { ...installerContext(), organizationId: ORG_ID, scope: 'node' as const };
 
-  console.log(`Abertura myProfit → org ${ORG_ID}`);
+  if (!fs.existsSync(file)) {
+    console.error('Arquivo de abertura não encontrado:', file);
+    process.exit(1);
+  }
+
+  console.log(`Abertura → org ${ORG_ID}`);
+  console.log('  arquivo:', file);
   console.log(
     `  long/RF: ${payload.opening_positions?.length ?? 0} | shorts: ${payload.opening_short_options?.length ?? 0}`
   );

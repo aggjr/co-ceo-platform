@@ -45,6 +45,26 @@
   letter-spacing: 0.5px;
 }
 
+/* Detecta autofill WebKit/Chrome para sincronizar e-mail + senha antes do submit */
+.login-screen input.login-field:-webkit-autofill,
+.login-screen input.login-field:-webkit-autofill:hover,
+.login-screen input.login-field:-webkit-autofill:focus {
+  animation-name: coceo-login-autofill;
+  animation-duration: 0.01s;
+  -webkit-text-fill-color: var(--color-text) !important;
+  caret-color: var(--color-text);
+  transition: background-color 99999s ease-out 0s;
+}
+
+@keyframes coceo-login-autofill {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .login-screen .login-card {
   background: rgba(30, 41, 59, 0.6);
   backdrop-filter: blur(16px);

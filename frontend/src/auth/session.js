@@ -72,8 +72,12 @@ export function getImpersonatorMeta() {
   }
 }
 
-/** Abre Cockpit cliente em nova aba com sessão emulada (sem afetar a aba atual). */
-export function openImpersonationTab(token, impersonatorMeta) {
+/**
+ * Abre sessão emulada em nova aba (handoff via localStorage + ?_imp=).
+ * Se o navegador bloquear pop-up, redireciona a aba atual.
+ * @returns {boolean} true se abriu nova aba; false se usou fallback na mesma aba
+ */
+export function openImpersonationTab(token, impersonatorMeta, options = {}) {
   const handoffId =
     typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
@@ -82,8 +86,17 @@ export function openImpersonationTab(token, impersonatorMeta) {
     `${HANDOFF_PREFIX}${handoffId}`,
     JSON.stringify({ token, impersonator: impersonatorMeta ?? null })
   );
-  const url = `${window.location.origin}/cockpit?_imp=${encodeURIComponent(handoffId)}`;
-  window.open(url, '_blank', 'noopener,noreferrer');
+  const path =
+    typeof options.redirectPath === 'string' && options.redirectPath.startsWith('/')
+      ? options.redirectPath
+      : '/cockpit';
+  const url = `${window.location.origin}${path}?_imp=${encodeURIComponent(handoffId)}`;
+  const win = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!win) {
+    window.location.assign(url);
+    return false;
+  }
+  return true;
 }
 
 export function clearImpersonationToken() {

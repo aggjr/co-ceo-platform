@@ -6,7 +6,7 @@ import { inferAssetType, inferUnderlyingTicker } from './assetClassifier';
 import { rebuildCustodyFromLedger, type LedgerEvent } from './CustodyEngine';
 import {
   canonicalTesouroTicker,
-  normalizeTesouroLedgerQuantity,
+  normalizeLedgerLineQuantity,
 } from './tesouroDirectLedger';
 import {
   LEDGER_TRANSACTION_TYPES,
@@ -14,7 +14,9 @@ import {
   type OpeningImportPayload,
 } from './ledgerTypes';
 
-const OPENING_BATCH_REF = 'OPENING-MYPROFIT-2025-12-31';
+/** Abertura de custódia — fonte BTG/Necton (não myProfit). */
+const OPENING_BATCH_REF = 'OPENING-BTG-2026-01-01';
+const LEGACY_OPENING_BATCH_REF = 'OPENING-MYPROFIT-2025-12-31';
 import { syncAutoPendingSettlements } from './AutoPendingSettlementSync';
 
 function normalizeLedgerDate(value: unknown): string {
@@ -156,7 +158,7 @@ export class LedgerImportService {
       const assetType = pos.asset_type || inferAssetType(ticker);
       const assetId = await ensureAsset(this.gateway, ctx, orgId, ticker, assetType, assetCache);
       const underlying = inferUnderlyingTicker(ticker, pos.underlying_ticker);
-      const norm = normalizeTesouroLedgerQuantity({
+      const norm = normalizeLedgerLineQuantity(ticker, {
         quantity: pos.quantity,
         unit_price: pos.avg_price,
         date: openingDate,
@@ -207,7 +209,7 @@ export class LedgerImportService {
       const assetType = line.asset_type || inferAssetType(ticker);
       const assetId = await ensureAsset(this.gateway, ctx, orgId, ticker, assetType, assetCache);
       const underlying = inferUnderlyingTicker(ticker, line.underlying_ticker);
-      const norm = normalizeTesouroLedgerQuantity({
+      const norm = normalizeLedgerLineQuantity(ticker, {
         quantity: line.quantity,
         unit_price: line.unit_price,
         total_net_value: line.total_net_value,
@@ -291,12 +293,16 @@ export class LedgerImportService {
       openingDate,
     ]);
     const hasOpeningRef = (ticker: string, types: string[]) =>
-      dayRows.some(
-        (r) =>
+      dayRows.some((r) => {
+        const ref = String(r.broker_note_ref || '');
+        const openingRef =
+          ref === OPENING_BATCH_REF || ref === LEGACY_OPENING_BATCH_REF;
+        return (
           String(r.asset_ticker).toUpperCase() === ticker &&
           types.includes(String(r.transaction_type)) &&
-          String(r.broker_note_ref || '') === OPENING_BATCH_REF
-      );
+          openingRef
+        );
+      });
 
     const notePrefix = payload.source_label
       ? `Saldo inicial — ${payload.source_label}`
@@ -312,7 +318,7 @@ export class LedgerImportService {
       const assetType = pos.asset_type || inferAssetType(ticker);
       const assetId = await ensureAsset(this.gateway, ctx, orgId, ticker, assetType, assetCache);
       const underlying = inferUnderlyingTicker(ticker, pos.underlying_ticker);
-      const norm = normalizeTesouroLedgerQuantity({
+      const norm = normalizeLedgerLineQuantity(ticker, {
         quantity: pos.quantity,
         unit_price: pos.avg_price,
         date: openingDate,
@@ -425,7 +431,7 @@ export class LedgerImportService {
       const assetType = line.asset_type || inferAssetType(ticker);
       const assetId = await ensureAsset(this.gateway, ctx, orgId, ticker, assetType, assetCache);
       const underlying = inferUnderlyingTicker(ticker, line.underlying_ticker);
-      const norm = normalizeTesouroLedgerQuantity({
+      const norm = normalizeLedgerLineQuantity(ticker, {
         quantity: line.quantity,
         unit_price: line.unit_price,
         total_net_value: line.total_net_value,

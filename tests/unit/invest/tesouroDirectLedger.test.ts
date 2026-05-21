@@ -1,5 +1,6 @@
 import {
   canonicalTesouroTicker,
+  normalizeLedgerLineQuantity,
   normalizeTesouroLedgerQuantity,
 } from '../../../src/core/invest/tesouroDirectLedger';
 import { rebuildCustodyFromLedger } from '../../../src/core/invest/CustodyEngine';
@@ -14,6 +15,17 @@ describe('tesouroDirectLedger', () => {
     });
     expect(norm.unit_price).toBeCloseTo(18774.21, 0);
     expect(norm.quantity).toBeCloseTo(15.13, 1);
+  });
+
+  it('não aplica PU de Tesouro em ação com preço abaixo de R$ 50', () => {
+    const norm = normalizeLedgerLineQuantity('ITUB4', {
+      quantity: 1200,
+      unit_price: 41.43,
+      total_net_value: -49716,
+      date: '2026-05-15',
+    });
+    expect(norm.quantity).toBe(1200);
+    expect(norm.unit_price).toBeCloseTo(41.43, 2);
   });
 
   it('unifica tickers LFT e Tesouro Selic', () => {

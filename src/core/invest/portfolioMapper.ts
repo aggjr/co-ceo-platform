@@ -216,7 +216,7 @@ export function enrichPortfolioRow(
   const updatedQuote = metaLast > 0 ? metaLast : null;
   const pmB3 = prices.b3 > 0 ? prices.b3 : displayAvg;
   let marketValue = qty * lastPrice;
-  const costBasis = qty * displayAvg;
+  let costBasis = qty * displayAvg;
   let pnl = marketValue - costBasis;
   const optionLike = isOptionTicker(ticker) || isOptionAssetType(assetType);
   if (optionLike && !isOptionAssetType(assetType)) {
@@ -238,10 +238,16 @@ export function enrichPortfolioRow(
       ? Math.round(Math.abs(qty) * optionStrike * 100) / 100
       : null;
 
-  if (isEquityPortfolioItem(assetType, optionLike) && pmB3 > 0) {
+  if (isEquityPortfolioItem(assetType, optionLike)) {
     const quote = updatedQuote ?? lastPrice;
-    pnl = equityResultFromB3Quote(pmB3, quote, qty);
-    marketValue = Math.round(pmB3 * qty * 100) / 100;
+    const b3Cost = pmB3 > 0 ? pmB3 : displayAvg;
+    costBasis = Math.round(qty * b3Cost * 100) / 100;
+    marketValue = Math.round(qty * quote * 100) / 100;
+    if (pmB3 > 0) {
+      pnl = equityResultFromB3Quote(pmB3, quote, qty);
+    } else {
+      pnl = Math.round((marketValue - costBasis) * 100) / 100;
+    }
   }
 
   const pnlPct = optionLike
@@ -440,14 +446,20 @@ export function applyCashInvestBalanceToItems(
 }
 
 export function applyAllocationPercents(items: PortfolioItemDto[]): PortfolioItemDto[] {
-  const total = items.reduce((s, i) => s + i.marketValue, 0);
+  const total = items.reduce((s, i) => {
+    if (i.assetType !== 'stock' && i.assetType !== 'fii') return s;
+    if (Math.abs(i.quantity) < QTY_ZERO_EPS) return s;
+    return s + i.costBasis;
+  }, 0);
   if (total <= 0) return items;
   return items.map((item) => ({
     ...item,
     allocationPct:
       item.allocationPct != null
         ? item.allocationPct
-        : Math.round((item.marketValue / total) * 1000) / 10,
+        : item.assetType === 'stock' || item.assetType === 'fii'
+          ? Math.round((item.costBasis / total) * 1000) / 10
+          : null,
   }));
 }
 

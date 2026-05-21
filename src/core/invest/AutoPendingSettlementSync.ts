@@ -4,8 +4,9 @@ import type { UserContext } from '../dal';
 import type { LedgerEvent } from './CustodyEngine';
 import {
   cashSettlementDate,
-  isOptionPremiumSell,
-  isStockLikeAsset,
+  cashSettlementRuleLabel,
+  defersCashSettlement,
+  resolveAssetTypeForSettlement,
 } from './settlementCalendar';
 
 export const AUTO_D2_REF_PREFIX = 'AUTO-D2:';
@@ -14,20 +15,10 @@ export function autoD2Ref(ledgerEntryId: string): string {
   return `${AUTO_D2_REF_PREFIX}${ledgerEntryId}`;
 }
 
-function isDeferredStockTrade(e: LedgerEvent): boolean {
-  const type = String(e.transaction_type);
-  const assetType = String(e.asset_type || 'stock');
-  return isStockLikeAsset(assetType) && (type === 'buy' || type === 'sell');
-}
-
-function isDeferredOptionPremium(e: LedgerEvent): boolean {
-  const type = String(e.transaction_type);
-  const assetType = String(e.asset_type || '');
-  return isOptionPremiumSell(assetType, type);
-}
-
 function defersCashSettlementEvent(e: LedgerEvent): boolean {
-  return isDeferredStockTrade(e) || isDeferredOptionPremium(e);
+  const ticker = String(e.asset_ticker || '');
+  const assetType = resolveAssetTypeForSettlement(ticker, String(e.asset_type));
+  return defersCashSettlement(assetType, String(e.transaction_type), ticker);
 }
 
 export type AutoPendingSyncResult = {
@@ -37,8 +28,8 @@ export type AutoPendingSyncResult = {
 };
 
 /**
- * Gera `pending_settlement` no livro-razão para compras/vendas de ação com pagamento D+2,
- * mantendo o patrimônio alinhado ao BTG (lançamento futuro até liquidar).
+ * Gera `pending_settlement` (valor em trânsito) no livro-razão:
+ * ação/FII D+2, prêmio de opção D+1, RF conforme calendário — conferir extrato BTG na data prevista.
  */
 export async function syncAutoPendingSettlements(
   gateway: CoCeoDataGateway,
@@ -71,13 +62,13 @@ export async function syncAutoPendingSettlements(
     const tradeDate = String(e.transaction_date || '').slice(0, 10);
     if (!tradeDate) continue;
 
-    const settleOn = cashSettlementDate(
-      tradeDate,
-      String(e.asset_type || 'stock'),
-      String(e.transaction_type)
-    );
+    const ticker = String(e.asset_ticker || '');
+    const assetType = resolveAssetTypeForSettlement(ticker, String(e.asset_type));
+    const txType = String(e.transaction_type);
+    const settleOn = cashSettlementDate(tradeDate, assetType, txType, ticker);
     const net = Number(e.total_net_value ?? 0);
     const open = pendingByRef.get(ref) ?? 0;
+    const rule = cashSettlementRuleLabel(assetType, txType, ticker);
 
     if (settleOn > today) {
       if (Math.abs(open) < 0.01) {
@@ -98,7 +89,7 @@ export async function syncAutoPendingSettlements(
           impacts_managerial_price: false,
           broker_note_ref: ref,
           source_batch_id: null,
-          notes: `Previsão pagamento D+2 — ${e.asset_ticker} (${String(e.transaction_type)})`,
+          notes: `Valor em trânsito — ${rule} — liquidação prevista ${settleOn} — ${ticker} (${txType})`,
         });
         pendingByRef.set(ref, net);
         created += 1;
@@ -126,7 +117,7 @@ export async function syncAutoPendingSettlements(
         impacts_managerial_price: false,
         broker_note_ref: `${ref}:CLEAR`,
         source_batch_id: null,
-        notes: `Liquidação D+2 — ${e.asset_ticker}`,
+          notes: `Liquidação na conta — ${rule} — ${ticker} (${settleOn})`,
       });
       pendingByRef.set(ref, 0);
       cleared += 1;

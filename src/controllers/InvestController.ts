@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { Request, Response } from 'express';
 import { FieldPolicyService } from '../core/auth/FieldPolicyService';
 import { CoCeoDataGateway } from '../core/dal';
@@ -15,6 +17,10 @@ import { buildDailyPatrimonyMtmSeries } from '../core/invest/PatrimonyMtmDailyEn
 import { buildExtractReconciliationSummary } from '../core/invest/btgExtractCashSeries';
 import { compareToBtgPublished } from '../core/invest/btgPerformanceReference';
 import { loadPatrimonyAnchors } from '../core/invest/patrimonyAnchors';
+import {
+  fixedIncomeTotalFromLedger,
+  shouldUseBtgAnchorCalibration,
+} from '../core/invest/patrimonyLedgerGates';
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import {
@@ -29,6 +35,7 @@ import {
 } from '../core/invest/callCoverage';
 import { rebuildCustodyFromLedger } from '../core/invest/CustodyEngine';
 import { resolveCashInvestDisplayBalance } from '../core/invest/cashInvestLedger';
+import { buildCashInTransitSummary } from '../core/invest/cashInTransit';
 import {
   applyAllocationPercents,
   applyCashInvestBalanceToItems,
@@ -130,15 +137,19 @@ export class InvestController {
       coverageOptions,
       premiumByUnderlying
     );
-    const cashBalance = resolveCashInvestDisplayBalance(ledgerEvents, today);
-    const withCash = applyCashInvestBalanceToItems(withCallCoverage, cashBalance);
+    const cashInTransit = buildCashInTransitSummary(ledgerEvents, today);
+    const withCash = applyCashInvestBalanceToItems(
+      withCallCoverage,
+      cashInTransit.settledCashBalance
+    );
 
     return res.json({
       success: true,
       items: withCash,
       closedOptions,
       summary: summarizePortfolio(withCash),
-      cashStatementBalance: cashBalance,
+      cashStatementBalance: cashInTransit.settledCashBalance,
+      cashInTransit,
       source: 'custody',
     });
   };
@@ -187,6 +198,12 @@ export class InvestController {
     }
 
     const anchors = loadPatrimonyAnchors();
+    const calibrateToAnchors =
+      method === 'mtm_btg' && shouldUseBtgAnchorCalibration(events);
+    const fixedIncomeTotal = calibrateToAnchors
+      ? Number(anchors.fixed_income_total ?? 0)
+      : fixedIncomeTotalFromLedger(events);
+
     let result =
       method === 'ledger_replay'
         ? buildDailyPatrimonySeries(events, from, to, {
@@ -196,7 +213,8 @@ export class InvestController {
             riskFreeAnnual: Number.isFinite(riskFreeAnnual) ? riskFreeAnnual : 0,
             anchors,
             stockQuotes,
-            fixedIncomeTotal: Number(anchors.fixed_income_total ?? 0),
+            fixedIncomeTotal,
+            calibrateToAnchors,
           });
 
     const storedDays = await this.patrimonyStore.loadRange(ctx, from, to);
@@ -222,9 +240,12 @@ export class InvestController {
         ledgerFlows.some((f) => f.date === et.date && Math.abs(f.amount - et.amount) < 0.02)
       );
 
+    const cashInTransit = buildCashInTransitSummary(events, to);
+
     return res.json({
       success: true,
       ...result,
+      cashInTransit,
       btgReference,
       extractReconciliation: {
         ...extractReconciliation,
@@ -243,9 +264,12 @@ export class InvestController {
         storedDates.length > 0
           ? `${storedDates.length} dia(s) com fechamento gravado (patrimônio econômico real + cotações do dia).`
           : 'A partir de agora: execute record-daily-patrimony 1x/dia após atualizar cotações para construir histórico detalhado.',
-        'Antes do primeiro fechamento gravado: série estimada (âncoras BTG + cotação atual).',
+        calibrateToAnchors
+          ? 'Série estimada com âncoras mensais BTG até haver fechamentos gravados dia a dia.'
+          : 'Série somente do livro-razão (sem âncoras BTG). Importe abertura 01/01/2026 e movimentações para evoluir a curva.',
         'TWR principal em períodos longos: fechamentos mensais BTG; TWR diário gravado usa só TED/aportes como fluxo externo.',
       ],
+      patrimonySource: calibrateToAnchors ? 'ledger_plus_btg_anchors' : 'ledger_only',
     });
   };
 
@@ -441,6 +465,31 @@ export class InvestController {
       const message = err instanceof Error ? err.message : 'Falha na conciliação.';
       return res.status(status).json({ success: false, error: message });
     }
+  };
+
+  /** Conferência de notas BTG — somente leitura; não importa ao livro razão. */
+  listBrokerageNotesReview = async (_req: Request, res: Response) => {
+    const file = path.join(
+      process.cwd(),
+      'data',
+      'invest',
+      'btg-brokerage-notes-review-2026.json'
+    );
+    if (!fs.existsSync(file)) {
+      return res.status(404).json({
+        success: false,
+        error:
+          'Arquivo de revisão não encontrado. Rode: npx ts-node scripts/build-btg-brokerage-notes-review.ts',
+      });
+    }
+    const data = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+    return res.json({
+      success: true,
+      ledgerImport: false,
+      message:
+        'Dados apenas para conferência. Não foram lançados no livro caixa. Cruze depois com extrato da conta.',
+      ...data,
+    });
   };
 
 }

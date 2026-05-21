@@ -58,7 +58,8 @@ function bindPatrimonyChart(container) {
         summaryHost.innerHTML = renderHoldingPatrimonySummary(
           series,
           data.performance,
-          data.btgReference
+          data.btgReference,
+          data.cashInTransit
         );
       }
 
@@ -71,8 +72,15 @@ function bindPatrimonyChart(container) {
         }
       }
 
-      if (metaHost && data.meta?.note) {
-        metaHost.textContent = data.meta.note;
+      if (metaHost) {
+        const parts = [
+          data.meta?.note,
+          ...(data.performanceNotes || []),
+          data.patrimonySource === 'ledger_only'
+            ? 'Fonte: somente livro-razão (base zerada ou sem custódia RV).'
+            : null,
+        ].filter(Boolean);
+        metaHost.textContent = parts.join(' ');
       }
     } catch (err) {
       if (summaryHost) summaryHost.innerHTML = '';
@@ -100,7 +108,7 @@ export async function InvestDashboardPage(container) {
 
   if (isGlobalSession()) {
     await renderShell(container, {
-      title: 'INVEST — Patrimônio',
+      title: 'INVEST — Resultado Histórico',
       contentHtml: `<${D} class="card"><h2 style="font-size:16px">INVEST</h2><p class="muted">Personifique o titular da holding para ver o gráfico patrimonial.</p></${D}>`,
     });
     return;
@@ -110,7 +118,7 @@ export async function InvestDashboardPage(container) {
     <${D} class="card invest-patrimony-card">
       <${D} class="patrimony-toolbar">
         <${D}>
-          <h2 style="font-size:18px;margin:0">Patrimônio da holding</h2>
+          <h2 style="font-size:18px;margin:0">Resultado histórico da holding</h2>
           <p class="muted" style="margin:4px 0 0;font-size:13px">
             Curva diária (livro-razão + âncoras BTG).
           </p>
@@ -126,8 +134,7 @@ export async function InvestDashboardPage(container) {
       <p id="patrimony-meta" class="patrimony-meta muted"></p>
       <nav class="invest-patrimony-links" aria-label="Atalhos INVEST">
         <a href="/invest/portfolio" data-link>Portfólio →</a>
-        · <a href="/invest/ganhos-por-acao" data-link>Ganhos por ação →</a>
-        <a href="/invest/resultado" data-link>Resultado →</a>
+        · <a href="/invest/ganhos-por-acao" data-link>Resultados por ação →</a>
       </nav>
     </${D}>
   </${D}>`;

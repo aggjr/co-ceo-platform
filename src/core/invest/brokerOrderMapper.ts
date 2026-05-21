@@ -4,6 +4,8 @@ import type { LedgerImportLine } from './ledgerTypes';
 export type MapBrokerOrderOptions = {
   /** Prêmio líquido já recebido na PUT vendida (ajuste B3 só no exercício). */
   putPremiumNetForB3?: number;
+  /** Prêmio líquido já pago na CALL comprada (ajuste B3: PM ≈ strike + prêmio/qty). */
+  callPremiumNetForB3?: number;
 };
 
 export type BrokerOrderRow = {
@@ -112,6 +114,31 @@ export function mapBrokerOrderToLedger(
           ? `${row.broker_note_ref}#b3-put`
           : undefined,
         notes: `B3 — prêmio PUT no exercício (${ticker})`,
+        impacts_managerial_price: false,
+      });
+    }
+
+    const callPremium = options?.callPremiumNetForB3;
+    if (
+      isBuy &&
+      inferAssetType(optionTicker) === 'option_call' &&
+      callPremium != null &&
+      callPremium !== 0
+    ) {
+      const paid = Math.abs(callPremium);
+      lines.push({
+        date,
+        ticker: optionTicker,
+        asset_type: 'option_call',
+        underlying_ticker: underlying,
+        operation: 'option_exercise',
+        quantity: qtyShares,
+        unit_price: price,
+        total_net_value: -paid,
+        broker_note_ref: row.broker_note_ref
+          ? `${row.broker_note_ref}#b3-call`
+          : undefined,
+        notes: `B3 — prêmio CALL no exercício (${ticker})`,
         impacts_managerial_price: false,
       });
     }

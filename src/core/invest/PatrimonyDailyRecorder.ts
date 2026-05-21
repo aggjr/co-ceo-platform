@@ -3,6 +3,7 @@ import type { UserContext } from '../dal';
 import { LedgerImportService } from './LedgerImportService';
 import { buildDailyPatrimonyMtmSeries } from './PatrimonyMtmDailyEngine';
 import { loadPatrimonyAnchors } from './patrimonyAnchors';
+import { fixedIncomeTotalFromLedger } from './patrimonyLedgerGates';
 import { PatrimonyDailyStore, type StoredPortfolioDay } from './PatrimonyDailyStore';
 import { aggregateExternalFlowsByDate } from './portfolioPerformance';
 
@@ -73,7 +74,7 @@ export class PatrimonyDailyRecorder {
     const mtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
       anchors,
       stockQuotes,
-      fixedIncomeTotal: Number(anchors.fixed_income_total ?? 0),
+      fixedIncomeTotal: fixedIncomeTotalFromLedger(events),
       calibrateToAnchors: false,
     });
 
@@ -110,7 +111,7 @@ export class PatrimonyDailyRecorder {
       snapshotDate: date,
       point,
       patrimonyGross,
-      fixedIncomeTotal: Number(anchors.fixed_income_total ?? 0),
+      fixedIncomeTotal: fixedIncomeTotalFromLedger(events),
       externalFlow,
       dailyReturnTwr,
       cumulativeTwr,

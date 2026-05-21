@@ -38,7 +38,7 @@ function main() {
 
   const payload = {
     opening_date: '2026-01-01',
-    source_label: 'BTG extratos jan–mai/2026 (PDF) + abertura myProfit 31/12/2025',
+    source_label: 'BTG extrato conta corrente 01/01–21/05/2026 (Extrato.pdf emitido 21/05/2026)',
     opening_positions: [],
     entries: [],
     monthly_statements: monthly,

@@ -1,0 +1,13 @@
+.notes-contract-value {
+  font-weight: 700;
+}
+
+.notes-note-net {
+  font-weight: 500;
+  opacity: 0.92;
+}
+
+.notes-legend .notes-contract-value,
+.notes-legend .notes-note-net {
+  font-weight: 700;
+}

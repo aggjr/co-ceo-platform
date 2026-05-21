@@ -1,5 +1,9 @@
 /**
- * Gera série patrimonial diária 2026 e grava em data/invest/patrimony-daily-2026.json
+ * Gera série patrimonial diária 2026 e grava em data/invest/patrimony-daily-2026.json.
+ * Com --persist, grava também em invest_portfolio_daily (cache; API não recalcula esses dias).
+ *
+ *   node ./node_modules/ts-node/dist/bin.js scripts/build-patrimony-daily-2026.ts
+ *   node ./node_modules/ts-node/dist/bin.js scripts/build-patrimony-daily-2026.ts --persist
  */
 import fs from 'fs';
 import path from 'path';
@@ -10,10 +14,17 @@ import { installerContext } from '../src/database/seeds/lib/installerContext';
 import { LedgerImportService } from '../src/core/invest/LedgerImportService';
 import { buildDailyPatrimonyMtmSeries } from '../src/core/invest/PatrimonyMtmDailyEngine';
 import { loadPatrimonyAnchors } from '../src/core/invest/patrimonyAnchors';
+import { PatrimonyDailyStore } from '../src/core/invest/PatrimonyDailyStore';
+import { aggregateExternalFlowsByDate } from '../src/core/invest/portfolioPerformance';
 
 dotenv.config();
 
 const ORG = process.env.PORTFOLIO_ORG_ID || 'org-holding-001';
+const persistDb = process.argv.includes('--persist');
+
+function roundTwr(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
 
 async function main() {
   const pool = mysql.createPool({
@@ -82,6 +93,53 @@ async function main() {
     );
   }
   console.log('Salvo:', outPath, `(${result.series.length} dias)`);
+
+  if (persistDb) {
+    const today = new Date().toISOString().slice(0, 10);
+    const store = new PatrimonyDailyStore(gateway);
+    const flowsByDate = aggregateExternalFlowsByDate(events, '2026-01-01', today);
+    const fixedIncomeTotal = Number(anchors.fixed_income_total ?? 0);
+    let prevPatrimony: number | null = null;
+    let cumulativeTwr = 0;
+    let persisted = 0;
+
+    for (const point of result.series) {
+      if (point.date > today) continue;
+      const externalFlow = flowsByDate.get(point.date) ?? 0;
+      let dailyReturnTwr = 0;
+      if (prevPatrimony != null && prevPatrimony > 0) {
+        dailyReturnTwr = roundTwr((point.patrimony - prevPatrimony - externalFlow) / prevPatrimony);
+        cumulativeTwr = roundTwr((1 + cumulativeTwr) * (1 + dailyReturnTwr) - 1);
+      }
+      await store.upsertPortfolioDay(ctx, {
+        snapshotDate: point.date,
+        point,
+        patrimonyGross: point.patrimonyGross,
+        fixedIncomeTotal,
+        externalFlow,
+        dailyReturnTwr,
+        cumulativeTwr,
+        quotesAsOf: null,
+        positionSnapshots: point.date === today ? (result.positionSnapshots ?? []) : [],
+        stockQuotes,
+      });
+      prevPatrimony = point.patrimony;
+      persisted++;
+    }
+    console.log(`Persistidos em invest_portfolio_daily: ${persisted} dia(s) até ${today}`);
+  }
+
+  if (result.performance) {
+    const p = result.performance;
+    console.log('\nResultado 2026 (YTD):');
+    console.log('  Patrimônio inicial:', p.startPatrimony.toLocaleString('pt-BR'));
+    console.log('  Patrimônio final (série):', p.endPatrimony.toLocaleString('pt-BR'));
+    console.log('  Ganho BRL:', p.periodGainBrl.toLocaleString('pt-BR'));
+    console.log('  TWR (âncoras mensais BTG):', `${(p.periodReturnTwr * 100).toFixed(2)}%`);
+    if (p.monthAnchorTwr != null) {
+      console.log('  TWR âncoras (confirmação):', `${(p.monthAnchorTwr * 100).toFixed(2)}%`);
+    }
+  }
 
   await pool.end();
 }

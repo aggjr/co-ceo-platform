@@ -118,26 +118,127 @@ function buyCost(e: LedgerEvent): number {
   return q * p;
 }
 
-/** Reduz totais proporcionais à fração vendida — preserva PM Estrito e PM B3. */
+/** Reduz totais proporcionais à fração vendida — preserva os três PM do lote. */
 function applyProportionalReduction(s: UnderlyingState, qtyOut: number): void {
   if (s.qty <= 0) return;
   const q = Math.min(qtyOut, s.qty);
   const frac = q / s.qty;
   s.estritoTotal -= s.estritoTotal * frac;
   s.b3AjusteTotal -= s.b3AjusteTotal * frac;
+  s.premioOpcoesPeriodo -= s.premioOpcoesPeriodo * frac;
   s.qty -= q;
   if (s.qty <= 1e-9) resetState(s);
+}
+
+function parseExerciseOptionTicker(e: LedgerEvent): string | null {
+  const ref = String(e.broker_note_ref ?? '');
+  const notes = String(e.notes ?? '');
+  if (!/exerc/i.test(notes) && !/atribui/i.test(notes) && !ref.includes('BTG-EXERCISE')) {
+    return null;
+  }
+
+  const parts = ref.split('#');
+  if (parts.length >= 3) {
+    return parts[parts.length - 1].trim().toUpperCase().replace(/[EF]$/, '');
+  }
+
+  const tailMatch = notes.match(/([A-Z]{4}[A-Z0-9]+)[EF]?\s*$/i);
+  if (tailMatch?.[1]) return tailMatch[1].toUpperCase().replace(/[EF]$/, '');
+
+  return null;
+}
+
+/** PUT vendida exercida: B3 só na parte exercida; Gerencial na série inteira não contada. */
+function applyPutShortExercisePremium(
+  s: UnderlyingState,
+  series: OptionSeriesState,
+  exercisedQty: number,
+  explicitNet: number | null
+): void {
+  const openAbs = Math.abs(series.qtyAtual);
+  const exercised = Math.min(exercisedQty, openAbs > 0 ? openAbs : exercisedQty);
+  if (exercised <= 0) return;
+
+  const useExplicitNet = explicitNet != null && Math.abs(explicitNet) > 0.005;
+  const frac = openAbs > 0 ? exercised / openAbs : 1;
+  const allocatedFromHistory = frac * series.premioLiquido;
+  const naoContadoSerieHistory =
+    series.premioLiquido - series.premioContadoGerencial;
+
+  if (useExplicitNet) {
+    const premioRecebido = Math.abs(explicitNet!);
+    s.b3AjusteTotal += premioRecebido;
+    s.premioOpcoesPeriodo += premioRecebido - series.premioContadoGerencial;
+    series.premioLiquido = 0;
+    series.premioContadoGerencial = 0;
+  } else if (Math.abs(series.premioLiquido) > 0.005) {
+    s.b3AjusteTotal += allocatedFromHistory;
+    s.premioOpcoesPeriodo += naoContadoSerieHistory;
+    series.premioLiquido -= allocatedFromHistory;
+    series.premioContadoGerencial = series.premioLiquido;
+  }
+}
+
+/** CALL comprada exercida: B3 só na parte exercida; Gerencial na série inteira não contada. */
+function applyCallLongExercisePremium(
+  s: UnderlyingState,
+  series: OptionSeriesState,
+  exercisedQty: number,
+  explicitNet: number | null
+): void {
+  const openAbs = Math.abs(series.qtyAtual);
+  const exercised = Math.min(exercisedQty, openAbs > 0 ? openAbs : exercisedQty);
+  if (exercised <= 0) return;
+
+  const useExplicitNet = explicitNet != null && Math.abs(explicitNet) > 0.005;
+  const frac = openAbs > 0 ? exercised / openAbs : 1;
+  const allocatedFromHistory = frac * series.premioLiquido;
+  const naoContadoSerieHistory =
+    series.premioLiquido - series.premioContadoGerencial;
+
+  if (useExplicitNet) {
+    const premioPago = -Math.abs(explicitNet!);
+    s.b3AjusteTotal += premioPago;
+    s.premioOpcoesPeriodo += premioPago - series.premioContadoGerencial;
+    series.premioLiquido = 0;
+    series.premioContadoGerencial = 0;
+  } else if (Math.abs(series.premioLiquido) > 0.005) {
+    s.b3AjusteTotal += allocatedFromHistory;
+    s.premioOpcoesPeriodo += naoContadoSerieHistory;
+    series.premioLiquido -= allocatedFromHistory;
+    series.premioContadoGerencial = series.premioLiquido;
+  }
 }
 
 function applyStockBuy(s: UnderlyingState, e: LedgerEvent): void {
   const q = Math.abs(Number(e.quantity ?? 0));
   if (q <= 0) return;
   const type = String(e.transaction_type);
+  const strike = Number(e.unit_price ?? 0);
+  const optionTicker = parseExerciseOptionTicker(e);
+
+  if (s.qty <= 0) s.lotStart = eventDate(e);
+
+  if (optionTicker && strike > 0) {
+    s.qty += q;
+    s.estritoTotal += q * strike;
+
+    const series = getOptionSeries(s, optionTicker);
+    const optType = inferAssetType(optionTicker);
+    if (optType === 'option_put' && series.qtyAtual < -1e-9) {
+      applyPutShortExercisePremium(s, series, q, null);
+      series.qtyAtual += q;
+    } else if (optType === 'option_call' && series.qtyAtual > 1e-9) {
+      applyCallLongExercisePremium(s, series, q, null);
+      series.qtyAtual -= q;
+    }
+    return;
+  }
+
   const cost =
     type === 'opening_balance' || type === 'bonus'
-      ? q * Number(e.unit_price ?? 0)
+      ? q * strike
       : buyCost(e);
-  if (s.qty <= 0) s.lotStart = eventDate(e);
   s.qty += q;
   s.estritoTotal += cost;
 }
@@ -198,58 +299,42 @@ function applyOptionExercise(s: UnderlyingState, e: LedgerEvent): void {
   const isCall = optType === 'option_call';
   if (!isPut && !isCall) return;
 
-  const positionShort = series.qtyAtual < -1e-9; // vendido
-  const positionLong = series.qtyAtual > 1e-9; // comprado
+  const positionShort = series.qtyAtual < -1e-9;
+  const positionLong = series.qtyAtual > 1e-9;
   const openAbs = Math.abs(series.qtyAtual);
   const exercised = Math.min(q, openAbs);
   if (exercised <= 0) return;
 
-  const frac = openAbs > 0 ? exercised / openAbs : 0;
-  const allocated = frac * series.premioLiquido;
-  const alreadyCounted = frac * series.premioContadoGerencial;
+  const explicitNet = Number(e.total_net_value ?? 0);
+  const explicitOrNull = Math.abs(explicitNet) > 0.005 ? explicitNet : null;
 
-  /** Em exercício que gera ENTRADA de ações (PUT vendida ou CALL comprada
-   *  exercida), todo o prêmio da série ainda não computado no Gerencial entra
-   *  agora — inclusive a parte das opções da mesma série que não foram
-   *  exercidas (vão expirar ou ainda estão em aberto). Regra: uma opção da
-   *  série foi exercida → série inteira impacta o PM Gerencial daquele lote. */
-  const naoContadoSerie = series.premioLiquido - series.premioContadoGerencial;
+  const frac = openAbs > 0 ? exercised / openAbs : 0;
+  const allocatedFromHistory = frac * series.premioLiquido;
+  const alreadyCountedHistory = frac * series.premioContadoGerencial;
 
   if (isPut && positionShort) {
-    const strike = Number(e.unit_price ?? 0);
-    if (s.qty <= 0) s.lotStart = eventDate(e);
-    s.qty += exercised;
-    s.estritoTotal += exercised * strike;
-    s.b3AjusteTotal += allocated;
-    s.premioOpcoesPeriodo += naoContadoSerie;
+    if (Math.abs(series.premioLiquido) > 0.005 || explicitOrNull != null) {
+      applyPutShortExercisePremium(s, series, exercised, explicitOrNull);
+    }
     series.qtyAtual += exercised;
-    series.premioLiquido -= allocated;
-    // Após absorver tudo no Gerencial e consumir o proporcional, o contado
-    // acompanha o restante do premioLiquido.
-    series.premioContadoGerencial = series.premioLiquido;
     return;
   }
 
   if (isCall && positionLong) {
-    const strike = Number(e.unit_price ?? 0);
-    if (s.qty <= 0) s.lotStart = eventDate(e);
-    s.qty += exercised;
-    s.estritoTotal += exercised * strike;
-    s.b3AjusteTotal += allocated;
-    s.premioOpcoesPeriodo += naoContadoSerie;
+    if (Math.abs(series.premioLiquido) > 0.005 || explicitOrNull != null) {
+      applyCallLongExercisePremium(s, series, exercised, explicitOrNull);
+    }
     series.qtyAtual -= exercised;
-    series.premioLiquido -= allocated;
-    series.premioContadoGerencial = series.premioLiquido;
     return;
   }
 
   if (isPut && positionLong) {
-    // PUT comprada exercida → saída forçada de ações. Não toca em Gerencial
-    // (saída não ressuscita prêmio pré-lote).
+    // PUT comprada exercida → saída forçada de ações. Não toca em PM B3 do
+    // remanescente; prêmio (pago) não ressuscita no Gerencial.
     applyProportionalReduction(s, exercised);
     series.qtyAtual -= exercised;
-    series.premioLiquido -= allocated;
-    series.premioContadoGerencial -= alreadyCounted;
+    series.premioLiquido -= allocatedFromHistory;
+    series.premioContadoGerencial -= alreadyCountedHistory;
     return;
   }
 
@@ -257,21 +342,20 @@ function applyOptionExercise(s: UnderlyingState, e: LedgerEvent): void {
     // CALL vendida exercida → saída forçada de ações.
     applyProportionalReduction(s, exercised);
     series.qtyAtual += exercised;
-    series.premioLiquido -= allocated;
-    series.premioContadoGerencial -= alreadyCounted;
+    series.premioLiquido -= allocatedFromHistory;
+    series.premioContadoGerencial -= alreadyCountedHistory;
     return;
   }
 }
 
 function applyEvent(s: UnderlyingState, e: LedgerEvent): void {
-  if (!impactsPrice(e.impacts_managerial_price)) return;
-
   const type = String(e.transaction_type);
   if (IGNORED_TX.has(type)) return;
 
   const assetType = effectiveAssetType(e);
 
   if (STOCK_LIKE.has(assetType)) {
+    if (!impactsPrice(e.impacts_managerial_price)) return;
     if (type === 'buy' || type === 'opening_balance' || type === 'bonus') {
       applyStockBuy(s, e);
       return;
@@ -288,15 +372,16 @@ function applyEvent(s: UnderlyingState, e: LedgerEvent): void {
   }
 
   if (OPTION_LIKE.has(assetType)) {
-    if (
-      OPTION_SELL_TX.has(type) ||
-      OPTION_BUY_TX.has(type)
-    ) {
-      applyOptionTrade(s, e);
-      return;
-    }
+    // option_exercise sempre processa — engine calcula o ajuste pelo histórico
+    // da série, então o flag impacts_managerial_price=false (resíduo de
+    // marcadores contábeis antigos) não deve ignorar o exercício.
     if (type === 'option_exercise') {
       applyOptionExercise(s, e);
+      return;
+    }
+    if (!impactsPrice(e.impacts_managerial_price)) return;
+    if (OPTION_SELL_TX.has(type) || OPTION_BUY_TX.has(type)) {
+      applyOptionTrade(s, e);
       return;
     }
     return;
