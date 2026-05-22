@@ -288,8 +288,8 @@ export function ImpersonationBar() {
                 }
               >
                 {submitting() ? 'Entrando...' : (
-                  <span style="display: inline-block; line-height: 1.1; text-align: center;">
-                    emular<br />acesso
+                  <span style="display: inline-block; line-height: 1.2; text-align: center;">
+                    Emular<br />Acesso
                   </span>
                 )}
               </button>
