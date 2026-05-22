@@ -88,8 +88,6 @@ function tesouroQtyAndPrice(
   const normalized = normalizeTesouroLedgerQuantity({
     quantity: Number(e.quantity),
     unit_price: Number(e.unit_price),
-    total_net_value: e.total_net_value,
-    date: e.transaction_date,
   });
   if (state.qty > 0 && state.totalCost > 0) {
     const avgPu = state.totalCost / state.qty;

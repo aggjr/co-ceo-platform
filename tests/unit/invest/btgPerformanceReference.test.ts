@@ -21,9 +21,22 @@ describe('btgPerformanceReference', () => {
 });
 
 describe('computeTwrFromMonthEndAnchors', () => {
-  it('encadeia fechamentos mensais das âncoras', () => {
+  it('âncoras vazias → retorna null (fonte canônica passou ao banco)', () => {
     const anchors = loadPatrimonyAnchors();
+    expect(anchors.month_ends).toHaveLength(0);
     const linked = computeTwrFromMonthEndAnchors(anchors, [], '2025-12-31', '2026-05-19');
+    expect(linked).toBeNull();
+  });
+
+  it('encadeia fechamentos mensais quando âncoras vêm explícitas no payload', () => {
+    const anchors = {
+      month_ends: [
+        { date: '2025-12-31', patrimony: 1_000_000 },
+        { date: '2026-01-31', patrimony: 1_050_000 },
+        { date: '2026-02-28', patrimony: 1_100_000 },
+      ],
+    };
+    const linked = computeTwrFromMonthEndAnchors(anchors, [], '2025-12-31', '2026-02-28');
     expect(linked).not.toBeNull();
     expect(linked!.months.length).toBeGreaterThan(0);
     const implied = compoundMonthlyReturns(linked!.months.map((m) => m.periodReturn));

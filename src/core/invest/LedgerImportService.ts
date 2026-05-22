@@ -161,7 +161,6 @@ export class LedgerImportService {
       const norm = normalizeLedgerLineQuantity(ticker, {
         quantity: pos.quantity,
         unit_price: pos.avg_price,
-        date: openingDate,
       });
       const qty = Math.abs(norm.quantity);
       const price = norm.unit_price;
@@ -212,8 +211,6 @@ export class LedgerImportService {
       const norm = normalizeLedgerLineQuantity(ticker, {
         quantity: line.quantity,
         unit_price: line.unit_price,
-        total_net_value: line.total_net_value,
-        date: line.date,
       });
       const qty = signedQuantity(op, norm.quantity);
       const unitPrice = norm.unit_price;
@@ -321,7 +318,6 @@ export class LedgerImportService {
       const norm = normalizeLedgerLineQuantity(ticker, {
         quantity: pos.quantity,
         unit_price: pos.avg_price,
-        date: openingDate,
       });
       const qty = Math.abs(norm.quantity);
       const price = norm.unit_price;
@@ -434,8 +430,6 @@ export class LedgerImportService {
       const norm = normalizeLedgerLineQuantity(ticker, {
         quantity: line.quantity,
         unit_price: line.unit_price,
-        total_net_value: line.total_net_value,
-        date: line.date,
       });
       const qty = signedQuantity(op, norm.quantity);
       const unitPrice = norm.unit_price;
