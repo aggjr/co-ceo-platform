@@ -290,7 +290,7 @@
 
 .shell .impersonate-label {
   color: var(--color-accent);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
@@ -300,16 +300,16 @@
   background: #1e293b;
   color: var(--color-text);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 0 6px;
+  padding: 0 8px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 13px;
   outline: none;
-  width: 155px;
-  min-width: 155px;
-  max-width: 155px;
-  height: 24px;
-  line-height: 24px;
-  flex: 0 0 155px;
+  width: 260px;
+  min-width: 200px;
+  max-width: 320px;
+  height: 32px;
+  line-height: 32px;
+  flex: 0 0 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -325,14 +325,14 @@
   background: var(--color-accent);
   color: var(--color-bg);
   border: none;
-  padding: 0 10px;
+  padding: 0 14px;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
-  height: 24px;
-  line-height: 24px;
+  height: 32px;
+  line-height: 32px;
   flex-shrink: 0;
 }
 

@@ -60,6 +60,9 @@ export function Shell(props: { children?: JSX.Element }) {
         <SideNav />
 
         <div class="sidebar-footer">
+          <div style={{ "margin-bottom": "8px", "font-size": "11px", color: "rgba(255, 255, 255, 0.4)", "text-align": "center" }}>
+            {APP_VERSION}
+          </div>
           <button type="button" class="btn-logout" onClick={handleLogout}>
             Sair
           </button>
@@ -93,9 +96,8 @@ export function Shell(props: { children?: JSX.Element }) {
               <ImpersonationBar />
             </div>
 
-            {/* Bloco Direito: Versão, Avatar, Email */}
+            {/* Bloco Direito: Avatar, Email */}
             <div class="header-right">
-              <span class="app-version">V0.0.39</span>
               <div class="avatar" title={user()?.fullName || user()?.email || ''}>
                 {initial()}
               </div>
