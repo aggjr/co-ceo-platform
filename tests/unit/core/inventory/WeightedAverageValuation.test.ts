@@ -27,6 +27,20 @@ describe('WeightedAverageValuation', () => {
     expect(state.currentValue).toBe(5000);
   });
 
+  it('opening_balance negativo (posicao short herdada) preserva pmA positivo e custo negativo', () => {
+    const state = v.applyMovement(empty, {
+      itemId: 'PRIOQ43',
+      transactionDate: '2026-01-01',
+      movementType: 'opening_balance',
+      quantityDelta: -31200,
+      unitValue: 1.426748,
+    });
+    expect(state.quantity).toBe(-31200);
+    expect(state.pmA).toBeCloseTo(1.426748, 6);
+    expect(state.acquisitionValue).toBeCloseTo(-44514.5376, 2);
+    expect(state.currentValue).toBeCloseTo(-44514.5376, 2);
+  });
+
   it('aquisicao adicional pondera o PM', () => {
     let state = v.applyMovement(empty, {
       itemId: 'x',

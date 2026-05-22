@@ -131,48 +131,53 @@ async function run() {
       openingDate: result.openingDate,
     });
 
-    console.log('\nPosições resultantes em invest_assets:');
-    const [assets] = await pool.query<mysql.RowDataPacket[]>(
-      `SELECT asset_ticker, asset_type, current_quantity, managerial_avg_price
-       FROM invest_assets
-       WHERE organization_id = ? AND status = 'active'
-       ORDER BY asset_type, asset_ticker`,
+    console.log('\nPosições resultantes em patrimony_items:');
+    const [items] = await pool.query<mysql.RowDataPacket[]>(
+      `SELECT identifier, subcategory,
+              CAST(quantity AS CHAR) qty,
+              CAST(acquisition_value AS CHAR) acq,
+              status
+       FROM patrimony_items
+       WHERE organization_id = ? AND deleted_at IS NULL
+       ORDER BY subcategory, identifier`,
       [HOLDING_ORG_ID]
     );
-    for (const a of assets) {
+    for (const it of items) {
       console.log(
-        `  ${String(a.asset_ticker).padEnd(20)} ${String(a.asset_type).padEnd(14)} qty=${a.current_quantity}  pm_gerencial=${a.managerial_avg_price}`
+        `  ${String(it.identifier).padEnd(20)} ${String(it.subcategory).padEnd(14)} qty=${it.qty}  acq=${it.acq}  status=${it.status}`
       );
     }
 
-    console.log('\nLançamentos OPENING-BTG-2026-01-01 (valor fiel = total_gross_value):');
+    console.log('\nLançamentos OPENING (patrimony_ledger_entries):');
     const [entries] = await pool.query<mysql.RowDataPacket[]>(
-      `SELECT a.asset_ticker, e.transaction_type,
-              CAST(e.quantity AS CHAR) qty,
-              CAST(e.unit_price AS CHAR) pu,
-              CAST(e.total_gross_value AS CHAR) gross
-       FROM invest_ledger_entries e
-       JOIN invest_assets a ON a.id = e.asset_id
-       WHERE e.organization_id = ? AND e.broker_note_ref = 'OPENING-BTG-2026-01-01'
-       ORDER BY a.asset_ticker`,
-      [HOLDING_ORG_ID]
+      `SELECT i.identifier, e.movement_type,
+              CAST(e.quantity_delta AS CHAR) qty,
+              CAST(e.unit_value AS CHAR) pu,
+              CAST(e.total_value AS CHAR) total
+       FROM patrimony_ledger_entries e
+       JOIN patrimony_items i ON i.id = e.patrimony_item_id
+       WHERE e.organization_id = ? AND e.transaction_date = ?
+         AND e.movement_type = 'opening_balance'
+         AND e.deleted_at IS NULL
+       ORDER BY i.identifier`,
+      [HOLDING_ORG_ID, OPENING_DATE]
     );
     let totalLong = 0;
     let totalShort = 0;
     for (const e of entries) {
-      const gross = Number(e.gross);
-      const isShort = String(e.transaction_type).endsWith('_sell');
-      if (isShort) totalShort += gross;
-      else totalLong += gross;
+      const total = Number(e.total);
+      const isShort = Number(e.qty) < 0;
+      if (isShort) totalShort += total;
+      else totalLong += total;
       console.log(
-        `  ${String(e.asset_ticker).padEnd(20)} ${String(e.transaction_type).padEnd(18)} qty=${e.qty}  pu=${e.pu}  bruto=${gross.toFixed(4)}`
+        `  ${String(e.identifier).padEnd(20)} ${String(e.movement_type).padEnd(18)} qty=${e.qty}  pu=${e.pu}  total=${total.toFixed(4)}`
       );
     }
     const patrimony = totalLong - totalShort;
     console.log(`\nLongos:     R$ ${totalLong.toFixed(2)}`);
-    console.log(`Shorts:    -R$ ${totalShort.toFixed(2)}`);
-    console.log(`Patrimônio (longos - shorts): R$ ${patrimony.toFixed(2)}`);
-    console.log(`Alvo informado:               R$ 1212435.41`);
+    console.log(`Shorts:    -R$ ${Math.abs(totalShort).toFixed(2)}`);
+    console.log(`Patrimônio (longos - |shorts|): R$ ${(totalLong - Math.abs(totalShort)).toFixed(2)}`);
+    console.log(`Alvo informado:                 R$ 1212435.41`);
   } finally {
     await pool.end();
   }

@@ -202,14 +202,13 @@ export class InvestOperations {
     input: OpeningPositionInput,
     options: { legacyBatchId?: string; businessEventId?: string | null } = {}
   ): Promise<{ itemId: string; entryId: string }> {
-    if (input.assetClass === 'option_call' || input.assetClass === 'option_put') {
-      if (!input.optionUnderlying || !input.optionStrike || !input.optionExpiration) {
-        throw new GatewayError(
-          'INVALID_PAYLOAD',
-          `Opcao ${input.ticker} exige underlying, strike e expiration.`,
-          400
-        );
-      }
+    const isOption = input.assetClass === 'option_call' || input.assetClass === 'option_put';
+    if (isOption && !input.optionUnderlying) {
+      throw new GatewayError(
+        'INVALID_PAYLOAD',
+        `Opcao ${input.ticker} exige underlying (ticker da acao mae).`,
+        400
+      );
     }
 
     const { item } = await this.inventoryRegistry.ensure(ctx, {
@@ -236,12 +235,15 @@ export class InvestOperations {
       pm_gerencial: state.pmC,
     });
 
-    if (input.assetClass === 'option_call' || input.assetClass === 'option_put') {
+    // invest_option_ext so eh preenchido se strike + expiration vierem
+    // explicitos. Opcao herdada (opening short) pode entrar sem esses
+    // metadados — a Calendar/B3 popula depois via cron de cotacao.
+    if (isOption && input.optionStrike && input.optionExpiration) {
       await this.upsertOptionExt(ctx, item.id, {
         optionType: input.assetClass === 'option_call' ? 'CALL' : 'PUT',
         underlyingTicker: input.optionUnderlying!,
-        strikePrice: input.optionStrike!,
-        expirationDate: input.optionExpiration!,
+        strikePrice: input.optionStrike,
+        expirationDate: input.optionExpiration,
       });
     }
 
@@ -454,26 +456,33 @@ export class InvestOperations {
     const isCash = assetType === 'cash' || ticker.startsWith('CAIXA-');
     const businessEventId = await this.resolveOrCreateEvent(ctx, line);
 
-    // Opening_balance vai pelo caminho dedicado.
+    // Opening_balance vai pelo caminho dedicado. Repassa businessEventId pra
+    // garantir rastreabilidade no header OPENING:{date}.
     if (op === 'opening_balance') {
       if (isCash) {
         await this.recordOpeningCash(ctx, line.date, {
           brokerCode: InvestOperations.cashTickerToExternalId(ticker) ?? 'CASH',
           externalId: InvestOperations.cashTickerToExternalId(ticker) ?? 'CASH',
           balance: Number(line.unit_price || line.total_net_value || 0) * (Number(line.quantity) || 1),
+          businessEventId,
         });
         return { skipped: false };
       }
       const cls = (assetType as InvestAssetClass);
-      await this.recordOpeningPosition(ctx, line.date, {
-        ticker,
-        assetClass: cls,
-        quantity: Number(line.quantity),
-        unitPrice: Number(line.unit_price),
-        optionUnderlying: inferUnderlyingTicker(ticker, line.underlying_ticker) ?? undefined,
-        optionStrike: line.option_strike,
-        notes: line.notes,
-      });
+      await this.recordOpeningPosition(
+        ctx,
+        line.date,
+        {
+          ticker,
+          assetClass: cls,
+          quantity: Number(line.quantity),
+          unitPrice: Number(line.unit_price),
+          optionUnderlying: inferUnderlyingTicker(ticker, line.underlying_ticker) ?? undefined,
+          optionStrike: line.option_strike,
+          notes: line.notes,
+        },
+        { businessEventId }
+      );
       return { skipped: false };
     }
 

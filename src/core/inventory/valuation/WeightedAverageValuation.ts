@@ -44,6 +44,21 @@ export class WeightedAverageValuation implements InventoryValuation {
       return next;
     }
 
+    /**
+     * Opening balance: usado tanto p/ posicao long (qty > 0) quanto p/
+     * posicao short herdada (qty < 0, ex: opcao vendida em ano anterior).
+     * Em ambos os casos o "custo" eh quantity * unitValue, e o pmA fica
+     * positivo (sempre = unitValue).
+     */
+    if (movement.movementType === 'opening_balance') {
+      const addedCost = movement.quantityDelta * movement.unitValue;
+      const totalQty = next.quantity;
+      next.acquisitionValue = state.acquisitionValue + addedCost;
+      next.pmA = totalQty === 0 ? 0 : next.acquisitionValue / totalQty;
+      next.currentValue = totalQty * next.pmA;
+      return next;
+    }
+
     if (movement.quantityDelta > 0) {
       const oldCost = state.quantity * state.pmA;
       const addedCost = movement.quantityDelta * movement.unitValue;

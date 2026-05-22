@@ -189,18 +189,26 @@ export class LedgerImportService {
       else inserted += 1;
     }
 
+    // Opcoes shorts herdadas (vendidas em ano anterior, ainda em aberto) entram
+    // como saldo inicial com qty NEGATIVA e unit_price = premio recebido. Isso
+    // produz acquisition_value negativo (refletindo a obrigacao em aberto) e
+    // pmA positivo (= premio unitario). NAO cria perna financeira: o premio ja
+    // foi recebido em data passada e ja esta refletido no saldo de caixa
+    // herdado (opening_balance da conta).
     for (const line of payload.opening_short_options || []) {
       const ticker = line.ticker.trim().toUpperCase();
-      const op = line.operation;
+      const op = line.operation; // put_sell | call_sell (apenas p/ inferir asset_type/legacy_op)
+      const assetType =
+        op === 'call_sell' ? 'option_call' : op === 'put_sell' ? 'option_put' : inferAssetType(ticker);
       const result = await this.operations.recordOperation(ctx, {
         date: openingDate,
         ticker,
-        operation: op,
-        quantity: Math.abs(Number(line.quantity)),
+        operation: 'opening_balance',
+        quantity: -Math.abs(Number(line.quantity)),
         unit_price: Number(line.unit_price),
         underlying_ticker: line.underlying_ticker,
-        asset_type: inferAssetType(ticker),
-        notes: line.notes ? `${notePrefix} — ${line.notes}` : `${notePrefix} (short)`,
+        asset_type: assetType,
+        notes: line.notes ? `${notePrefix} — ${line.notes}` : `${notePrefix} (short herdado)`,
         broker_note_ref: `${OPENING_BATCH_REF}:${ticker}`,
         event_source_ref: openingEventRef,
         source_system: 'invest.opening_import',
