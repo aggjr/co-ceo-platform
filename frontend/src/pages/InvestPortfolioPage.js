@@ -5,29 +5,22 @@ import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import {
-  computePortfolioPatrimonyFromTables,
   getUnderlyingFilter,
   mountPortfolioExcelTables,
   renderInvestPortfolioPage,
   renderInvestOpcoesPage,
   renderInvestTitulosPage,
-  renderPortfolioPatrimonyHeader,
   renderUnderlyingFilterSelect,
   setUnderlyingFilter,
 } from '../lib/portfolioDisplay.js';
 
 function bindPortfolioView(container, items, cashMeta, pageType) {
-  const patrimonyHost = container.querySelector('#portfolio-patrimony-host');
   const host = container.querySelector('#portfolio-positions');
   const filterEl = container.querySelector('#portfolio-underlying-filter');
   if (!host) return;
 
   const paint = () => {
     const underlying = getUnderlyingFilter();
-    if (pageType === 'equities' && patrimonyHost) {
-      const totals = computePortfolioPatrimonyFromTables(items, underlying, cashMeta);
-      patrimonyHost.innerHTML = renderPortfolioPatrimonyHeader(totals);
-    }
     if (pageType === 'options') {
       host.innerHTML = renderInvestOpcoesPage(items, underlying);
     } else if (pageType === 'titulos') {
@@ -103,7 +96,6 @@ export async function InvestPortfolioPage(container) {
             ${renderUnderlyingFilterSelect(items, underlyingFilter)}
           </div>
         </div>
-        ${pageType === 'equities' ? '<div id="portfolio-patrimony-host"></div>' : ''}
         <div id="portfolio-positions"></div>
       </div>
     `;
