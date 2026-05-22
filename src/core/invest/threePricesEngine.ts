@@ -179,33 +179,43 @@ function applyPutShortExercisePremium(
   }
 }
 
-/** CALL comprada exercida: Prêmio pago é alocado ao PM Estrito (base do custo da ação). */
+/**
+ * CALL comprada exercida: o premio pago aumenta o custo gerencial e o PM B3
+ * da posicao (formando o "custo total" da acao = strike + premio). Nao toca
+ * em estritoTotal — o Estrito reflete apenas o custo de aquisicao puro (strike).
+ *
+ * b3AjusteTotal eh subtraido na formula final (estrito - b3Ajuste). Para
+ * AUMENTAR o B3, b3AjusteTotal precisa ficar NEGATIVO (allocatedFromHistory
+ * vem negativo no caso CALL paga, entao b3AjusteTotal += allocatedFromHistory
+ * resulta em soma negativa => B3 sobe).
+ */
 function applyCallLongExercisePremium(
   s: UnderlyingState,
   series: OptionSeriesState,
   exercisedQty: number,
   explicitNet: number | null
-): number {
+): void {
   const openAbs = Math.abs(series.qtyAtual);
   const exercised = Math.min(exercisedQty, openAbs > 0 ? openAbs : exercisedQty);
-  if (exercised <= 0) return 0;
+  if (exercised <= 0) return;
 
+  const useExplicitNet = explicitNet != null && Math.abs(explicitNet) > 0.005;
   const frac = openAbs > 0 ? exercised / openAbs : 1;
   const allocatedFromHistory = frac * series.premioLiquido;
-  
-  // Prêmio pago é valor negativo em premioLiquido. O custo base da Call (positivo)
-  // é o que devemos retornar para ser somado ao PM Estrito.
-  const callPremiumPaidCost = Math.abs(allocatedFromHistory);
 
-  if (Math.abs(series.premioLiquido) > 0.005) {
-    // Como o prêmio foi absorvido pelo PM Estrito (custo base da ação), 
-    // NÃO ajustamos b3AjusteTotal nem premioOpcoesPeriodo, pois ele já fará 
-    // parte nativa da média de todos os PMs (incluindo B3 e Gerencial).
+  if (useExplicitNet) {
+    const allocatedExplicit =
+      explicitNet! < 0 ? explicitNet! : -Math.abs(explicitNet!);
+    s.b3AjusteTotal += allocatedExplicit;
+    s.premioOpcoesPeriodo += allocatedExplicit;
+    series.premioLiquido = 0;
+    series.premioContadoGerencial = 0;
+  } else if (Math.abs(series.premioLiquido) > 0.005) {
+    s.b3AjusteTotal += allocatedFromHistory;
+    s.premioOpcoesPeriodo += allocatedFromHistory;
     series.premioLiquido -= allocatedFromHistory;
     series.premioContadoGerencial = series.premioLiquido;
   }
-  
-  return callPremiumPaidCost;
 }
 
 function applyStockBuy(s: UnderlyingState, e: LedgerEvent): void {
@@ -219,29 +229,21 @@ function applyStockBuy(s: UnderlyingState, e: LedgerEvent): void {
 
   if (optionTicker && strike > 0) {
     s.qty += q;
-    
-    // Para exercício, consideramos buyCost para pegar eventuais taxas e corretagem cobradas na nota
+
     const baseExerciseCost = buyCost(e);
-    let premiumToAllocateToEstrito = 0;
 
     const series = getOptionSeries(s, optionTicker);
     const optType = inferAssetType(optionTicker);
-    
+
     if (optType === 'option_put' && series.qtyAtual < -1e-9) {
-      // Put Vendida: Prêmio recebido NÃO reduz o Estrito. 
-      // Ele abate apenas do B3/Gerencial via applyPutShortExercisePremium.
       applyPutShortExercisePremium(s, series, q, null);
       series.qtyAtual += q;
     } else if (optType === 'option_call' && series.qtyAtual > 1e-9) {
-      // Call Comprada: Prêmio pago DEVE ser somado ao Estrito.
-      premiumToAllocateToEstrito = applyCallLongExercisePremium(s, series, q, null);
+      applyCallLongExercisePremium(s, series, q, null);
       series.qtyAtual -= q;
     }
-    
-    // PM Estrito recebe o custo de aquisição (Strike + taxas eventuais) + Prêmio da Call (se aplicável).
-    // Nota: baseExerciseCost normalmente refletirá (q * strike) + taxas.
-    s.estritoTotal += baseExerciseCost + premiumToAllocateToEstrito;
-    
+
+    s.estritoTotal += baseExerciseCost;
     return;
   }
 
@@ -322,13 +324,18 @@ function applyOptionExercise(s: UnderlyingState, e: LedgerEvent): void {
   const allocatedFromHistory = frac * series.premioLiquido;
   const alreadyCountedHistory = frac * series.premioContadoGerencial;
 
+  // PUT vendida exercida: aplica abate do premio no B3/Gerencial. Idempotente
+  // via series.premioLiquido (se applyStockBuy ja consumiu, premio sera 0).
   if (isPut && positionShort) {
-    // Transferido para applyStockBuy. Apenas ignoramos aqui se vier antes.
+    applyPutShortExercisePremium(s, series, exercised, explicitOrNull);
+    series.qtyAtual += exercised;
     return;
   }
 
+  // CALL comprada exercida: prêmio pago sobe o B3/Gerencial. Idempotente.
   if (isCall && positionLong) {
-    // Transferido para applyStockBuy. Apenas ignoramos aqui se vier antes.
+    applyCallLongExercisePremium(s, series, exercised, explicitOrNull);
+    series.qtyAtual -= exercised;
     return;
   }
 
