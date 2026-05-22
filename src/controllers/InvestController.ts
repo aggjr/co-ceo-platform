@@ -250,8 +250,6 @@ export class InvestController {
       extractReconciliation: {
         ...extractReconciliation,
         tedsMatchedWithLedger: tedsMatched,
-        importSource: 'data/invest/btg-augusto-h1-2026.json',
-        extractSourcesDir: 'data/invest/sources/btg-extracts/',
       },
       dailyRecording: {
         storedDaysInRange: storedDates.length,

@@ -1,21 +1,16 @@
-import fs from 'fs';
-import path from 'path';
-
 export type PatrimonyAnchorFile = {
   month_ends: Array<{ date: string; patrimony: number }>;
   fixed_income_total?: number;
 };
 
-let cached: PatrimonyAnchorFile | null = null;
-
+/**
+ * Âncoras de patrimônio não vêm mais de arquivo JSON no repositório
+ * (ver .cursor/rules/no-runtime-data-files.mdc). A integração com a fonte
+ * canônica (livro razão / tabela de âncoras no banco) ainda será modelada.
+ * Por enquanto, retorna vazio: a série de patrimônio fica somente sobre o livro razão.
+ */
 export function loadPatrimonyAnchors(): PatrimonyAnchorFile {
-  if (cached) return cached;
-  const filePath = path.join(process.cwd(), 'data/invest/btg-patrimony-anchors-2026.json');
-  if (!fs.existsSync(filePath)) {
-    return { month_ends: [] };
-  }
-  cached = JSON.parse(fs.readFileSync(filePath, 'utf8')) as PatrimonyAnchorFile;
-  return cached;
+  return { month_ends: [], fixed_income_total: 0 };
 }
 
 /** Patrimônio alvo BTG com interpolação linear entre âncoras mensais. */

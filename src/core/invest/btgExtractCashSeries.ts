@@ -3,7 +3,6 @@
  * Inclui LIQ BOLSA — o saldo do extrato reflete liquidações agregadas; o detalhe de bolsa vem do myProfit.
  */
 
-import * as fs from 'fs';
 import * as path from 'path';
 import { parseBtgMovementLine, parseBrNumber } from './BtgExtractLineParser';
 
@@ -79,29 +78,19 @@ export function parseExtractCashSeries(
   return out.filter((p) => p.date);
 }
 
+/**
+ * Antes lia PDFs de extrato BTG do disco. Não usamos mais arquivos em `data/invest/`
+ * (ver .cursor/rules/no-runtime-data-files.mdc). A integração de extrato passará
+ * por translator → barramento canônico → livro razão. Por hora, série vazia.
+ */
 export function loadBtgExtractCashDailySeries(
-  srcDir: string = defaultBtgExtractDir()
+  _srcDir: string = defaultBtgExtractDir()
 ): {
   sources: BtgExtractSourceSpec[];
   series: BtgExtractCashPoint[];
   byDate: Map<string, BtgExtractCashPoint>;
 } {
-  const series: BtgExtractCashPoint[] = [];
-
-  for (const spec of BTG_EXTRACT_SOURCES) {
-    const fp = path.join(srcDir, spec.file);
-    if (!fs.existsSync(fp)) continue;
-    const text = fs.readFileSync(fp, 'utf8');
-    const block = extractMovementBlock(text);
-    series.push(...parseExtractCashSeries(block, spec.openingBalance));
-  }
-
-  series.sort((a, b) => a.date.localeCompare(b.date) || 0);
-  const byDate = new Map<string, BtgExtractCashPoint>();
-  for (const p of series) {
-    byDate.set(p.date, p);
-  }
-  return { sources: BTG_EXTRACT_SOURCES, series, byDate };
+  return { sources: [], series: [], byDate: new Map() };
 }
 
 export function lastExtractCashPoint(series: BtgExtractCashPoint[]): BtgExtractCashPoint | null {

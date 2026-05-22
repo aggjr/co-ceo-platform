@@ -1,0 +1,46 @@
+---
+description: Proíbe armazenar dados de runtime (carteira, extratos, âncoras, snapshots, cotações, lançamentos) em arquivos no repositório.
+globs:
+alwaysApply: true
+---
+
+# Sem dados de runtime no repositório
+
+Esta plataforma é SaaS multi-tenant. Dados operacionais (carteira, extratos, âncoras de patrimônio, cotações, lançamentos, posições, snapshots, exercícios, IR, listas de ordens, notas) **vivem no banco**, sob `organization_id`. Nunca em arquivo dentro do repo.
+
+## Proibido
+
+- Diretórios `data/invest/**`, `data/<modulo>/**`, `frontend/public/data/**` para conter dados operacionais (JSON, TXT, CSV, PDF).
+- Arquivos com nome de cliente, corretora, mês, ano, snapshot, ledger, extrato, anchors, openings, exercises, brokerage-notes, patrimony-daily, btg-*, myprofit-*, ir-*, opening-*.
+- `fs.readFileSync` / `fs.existsSync` / `path.join(process.cwd(), 'data/...')` em código de produção dentro de `src/`.
+
+## Por quê
+
+1. Multi-tenant: dado dentro do repo é compartilhado entre todos os clientes. Vaza isolamento.
+2. Versionamento: dado muda toda hora; commit poluído inviabiliza histórico.
+3. Confiabilidade: arquivo no disco do container some no próximo deploy.
+4. Auditoria: dado fora do livro razão não passa pelas regras de idempotência/origem.
+
+## Onde colocar então
+
+| Tipo de dado | Lugar correto |
+|---|---|
+| Movimentação financeira / negociação | `invest_ledger_entries` |
+| Posição derivada | `invest_assets` (projeção do livro) |
+| Cotação histórica do dia | `invest_daily_snapshots` / `invest_portfolio_daily` |
+| Cadeia de opções | `invest_options_chain` |
+| Âncoras de patrimônio | tabela canônica (a modelar) — não em arquivo |
+| Extratos de corretora | translator BTG/MyProfit → barramento canônico → livro razão |
+
+## Exceções legítimas (não confundir)
+
+- **Migrações / seeds estruturais** em `database/migrations/` (esquema de catálogo, módulos, roles padrão).
+- **Fixtures de teste** em `tests/**` — usadas só por testes, nunca lidas pelo runtime.
+- **Documentação** em `docs/` e `tasks/`.
+- **Exemplos `*.template.*`** ou `import-template.json` versão exemplo — desde que claramente marcados como template e fora de `data/`.
+
+Se a task pede para "importar dados", o caminho é: upload → translator → barramento canônico → livro razão. Não é colocar arquivo no repo.
+
+## Se encontrar violação
+
+Pare, abra issue/PR removendo o arquivo, mova o consumo para o gateway de dados (`src/core/dal/`), e atualize a task spec se ela tiver pedido o caminho proibido.
