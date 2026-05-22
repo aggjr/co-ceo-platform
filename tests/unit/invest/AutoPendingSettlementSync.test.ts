@@ -3,6 +3,7 @@ import {
   syncAutoPendingSettlements,
 } from '../../../src/core/invest/AutoPendingSettlementSync';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
+import type { InvestOperations } from '../../../src/modules/invest';
 
 describe('AutoPendingSettlementSync', () => {
   it('autoD2Ref is stable', () => {
@@ -10,12 +11,13 @@ describe('AutoPendingSettlementSync', () => {
   });
 
   it('creates pending_settlement for open stock buy', async () => {
-    const inserts: unknown[] = [];
-    const gateway = {
-      insert: async (_ctx: unknown, _table: string, row: unknown) => {
-        inserts.push(row);
+    const calls: Array<{ ticker: string; operation: string; total_net_value?: number }> = [];
+    const operations = {
+      recordOperation: async (_ctx: unknown, line: { ticker: string; operation: string; total_net_value?: number }) => {
+        calls.push(line);
+        return { skipped: false };
       },
-    };
+    } as unknown as InvestOperations;
 
     const events: LedgerEvent[] = [
       {
@@ -32,20 +34,18 @@ describe('AutoPendingSettlementSync', () => {
     ];
 
     const result = await syncAutoPendingSettlements(
-      gateway as never,
+      {} as never,
       {} as never,
       events,
       {
         today: '2026-05-15',
-        orgId: 'org-1',
-        cashAssetId: 'cash-1',
+        operations,
       }
     );
 
     expect(result.created).toBe(1);
-    expect(inserts).toHaveLength(1);
-    const row = inserts[0] as { transaction_type: string; total_net_value: number };
-    expect(row.transaction_type).toBe('pending_settlement');
-    expect(row.total_net_value).toBe(-5000);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].operation).toBe('pending_settlement');
+    expect(calls[0].total_net_value).toBe(-5000);
   });
 });

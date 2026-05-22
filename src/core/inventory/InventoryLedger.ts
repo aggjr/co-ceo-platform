@@ -168,7 +168,12 @@ export class InventoryLedger {
       source_batch_id: input.sourceBatchId ?? null,
       external_ref: input.externalRef ?? null,
       notes: input.notes ?? null,
-      metadata: input.metadata ?? null,
+      metadata:
+        input.metadata == null
+          ? null
+          : typeof input.metadata === 'string'
+          ? input.metadata
+          : JSON.stringify(input.metadata),
     };
     await this.gateway.insert(ctx, 'patrimony_ledger_entries', payload);
 

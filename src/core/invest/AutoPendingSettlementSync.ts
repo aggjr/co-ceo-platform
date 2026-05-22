@@ -1,7 +1,7 @@
-import { randomUUID } from 'crypto';
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
 import type { LedgerEvent } from './CustodyEngine';
+import type { InvestOperations } from '../../modules/invest';
 import {
   cashSettlementDate,
   cashSettlementRuleLabel,
@@ -28,17 +28,21 @@ export type AutoPendingSyncResult = {
 };
 
 /**
- * Gera `pending_settlement` (valor em trânsito) no livro-razão:
- * ação/FII D+2, prêmio de opção D+1, RF conforme calendário — conferir extrato BTG na data prevista.
+ * Gera `pending_settlement` (valor em trânsito) no livro-razão financeiro:
+ * ação/FII D+2, prêmio de opção D+1, RF conforme calendário — conferir
+ * extrato BTG na data prevista.
+ *
+ * Grava em financial_ledger_entries (status='pending' enquanto não liquida,
+ * status='cleared' quando settle_date <= hoje). InvestOperations encapsula
+ * a resolução da conta de caixa e da idempotência por broker_note_ref.
  */
 export async function syncAutoPendingSettlements(
-  gateway: CoCeoDataGateway,
+  _gateway: CoCeoDataGateway,
   ctx: UserContext,
   events: LedgerEvent[],
   options: {
     today?: string;
-    cashAssetId: string;
-    orgId: string;
+    operations: InvestOperations;
   }
 ): Promise<AutoPendingSyncResult> {
   const today = (options.today || new Date().toISOString().slice(0, 10)).slice(0, 10);
@@ -72,27 +76,24 @@ export async function syncAutoPendingSettlements(
 
     if (settleOn > today) {
       if (Math.abs(open) < 0.01) {
-        await gateway.insert(ctx, 'invest_ledger_entries', {
-          id: randomUUID(),
-          organization_id: options.orgId,
-          asset_id: options.cashAssetId,
-          underlying_ticker: null,
-          transaction_date: tradeDate,
-          transaction_type: 'pending_settlement',
+        const result = await options.operations.recordOperation(ctx, {
+          date: tradeDate,
+          ticker: 'CAIXA-BTG',
+          operation: 'pending_settlement',
           quantity: 0,
           unit_price: 0,
-          total_gross_value: 0,
-          brokerage_fee: 0,
-          b3_fees: 0,
-          irrf_tax: 0,
           total_net_value: net,
-          impacts_managerial_price: false,
+          settlement_date: settleOn,
           broker_note_ref: ref,
-          source_batch_id: null,
-          notes: `Valor em trânsito — ${rule} — liquidação prevista ${settleOn} — ${ticker} (${txType})`,
+          notes: `Valor em transito — ${rule} — liquidacao prevista ${settleOn} — ${ticker} (${txType})`,
+          asset_type: 'cash',
         });
-        pendingByRef.set(ref, net);
-        created += 1;
+        if (!result.skipped) {
+          pendingByRef.set(ref, net);
+          created += 1;
+        } else {
+          skipped += 1;
+        }
       } else {
         skipped += 1;
       }
@@ -100,27 +101,24 @@ export async function syncAutoPendingSettlements(
     }
 
     if (Math.abs(open) >= 0.01) {
-      await gateway.insert(ctx, 'invest_ledger_entries', {
-        id: randomUUID(),
-        organization_id: options.orgId,
-        asset_id: options.cashAssetId,
-        underlying_ticker: null,
-        transaction_date: settleOn,
-        transaction_type: 'pending_settlement',
+      const result = await options.operations.recordOperation(ctx, {
+        date: settleOn,
+        ticker: 'CAIXA-BTG',
+        operation: 'pending_settlement',
         quantity: 0,
         unit_price: 0,
-        total_gross_value: 0,
-        brokerage_fee: 0,
-        b3_fees: 0,
-        irrf_tax: 0,
         total_net_value: -open,
-        impacts_managerial_price: false,
+        settlement_date: settleOn,
         broker_note_ref: `${ref}:CLEAR`,
-        source_batch_id: null,
-          notes: `Liquidação na conta — ${rule} — ${ticker} (${settleOn})`,
+        notes: `Liquidacao na conta — ${rule} — ${ticker} (${settleOn})`,
+        asset_type: 'cash',
       });
-      pendingByRef.set(ref, 0);
-      cleared += 1;
+      if (!result.skipped) {
+        pendingByRef.set(ref, 0);
+        cleared += 1;
+      } else {
+        skipped += 1;
+      }
     }
   }
 
