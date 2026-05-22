@@ -63,6 +63,7 @@ async function main() {
     database: process.env.DB_NAME || 'co_ceo_db',
     waitForConnections: true,
     connectionLimit: 5,
+    charset: 'utf8mb4',
   });
 
   const gateway = new CoCeoDataGateway(pool);

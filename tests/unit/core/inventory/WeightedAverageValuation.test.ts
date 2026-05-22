@@ -105,4 +105,37 @@ describe('WeightedAverageValuation', () => {
     expect(state.pmA).toBe(65);
     expect(state.currentValue).toBe(6500);
   });
+
+  it('cost_adjustment incorpora custo absoluto e sobe o PM', () => {
+    let state = v.applyMovement(empty, {
+      itemId: 'lft',
+      transactionDate: '2026-01-09',
+      movementType: 'acquisition',
+      quantityDelta: 1000,
+      unitValue: 16,
+    });
+    state = v.applyMovement(state, {
+      itemId: 'lft',
+      transactionDate: '2026-01-10',
+      movementType: 'cost_adjustment',
+      quantityDelta: 0,
+      unitValue: 24,
+    });
+    expect(state.quantity).toBe(1000);
+    expect(state.acquisitionValue).toBeCloseTo(16024, 4);
+    expect(state.pmA).toBeCloseTo(16.024, 6);
+    expect(state.currentValue).toBeCloseTo(16024, 4);
+  });
+
+  it('cost_adjustment com quantity zero nao quebra (sem div por zero)', () => {
+    const state = v.applyMovement(empty, {
+      itemId: 'lft',
+      transactionDate: '2026-01-09',
+      movementType: 'cost_adjustment',
+      quantityDelta: 0,
+      unitValue: 24,
+    });
+    expect(state.quantity).toBe(0);
+    expect(state.pmA).toBe(0);
+  });
 });

@@ -29,6 +29,21 @@ export class WeightedAverageValuation implements InventoryValuation {
       return next;
     }
 
+    /**
+     * Ajuste de custo: incorpora um custo absoluto (unitValue) sem alterar
+     * quantidade. Usado p/ taxas/IRRF que chegam fora da linha original.
+     * Veja docstring em MovementType.
+     */
+    if (movement.movementType === 'cost_adjustment') {
+      if (state.quantity <= 0) {
+        return next;
+      }
+      next.acquisitionValue = state.acquisitionValue + movement.unitValue;
+      next.pmA = next.acquisitionValue / state.quantity;
+      next.currentValue = state.quantity * next.pmA;
+      return next;
+    }
+
     if (movement.quantityDelta > 0) {
       const oldCost = state.quantity * state.pmA;
       const addedCost = movement.quantityDelta * movement.unitValue;

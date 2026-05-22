@@ -61,6 +61,29 @@ export class InventoryLedger {
     };
   }
 
+  /**
+   * Parse defensivo do metadata (que pode vir como string JSON do MySQL ou ja
+   * como objeto JS). Devolve `null` para qualquer formato invalido para nao
+   * quebrar o replay.
+   */
+  private static parseMetadata(raw: unknown): Record<string, unknown> | null {
+    if (raw == null) return null;
+    if (typeof raw === 'object') return raw as Record<string, unknown>;
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim();
+      if (!trimmed) return null;
+      try {
+        const parsed = JSON.parse(trimmed);
+        return typeof parsed === 'object' && parsed != null
+          ? (parsed as Record<string, unknown>)
+          : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   /** Rebuild integral. Util apos correcoes ou para conciliacao. */
   async rebuildPosition(
     ctx: UserContext,
@@ -89,6 +112,7 @@ export class InventoryLedger {
         unitValue: Number(row.unit_value),
         impactsValuation: Boolean(row.impacts_valuation),
         externalRef: row.external_ref,
+        metadata: InventoryLedger.parseMetadata(row.metadata),
       });
     }
     return state;
@@ -145,6 +169,7 @@ export class InventoryLedger {
         unitValue: Number(row.unit_value),
         impactsValuation: Boolean(row.impacts_valuation),
         externalRef: row.external_ref,
+        metadata: InventoryLedger.parseMetadata(row.metadata),
       });
     }
     const next = valuation.applyMovement(state, input);
@@ -165,6 +190,7 @@ export class InventoryLedger {
       unit_value: input.unitValue,
       total_value: totalValue,
       impacts_valuation: input.impactsValuation ?? true,
+      business_event_id: input.businessEventId ?? null,
       source_batch_id: input.sourceBatchId ?? null,
       external_ref: input.externalRef ?? null,
       notes: input.notes ?? null,
@@ -214,5 +240,27 @@ export class InventoryLedger {
     await this.gateway.update(ctx, 'patrimony_ledger_entries', patrimonyLedgerId, {
       related_financial_entry_id: financialLedgerId,
     });
+  }
+
+  /**
+   * Rebuild + persistencia: recalcula o estado lendo o livro razao do item
+   * e grava no snapshot (patrimony_items). Use depois de soft-deletar pernas
+   * (ex: voidEvent/amendEvent) pra reconciliar quantidade/valor.
+   *
+   * Se o livro ficou vazio (todas as pernas anuladas), grava quantity=0 e
+   * acquisitionValue/currentValue=0.
+   */
+  async rebuildAndPersist(
+    ctx: UserContext,
+    itemId: string,
+    methodCode?: string
+  ): Promise<PositionState> {
+    const state = await this.rebuildPosition(ctx, itemId, methodCode);
+    await this.registry.updateSnapshot(ctx, itemId, {
+      quantity: state.quantity,
+      acquisitionValue: state.acquisitionValue,
+      currentValue: state.currentValue,
+    });
+    return state;
   }
 }

@@ -88,6 +88,8 @@ export class LedgerEventProjection {
         return 'buy';
       case 'bonus':
         return 'bonus';
+      case 'cost_adjustment':
+        return 'fee';
       default:
         return signedQty >= 0 ? 'buy' : 'sell';
     }

@@ -50,6 +50,10 @@ export class LedgerImportService {
     const batchId = randomUUID();
     let inserted = 0;
 
+    // Header agregador unico para todas as pernas do opening — bate com o
+    // padrao adotado em scripts/backfill-opening-business-event.js
+    const openingEventRef = `OPENING:${openingDate}`;
+
     // 1. Posicoes de abertura → opening_balance no nucleo (InvestOperations).
     for (const pos of payload.opening_positions || []) {
       const ticker = canonicalTesouroTicker(pos.ticker.trim().toUpperCase());
@@ -71,6 +75,8 @@ export class LedgerImportService {
           : pos.notes ?? 'Saldo inicial da carteira',
         option_strike: pos.option_strike,
         broker_note_ref: `OPEN:${batchId}:${ticker}`,
+        event_source_ref: openingEventRef,
+        source_system: 'invest.opening_import',
       };
       const result = await this.operations.recordOperation(ctx, line);
       if (!result.skipped) inserted += 1;
@@ -91,6 +97,8 @@ export class LedgerImportService {
         asset_type: assetType,
         notes: short.notes ?? `Saldo inicial (short)`,
         broker_note_ref: `OPEN-SHORT:${batchId}:${ticker}`,
+        event_source_ref: openingEventRef,
+        source_system: 'invest.opening_import',
       };
       const result = await this.operations.recordOperation(ctx, line);
       if (!result.skipped) inserted += 1;
@@ -154,6 +162,7 @@ export class LedgerImportService {
     const notePrefix = payload.source_label
       ? `Saldo inicial — ${payload.source_label}`
       : 'Saldo inicial da carteira';
+    const openingEventRef = `OPENING:${openingDate}`;
 
     for (const pos of payload.opening_positions || []) {
       const ticker = canonicalTesouroTicker(pos.ticker.trim().toUpperCase());
@@ -173,6 +182,8 @@ export class LedgerImportService {
         notes: pos.notes ? `${notePrefix} — ${pos.notes}` : notePrefix,
         option_strike: pos.option_strike,
         broker_note_ref: `${OPENING_BATCH_REF}:${ticker}`,
+        event_source_ref: openingEventRef,
+        source_system: 'invest.opening_import',
       });
       if (result.skipped) skipped += 1;
       else inserted += 1;
@@ -191,6 +202,8 @@ export class LedgerImportService {
         asset_type: inferAssetType(ticker),
         notes: line.notes ? `${notePrefix} — ${line.notes}` : `${notePrefix} (short)`,
         broker_note_ref: `${OPENING_BATCH_REF}:${ticker}`,
+        event_source_ref: openingEventRef,
+        source_system: 'invest.opening_import',
       });
       if (result.skipped) skipped += 1;
       else inserted += 1;

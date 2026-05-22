@@ -51,6 +51,7 @@ async function main() {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'co_ceo_db',
+    charset: 'utf8mb4',
   });
 
   const gateway = new CoCeoDataGateway(pool);

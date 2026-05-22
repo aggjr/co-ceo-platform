@@ -7,6 +7,11 @@ import type {
   FinancialLedger,
 } from '../../core/financial';
 import type {
+  BusinessEventRegistry,
+  BusinessEventKind,
+  CreateBusinessEventInput,
+} from '../../core/business-events';
+import type {
   InvestAssetClass,
   InvestPositionExtRow,
   OpeningBatchInput,
@@ -36,8 +41,78 @@ export class InvestOperations {
     private readonly inventoryRegistry: InventoryRegistry,
     private readonly inventoryLedger: InventoryLedger,
     private readonly accountRegistry: FinancialAccountRegistry,
-    private readonly financialLedger: FinancialLedger
+    private readonly financialLedger: FinancialLedger,
+    /**
+     * Registry do header canonico (business_events). Opcional pra nao quebrar
+     * callers legados, mas todo write novo deveria ja passar.
+     */
+    private readonly businessEvents?: BusinessEventRegistry
   ) {}
+
+  /**
+   * Mapeia operacao de import (LedgerTransactionType) para event_kind canonico.
+   */
+  private static kindOf(op: string): BusinessEventKind {
+    if (op === 'opening_balance') return 'opening_balance';
+    if (op === 'buy' || op === 'sell' || op === 'pending_settlement') return 'broker_note_spot';
+    if (op === 'put_sell' || op === 'put_buy' || op === 'call_sell' || op === 'call_buy' || op === 'option_exercise') {
+      return 'broker_note_option';
+    }
+    if (op === 'split' || op === 'bonus' || op === 'revaluation') return 'corporate_action';
+    if (op === 'securities_lending') return 'broker_note_loan';
+    // dividend, jcp, cash_yield, fee, penalty_b3, capital_*, cost_adjustment
+    return 'cash_movement';
+  }
+
+  /**
+   * Resolve qual business_event vincular a linha:
+   *   1. Se a linha ja traz business_event_id, usa direto (caller ja resolveu).
+   *   2. Senao, se traz event_source_ref, faz ensureByRef — multiplas linhas
+   *      com o mesmo event_source_ref caem no mesmo header (1 header por nota).
+   *   3. Senao, cria 1 header avulso por linha (caso classico do extrato
+   *      bancario, onde cada linha eh um fato independente: multa, taxa, TED).
+   * Sem registry injetado, retorna null e a linha grava sem business_event_id
+   * (compatibilidade com callers antigos).
+   *
+   * IMPORTANTE: broker_note_ref NAO eh chave de header — eh chave de
+   * idempotencia da perna individual (vira external_ref='BROKER_REF:{ref}').
+   * Ver docs/architecture/business_events_integration_plan.md.
+   */
+  private async resolveOrCreateEvent(
+    ctx: UserContext,
+    line: LedgerImportLine
+  ): Promise<string | null> {
+    if (!this.businessEvents) return null;
+    if (line.business_event_id) return line.business_event_id;
+    const kind = InvestOperations.kindOf(String(line.operation));
+    const net = Number(line.total_net_value ?? line.quantity * line.unit_price);
+    if (line.event_source_ref) {
+      const { event } = await this.businessEvents.ensureByRef(ctx, {
+        sourceModule: 'INVEST',
+        eventKind: kind,
+        occurredOn: line.date,
+        settlesOn: line.settlement_date ?? line.date,
+        sourceRef: line.event_source_ref,
+        counterparty: line.counterparty ?? null,
+        totalNet: net,
+        sourceSystem: line.source_system ?? 'invest_operations',
+        sourceVersion: line.source_version ?? null,
+      });
+      return event.id;
+    }
+    const ev = await this.businessEvents.create(ctx, {
+      sourceModule: 'INVEST',
+      eventKind: kind,
+      occurredOn: line.date,
+      settlesOn: line.settlement_date ?? line.date,
+      sourceRef: null,
+      counterparty: line.counterparty ?? null,
+      totalNet: net,
+      sourceSystem: line.source_system ?? 'invest_operations',
+      sourceVersion: line.source_version ?? null,
+    });
+    return ev.id;
+  }
 
   /** Categoria canonica em module_categories.subcategory para cada asset_class. */
   private static subcategoryOf(cls: InvestAssetClass): string {
@@ -125,7 +200,7 @@ export class InvestOperations {
     ctx: UserContext,
     asOfDate: string,
     input: OpeningPositionInput,
-    options: { legacyBatchId?: string } = {}
+    options: { legacyBatchId?: string; businessEventId?: string | null } = {}
   ): Promise<{ itemId: string; entryId: string }> {
     if (input.assetClass === 'option_call' || input.assetClass === 'option_put') {
       if (!input.optionUnderlying || !input.optionStrike || !input.optionExpiration) {
@@ -151,6 +226,7 @@ export class InvestOperations {
       quantityDelta: input.quantity,
       unitValue: input.unitPrice,
       notes: input.notes ?? 'Saldo inicial',
+      businessEventId: options.businessEventId ?? null,
     });
 
     await this.upsertPositionExt(ctx, item.id, input.assetClass, {
@@ -189,6 +265,7 @@ export class InvestOperations {
       accountName?: string;
       externalId?: string;
       balance: number;
+      businessEventId?: string | null;
     }
   ): Promise<{ accountId: string; entryId: string | null }> {
     const name = input.accountName ?? `Caixa ${input.brokerCode}`;
@@ -214,6 +291,7 @@ export class InvestOperations {
       description: 'Saldo inicial',
       status: 'cleared',
       settlementDate: asOfDate,
+      businessEventId: input.businessEventId ?? null,
       metadata: { legacy_op: 'opening_balance' },
     });
 
@@ -240,6 +318,20 @@ export class InvestOperations {
     };
 
     const legacyBatchId = randomUUID();
+    // Header canonico unico: TODAS as pernas do opening apontam pra ele.
+    let openingEventId: string | null = null;
+    if (this.businessEvents) {
+      const { event } = await this.businessEvents.ensureByRef(ctx, {
+        sourceModule: 'INVEST',
+        eventKind: 'opening_balance',
+        occurredOn: input.asOfDate,
+        settlesOn: input.asOfDate,
+        sourceRef: `OPENING:${input.asOfDate}`,
+        counterparty: 'Saldo inicial',
+        sourceSystem: 'invest_operations.opening_batch',
+      });
+      openingEventId = event.id;
+    }
     for (const p of input.positions) {
       const before = await this.inventoryRegistry.findByIdentifier(
         ctx,
@@ -248,6 +340,7 @@ export class InvestOperations {
       );
       const { entryId } = await this.recordOpeningPosition(ctx, input.asOfDate, p, {
         legacyBatchId,
+        businessEventId: openingEventId,
       });
       if (!before) result.patrimonyItemsCreated += 1;
       if (entryId) result.ledgerEntriesCreated += 1;
@@ -267,6 +360,7 @@ export class InvestOperations {
         accountName: c.accountName,
         externalId: c.externalId,
         balance: c.balance,
+        businessEventId: openingEventId,
       });
       if (!beforeAcc) result.cashAccountsCreated += 1;
       if (entryId) result.cashEntriesCreated += 1;
@@ -358,6 +452,7 @@ export class InvestOperations {
     const declaredType = String(line.asset_type ?? '').trim();
     const assetType = declaredType || inferAssetType(ticker);
     const isCash = assetType === 'cash' || ticker.startsWith('CAIXA-');
+    const businessEventId = await this.resolveOrCreateEvent(ctx, line);
 
     // Opening_balance vai pelo caminho dedicado.
     if (op === 'opening_balance') {
@@ -397,6 +492,7 @@ export class InvestOperations {
         description: line.notes ?? op,
         status: 'cleared',
         settlementDate: line.settlement_date ?? line.date,
+        businessEventId,
         externalRef: ref ? `BROKER_REF:${ref}` : null,
         metadata: { legacy_op: op, broker_note_ref: ref ?? null },
       });
@@ -417,9 +513,68 @@ export class InvestOperations {
         description: line.notes ?? op,
         status: 'cleared',
         settlementDate: line.settlement_date ?? line.date,
+        businessEventId,
         externalRef: ref ? `BROKER_REF:${ref}` : null,
         metadata: { legacy_op: op, broker_note_ref: ref ?? null },
       });
+      return { skipped: false };
+    }
+
+    if (op === 'cost_adjustment') {
+      if (isCash) {
+        return {
+          skipped: true,
+          reason: `cost_adjustment exige ticker patrimonial (ativo afetado), nao ${ticker}`,
+        };
+      }
+      const assetClass = assetType as InvestAssetClass;
+      const { item } = await this.inventoryRegistry.ensure(ctx, {
+        category: 'financial_asset',
+        subcategory: InvestOperations.subcategoryOf(assetClass),
+        identifier: ticker,
+        name: ticker,
+      });
+      // Custo absoluto vem ou em unit_price (linha simples) ou em total_net_value.
+      const amount = Math.abs(
+        Number(line.total_net_value ?? line.unit_price ?? 0)
+      );
+      if (amount === 0) return { skipped: true, reason: 'cost_adjustment com custo zero' };
+
+      await this.inventoryLedger.recordMovement(ctx, {
+        itemId: item.id,
+        transactionDate: line.date,
+        movementType: 'cost_adjustment',
+        quantityDelta: 0,
+        unitValue: amount,
+        notes: line.notes ?? op,
+        externalRef: ref ? `BROKER_REF:${ref}` : undefined,
+        businessEventId,
+        metadata: {
+          legacy_op: 'fee',
+          broker_note_ref: ref ?? null,
+          applies_to_b3: line.applies_to_b3 ?? false,
+          target_ticker: ticker,
+        },
+      });
+
+      const { accountId } = await this.resolveCashAccount(ctx, 'CAIXA-DEFAULT', line.date);
+      await this.financialLedger.record(ctx, {
+        accountId,
+        transactionDate: line.date,
+        direction: 'out',
+        amount,
+        description: line.notes ?? `cost_adjustment ${ticker}`,
+        status: 'cleared',
+        settlementDate: line.settlement_date ?? line.date,
+        businessEventId,
+        externalRef: ref ? `BROKER_REF:${ref}:CASH` : null,
+        metadata: {
+          legacy_op: 'fee',
+          broker_note_ref: ref ?? null,
+          target_ticker: ticker,
+        },
+      });
+
       return { skipped: false };
     }
 
@@ -437,6 +592,7 @@ export class InvestOperations {
         description: line.notes ?? 'Valor em transito',
         status: 'pending',
         settlementDate: line.settlement_date ?? line.date,
+        businessEventId,
         externalRef: ref ? `BROKER_REF:${ref}` : null,
         metadata: { legacy_op: op, broker_note_ref: ref ?? null },
       });
@@ -509,6 +665,7 @@ export class InvestOperations {
       unitValue: Number(line.unit_price),
       notes: line.notes ?? op,
       externalRef: ref ? `BROKER_REF:${ref}` : undefined,
+      businessEventId,
       metadata: { legacy_op: op, broker_note_ref: ref ?? null },
     });
 
@@ -527,6 +684,7 @@ export class InvestOperations {
           description: line.notes ?? op,
           status: 'cleared',
           settlementDate: line.settlement_date ?? line.date,
+          businessEventId,
           externalRef: ref ? `BROKER_REF:${ref}:CASH` : null,
           metadata: {
             legacy_op: op,
@@ -538,5 +696,202 @@ export class InvestOperations {
     }
 
     return { skipped: false };
+  }
+
+  // ==========================================================================
+  // VOID / AMEND — anulacao e correcao de eventos ja gravados
+  // ==========================================================================
+
+  /**
+   * Soft-deleta TODAS as pernas (custodia + caixa) vinculadas a um header.
+   * Retorna os patrimony_item_ids tocados (caller usa pra rebuild).
+   *
+   * Privado: nao chame direto; use voidEvent/amendEvent que fazem o ciclo
+   * completo (header + pernas + rebuild).
+   */
+  private async invalidateLegs(
+    ctx: UserContext,
+    eventId: string
+  ): Promise<{ patrimonyItemIds: Set<string>; voidedPatrimony: number; voidedFinancial: number }> {
+    if (!this.businessEvents) {
+      throw new GatewayError(
+        'INVALID_CONTEXT',
+        'InvestOperations construido sem BusinessEventRegistry; void/amend indisponivel.',
+        500
+      );
+    }
+    const { patrimonyLegs, financialLegs } = await this.businessEvents.listLegs(
+      ctx,
+      eventId
+    );
+    const itemIds = new Set<string>();
+    for (const leg of patrimonyLegs) {
+      const id = String((leg as { id: string }).id);
+      const itemId = String((leg as { patrimony_item_id: string }).patrimony_item_id);
+      itemIds.add(itemId);
+      await this.gateway.softDelete(ctx, 'patrimony_ledger_entries', id);
+    }
+    for (const leg of financialLegs) {
+      const id = String((leg as { id: string }).id);
+      await this.gateway.softDelete(ctx, 'financial_ledger_entries', id);
+    }
+    return {
+      patrimonyItemIds: itemIds,
+      voidedPatrimony: patrimonyLegs.length,
+      voidedFinancial: financialLegs.length,
+    };
+  }
+
+  /**
+   * Estorno explicito: marca o header como voided e soft-deleta as pernas.
+   * Apos o void, o saldo dos itens afetados eh recomputado via rebuild.
+   *
+   * Use quando o evento de negocio foi cancelado (B3 cancelou retroativamente,
+   * cliente desistiu, etc). Audit trail fica em:
+   *   - business_events.voided_at / voided_by_user_id / void_reason
+   *   - audit_logs (do gateway) com SOFT_DELETE de cada perna
+   */
+  async voidEvent(
+    ctx: UserContext,
+    eventId: string,
+    reason: string
+  ): Promise<{
+    voidedPatrimonyLegs: number;
+    voidedFinancialLegs: number;
+    rebuiltItems: number;
+  }> {
+    if (!this.businessEvents) {
+      throw new GatewayError(
+        'INVALID_CONTEXT',
+        'InvestOperations construido sem BusinessEventRegistry; void indisponivel.',
+        500
+      );
+    }
+    const event = await this.businessEvents.findById(ctx, eventId);
+    if (!event) {
+      throw new GatewayError(
+        'RECORD_NOT_FOUND',
+        `business_events ${eventId} nao encontrado`,
+        404
+      );
+    }
+    if (event.voided_at) {
+      throw new GatewayError(
+        'FINANCIAL_RULE_VIOLATION',
+        `business_events ${eventId} ja esta voided em ${event.voided_at}`,
+        409
+      );
+    }
+    await this.businessEvents.voidEvent(ctx, eventId, ctx.userId, reason);
+    const { patrimonyItemIds, voidedPatrimony, voidedFinancial } =
+      await this.invalidateLegs(ctx, eventId);
+    for (const itemId of patrimonyItemIds) {
+      await this.inventoryLedger.rebuildAndPersist(ctx, itemId);
+    }
+    return {
+      voidedPatrimonyLegs: voidedPatrimony,
+      voidedFinancialLegs: voidedFinancial,
+      rebuiltItems: patrimonyItemIds.size,
+    };
+  }
+
+  /**
+   * Correcao com nova revisao: cria business_events rev=N+1 supersedendo a
+   * anterior, soft-deleta pernas antigas e re-grava as N pernas novas.
+   *
+   * - `headerPatch`: campos do novo header (occurred_on, total_net, etc).
+   *   Default copia da revisao anterior.
+   * - `lines`: as novas linhas a reaplicar via recordOperation. Cada linha
+   *   herda automaticamente o business_event_id da nova revisao.
+   *
+   * Apos o amend, todos os patrimony_items afetados (pelas pernas antigas E
+   * pelas novas) tem seu snapshot recomputado.
+   */
+  async amendEvent(
+    ctx: UserContext,
+    prevEventId: string,
+    headerPatch: Partial<CreateBusinessEventInput>,
+    lines: LedgerImportLine[]
+  ): Promise<{
+    newEventId: string;
+    revisionNo: number;
+    voidedPatrimonyLegs: number;
+    voidedFinancialLegs: number;
+    recreatedLines: number;
+    skippedLines: number;
+    rebuiltItems: number;
+  }> {
+    if (!this.businessEvents) {
+      throw new GatewayError(
+        'INVALID_CONTEXT',
+        'InvestOperations construido sem BusinessEventRegistry; amend indisponivel.',
+        500
+      );
+    }
+    const prev = await this.businessEvents.findById(ctx, prevEventId);
+    if (!prev) {
+      throw new GatewayError(
+        'RECORD_NOT_FOUND',
+        `business_events ${prevEventId} nao encontrado`,
+        404
+      );
+    }
+    if (prev.voided_at) {
+      throw new GatewayError(
+        'FINANCIAL_RULE_VIOLATION',
+        `Nao se faz amend de header voided (${prevEventId}). Crie um novo header.`,
+        409
+      );
+    }
+    const newHeaderInput: CreateBusinessEventInput = {
+      sourceModule: headerPatch.sourceModule ?? prev.source_module,
+      eventKind: headerPatch.eventKind ?? prev.event_kind,
+      occurredOn: headerPatch.occurredOn ?? prev.occurred_on,
+      settlesOn: headerPatch.settlesOn ?? prev.settles_on,
+      sourceRef: headerPatch.sourceRef ?? prev.source_ref,
+      counterparty: headerPatch.counterparty ?? prev.counterparty,
+      totalGross: headerPatch.totalGross ?? Number(prev.total_gross),
+      totalCosts: headerPatch.totalCosts ?? Number(prev.total_costs),
+      totalNet: headerPatch.totalNet ?? Number(prev.total_net),
+      sourceSystem: headerPatch.sourceSystem ?? prev.source_system,
+      sourceVersion: headerPatch.sourceVersion ?? prev.source_version,
+      recordedByUserId: headerPatch.recordedByUserId ?? ctx.userId,
+      metadata: headerPatch.metadata ?? null,
+    };
+    const newEvent = await this.businessEvents.amend(ctx, prevEventId, newHeaderInput);
+
+    const { patrimonyItemIds, voidedPatrimony, voidedFinancial } =
+      await this.invalidateLegs(ctx, prevEventId);
+
+    let recreated = 0;
+    let skipped = 0;
+    for (const line of lines) {
+      const result = await this.recordOperation(ctx, {
+        ...line,
+        business_event_id: newEvent.id,
+      });
+      if (result.skipped) skipped += 1;
+      else recreated += 1;
+    }
+
+    // Recolhe items tocados pelas linhas novas (alem dos antigos).
+    const newLegs = await this.businessEvents.listLegs(ctx, newEvent.id);
+    for (const leg of newLegs.patrimonyLegs) {
+      patrimonyItemIds.add(String((leg as { patrimony_item_id: string }).patrimony_item_id));
+    }
+
+    for (const itemId of patrimonyItemIds) {
+      await this.inventoryLedger.rebuildAndPersist(ctx, itemId);
+    }
+
+    return {
+      newEventId: newEvent.id,
+      revisionNo: newEvent.revision_no,
+      voidedPatrimonyLegs: voidedPatrimony,
+      voidedFinancialLegs: voidedFinancial,
+      recreatedLines: recreated,
+      skippedLines: skipped,
+      rebuiltItems: patrimonyItemIds.size,
+    };
   }
 }

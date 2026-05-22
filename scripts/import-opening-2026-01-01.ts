@@ -46,11 +46,11 @@ const PAYLOAD: OpeningImportPayload = {
       notes: 'Saldo em conta investimento BTG em 01/01/2026',
     },
     {
-      ticker: 'TESOURO-LFT-BTG',
+      ticker: 'LFT-20310301',
       asset_type: 'fixed_income',
       quantity: 1,
       avg_price: 1_000_341.65,
-      notes: 'Tesouro LFT (custódia BTG) — quantity=1, unit_price=valor financeiro',
+      notes: 'Tesouro LFT 01/03/2031 (custódia BTG) — quantity=1, unit_price=valor financeiro',
     },
   ],
   opening_short_options: [
@@ -98,6 +98,7 @@ async function run() {
     database,
     waitForConnections: true,
     connectionLimit: 4,
+    charset: 'utf8mb4',
   });
 
   try {

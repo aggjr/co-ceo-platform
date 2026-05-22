@@ -87,6 +87,8 @@ const TABLES: TableDefinition[] = [
   def('financial_accounts', 'tenant'),
   def('financial_ledger_entries', 'tenant'),
   def('financial_closings', 'tenant', { softDelete: false }),
+  // Elo canonico entre pernas de custodia e pernas de caixa.
+  def('business_events', 'tenant'),
   def('module_categories', 'global', {
     softDelete: false,
     primaryKey: 'module_code',

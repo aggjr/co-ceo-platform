@@ -9,6 +9,19 @@ import type { BtgBrokerageNote, BtgBrokerageNoteTrade } from './btgBrokerageNote
 import type { LedgerImportLine } from './ledgerTypes';
 
 export const BTG_NOTE_LEDGER_REF_PREFIX = 'BTG-NOTA';
+export const BTG_NOTE_EVENT_REF_PREFIX = 'BTG-NOTA';
+
+/**
+ * Chave canonica do header business_events para uma nota BTG. Todas as
+ * pernas da mesma nota carregam o MESMO event_source_ref e caem no mesmo
+ * business_events.id via BusinessEventRegistry.ensureByRef.
+ *
+ * `broker_note_ref` (line-level) continua diferenciado por trade para
+ * idempotencia da perna individual.
+ */
+function eventSourceRefForNote(note: BtgBrokerageNote): string {
+  return `${BTG_NOTE_EVENT_REF_PREFIX}-${note.noteNumber}`;
+}
 
 type NoteFees = {
   settlement: number;
@@ -86,6 +99,9 @@ function loanToLedger(
     unit_price: Number(trade.unitPrice) || 0,
     total_net_value: Math.abs(Number(trade.grossValue) || 0),
     broker_note_ref: ref,
+    event_source_ref: eventSourceRefForNote(note),
+    counterparty: 'BTG Pactual',
+    source_system: 'btg_brokerage_note_parser',
     notes: `Locação BTC — ${trade.specification || trade.ticker}`,
     impacts_managerial_price: false,
     settlement_date: cashSettlementDate(note.pregaoDate, 'securities_lending', 'securities_lending', ticker),
@@ -119,6 +135,7 @@ function tradeToLedger(
 
   if (!mapped.length) return [];
 
+  const eventRef = eventSourceRefForNote(note);
   for (const line of mapped) {
     if (trade.isExercise && line.operation === 'buy') {
       line.option_strike = Number(trade.unitPrice) || undefined;
@@ -127,6 +144,9 @@ function tradeToLedger(
     applyFeesToLine(line, share, trade);
     line.settlement_date = cashSettlementDate(note.pregaoDate, line.asset_type || 'stock', line.operation, line.ticker);
     line.settlement_status = 'pending';
+    line.event_source_ref = eventRef;
+    line.counterparty = 'BTG Pactual';
+    line.source_system = 'btg_brokerage_note_parser';
   }
   return mapped;
 }

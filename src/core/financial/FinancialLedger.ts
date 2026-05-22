@@ -55,6 +55,7 @@ export class FinancialLedger {
       counterparty: input.counterparty ?? null,
       status: input.status ?? 'cleared',
       related_patrimony_ledger_id: input.relatedPatrimonyLedgerId ?? null,
+      business_event_id: input.businessEventId ?? null,
       source_batch_id: input.sourceBatchId ?? null,
       external_ref: input.externalRef ?? null,
       metadata: input.metadata == null

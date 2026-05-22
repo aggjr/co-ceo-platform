@@ -21,6 +21,13 @@ export const LEDGER_TRANSACTION_TYPES = [
   'penalty_b3',
   /** Previsão negativa/positiva de liquidação (lançamentos futuros BTG). */
   'pending_settlement',
+  /**
+   * Ajuste de custo posterior: gera 1 perna patrimony 'cost_adjustment'
+   * (quantity=0, unit_value=custo) NO ITEM `ticker` e 1 perna financial 'out'
+   * no caixa. Use para IRRF de TD, taxa BTC, multa, custodia, etc. Ver
+   * docstring de MovementType.cost_adjustment.
+   */
+  'cost_adjustment',
 ] as const;
 
 /** Ticker sintético por corretora para lançamentos de extrato (caixa). */
@@ -93,6 +100,39 @@ export type LedgerImportLine = {
   impacts_managerial_price?: boolean;
   /** Strike de exercício (R$) — persiste em metadata do ativo. */
   option_strike?: number;
+  /**
+   * Header canonico (business_events.id) que esta linha pertence. Quando o
+   * caller (ex: import-btg-notes) ja agrupou as N pernas de uma mesma nota,
+   * passa o mesmo ID em todas. Quando vazio, InvestOperations cria 1 header
+   * automatico por linha (caso de cash_movement do extrato).
+   */
+  business_event_id?: string;
+  /**
+   * Chave do header agregador (business_events.source_ref). Multiplas linhas
+   * com o MESMO event_source_ref caem no MESMO business_events.id via
+   * BusinessEventRegistry.ensureByRef.
+   *
+   * Padroes adotados:
+   *   - 'BTG-NOTA-{noteNumber}' → 1 header por nota de corretagem
+   *   - 'OPENING:{date}'        → 1 header para o opening
+   *   - vazio                   → cada linha vira 1 header avulso (cash_movement)
+   *
+   * Difere de `broker_note_ref` (que continua sendo idempotencia da perna
+   * via external_ref). Ver docs/architecture/business_events_integration_plan.md.
+   */
+  event_source_ref?: string;
+  /** Sistema/parser que gerou (rastreabilidade). Ex: 'btg_extract_import'. */
+  source_system?: string;
+  /** Versao do parser (commit sha curto). */
+  source_version?: string;
+  /** Contraparte legivel: 'BTG Pactual', etc. */
+  counterparty?: string;
+  /**
+   * Quando operation = 'cost_adjustment', define se o custo sobe tambem o
+   * pmB (B3/fiscal). Default false (regra geral pra IRRF/IOF/custodia/multa).
+   * Ver tabela em MovementType.cost_adjustment.
+   */
+  applies_to_b3?: boolean;
 };
 
 export type OpeningShortOptionLine = {

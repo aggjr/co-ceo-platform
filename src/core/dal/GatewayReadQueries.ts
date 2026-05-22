@@ -23,7 +23,9 @@ export type GatewayReadQueryKey =
   | 'cockpit_impersonation_targets'
   | 'cockpit_contract_team'
   | 'invest_portfolio_daily_range'
-  | 'invest_portfolio_daily_before';
+  | 'invest_portfolio_daily_before'
+  | 'business_event_orphan_patrimony_legs'
+  | 'business_event_orphan_financial_legs';
 
 export interface GatewayReadQueryDef {
   sql: string;
@@ -230,5 +232,29 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
             AND snapshot_date < ?
           ORDER BY snapshot_date DESC
           LIMIT 1`,
+  },
+  business_event_orphan_patrimony_legs: {
+    sql: `SELECT id, organization_id, patrimony_item_id, transaction_date, movement_type,
+                 quantity_delta, unit_value, total_value, external_ref
+          FROM patrimony_ledger_entries
+          WHERE organization_id = ?
+            AND business_event_id IS NULL
+            AND deleted_at IS NULL
+            AND transaction_date >= ?
+            AND transaction_date <= ?
+          ORDER BY transaction_date ASC, created_at ASC
+          LIMIT ?`,
+  },
+  business_event_orphan_financial_legs: {
+    sql: `SELECT id, organization_id, account_id, transaction_date, settlement_date,
+                 direction, amount, status, description, external_ref
+          FROM financial_ledger_entries
+          WHERE organization_id = ?
+            AND business_event_id IS NULL
+            AND deleted_at IS NULL
+            AND transaction_date >= ?
+            AND transaction_date <= ?
+          ORDER BY transaction_date ASC, created_at ASC
+          LIMIT ?`,
   },
 };

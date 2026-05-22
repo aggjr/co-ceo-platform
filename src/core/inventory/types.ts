@@ -42,7 +42,42 @@ export type MovementType =
   | 'write_off'
   | 'short_open'
   | 'short_close'
-  | 'income_in_kind';
+  | 'income_in_kind'
+  /**
+   * Ajuste de custo posterior (custos atrelados a uma operacao patrimonial mas
+   * que aparecem em data/fonte diferentes — IRRF de TD, IRRF de opcao,
+   * taxa BTC, taxa de custodia, multa rateada, etc).
+   *
+   *   quantityDelta = 0
+   *   unitValue     = valor absoluto do custo a ser incorporado ao item
+   *   metadata.applies_to_b3 = true  -> tambem afeta pmB (B3)
+   *   metadata.applies_to_b3 = false -> afeta apenas pmA (estrito) e pmC (gerencial)
+   *
+   * REGRA FISCAL (IN RFB 1.585/2015 + Solucoes de Consulta COSIT):
+   *
+   * O PM B3 (fiscal) inclui apenas "custos e despesas necessarios a realizacao
+   * das operacoes ... que constem das notas de corretagem". Portanto:
+   *
+   *   SIM no PM B3 (entra via unit_price da linha de acquisition):
+   *     - Corretagem, ISS s/ corretagem
+   *     - Emolumentos, taxa de liquidacao, taxa de registro
+   *     - Taxas de termo/opcoes vinculadas a operacao
+   *
+   *   NAO no PM B3 (default deste cost_adjustment, applies_to_b3=false):
+   *     - IRRF retido (em qualquer ativo: TD, opcoes, swing trade) — eh
+   *       antecipacao de IR, vira credito na DARF
+   *     - IOF — tributo sobre rendimento
+   *     - Taxa de custodia (mensal ou TD 0,2% a.a.) — despesa de manutencao
+   *     - Juros/multa saldo negativo na corretora — despesa financeira pessoal
+   *     - Custos de BTC (aluguel de acoes), tanto doador quanto tomador
+   *
+   * O PM Estrito (gerencial-pessoal do investidor) e o PM Gerencial absorvem
+   * TODOS esses custos, porque sao gastos efetivos atrelados ao ativo na
+   * visao do investidor.
+   *
+   * Default: applies_to_b3 = false.
+   */
+  | 'cost_adjustment';
 
 export type PatrimonyLedgerRow = {
   id: string;
@@ -56,6 +91,7 @@ export type PatrimonyLedgerRow = {
   total_value: number;
   impacts_valuation: boolean | number;
   related_financial_entry_id: string | null;
+  business_event_id: string | null;
   source_batch_id: string | null;
   external_ref: string | null;
   notes: string | null;
@@ -81,6 +117,8 @@ export type RecordMovementInput = {
   unitValue: number;
   impactsValuation?: boolean;
   externalRef?: string | null;
+  /** Header canonico (business_events.id) que esta perna pertence. */
+  businessEventId?: string | null;
   sourceBatchId?: string | null;
   notes?: string | null;
   metadata?: Record<string, unknown> | null;

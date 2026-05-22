@@ -10,6 +10,7 @@ import {
   SettlementEngine,
 } from '../../core/financial';
 import { ContractGuard, ModuleCategories } from '../../core/module-registry';
+import { BusinessEventRegistry } from '../../core/business-events';
 import { InvestOperations } from './InvestOperations';
 import { ThreePricesValuation } from './ThreePricesValuation';
 
@@ -33,11 +34,14 @@ export function buildInvestOperations(gateway: CoCeoDataGateway): InvestOperatio
   const accountRegistry = new FinancialAccountRegistry(gateway, contractGuard);
   const financialLedger = new FinancialLedger(gateway, settlementEngine);
 
+  const businessEvents = new BusinessEventRegistry(gateway);
+
   return new InvestOperations(
     gateway,
     inventoryRegistry,
     inventoryLedger,
     accountRegistry,
-    financialLedger
+    financialLedger,
+    businessEvents
   );
 }

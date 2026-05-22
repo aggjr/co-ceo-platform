@@ -27,6 +27,7 @@ export class ThreePricesValuation implements InventoryValuation {
       put_premium_used?: number;
       open_call_premium_total?: number;
       cumulative_put_discount?: number;
+      applies_to_b3?: boolean;
     };
 
     const next: PositionState = {
@@ -37,6 +38,35 @@ export class ThreePricesValuation implements InventoryValuation {
       acquisitionValue: state.acquisitionValue,
       currentValue: state.currentValue,
     };
+
+    /**
+     * Ajuste de custo: incorpora um custo (positivo) no item sem alterar
+     * quantidade. Usado para IRRF de TD, taxa BTC, IRRF de opcao etc, que
+     * caem em data/fonte diferentes da operacao geradora.
+     *
+     * Regra atual (a confirmar com pesquisa B3/RFB):
+     *   - pmA (estrito)    : sempre absorve.
+     *   - pmC (gerencial)  : sempre absorve.
+     *   - pmB (B3)         : absorve somente se metadata.applies_to_b3 === true.
+     */
+    if (movement.movementType === 'cost_adjustment') {
+      if (state.quantity <= 0) {
+        return next;
+      }
+      const addedCost = movement.unitValue;
+      next.acquisitionValue = state.acquisitionValue + addedCost;
+      next.pmA = next.acquisitionValue / state.quantity;
+      const pmCOld = state.pmC ?? state.pmA;
+      const oldCostC = state.quantity * pmCOld;
+      next.pmC = (oldCostC + addedCost) / state.quantity;
+      if (meta.applies_to_b3) {
+        const pmBOld = state.pmB ?? state.pmA;
+        const oldCostB = state.quantity * pmBOld;
+        next.pmB = (oldCostB + addedCost) / state.quantity;
+      }
+      next.currentValue = state.quantity * next.pmA;
+      return next;
+    }
 
     if (movement.movementType === 'revaluation') {
       next.pmA = movement.unitValue;

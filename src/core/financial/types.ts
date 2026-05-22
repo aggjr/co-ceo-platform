@@ -37,6 +37,7 @@ export type FinancialLedgerRow = {
   counterparty: string | null;
   status: LedgerStatus;
   related_patrimony_ledger_id: string | null;
+  business_event_id: string | null;
   source_batch_id: string | null;
   external_ref: string | null;
   metadata: Record<string, unknown> | null;
@@ -65,6 +66,8 @@ export type RecordCashMovementInput = {
   counterparty?: string;
   status?: LedgerStatus;
   relatedPatrimonyLedgerId?: string | null;
+  /** Header canonico (business_events.id) que esta perna pertence. */
+  businessEventId?: string | null;
   externalRef?: string | null;
   sourceBatchId?: string | null;
   metadata?: Record<string, unknown>;
