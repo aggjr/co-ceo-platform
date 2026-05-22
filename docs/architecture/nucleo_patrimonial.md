@@ -229,3 +229,17 @@ Antes deste documento, INVEST tinha:
 - Hardcode de PU do Tesouro por data.
 
 Tudo isso é removido na migração para este modelo.
+
+## Estado da migração (vivo neste branch)
+
+A transição do schema legado para o canônico é progressiva. Hoje os dois schemas coexistem e a sincronia é garantida por dois adaptadores espelhados:
+
+- **`LegacyMirror`** (`src/modules/invest/legacy/LegacyMirror.ts`) — sentido NÚCLEO → LEGADO. Toda escrita feita via `InvestOperations` é espelhada em `invest_assets` / `invest_ledger_entries` com `broker_note_ref = 'MIRROR-FROM-CORE'` (constante `LegacyMirror.MIRROR_REF`).
+- **`CoreModelSync`** (`src/modules/invest/sync/CoreModelSync.ts`) — sentido LEGADO → NÚCLEO. Roda no fim de cada `LedgerImportService.importPortfolio/importOpeningOnly/importEntriesOnly` e projeta `invest_assets`/`invest_ledger_entries` em `patrimony_items` + `invest_position_ext` + `financial_accounts` + `patrimony_ledger_entries` + `financial_ledger_entries`. Idempotente:
+  - Marca cada lançamento projetado com `external_ref = 'LEGACY:<legacy_id>'`.
+  - Pula entradas cujo `broker_note_ref` começa com `MIRROR-FROM-CORE` (já vieram do núcleo).
+- **`InvestQuoteSyncService`** atualiza `metadata.last_price` em `invest_assets` (legado) e espelha em `invest_position_ext.last_price` no núcleo.
+
+**Engines de leitura** (`CustodyEngine`, `threePricesEngine`, `PnLPivotEngine`, `PatrimonyMtmDailyEngine`) ainda consomem o schema legado. Cada um deles vai ser portado para ler do núcleo em iterações futuras; quando o último for migrado, removem-se `LegacyMirror` + `CoreModelSync` e dropam-se `invest_assets`, `invest_ledger_entries`, `invest_daily_snapshots`, `invest_portfolio_daily`.
+
+Critério de saída do regime de espelho: nenhum engine/serviço consultando `invest_assets` ou `invest_ledger_entries` diretamente.

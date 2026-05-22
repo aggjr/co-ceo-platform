@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { CoCeoDataGateway } from '../../core/dal';
 import { installerContext } from './lib/installerContext';
 import { ensureInsert } from './lib/seedHelpers';
+import { CoreModelSync } from '../../modules/invest/sync/CoreModelSync';
 
 dotenv.config();
 
@@ -127,7 +128,15 @@ async function runSeed() {
     });
   }
 
-  console.log('✅ Portfólio demo inserido (ids estáveis — reexecutar é idempotente).');
+  console.log('Portfolio demo inserido (ids estaveis — reexecutar eh idempotente).');
+
+  const syncCtx = { ...ctx, organizationId: HOLDING_ORG_ID };
+  const sync = new CoreModelSync(gateway);
+  const result = await sync.syncFromLegacy(syncCtx);
+  console.log(
+    `[007] Projetado no nucleo: items=${result.itemsUpserted} ledger=${result.patrimonyLedgerInserted} cash=${result.accountsUpserted} fin=${result.financialLedgerInserted}`
+  );
+
   await pool.end();
 }
 
