@@ -23,6 +23,7 @@ import {
 } from '../core/invest/patrimonyLedgerGates';
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
+import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import {
   mergeStoredPatrimonySeries,
   PatrimonyDailyStore,
@@ -57,12 +58,14 @@ export class InvestController {
   private readonly patrimonyStore: PatrimonyDailyStore;
   private readonly patrimonyRecorder: PatrimonyDailyRecorder;
   private readonly quoteSync: InvestQuoteSyncService;
+  private readonly assetProjection: InvestAssetProjection;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
     this.patrimonyStore = new PatrimonyDailyStore(gateway);
     this.patrimonyRecorder = new PatrimonyDailyRecorder(gateway);
     this.quoteSync = new InvestQuoteSyncService(gateway);
+    this.assetProjection = new InvestAssetProjection(gateway);
   }
 
   listPortfolio = async (req: Request, res: Response) => {
@@ -75,10 +78,7 @@ export class InvestController {
       });
     }
 
-    const rows = await this.gateway.findWhere(ctx, 'invest_assets', {
-      organization_id: ctx.organizationId,
-      status: 'active',
-    });
+    const rows = await this.assetProjection.listActiveAssets(ctx);
 
     const today = new Date().toISOString().slice(0, 10);
     const ledgerEvents = await this.ledger.listLedgerEvents(
@@ -174,10 +174,7 @@ export class InvestController {
 
     let stockQuotes: Record<string, number> | undefined;
     if (method === 'mtm_btg') {
-      const assets = await this.gateway.findWhere(ctx, 'invest_assets', {
-        organization_id: ctx.organizationId,
-        status: 'active',
-      });
+      const assets = await this.assetProjection.listActiveAssets(ctx);
       stockQuotes = {};
       for (const row of assets) {
         const ticker = String(row.asset_ticker ?? '').toUpperCase();
@@ -363,10 +360,7 @@ export class InvestController {
     const events = await this.ledger.listLedgerEvents(ctx, from, to);
     let pivot = buildStockUnderlyingPivot(events, from, to);
 
-    const assets = await this.gateway.findWhere(ctx, 'invest_assets', {
-      organization_id: ctx.organizationId,
-      status: 'active',
-    });
+    const assets = await this.assetProjection.listActiveAssets(ctx);
     const quotesByTicker: Record<string, { lastPrice?: number }> = {};
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();

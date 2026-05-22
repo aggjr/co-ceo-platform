@@ -2,6 +2,7 @@ import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
 import { inferAssetType } from './assetClassifier';
 import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
+import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
 export type QuoteSyncResult = {
   asOf: string;
@@ -19,34 +20,24 @@ export type SnapshotOptionRow = {
   option_strike?: number;
 };
 
-function parseMetadata(raw: unknown): Record<string, unknown> {
-  if (!raw) return {};
-  try {
-    return typeof raw === 'string' ? (JSON.parse(raw) as Record<string, unknown>) : (raw as Record<string, unknown>);
-  } catch {
-    return {};
-  }
-}
-
 export class InvestQuoteSyncService {
-  constructor(private readonly gateway: CoCeoDataGateway) {}
+  private readonly assetProjection: InvestAssetProjection;
+
+  constructor(private readonly gateway: CoCeoDataGateway) {
+    this.assetProjection = new InvestAssetProjection(gateway);
+  }
 
   /** Tickers de ações/FIIs com posição ou ativos ativos na custódia. */
   async listB3QuoteTickers(ctx: UserContext): Promise<string[]> {
     if (!ctx.organizationId) return [];
-    const assets = await this.gateway.findWhere(ctx, 'invest_assets', {
-      organization_id: ctx.organizationId,
-      status: 'active',
-    });
+    const assets = await this.assetProjection.listActiveAssets(ctx);
     const tickers: string[] = [];
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
       const type = String(row.asset_type || inferAssetType(ticker));
       if (type === 'stock' || type === 'fii') {
-        if (Math.abs(Number(row.current_quantity ?? 0)) > 0.0001 || type === 'stock' || type === 'fii') {
-          tickers.push(ticker);
-        }
+        tickers.push(ticker);
       }
     }
     return [...new Set(tickers)];
@@ -71,25 +62,8 @@ export class InvestQuoteSyncService {
         missing.push(ticker);
         continue;
       }
-      const assets = await this.gateway.findWhere(
-        ctx,
-        'invest_assets',
-        { organization_id: ctx.organizationId, asset_ticker: ticker },
-        { limit: 1 }
-      );
-      const row = assets[0];
-      if (!row?.id) continue;
-
-      const meta = parseMetadata(row.metadata);
-      meta.last_price = q.price;
-      meta.quote_as_of = q.asOf;
-      meta.quote_source = q.source;
-      meta.quote_kind = q.kind;
-      await this.gateway.update(ctx, 'invest_assets', String(row.id), {
-        metadata: JSON.stringify(meta),
-      });
-      await this.mirrorQuoteToPositionExt(ctx, ticker, q.price, q.asOf);
-      updated += 1;
+      const ok = await this.writeQuoteToPositionExt(ctx, ticker, q.price, q.asOf);
+      if (ok) updated += 1;
     }
 
     const asOf = asOfDate?.slice(0, 10) || quotes[0]?.asOf || new Date().toISOString().slice(0, 10);
@@ -126,48 +100,30 @@ export class InvestQuoteSyncService {
       const hasStrike = Number.isFinite(strike) && strike > 0;
       if (!hasPrice && !hasStrike) continue;
 
-      const assets = await this.gateway.findWhere(
-        ctx,
-        'invest_assets',
-        { organization_id: ctx.organizationId, asset_ticker: ticker },
-        { limit: 1 }
-      );
-      const row = assets[0];
-      if (!row?.id) continue;
-
-      const meta = parseMetadata(row.metadata);
+      let touched = false;
       if (hasPrice) {
-        meta.last_price = lastPrice;
-        meta.quote_as_of = asOfDay;
-        meta.quote_source = 'btg_snapshot';
+        const ok = await this.writeQuoteToPositionExt(ctx, ticker, lastPrice, asOfDay);
+        touched = touched || ok;
       }
       if (hasStrike) {
-        meta.option_strike = Math.round(strike * 10000) / 10000;
-        meta.option_strike_as_of = asOfDay;
+        const ok = await this.writeOptionStrike(ctx, ticker, strike, asOfDay);
+        touched = touched || ok;
       }
-      await this.gateway.update(ctx, 'invest_assets', String(row.id), {
-        metadata: JSON.stringify(meta),
-      });
-      if (hasPrice) {
-        await this.mirrorQuoteToPositionExt(ctx, ticker, lastPrice, asOfDay);
-      }
-      n += 1;
+      if (touched) n += 1;
     }
     return n;
   }
 
   /**
-   * Espelha cotacao em invest_position_ext.last_price (novo modelo). Idempotente:
-   * se o patrimony_item ainda nao existe, o CoreModelSync vai criar — entao a
-   * proxima execucao ja achara o registro para atualizar.
+   * Grava cotacao em invest_position_ext.last_price. Retorna true se atualizou.
    */
-  private async mirrorQuoteToPositionExt(
+  private async writeQuoteToPositionExt(
     ctx: UserContext,
     ticker: string,
     lastPrice: number,
     asOf: string
-  ): Promise<void> {
-    if (!ctx.organizationId) return;
+  ): Promise<boolean> {
+    if (!ctx.organizationId) return false;
     const item = await this.gateway.findWhere(
       ctx,
       'patrimony_items',
@@ -178,7 +134,7 @@ export class InvestQuoteSyncService {
       },
       { limit: 1 }
     );
-    if (!item.length) return;
+    if (!item.length) return false;
     const itemId = String(item[0].id);
     const ext = await this.gateway.findWhere(
       ctx,
@@ -186,10 +142,44 @@ export class InvestQuoteSyncService {
       { patrimony_item_id: itemId },
       { limit: 1 }
     );
-    if (!ext.length) return;
+    if (!ext.length) return false;
     await this.gateway.update(ctx, 'invest_position_ext', itemId, {
       last_price: lastPrice,
       last_price_as_of: asOf.slice(0, 10),
     });
+    return true;
+  }
+
+  /** Atualiza strike de opcao em invest_option_ext. */
+  private async writeOptionStrike(
+    ctx: UserContext,
+    ticker: string,
+    strike: number,
+    asOf: string
+  ): Promise<boolean> {
+    if (!ctx.organizationId) return false;
+    const item = await this.gateway.findWhere(
+      ctx,
+      'patrimony_items',
+      {
+        organization_id: ctx.organizationId,
+        source_module: 'INVEST',
+        identifier: ticker,
+      },
+      { limit: 1 }
+    );
+    if (!item.length) return false;
+    const itemId = String(item[0].id);
+    const ext = await this.gateway.findWhere(
+      ctx,
+      'invest_option_ext',
+      { patrimony_item_id: itemId },
+      { limit: 1 }
+    );
+    if (!ext.length) return false;
+    await this.gateway.update(ctx, 'invest_option_ext', itemId, {
+      strike_price: Math.round(strike * 10000) / 10000,
+    });
+    return true;
   }
 }

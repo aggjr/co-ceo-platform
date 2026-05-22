@@ -6,6 +6,7 @@ import { loadPatrimonyAnchors } from './patrimonyAnchors';
 import { fixedIncomeTotalFromLedger } from './patrimonyLedgerGates';
 import { PatrimonyDailyStore, type StoredPortfolioDay } from './PatrimonyDailyStore';
 import { aggregateExternalFlowsByDate } from './portfolioPerformance';
+import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
 export type RecordDailyPatrimonyResult = {
   snapshotDate: string;
@@ -17,10 +18,12 @@ export type RecordDailyPatrimonyResult = {
 export class PatrimonyDailyRecorder {
   private readonly ledger: LedgerImportService;
   private readonly store: PatrimonyDailyStore;
+  private readonly assetProjection: InvestAssetProjection;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
     this.store = new PatrimonyDailyStore(gateway);
+    this.assetProjection = new InvestAssetProjection(gateway);
   }
 
   async loadStockQuotes(ctx: UserContext): Promise<{
@@ -28,10 +31,7 @@ export class PatrimonyDailyRecorder {
     quotesAsOf: string | null;
   }> {
     if (!ctx.organizationId) return { quotes: {}, quotesAsOf: null };
-    const assets = await this.gateway.findWhere(ctx, 'invest_assets', {
-      organization_id: ctx.organizationId,
-      status: 'active',
-    });
+    const assets = await this.assetProjection.listActiveAssets(ctx);
     const quotes: Record<string, number> = {};
     let quotesAsOf: string | null = null;
     for (const row of assets) {
