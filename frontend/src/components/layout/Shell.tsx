@@ -72,66 +72,43 @@ export function Shell(props: { children?: JSX.Element }) {
         {/* Se estiver emulando, envolve o frame em uma moldura dourada */}
         <div class={impersonating() ? 'impersonation-frame' : ''} style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
           
-          {/* Cabeçalho (Header) */}
+          {/* Cabeçalho (Header) — linha única compacta */}
           <header class="header">
-            <div class="header-top">
-              <div style="display: flex; align-items: center; gap: 24px; flex: 1; min-width: 0;">
-                <div class="header-title" style="flex: 0 1 auto;">
-                  <h1>{pageTitle()}</h1>
-
-                  <Show
-                    when={originalLines()}
-                    fallback={
-                      <>
-                        <p class="muted" style="margin: 0;">
-                          <strong>{roleHint()}</strong>
-                        </p>
-                        <p class="muted header-email" style="margin: 2px 0 0 0;">
-                          {user()?.email || ''}
-                        </p>
-                      </>
-                    }
-                  >
-                    {(lines) => (
-                      <>
-                        <p class="muted header-original" style="margin: 2px 0 0 0;">
-                          <strong>{lines().line1}</strong>
-                        </p>
-                        <p class="muted header-original" style="margin: 2px 0 0 0;">
-                          {lines().line2}
-                        </p>
-                      </>
-                    )}
-                  </Show>
-                </div>
-
-                <div id="impersonation-bar-host" style="flex: 0 1 auto;">
-                  <ImpersonationBar />
-                </div>
-              </div>
-
-              <div class="header-right">
-              {/* IVA (IA conselheira) — desativada; reativar quando houver backend/API.
-              <button
-                type="button"
-                class="btn-ghost"
-                ...
+            {/* Bloco título */}
+            <div class="header-title" style="flex-shrink: 0;">
+              <h1>{pageTitle()}</h1>
+              <Show
+                when={originalLines()}
+                fallback={
+                  <p class="muted" style="margin: 0;">
+                    <strong>{roleHint()}</strong> · {user()?.email || ''}
+                  </p>
+                }
               >
-                <span>IVA</span>
-              </button>
-              */}
+                {(lines) => (
+                  <p class="muted" style="margin: 0;">
+                    <strong>{lines().line1}</strong> · {lines().line2}
+                  </p>
+                )}
+              </Show>
+            </div>
 
-              <div
-                class="user-profile"
-                classList={{ 'user-profile--compact': impersonating() }}
-                title={user()?.fullName || user()?.email || ''}
-              >
-                <div class="avatar">{initial()}</div>
-                <Show when={!impersonating()}>
-                  <span>{user()?.email || ''}</span>
-                </Show>
-              </div>
-              </div>
+            {/* Barra de personificação — ocupa o espaço central */}
+            <div style="flex: 1; min-width: 0; display: flex; align-items: center;">
+              <ImpersonationBar />
+            </div>
+
+            {/* Avatar do usuário */}
+            <div
+              class="user-profile"
+              classList={{ 'user-profile--compact': impersonating() }}
+              title={user()?.fullName || user()?.email || ''}
+              style="flex-shrink: 0;"
+            >
+              <div class="avatar">{initial()}</div>
+              <Show when={!impersonating()}>
+                <span style="font-size: 12px;">{user()?.email || ''}</span>
+              </Show>
             </div>
           </header>
 

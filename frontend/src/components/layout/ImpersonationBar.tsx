@@ -212,95 +212,80 @@ export function ImpersonationBar() {
             </span>
           }
         >
-          <div style="display: flex; gap: 12px; align-items: flex-end;">
-            {/* Box 1 - Org */}
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-              <span class="impersonate-label" style="text-align: left; padding: 0;">
-                {global ? 'Personificar:' : 'Simular usuário:'}
-              </span>
-              <select
-                class="impersonate-combo"
-                id="impersonate-ou"
-                value={selectedOrgId()}
-                onChange={(e) => handleOrgChange(e.currentTarget.value)}
-              >
-                <option value="">
-                  {global ? 'Visão global — sem personificar' : 'Selecione a unidade da equipe...'}
-                </option>
-                <For each={nodes()}>
-                  {(n) => {
-                    const depth = pathDepth(n.path) - minDepth();
-                    const indent = '\u00A0'.repeat(depth * 4);
-                    return (
-                      <option value={n.id} data-contract-id={n.contract_id || ''}>
-                        {indent}
-                        {depth > 0 ? '↳ ' : ''}
-                        {orgIcon(n.type)} {n.name}
-                      </option>
-                    );
-                  }}
-                </For>
-              </select>
-            </div>
-
-            {/* Box 2 - User */}
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-              <span class="impersonate-label" style="text-align: left; padding: 0;">
-                Usuário:
-              </span>
-              <select
-                class="impersonate-combo"
-                id="impersonate-user"
-                value={selectedUserRoleId()}
-                disabled={loadingUsers() || targets().length === 0}
-                onChange={(e) => setSelectedUserRoleId(e.currentTarget.value)}
-              >
-                <Show when={!loadingUsers()} fallback={<option value="">Carregando...</option>}>
-                  <Show
-                    when={targets().length > 0}
-                    fallback={<option value="">Nenhum colaborador nesta unidade</option>}
-                  >
-                    <option value="">Selecione o colaborador...</option>
-                    <For each={targets()}>
-                      {(t) => (
-                        <option value={t.user_role_id}>
-                          {t.full_name || t.email} — {t.role_name}
-                        </option>
-                      )}
-                    </For>
-                  </Show>
-                </Show>
-              </select>
-            </div>
-
-            {/* Box 3 - Button */}
-            <div>
-              <button
-                type="button"
-                class="btn-entrar"
-                id="impersonate-enter"
-                disabled={!selectedUserRoleId() || submitting()}
-                onClick={handleEnterImpersonation}
-                title={
-                  global
-                    ? 'Abrir sessão emulada em nova aba'
-                    : 'Ver o sistema como este membro da sua estrutura (nova aba)'
-                }
-              >
-                {submitting() ? 'Entrando...' : (
-                  <span style="display: inline-block; line-height: 1.2; text-align: center;">
-                    Emular<br />Acesso
-                  </span>
-                )}
-              </button>
-            </div>
-          </div>
-
-          <Show when={statusText()}>
-            <span class="impersonate-status" aria-live="polite">
-              {statusText()}
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;">
+            <span class="impersonate-label">
+              {global ? 'Personificar:' : 'Simular:'}
             </span>
-          </Show>
+            <select
+              class="impersonate-combo"
+              id="impersonate-ou"
+              value={selectedOrgId()}
+              onChange={(e) => handleOrgChange(e.currentTarget.value)}
+            >
+              <option value="">
+                {global ? 'Visão global — sem personificar' : 'Selecione a unidade...'}
+              </option>
+              <For each={nodes()}>
+                {(n) => {
+                  const depth = pathDepth(n.path) - minDepth();
+                  const indent = '\u00A0'.repeat(depth * 4);
+                  return (
+                    <option value={n.id} data-contract-id={n.contract_id || ''}>
+                      {indent}
+                      {depth > 0 ? '↳ ' : ''}
+                      {orgIcon(n.type)} {n.name}
+                    </option>
+                  );
+                }}
+              </For>
+            </select>
+
+            <span class="impersonate-label">Usuário:</span>
+            <select
+              class="impersonate-combo"
+              id="impersonate-user"
+              value={selectedUserRoleId()}
+              disabled={loadingUsers() || targets().length === 0}
+              onChange={(e) => setSelectedUserRoleId(e.currentTarget.value)}
+            >
+              <Show when={!loadingUsers()} fallback={<option value="">Carregando...</option>}>
+                <Show
+                  when={targets().length > 0}
+                  fallback={<option value="">Nenhum colaborador</option>}
+                >
+                  <option value="">Selecione...</option>
+                  <For each={targets()}>
+                    {(t) => (
+                      <option value={t.user_role_id}>
+                        {t.full_name || t.email} — {t.role_name}
+                      </option>
+                    )}
+                  </For>
+                </Show>
+              </Show>
+            </select>
+
+            <button
+              type="button"
+              class="btn-entrar"
+              id="impersonate-enter"
+              disabled={!selectedUserRoleId() || submitting()}
+              onClick={handleEnterImpersonation}
+              title={
+                global
+                  ? 'Abrir sessão emulada em nova aba'
+                  : 'Ver o sistema como este membro da sua estrutura (nova aba)'
+              }
+            >
+              {submitting() ? 'Entrando...' : 'Emular Acesso'}
+            </button>
+
+            <Show when={statusText()}>
+              <span class="impersonate-status" aria-live="polite">
+                {statusText()}
+              </span>
+            </Show>
+          </div>
         </Show>
       </div>
     </Show>
