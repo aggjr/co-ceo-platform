@@ -77,6 +77,45 @@ const TABLES: TableDefinition[] = [
     primaryKey: 'ticker',
     countsTowardStorage: false,
   }),
+  // ===== Nucleo patrimonial canonico (ver docs/architecture/nucleo_patrimonial.md) =====
+  def('patrimony_items', 'tenant'),
+  def('patrimony_locations', 'tenant'),
+  def('patrimony_item_locations', 'tenant', { softDelete: false }),
+  def('patrimony_ledger_entries', 'tenant'),
+  def('patrimony_closings', 'tenant', { softDelete: false }),
+  def('financial_accounts', 'tenant'),
+  def('financial_ledger_entries', 'tenant'),
+  def('financial_closings', 'tenant', { softDelete: false }),
+  def('module_categories', 'global', {
+    softDelete: false,
+    primaryKey: 'module_code',
+    primaryKeyColumns: ['module_code', 'category', 'subcategory'],
+    allowHardDelete: true,
+    countsTowardStorage: false,
+  }),
+  def('module_valuation_methods', 'global', {
+    softDelete: false,
+    primaryKey: 'method_code',
+    countsTowardStorage: false,
+  }),
+  def('module_settlement_profiles', 'global', {
+    softDelete: false,
+    primaryKey: 'profile_code',
+    countsTowardStorage: false,
+  }),
+  def('invest_position_ext', 'tenant', {
+    softDelete: false,
+    primaryKey: 'patrimony_item_id',
+  }),
+  def('invest_option_ext', 'tenant', {
+    softDelete: false,
+    primaryKey: 'patrimony_item_id',
+  }),
+  def('invest_options_market', 'global', {
+    softDelete: false,
+    primaryKey: 'ticker',
+    countsTowardStorage: false,
+  }),
   def('telemetry_events', 'telemetry', {
     softDelete: false,
     countsTowardStorage: false,

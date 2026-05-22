@@ -15,7 +15,13 @@ export type GatewayErrorCode =
   | 'INVALID_MODULE_CODE'
   | 'METADATA_TOO_LARGE'
   | 'INVALID_PAYLOAD'
-  | 'INVALID_CONTEXT';
+  | 'INVALID_CONTEXT'
+  | 'FORBIDDEN_MODULE'
+  | 'UNKNOWN_SUBCATEGORY'
+  | 'UNKNOWN_VALUATION_METHOD'
+  | 'UNKNOWN_SETTLEMENT_PROFILE'
+  | 'INVENTORY_RULE_VIOLATION'
+  | 'FINANCIAL_RULE_VIOLATION';
 
 export class GatewayError extends Error {
   readonly code: GatewayErrorCode;
