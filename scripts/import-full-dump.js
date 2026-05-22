@@ -24,6 +24,7 @@ async function main() {
   }
 
   let sql = fs.readFileSync(sqlFile, 'utf8');
+  if (sql.charCodeAt(0) === 0xfeff) sql = sql.slice(1);
   if (targetDb !== SOURCE_DB) {
     sql = sql.split(SOURCE_DB).join(targetDb);
     console.log(`Schema no dump: ${SOURCE_DB} → ${targetDb}`);
