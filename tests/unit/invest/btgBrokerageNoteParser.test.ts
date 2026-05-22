@@ -126,6 +126,61 @@ Valor Líquido   R$ -0,11
     expect(notes[0].trades).toHaveLength(0);
   });
 
+  it('ticker colado ao maturity: separa corretamente (4 casos reais)', () => {
+    const lines = `
+NOTA DE CORRETAGEM
+99000001
+Nr. nota
+1
+Folha
+22/05/2026
+Data pregão
+004176105
+Negócios realizados
+1-BOVESPA VOPCAO DE VENDA 01/26PRIOM385 ON 2500 0,16 400,00 C
+1-BOVESPA VOPCAO DE COMPRA 02/26PRIOC405 ON 3000 1,23 3.690,00 C
+1-BOVESPA VEXERC OPC VENDA 04/26PRIOP650E ON 4000 65,00 260.000,00 D
+1-BOVESPA COPCAO DE COMPRA 03/26ITUBC42 ON 1200 1,23 1.476,00 D
+Resumo dos Negócios
+`.trim().split('\n');
+
+    const notes = parseBtgBrokerageNoteBlocks(lines, 'OPTIONS/test.pdf', 'OPTIONS');
+    expect(notes).toHaveLength(1);
+    const [t0, t1, t2, t3] = notes[0].trades;
+
+    // linha 1: VENDA opção PRIOM385
+    expect(t0.ticker).toBe('PRIOM385');
+    expect(t0.side).toBe('V');
+    expect(t0.quantity).toBe(2500);
+    expect(t0.unitPrice).toBe(0.16);
+    expect(t0.maturity).toBe('01/26');
+    expect(t0.isExercise).toBe(false);
+
+    // linha 2: COMPRA opção PRIOC405
+    expect(t1.ticker).toBe('PRIOC405');
+    expect(t1.side).toBe('V');
+    expect(t1.quantity).toBe(3000);
+    expect(t1.unitPrice).toBe(1.23);
+    expect(t1.maturity).toBe('02/26');
+    expect(t1.isExercise).toBe(false);
+
+    // linha 3: EXERC OPC VENDA PRIOP650E
+    expect(t2.ticker).toBe('PRIOP650E');
+    expect(t2.side).toBe('V');
+    expect(t2.quantity).toBe(4000);
+    expect(t2.unitPrice).toBe(65);
+    expect(t2.maturity).toBe('04/26');
+    expect(t2.isExercise).toBe(true);
+
+    // linha 4: COMPRA opção ITUBC42
+    expect(t3.ticker).toBe('ITUBC42');
+    expect(t3.side).toBe('C');
+    expect(t3.quantity).toBe(1200);
+    expect(t3.unitPrice).toBe(1.23);
+    expect(t3.maturity).toBe('03/26');
+    expect(t3.isExercise).toBe(false);
+  });
+
   it('dedupe remove nota repetida (abril)', () => {
     const { kept, skipped } = dedupeBrokerageNotes(
       parseBtgBrokerageNoteBlocks(SAMPLE, 'a.pdf', 'OPTIONS')

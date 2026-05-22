@@ -6,6 +6,7 @@ import type { ValuationFactory } from './valuation/ValuationFactory';
 import type {
   PatrimonyItemRow,
   PatrimonyLedgerRow,
+  PatrimonyStatus,
   PositionState,
   RecordMovementInput,
 } from './types';
@@ -211,8 +212,12 @@ export class InventoryLedger {
     const divestedAt =
       next.quantity === 0 && state.quantity !== 0 ? input.transactionDate : undefined;
 
-    const status =
-      next.quantity === 0 && state.quantity !== 0 ? 'liquidated' : undefined;
+    const status: PatrimonyStatus | undefined =
+      next.quantity === 0 && state.quantity !== 0
+        ? 'liquidated'
+        : next.quantity !== 0 && state.quantity === 0
+        ? 'active'
+        : undefined;
 
     await this.registry.updateSnapshot(ctx, input.itemId, {
       quantity: next.quantity,

@@ -9,6 +9,13 @@ export type BtgNoteCategory = 'SPOT' | 'OPTIONS' | 'LOAN';
 
 const B3_INSTRUMENT_SUFFIX = /^(ON|PN|CI|ES|UNT|DIR)$/i;
 
+// Palavras que aparecem no market type e nunca são ticker de instrumento.
+const MARKET_TYPE_WORDS = new Set([
+  'VENDA', 'COMPRA', 'OPCAO', 'EXERC',
+  'MERC', 'VISTA', 'TERMO', 'FRACIONA',
+  'BOVESPA', 'CBLC', 'BMF',
+]);
+
 export type BtgBrokerageNoteTrade = {
   negotiation: string;
   side: 'C' | 'V';
@@ -82,6 +89,7 @@ export function isoDateToBr(iso: string): string {
 
 function looksLikeInstrumentToken(token: string): boolean {
   const t = token.toUpperCase();
+  if (MARKET_TYPE_WORDS.has(t)) return false;
   if (B3_INSTRUMENT_SUFFIX.test(t)) return false;
   if (/^\d{2}\/\d{2,4}$/.test(t)) return false;
   return /^[A-Z]{4}[A-Z0-9]{0,6}E?$/i.test(t) && t.length >= 5;
@@ -106,7 +114,16 @@ function resolveSideLabel(side: 'C' | 'V', marketTypeRaw: string, isExercise: bo
 }
 
 function parseTradeMiddle(middle: string, side: 'C' | 'V') {
-  const tokens = middle.split(/\s+/).filter(Boolean);
+  // Separa tokens colados no formato MM/YY(YY)TICKER (ex: "01/26PRIOM385" → ["01/26", "PRIOM385"])
+  const tokens: string[] = [];
+  for (const tok of middle.split(/\s+/).filter(Boolean)) {
+    const m = tok.match(/^(\d{2}\/\d{2,4})([A-Z][A-Z0-9]+)$/i);
+    if (m) {
+      tokens.push(m[1], m[2].toUpperCase());
+    } else {
+      tokens.push(tok);
+    }
+  }
   let suffix = '';
   if (tokens.length && B3_INSTRUMENT_SUFFIX.test(tokens[tokens.length - 1])) {
     suffix = tokens.pop()!.toUpperCase();
@@ -124,6 +141,12 @@ function parseTradeMiddle(middle: string, side: 'C' | 'V') {
       tokens.splice(i, 1);
       break;
     }
+  }
+
+  // Segunda chance: o maturity pode estar imediatamente antes do ticker (colado
+  // no PDF e já separado pelo pre-processamento acima, ou separado por espaço).
+  if (!maturity && tokens.length && /^\d{2}\/\d{2,4}$/.test(tokens[tokens.length - 1])) {
+    maturity = tokens.pop()!;
   }
 
   const marketTypeRaw = tokens.join(' ').trim();
