@@ -20,6 +20,8 @@ export function isBtgHomeBrokerRow(row: MyProfitRow): boolean {
   return inst.includes('BTG') || doc.includes('BTG PACTUAL');
 }
 
+import { cashSettlementDate } from './settlementCalendar';
+
 /** Normaliza underlying (ITUB4, não ITUB3) e rótulos de origem. */
 export function normalizeBtgHomeBrokerLine(line: LedgerImportLine): LedgerImportLine {
   const ticker = line.ticker.trim().toUpperCase();
@@ -32,12 +34,15 @@ export function normalizeBtgHomeBrokerLine(line: LedgerImportLine): LedgerImport
   } else if (!notes.toLowerCase().includes('btg')) {
     notes = `BTG home broker — ${notes}`;
   }
+  const assetType = line.asset_type || inferAssetType(ticker);
   return {
     ...line,
     ticker,
-    asset_type: line.asset_type || inferAssetType(ticker),
+    asset_type: assetType,
     underlying_ticker: underlying,
     notes,
+    settlement_date: line.settlement_date || cashSettlementDate(line.date, assetType, line.operation, ticker),
+    settlement_status: line.settlement_status || 'pending',
   };
 }
 

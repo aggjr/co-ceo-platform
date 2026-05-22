@@ -4,6 +4,7 @@
  */
 import { inferAssetType } from './assetClassifier';
 import { mapBrokerOrderToLedger } from './brokerOrderMapper';
+import { cashSettlementDate } from './settlementCalendar';
 import type { BtgBrokerageNote, BtgBrokerageNoteTrade } from './btgBrokerageNoteParser';
 import type { LedgerImportLine } from './ledgerTypes';
 
@@ -87,6 +88,8 @@ function loanToLedger(
     broker_note_ref: ref,
     notes: `Locação BTC — ${trade.specification || trade.ticker}`,
     impacts_managerial_price: false,
+    settlement_date: cashSettlementDate(note.pregaoDate, 'securities_lending', 'securities_lending', ticker),
+    settlement_status: 'pending',
   };
   applyFeesToLine(line, share, trade);
   return line;
@@ -122,6 +125,8 @@ function tradeToLedger(
       line.notes = line.notes || `Exercício — ${trade.ticker}`;
     }
     applyFeesToLine(line, share, trade);
+    line.settlement_date = cashSettlementDate(note.pregaoDate, line.asset_type || 'stock', line.operation, line.ticker);
+    line.settlement_status = 'pending';
   }
   return mapped;
 }

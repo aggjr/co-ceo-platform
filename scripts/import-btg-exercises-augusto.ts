@@ -11,6 +11,7 @@ import { installerContext } from '../src/database/seeds/lib/installerContext';
 import { mapBrokerOrderToLedger } from '../src/core/invest/brokerOrderMapper';
 import { LedgerImportService } from '../src/core/invest/LedgerImportService';
 import type { LedgerImportLine } from '../src/core/invest/ledgerTypes';
+import { cashSettlementDate } from '../src/core/invest/settlementCalendar';
 import { buildThreeAvgPricesByUnderlying } from '../src/core/invest/portfolioThreePrices';
 
 dotenv.config();
@@ -67,7 +68,11 @@ async function main() {
       date: orderDate,
       broker_note_ref: `${BATCH_PREFIX}#${seq}#${o.ticker}`,
     });
-    entries.push(...mapped);
+    for (const m of mapped) {
+      m.settlement_date = m.settlement_date || cashSettlementDate(m.date, m.asset_type || 'stock', m.operation, m.ticker);
+      m.settlement_status = m.settlement_status || 'pending';
+      entries.push(m);
+    }
   }
 
   console.log(`Exercícios → ${entries.length} lançamentos (${data.orders.length} ordens)`);

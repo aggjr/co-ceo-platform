@@ -83,6 +83,8 @@ export type LedgerImportLine = {
   brokerage_fee?: number;
   b3_fees?: number;
   irrf_tax?: number;
+  settlement_date?: string;
+  settlement_status?: 'pending' | 'cleared';
   total_net_value?: number;
   underlying_ticker?: string;
   asset_type?: string;

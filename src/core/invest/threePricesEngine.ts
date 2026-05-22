@@ -179,35 +179,33 @@ function applyPutShortExercisePremium(
   }
 }
 
-/** CALL comprada exercida: B3 só na parte exercida; Gerencial na série inteira não contada. */
+/** CALL comprada exercida: Prêmio pago é alocado ao PM Estrito (base do custo da ação). */
 function applyCallLongExercisePremium(
   s: UnderlyingState,
   series: OptionSeriesState,
   exercisedQty: number,
   explicitNet: number | null
-): void {
+): number {
   const openAbs = Math.abs(series.qtyAtual);
   const exercised = Math.min(exercisedQty, openAbs > 0 ? openAbs : exercisedQty);
-  if (exercised <= 0) return;
+  if (exercised <= 0) return 0;
 
-  const useExplicitNet = explicitNet != null && Math.abs(explicitNet) > 0.005;
   const frac = openAbs > 0 ? exercised / openAbs : 1;
   const allocatedFromHistory = frac * series.premioLiquido;
-  const naoContadoSerieHistory =
-    series.premioLiquido - series.premioContadoGerencial;
+  
+  // Prêmio pago é valor negativo em premioLiquido. O custo base da Call (positivo)
+  // é o que devemos retornar para ser somado ao PM Estrito.
+  const callPremiumPaidCost = Math.abs(allocatedFromHistory);
 
-  if (useExplicitNet) {
-    const premioPago = -Math.abs(explicitNet!);
-    s.b3AjusteTotal += premioPago;
-    s.premioOpcoesPeriodo += premioPago - series.premioContadoGerencial;
-    series.premioLiquido = 0;
-    series.premioContadoGerencial = 0;
-  } else if (Math.abs(series.premioLiquido) > 0.005) {
-    s.b3AjusteTotal += allocatedFromHistory;
-    s.premioOpcoesPeriodo += naoContadoSerieHistory;
+  if (Math.abs(series.premioLiquido) > 0.005) {
+    // Como o prêmio foi absorvido pelo PM Estrito (custo base da ação), 
+    // NÃO ajustamos b3AjusteTotal nem premioOpcoesPeriodo, pois ele já fará 
+    // parte nativa da média de todos os PMs (incluindo B3 e Gerencial).
     series.premioLiquido -= allocatedFromHistory;
     series.premioContadoGerencial = series.premioLiquido;
   }
+  
+  return callPremiumPaidCost;
 }
 
 function applyStockBuy(s: UnderlyingState, e: LedgerEvent): void {
@@ -221,17 +219,29 @@ function applyStockBuy(s: UnderlyingState, e: LedgerEvent): void {
 
   if (optionTicker && strike > 0) {
     s.qty += q;
-    s.estritoTotal += q * strike;
+    
+    // Para exercício, consideramos buyCost para pegar eventuais taxas e corretagem cobradas na nota
+    const baseExerciseCost = buyCost(e);
+    let premiumToAllocateToEstrito = 0;
 
     const series = getOptionSeries(s, optionTicker);
     const optType = inferAssetType(optionTicker);
+    
     if (optType === 'option_put' && series.qtyAtual < -1e-9) {
+      // Put Vendida: Prêmio recebido NÃO reduz o Estrito. 
+      // Ele abate apenas do B3/Gerencial via applyPutShortExercisePremium.
       applyPutShortExercisePremium(s, series, q, null);
       series.qtyAtual += q;
     } else if (optType === 'option_call' && series.qtyAtual > 1e-9) {
-      applyCallLongExercisePremium(s, series, q, null);
+      // Call Comprada: Prêmio pago DEVE ser somado ao Estrito.
+      premiumToAllocateToEstrito = applyCallLongExercisePremium(s, series, q, null);
       series.qtyAtual -= q;
     }
+    
+    // PM Estrito recebe o custo de aquisição (Strike + taxas eventuais) + Prêmio da Call (se aplicável).
+    // Nota: baseExerciseCost normalmente refletirá (q * strike) + taxas.
+    s.estritoTotal += baseExerciseCost + premiumToAllocateToEstrito;
+    
     return;
   }
 
@@ -313,18 +323,12 @@ function applyOptionExercise(s: UnderlyingState, e: LedgerEvent): void {
   const alreadyCountedHistory = frac * series.premioContadoGerencial;
 
   if (isPut && positionShort) {
-    if (Math.abs(series.premioLiquido) > 0.005 || explicitOrNull != null) {
-      applyPutShortExercisePremium(s, series, exercised, explicitOrNull);
-    }
-    series.qtyAtual += exercised;
+    // Transferido para applyStockBuy. Apenas ignoramos aqui se vier antes.
     return;
   }
 
   if (isCall && positionLong) {
-    if (Math.abs(series.premioLiquido) > 0.005 || explicitOrNull != null) {
-      applyCallLongExercisePremium(s, series, exercised, explicitOrNull);
-    }
-    series.qtyAtual -= exercised;
+    // Transferido para applyStockBuy. Apenas ignoramos aqui se vier antes.
     return;
   }
 
