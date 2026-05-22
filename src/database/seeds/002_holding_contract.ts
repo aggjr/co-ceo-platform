@@ -186,12 +186,12 @@ async function runSeed() {
       { entityType: 'user_roles', entityId: IDS.teamMemberUserRole }
     );
 
-    const teamRoleRow = await gateway.findById(ctx, 'user_roles', IDS.teamMemberUserRole);
-    if (teamRoleRow && teamRoleRow.organization_id == null) {
-      await gateway.update(ctx, 'user_roles', IDS.teamMemberUserRole, {
-        organization_id: IDS.org,
-      });
-    }
+    // const teamRoleRow = await gateway.findById(ctx, 'user_roles', IDS.teamMemberUserRole);
+    // if (teamRoleRow && teamRoleRow.organization_id == null) {
+    //   await gateway.update(ctx, 'user_roles', IDS.teamMemberUserRole, {
+    //     organization_id: IDS.org,
+    //   });
+    // }
 
     console.log('✅ Holding configurada via gateway.');
     console.log(`👤 Super usuário holding: ${ownerEmail}`);
