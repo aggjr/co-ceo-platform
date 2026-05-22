@@ -39,11 +39,11 @@ const PAYLOAD: OpeningImportPayload = {
       notes: 'PetroRio (ação ordinária)',
     },
     {
-      ticker: 'CDB-SR-BTG',
-      asset_type: 'fixed_income',
+      ticker: 'CAIXA-BTG',
+      asset_type: 'cash',
       quantity: 1,
       avg_price: 58_758.79,
-      notes: 'CDB Subordinado BTG — quantity=1, unit_price=valor financeiro',
+      notes: 'Saldo em conta investimento BTG em 01/01/2026',
     },
     {
       ticker: 'TESOURO-LFT-BTG',
