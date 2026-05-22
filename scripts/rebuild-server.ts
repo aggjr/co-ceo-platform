@@ -8,12 +8,12 @@ import path from 'path';
 const SCRIPTS = [
   'wipe-data.ts',
   '../src/database/seeds/002_holding_contract.ts',
-  'import-opening-augusto.ts',
-  'import-btg-orders-augusto.ts',
-  'import-btg-exercises-augusto.ts',
-  'import-btg-extract-ledger.ts',
-  'import-btg-brokerage-notes-ledger.ts',
-  'import-may20-orders.ts'
+  // 'import-opening-augusto.ts',
+  // 'import-btg-orders-augusto.ts',
+  // 'import-btg-exercises-augusto.ts',
+  // 'import-btg-extract-ledger.ts',
+  // 'import-btg-brokerage-notes-ledger.ts',
+  // 'import-may20-orders.ts'
 ];
 
 async function main() {

@@ -59,10 +59,11 @@ export function Shell(props: { children?: JSX.Element }) {
         {/* Componente SolidJS de navegação */}
         <SideNav />
 
-        <div class="sidebar-footer">
+        <div class="sidebar-footer" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
           <button type="button" class="btn-logout" onClick={handleLogout}>
             Sair
           </button>
+          <span class="app-version" style="font-size: 11px; opacity: 0.6;">{APP_VERSION}</span>
         </div>
       </aside>
 
@@ -74,33 +75,39 @@ export function Shell(props: { children?: JSX.Element }) {
           {/* Cabeçalho (Header) */}
           <header class="header">
             <div class="header-top">
-              <div class="header-title">
-                <h1>{pageTitle()}</h1>
+              <div style="display: flex; align-items: center; gap: 24px; flex: 1; min-width: 0;">
+                <div class="header-title" style="flex: 0 1 auto;">
+                  <h1>{pageTitle()}</h1>
 
-                <Show
-                  when={originalLines()}
-                  fallback={
-                    <>
-                      <p class="muted" style="margin: 0;">
-                        Logado como <strong>{roleHint()}</strong>
-                      </p>
-                      <p class="muted header-email" style="margin: 2px 0 0 0;">
-                        {user()?.email || ''}
-                      </p>
-                    </>
-                  }
-                >
-                  {(lines) => (
-                    <>
-                      <p class="muted header-original" style="margin: 2px 0 0 0;">
-                        <strong>{lines().line1}</strong>
-                      </p>
-                      <p class="muted header-original" style="margin: 2px 0 0 0;">
-                        {lines().line2}
-                      </p>
-                    </>
-                  )}
-                </Show>
+                  <Show
+                    when={originalLines()}
+                    fallback={
+                      <>
+                        <p class="muted" style="margin: 0;">
+                          <strong>{roleHint()}</strong>
+                        </p>
+                        <p class="muted header-email" style="margin: 2px 0 0 0;">
+                          {user()?.email || ''}
+                        </p>
+                      </>
+                    }
+                  >
+                    {(lines) => (
+                      <>
+                        <p class="muted header-original" style="margin: 2px 0 0 0;">
+                          <strong>{lines().line1}</strong>
+                        </p>
+                        <p class="muted header-original" style="margin: 2px 0 0 0;">
+                          {lines().line2}
+                        </p>
+                      </>
+                    )}
+                  </Show>
+                </div>
+
+                <div id="impersonation-bar-host" style="flex: 0 1 auto;">
+                  <ImpersonationBar />
+                </div>
               </div>
 
               <div class="header-right">
@@ -114,8 +121,6 @@ export function Shell(props: { children?: JSX.Element }) {
               </button>
               */}
 
-              <span class="app-version">{APP_VERSION}</span>
-              
               <div
                 class="user-profile"
                 classList={{ 'user-profile--compact': impersonating() }}
@@ -127,10 +132,6 @@ export function Shell(props: { children?: JSX.Element }) {
                 </Show>
               </div>
               </div>
-            </div>
-
-            <div id="impersonation-bar-host" class="header-impersonate-row">
-              <ImpersonationBar />
             </div>
           </header>
 

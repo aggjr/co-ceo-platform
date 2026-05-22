@@ -11,6 +11,9 @@ let cached: PatrimonyAnchorFile | null = null;
 export function loadPatrimonyAnchors(): PatrimonyAnchorFile {
   if (cached) return cached;
   const filePath = path.join(process.cwd(), 'data/invest/btg-patrimony-anchors-2026.json');
+  if (!fs.existsSync(filePath)) {
+    return { month_ends: [] };
+  }
   cached = JSON.parse(fs.readFileSync(filePath, 'utf8')) as PatrimonyAnchorFile;
   return cached;
 }
@@ -19,6 +22,7 @@ export function loadPatrimonyAnchors(): PatrimonyAnchorFile {
 export function interpolatePatrimonyTarget(date: string, anchors?: PatrimonyAnchorFile): number {
   const data = anchors ?? loadPatrimonyAnchors();
   const points = [...data.month_ends].sort((a, b) => a.date.localeCompare(b.date));
+  if (points.length === 0) return 0;
   const d = date.slice(0, 10);
   if (d <= points[0]!.date) return points[0]!.patrimony;
   const last = points[points.length - 1]!;

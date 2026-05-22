@@ -25,6 +25,10 @@ async function main() {
     await connection.query('TRUNCATE TABLE invest_daily_snapshots;');
     await connection.query('TRUNCATE TABLE invest_portfolio_daily;');
     await connection.query('TRUNCATE TABLE invest_options_chain;');
+    await connection.query('TRUNCATE TABLE organization_storage_ledger;');
+    
+    console.log('Resetando contadores de storage...');
+    await connection.query('UPDATE organizations SET storage_bytes_used = 0;');
 
     // 2. Apagar usuários, exceto os administradores
     console.log('Apagando todos os usuários (exceto admin@co-ceo.com e admin@coceo.com.br)...');

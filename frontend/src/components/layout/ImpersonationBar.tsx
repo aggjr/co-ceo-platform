@@ -280,7 +280,11 @@ export function ImpersonationBar() {
                 : 'Ver o sistema como este membro da sua estrutura (nova aba)'
             }
           >
-            {submitting() ? 'Entrando...' : 'Simular acesso'}
+            {submitting() ? 'Entrando...' : (
+              <span style="display: inline-block; line-height: 1.1; text-align: center;">
+                emular<br />acesso
+              </span>
+            )}
           </button>
         </Show>
       </div>
