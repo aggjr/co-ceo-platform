@@ -1,5 +1,6 @@
 import { render } from 'solid-js/web';
 import { App } from './App';
+import './styles/app.css';
 import './styles/loader.css';
 import './styles/coceo-excel-table.css';
 import './styles/coceo-excel-global.css';

@@ -132,6 +132,8 @@ export function isPageReload() {
  * Deve rodar uma vez no boot, antes do router.
  */
 export function resetAuthOnPageReload() {
+  // Em dev (Vite), manter sessão no F5 para não “quebrar” após recarregar.
+  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) return false;
   if (!isPageReload()) return false;
   clearSession();
   const loginPath = '/login';
