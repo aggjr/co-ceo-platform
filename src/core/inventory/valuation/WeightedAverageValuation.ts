@@ -9,6 +9,13 @@ import type {
  * onde nao ha distincao entre custo "estrito", "B3" ou "gerencial".
  *
  * Apenas pmA eh atualizado; pmB e pmC ficam null.
+ *
+ * REGRA UNIVERSAL DOS PMs (espelha ThreePricesValuation):
+ *
+ *   PM SO eh recalculado quando o movimento AFASTA a posicao de zero
+ *   (lote cresce em valor absoluto). Movimentos que APROXIMAM de zero
+ *   nao mexem em PM. Movimentos que CRUZAM zero abrem novo lote do
+ *   outro lado com PM = unitValue do movimento.
  */
 export class WeightedAverageValuation implements InventoryValuation {
   readonly methodCode = 'weighted_avg';
@@ -30,63 +37,57 @@ export class WeightedAverageValuation implements InventoryValuation {
     }
 
     /**
-     * Ajuste de custo: incorpora um custo absoluto (unitValue) sem alterar
-     * quantidade. Usado p/ taxas/IRRF que chegam fora da linha original.
-     * Veja docstring em MovementType.
+     * Ajuste de custo (qty_delta = 0): incorpora custo absoluto sem alterar
+     * quantidade. Veja docstring em MovementType.
      */
     if (movement.movementType === 'cost_adjustment') {
-      if (state.quantity <= 0) {
-        return next;
-      }
+      if (state.quantity <= 0) return next;
       next.acquisitionValue = state.acquisitionValue + movement.unitValue;
       next.pmA = next.acquisitionValue / state.quantity;
       next.currentValue = state.quantity * next.pmA;
       return next;
     }
 
-    /**
-     * Opening balance: usado tanto p/ posicao long (qty > 0) quanto p/
-     * posicao short herdada (qty < 0, ex: opcao vendida em ano anterior).
-     * Em ambos os casos o "custo" eh quantity * unitValue, e o pmA fica
-     * positivo (sempre = unitValue).
-     */
-    if (movement.movementType === 'opening_balance') {
-      const addedCost = movement.quantityDelta * movement.unitValue;
-      const totalQty = next.quantity;
-      next.acquisitionValue = state.acquisitionValue + addedCost;
-      next.pmA = totalQty === 0 ? 0 : next.acquisitionValue / totalQty;
+    if (
+      movement.movementType !== 'acquisition' &&
+      movement.movementType !== 'disposition' &&
+      movement.movementType !== 'opening_balance'
+    ) {
+      return next;
+    }
+
+    const totalQty = next.quantity;
+
+    // (1) LIQUIDOU.
+    if (totalQty === 0) {
+      next.pmA = 0;
+      next.acquisitionValue = 0;
+      next.currentValue = 0;
+      return next;
+    }
+
+    // (2) CRUZOU ZERO.
+    if (state.quantity * totalQty < 0) {
+      next.pmA = movement.unitValue;
+      next.acquisitionValue = totalQty * movement.unitValue;
+      next.currentValue = next.acquisitionValue;
+      return next;
+    }
+
+    // (3) APROXIMA DE ZERO: PM mantido, acquisitionValue proporcional.
+    if (Math.abs(totalQty) < Math.abs(state.quantity)) {
+      const ratio = totalQty / state.quantity;
+      next.acquisitionValue = state.acquisitionValue * ratio;
       next.currentValue = totalQty * next.pmA;
       return next;
     }
 
-    if (movement.quantityDelta > 0) {
-      const oldCost = state.quantity * state.pmA;
-      const addedCost = movement.quantityDelta * movement.unitValue;
-      const totalQty = next.quantity;
-      if (totalQty <= 0) {
-        next.pmA = 0;
-      } else {
-        next.pmA = (oldCost + addedCost) / totalQty;
-      }
-      next.acquisitionValue = state.acquisitionValue + addedCost;
-      next.currentValue = totalQty * next.pmA;
-      return next;
-    }
-
-    if (movement.quantityDelta < 0) {
-      if (next.quantity <= 0) {
-        next.pmA = 0;
-        next.acquisitionValue = 0;
-        next.currentValue = 0;
-        return next;
-      }
-      next.acquisitionValue = next.quantity * next.pmA;
-      next.currentValue = next.quantity * next.pmA;
-      return next;
-    }
-
-    next.acquisitionValue = next.quantity * next.pmA;
-    next.currentValue = next.quantity * next.pmA;
+    // (4) AFASTA DE ZERO: ponderacao classica.
+    const oldCost = state.quantity * state.pmA;
+    const addedCost = movement.quantityDelta * movement.unitValue;
+    next.pmA = Math.abs((oldCost + addedCost) / totalQty);
+    next.acquisitionValue = state.acquisitionValue + addedCost;
+    next.currentValue = totalQty * next.pmA;
     return next;
   }
 }

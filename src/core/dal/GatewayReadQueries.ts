@@ -25,7 +25,8 @@ export type GatewayReadQueryKey =
   | 'invest_portfolio_daily_range'
   | 'invest_portfolio_daily_before'
   | 'business_event_orphan_patrimony_legs'
-  | 'business_event_orphan_financial_legs';
+  | 'business_event_orphan_financial_legs'
+  | 'invest_ledger_note_refs';
 
 export interface GatewayReadQueryDef {
   sql: string;
@@ -256,5 +257,17 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
             AND transaction_date <= ?
           ORDER BY transaction_date ASC, created_at ASC
           LIMIT ?`,
+  },
+  invest_ledger_note_refs: {
+    sql: `SELECT DISTINCT
+            CASE
+              WHEN external_ref LIKE 'BROKER_REF:%'
+              THEN SUBSTRING(external_ref, 12)
+              ELSE external_ref
+            END AS broker_note_ref
+          FROM financial_ledger_entries
+          WHERE organization_id = ?
+            AND external_ref IS NOT NULL
+            AND deleted_at IS NULL`,
   },
 };

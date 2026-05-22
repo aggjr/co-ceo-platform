@@ -78,14 +78,6 @@ export class LedgerEventProjection {
       case 'disposition':
         if (isOption && optionSide) return optionSide === 'put' ? 'put_sell' : 'call_sell';
         return 'sell';
-      case 'short_open':
-        if (optionSide === 'put') return 'put_sell';
-        if (optionSide === 'call') return 'call_sell';
-        return 'sell';
-      case 'short_close':
-        if (optionSide === 'put') return 'put_buy';
-        if (optionSide === 'call') return 'call_buy';
-        return 'buy';
       case 'bonus':
         return 'bonus';
       case 'cost_adjustment':

@@ -627,9 +627,7 @@ export class InvestOperations {
       | 'disposition'
       | 'split'
       | 'bonus'
-      | 'revaluation'
-      | 'short_open'
-      | 'short_close';
+      | 'revaluation';
     let quantityDelta: number;
     let cashDirection: 'in' | 'out' | null = null;
 
@@ -638,12 +636,15 @@ export class InvestOperations {
       quantityDelta = op === 'buy' ? Math.abs(line.quantity) : -Math.abs(line.quantity);
       cashDirection = op === 'buy' ? 'out' : 'in';
     } else if (OPTION_OPS.has(op)) {
+      // Toda venda (put_sell/call_sell) eh disposition. Toda compra
+      // (put_buy/call_buy) eh acquisition. O estado de "short" e derivado
+      // pela quantidade resultante (qty < 0 = posicao vendida liquida).
       if (op === 'put_sell' || op === 'call_sell') {
-        movementType = 'short_open';
+        movementType = 'disposition';
         quantityDelta = -Math.abs(line.quantity);
         cashDirection = 'in';
       } else {
-        movementType = 'short_close';
+        movementType = 'acquisition';
         quantityDelta = Math.abs(line.quantity);
         cashDirection = 'out';
       }

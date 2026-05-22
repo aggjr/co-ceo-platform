@@ -30,6 +30,21 @@ export type PatrimonyLocationRow = {
   metadata: Record<string, unknown> | null;
 };
 
+/**
+ * MovementType: tipo conceitual da operacao patrimonial (independente do
+ * estado da posicao). Toda venda e `disposition` (entrega de bem/servico
+ * contra contrapartida financeira), independente de ja existir estoque
+ * positivo. Construtora vende imovel na planta, montadora vende aviao
+ * por encomenda — todos viram `disposition` com qty_delta negativo, e
+ * a posicao residual pode ficar comprada (>0), zerada (=0) ou vendida
+ * (<0). A distincao fiscal "venda contra estoque" vs "venda a descoberto"
+ * e DERIVADA do estado pelo engine de calculo fiscal — NAO eh um tipo
+ * separado de movimento. Mesmo principio para `acquisition`.
+ *
+ * Os antigos `short_open` e `short_close` foram removidos por confundirem
+ * "tipo de operacao" com "estado resultante". Quem precisar dessa info
+ * fiscal/regulatoria computa: state.quantity vs next.quantity vs zero.
+ */
 export type MovementType =
   | 'opening_balance'
   | 'acquisition'
@@ -40,8 +55,6 @@ export type MovementType =
   | 'split'
   | 'bonus'
   | 'write_off'
-  | 'short_open'
-  | 'short_close'
   | 'income_in_kind'
   /**
    * Ajuste de custo posterior (custos atrelados a uma operacao patrimonial mas
