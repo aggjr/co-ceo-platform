@@ -5,6 +5,8 @@ coverage/
 reports/
 !reports/.gitkeep
 .env
+config/deploy-credentials.env
+deploy-credentials.env
 .claude/settings.local.json
 *.log
 .DS_Store
