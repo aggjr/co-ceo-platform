@@ -185,7 +185,7 @@ export function ImpersonationBar() {
       setStatusText(
         openedNewTab
           ? 'Sessão emulada aberta em nova aba. Confira a aba do Portfólio INVEST.'
-          : 'Pop-up bloqueado — abrindo simulação nesta aba…'
+          : 'Pop-up bloqueado. Por favor, permita a abertura de janelas pop-up para abrir a simulação.'
       );
     } catch (err: any) {
       const msg = err?.message || err?.body?.error || 'Falha na simulação';

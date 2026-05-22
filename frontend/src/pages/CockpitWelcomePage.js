@@ -15,11 +15,13 @@ export async function CockpitWelcomePage(container) {
   }
 
   const content = `
-    <div class="card" style="text-align:center;padding:48px 32px">
-      <h2 style="font-size:26px;color:var(--color-accent);margin-bottom:12px">Bem-vindo ao CO-CEO</h2>
-      <p class="muted" style="max-width:520px;margin:0 auto;line-height:1.6">
-        Plataforma de apoio à tomada de decisão. Use o menu à esquerda para acessar Cockpit, INVEST e demais módulos.
-      </p>
+    <div style="display: flex; align-items: center; justify-content: center; height: 100%; width: 100%;">
+      <div class="card" style="text-align:center;padding:48px 32px">
+        <h2 style="font-size:26px;color:var(--color-accent);margin-bottom:12px">Bem-vindo ao CO-CEO</h2>
+        <p class="muted" style="max-width:520px;margin:0 auto;line-height:1.6">
+          Plataforma de apoio à tomada de decisão. Use o menu à esquerda para acessar Cockpit, INVEST e demais módulos.
+        </p>
+      </div>
     </div>
   `;
 

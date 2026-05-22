@@ -93,7 +93,6 @@ export function openImpersonationTab(token, impersonatorMeta, options = {}) {
   const url = `${window.location.origin}${path}?_imp=${encodeURIComponent(handoffId)}`;
   const win = window.open(url, '_blank', 'noopener,noreferrer');
   if (!win) {
-    window.location.assign(url);
     return false;
   }
   return true;
@@ -147,7 +146,13 @@ export function resetAuthOnPageReload() {
 export function decodeJwt(token) {
   try {
     const payload = token.split('.')[1];
-    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const binString = atob(base64);
+    const bytes = new Uint8Array(binString.length);
+    for (let i = 0; i < binString.length; i++) {
+        bytes[i] = binString.charCodeAt(i);
+    }
+    return JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     return null;
   }
