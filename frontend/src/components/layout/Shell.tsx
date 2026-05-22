@@ -71,33 +71,35 @@ export function Shell(props: { children?: JSX.Element }) {
         {/* Se estiver emulando, envolve o frame em uma moldura dourada */}
         <div class={impersonating() ? 'impersonation-frame' : ''} style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
           
-          {/* Cabeçalho — 2 linhas alinhadas */}
+          {/* Cabeçalho */}
           <header class="header">
 
-            {/* Coluna 1: identidade */}
-            <div class="hdr-col">
-              <span class="hdr-label">
-                <Show when={originalLines()} fallback={roleHint()}>
+            {/* Bloco Esquerdo: Identidade */}
+            <div class="header-left">
+              <div class="header-title">
+                <Show when={originalLines()} fallback="CO-CEO">
                   {(lines) => lines().line1}
                 </Show>
-              </span>
-              <span class="hdr-value">
-                <Show when={originalLines()} fallback={user()?.email || ''}>
+              </div>
+              <div class="header-subtitle">
+                <Show when={originalLines()} fallback={roleHint()}>
                   {(lines) => lines().line2}
                 </Show>
-              </span>
+              </div>
             </div>
 
-            {/* Colunas 2-4: barra de personificação */}
-            <ImpersonationBar />
+            {/* Bloco Central: Personificação */}
+            <div class="header-center">
+              <ImpersonationBar />
+            </div>
 
-            {/* Avatar */}
-            <div
-              class="avatar"
-              title={user()?.fullName || user()?.email || ''}
-              style="flex-shrink:0; margin-left: auto;"
-            >
-              {initial()}
+            {/* Bloco Direito: Versão, Avatar, Email */}
+            <div class="header-right">
+              <span class="app-version">V0.0.39</span>
+              <div class="avatar" title={user()?.fullName || user()?.email || ''}>
+                {initial()}
+              </div>
+              <span class="header-email">{user()?.email || ''}</span>
             </div>
 
           </header>

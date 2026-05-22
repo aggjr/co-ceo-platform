@@ -211,9 +211,8 @@ export function ImpersonationBar() {
               <span class="impersonate-line">{activeLines().line2}</span>
             </span>
           }
-        >
           <div class="impersonate-cols">
-
+            
             {/* Col: Personificar */}
             <div class="impersonate-col">
               <span class="impersonate-label">{global ? 'Personificar:' : 'Simular:'}</span>
@@ -224,7 +223,7 @@ export function ImpersonationBar() {
                 onChange={(e) => handleOrgChange(e.currentTarget.value)}
               >
                 <option value="">
-                  {global ? 'Visão global' : 'Selecione a unidade...'}
+                  {global ? 'Visão global — sem personificar' : 'Selecione a unidade...'}
                 </option>
                 <For each={nodes()}>
                   {(n) => {
@@ -251,7 +250,7 @@ export function ImpersonationBar() {
                 onChange={(e) => setSelectedUserRoleId(e.currentTarget.value)}
               >
                 <Show when={!loadingUsers()} fallback={<option value="">Carregando...</option>}>
-                  <Show when={targets().length > 0} fallback={<option value="">Nenhum colaborador</option>}>
+                  <Show when={targets().length > 0} fallback={<option value="">Nenhum colaborador nesta unidade</option>}>
                     <option value="">Selecione...</option>
                     <For each={targets()}>
                       {(t) => (
@@ -265,7 +264,7 @@ export function ImpersonationBar() {
               </select>
             </div>
 
-            {/* Col: Botão */}
+            {/* Botão Emular */}
             <button
               type="button"
               class="btn-entrar"
@@ -274,7 +273,7 @@ export function ImpersonationBar() {
               onClick={handleEnterImpersonation}
               title="Abrir sessão emulada em nova aba"
             >
-              {submitting() ? 'Aguarde...' : <>Emular<br />Acesso</>}
+              {submitting() ? 'Aguarde' : 'Emular'}
             </button>
 
           </div>
