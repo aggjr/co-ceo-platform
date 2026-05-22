@@ -13,6 +13,7 @@ const pool = mysql.createPool({
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'co_ceo_platform',
+  charset: 'utf8mb4',
   waitForConnections: true,
   connectionLimit: process.env.DB_POOL_LIMIT ? parseInt(process.env.DB_POOL_LIMIT) : 20,
   queueLimit: 0
