@@ -6,6 +6,7 @@ reports/
 !reports/.gitkeep
 .env
 config/deploy-credentials.env
+config/easypanel-app.env
 deploy-credentials.env
 .claude/settings.local.json
 *.log
