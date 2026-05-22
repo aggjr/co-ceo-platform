@@ -211,6 +211,7 @@ export function ImpersonationBar() {
               <span class="impersonate-line">{activeLines().line2}</span>
             </span>
           }
+        >
           <div class="impersonate-cols">
             
             {/* Col: Personificar */}
