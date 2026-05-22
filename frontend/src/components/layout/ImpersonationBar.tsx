@@ -212,79 +212,71 @@ export function ImpersonationBar() {
             </span>
           }
         >
-          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;">
-            <span class="impersonate-label">
-              {global ? 'Personificar:' : 'Simular:'}
-            </span>
-            <select
-              class="impersonate-combo"
-              id="impersonate-ou"
-              value={selectedOrgId()}
-              onChange={(e) => handleOrgChange(e.currentTarget.value)}
-            >
-              <option value="">
-                {global ? 'Visão global — sem personificar' : 'Selecione a unidade...'}
-              </option>
-              <For each={nodes()}>
-                {(n) => {
-                  const depth = pathDepth(n.path) - minDepth();
-                  const indent = '\u00A0'.repeat(depth * 4);
-                  return (
-                    <option value={n.id} data-contract-id={n.contract_id || ''}>
-                      {indent}
-                      {depth > 0 ? '↳ ' : ''}
-                      {orgIcon(n.type)} {n.name}
-                    </option>
-                  );
-                }}
-              </For>
-            </select>
+          <div class="impersonate-cols">
 
-            <span class="impersonate-label">Usuário:</span>
-            <select
-              class="impersonate-combo"
-              id="impersonate-user"
-              value={selectedUserRoleId()}
-              disabled={loadingUsers() || targets().length === 0}
-              onChange={(e) => setSelectedUserRoleId(e.currentTarget.value)}
-            >
-              <Show when={!loadingUsers()} fallback={<option value="">Carregando...</option>}>
-                <Show
-                  when={targets().length > 0}
-                  fallback={<option value="">Nenhum colaborador</option>}
-                >
-                  <option value="">Selecione...</option>
-                  <For each={targets()}>
-                    {(t) => (
-                      <option value={t.user_role_id}>
-                        {t.full_name || t.email} — {t.role_name}
+            {/* Col: Personificar */}
+            <div class="impersonate-col">
+              <span class="impersonate-label">{global ? 'Personificar:' : 'Simular:'}</span>
+              <select
+                class="impersonate-combo"
+                id="impersonate-ou"
+                value={selectedOrgId()}
+                onChange={(e) => handleOrgChange(e.currentTarget.value)}
+              >
+                <option value="">
+                  {global ? 'Visão global' : 'Selecione a unidade...'}
+                </option>
+                <For each={nodes()}>
+                  {(n) => {
+                    const depth = pathDepth(n.path) - minDepth();
+                    const indent = '\u00A0'.repeat(depth * 4);
+                    return (
+                      <option value={n.id} data-contract-id={n.contract_id || ''}>
+                        {indent}{depth > 0 ? '↳ ' : ''}{orgIcon(n.type)} {n.name}
                       </option>
-                    )}
-                  </For>
-                </Show>
-              </Show>
-            </select>
+                    );
+                  }}
+                </For>
+              </select>
+            </div>
 
+            {/* Col: Usuário */}
+            <div class="impersonate-col">
+              <span class="impersonate-label">Usuário:</span>
+              <select
+                class="impersonate-combo"
+                id="impersonate-user"
+                value={selectedUserRoleId()}
+                disabled={loadingUsers() || targets().length === 0}
+                onChange={(e) => setSelectedUserRoleId(e.currentTarget.value)}
+              >
+                <Show when={!loadingUsers()} fallback={<option value="">Carregando...</option>}>
+                  <Show when={targets().length > 0} fallback={<option value="">Nenhum colaborador</option>}>
+                    <option value="">Selecione...</option>
+                    <For each={targets()}>
+                      {(t) => (
+                        <option value={t.user_role_id}>
+                          {t.full_name || t.email} — {t.role_name}
+                        </option>
+                      )}
+                    </For>
+                  </Show>
+                </Show>
+              </select>
+            </div>
+
+            {/* Col: Botão */}
             <button
               type="button"
               class="btn-entrar"
               id="impersonate-enter"
               disabled={!selectedUserRoleId() || submitting()}
               onClick={handleEnterImpersonation}
-              title={
-                global
-                  ? 'Abrir sessão emulada em nova aba'
-                  : 'Ver o sistema como este membro da sua estrutura (nova aba)'
-              }
+              title="Abrir sessão emulada em nova aba"
             >
-              {submitting() ? 'Entrando...' : 'Emular Acesso'}
+              {submitting() ? 'Aguarde...' : <>Emular<br />Acesso</>}
             </button>
 
-            <Show when={statusText()}>
-              <span class="impersonate-status" aria-live="polite">
-                {statusText()}
-              </span>
-            </Show>
           </div>
         </Show>
       </div>

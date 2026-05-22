@@ -59,11 +59,10 @@ export function Shell(props: { children?: JSX.Element }) {
         {/* Componente SolidJS de navegação */}
         <SideNav />
 
-        <div class="sidebar-footer" style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <div class="sidebar-footer">
           <button type="button" class="btn-logout" onClick={handleLogout}>
             Sair
           </button>
-          <span class="app-version" style="font-size: 11px; opacity: 0.6;">{APP_VERSION}</span>
         </div>
       </aside>
 
@@ -72,44 +71,35 @@ export function Shell(props: { children?: JSX.Element }) {
         {/* Se estiver emulando, envolve o frame em uma moldura dourada */}
         <div class={impersonating() ? 'impersonation-frame' : ''} style="display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden;">
           
-          {/* Cabeçalho (Header) — linha única compacta */}
+          {/* Cabeçalho — 2 linhas alinhadas */}
           <header class="header">
-            {/* Bloco título */}
-            <div class="header-title" style="flex-shrink: 0;">
-              <h1>{pageTitle()}</h1>
-              <Show
-                when={originalLines()}
-                fallback={
-                  <p class="muted" style="margin: 0;">
-                    <strong>{roleHint()}</strong> · {user()?.email || ''}
-                  </p>
-                }
-              >
-                {(lines) => (
-                  <p class="muted" style="margin: 0;">
-                    <strong>{lines().line1}</strong> · {lines().line2}
-                  </p>
-                )}
-              </Show>
+
+            {/* Coluna 1: identidade */}
+            <div class="hdr-col">
+              <span class="hdr-label">
+                <Show when={originalLines()} fallback={roleHint()}>
+                  {(lines) => lines().line1}
+                </Show>
+              </span>
+              <span class="hdr-value">
+                <Show when={originalLines()} fallback={user()?.email || ''}>
+                  {(lines) => lines().line2}
+                </Show>
+              </span>
             </div>
 
-            {/* Barra de personificação — ocupa o espaço central */}
-            <div style="flex: 1; min-width: 0; display: flex; align-items: center;">
-              <ImpersonationBar />
-            </div>
+            {/* Colunas 2-4: barra de personificação */}
+            <ImpersonationBar />
 
-            {/* Avatar do usuário */}
+            {/* Avatar */}
             <div
-              class="user-profile"
-              classList={{ 'user-profile--compact': impersonating() }}
+              class="avatar"
               title={user()?.fullName || user()?.email || ''}
-              style="flex-shrink: 0;"
+              style="flex-shrink:0; margin-left: auto;"
             >
-              <div class="avatar">{initial()}</div>
-              <Show when={!impersonating()}>
-                <span style="font-size: 12px;">{user()?.email || ''}</span>
-              </Show>
+              {initial()}
             </div>
+
           </header>
 
           {/* Conteúdo principal (painel IVA desativado — ver bloco comentado no git history / Shell.tsx) */}
