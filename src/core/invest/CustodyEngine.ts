@@ -9,10 +9,14 @@ function isFixedIncomeAsset(assetType: string, ticker: string): boolean {
   return assetType === 'fixed_income' || isFixedIncomeTicker(ticker);
 }
 
-/** Ações, FIIs e opções podem ficar vendidas a descoberto; RF e caixa não. */
+function isCashAsset(assetType: string, ticker: string): boolean {
+  return assetType === 'cash' || ticker.toUpperCase().startsWith('CAIXA');
+}
+
+/** Ações, FIIs e opções podem ficar vendidas a descoberto; RF não. */
 function allowsShortPosition(assetType: string, ticker: string): boolean {
   if (isFixedIncomeAsset(assetType, ticker)) return false;
-  if (assetType === 'cash' || ticker.startsWith('CAIXA')) return false;
+  if (isCashAsset(assetType, ticker)) return false;
   return (
     assetType === 'stock' ||
     assetType === 'fii' ||
@@ -20,6 +24,16 @@ function allowsShortPosition(assetType: string, ticker: string): boolean {
     assetType === 'option_put' ||
     isOptionTicker(ticker)
   );
+}
+
+/**
+ * Caixa pode ficar negativo via overdraft de garantia B3 (D+1/D+3 entre
+ * exercício e liberação de garantia) ou via cheque especial da corretora.
+ * Não confundir com venda a descoberto.
+ */
+function allowsNegativeBalance(assetType: string, ticker: string): boolean {
+  if (isCashAsset(assetType, ticker)) return true;
+  return allowsShortPosition(assetType, ticker);
 }
 
 export type LedgerEvent = {
@@ -174,7 +188,7 @@ export function rebuildCustodyFromLedger(entries: LedgerEvent[]): CustodyRebuild
   const assets: AssetCustodyState[] = [];
   for (const s of states.values()) {
     if (Math.abs(s.qty) < 1e-9) continue;
-    if (s.qty < 0 && !allowsShortPosition(s.assetType, s.ticker)) continue;
+    if (s.qty < 0 && !allowsNegativeBalance(s.assetType, s.ticker)) continue;
     const absQty = Math.abs(s.qty);
     const quantity = Math.round(s.qty * 10000) / 10000;
     const avgPrice = Math.round((absQty > 0 ? s.totalCost / absQty : 0) * 10000) / 10000;
