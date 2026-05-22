@@ -239,48 +239,6 @@
   color: var(--color-accent);
 }
 
-.shell .impersonate-combo {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  width: 240px;
-  height: 28px;
-  outline: none;
-}
-
-.shell .impersonate-combo:focus {
-  border-color: var(--color-accent);
-}
-
-.shell .impersonate-combo:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.shell .btn-entrar {
-  background: rgba(218, 177, 119, 0.8);
-  color: #000;
-  border: none;
-  padding: 0 16px;
-  height: 28px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.shell .btn-entrar:hover:not(:disabled) {
-  background: var(--color-accent);
-}
-
-.shell .btn-entrar:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 .shell .content {
   padding: 28px 40px;
@@ -305,6 +263,24 @@
   flex-shrink: 0;
 }
 
+/* Container das colunas de personificação — NUNCA quebra linha */
+.shell .impersonate-cols {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+
+/* Cada coluna: label em cima, combo embaixo */
+.shell .impersonate-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+
 .shell .impersonate-status {
   font-size: 12px;
   color: var(--color-text-muted);
@@ -314,8 +290,10 @@
 
 .shell .impersonate-label {
   color: var(--color-accent);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .shell .impersonate-combo {
