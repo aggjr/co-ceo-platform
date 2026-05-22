@@ -88,6 +88,7 @@ export class InvestQuoteSyncService {
       await this.gateway.update(ctx, 'invest_assets', String(row.id), {
         metadata: JSON.stringify(meta),
       });
+      await this.mirrorQuoteToPositionExt(ctx, ticker, q.price, q.asOf);
       updated += 1;
     }
 
@@ -147,8 +148,48 @@ export class InvestQuoteSyncService {
       await this.gateway.update(ctx, 'invest_assets', String(row.id), {
         metadata: JSON.stringify(meta),
       });
+      if (hasPrice) {
+        await this.mirrorQuoteToPositionExt(ctx, ticker, lastPrice, asOfDay);
+      }
       n += 1;
     }
     return n;
+  }
+
+  /**
+   * Espelha cotacao em invest_position_ext.last_price (novo modelo). Idempotente:
+   * se o patrimony_item ainda nao existe, o CoreModelSync vai criar — entao a
+   * proxima execucao ja achara o registro para atualizar.
+   */
+  private async mirrorQuoteToPositionExt(
+    ctx: UserContext,
+    ticker: string,
+    lastPrice: number,
+    asOf: string
+  ): Promise<void> {
+    if (!ctx.organizationId) return;
+    const item = await this.gateway.findWhere(
+      ctx,
+      'patrimony_items',
+      {
+        organization_id: ctx.organizationId,
+        source_module: 'INVEST',
+        identifier: ticker,
+      },
+      { limit: 1 }
+    );
+    if (!item.length) return;
+    const itemId = String(item[0].id);
+    const ext = await this.gateway.findWhere(
+      ctx,
+      'invest_position_ext',
+      { patrimony_item_id: itemId },
+      { limit: 1 }
+    );
+    if (!ext.length) return;
+    await this.gateway.update(ctx, 'invest_position_ext', itemId, {
+      last_price: lastPrice,
+      last_price_as_of: asOf.slice(0, 10),
+    });
   }
 }
