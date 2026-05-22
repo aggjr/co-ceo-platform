@@ -165,6 +165,7 @@ export class LedgerImportService {
       const qty = Math.abs(norm.quantity);
       const price = norm.unit_price;
       const gross = qty * price;
+      const isCashOpening = assetType === 'cash' || ticker.startsWith('CAIXA');
 
       await this.gateway.insert(ctx, 'invest_ledger_entries', {
         id: randomUUID(),
@@ -179,7 +180,7 @@ export class LedgerImportService {
         brokerage_fee: 0,
         b3_fees: 0,
         irrf_tax: 0,
-        total_net_value: -gross,
+        total_net_value: isCashOpening ? gross : -gross,
         impacts_managerial_price: true,
         broker_note_ref: null,
         source_batch_id: batchId,
@@ -322,6 +323,8 @@ export class LedgerImportService {
       const qty = Math.abs(norm.quantity);
       const price = norm.unit_price;
       const gross = qty * price;
+      // Caixa na abertura é saldo positivo (entrada). Ativos: caixa "saiu" para compra (negativo).
+      const isCashOpening = assetType === 'cash' || ticker.startsWith('CAIXA');
 
       await this.gateway.insert(ctx, 'invest_ledger_entries', {
         id: randomUUID(),
@@ -336,7 +339,7 @@ export class LedgerImportService {
         brokerage_fee: 0,
         b3_fees: 0,
         irrf_tax: 0,
-        total_net_value: -gross,
+        total_net_value: isCashOpening ? gross : -gross,
         impacts_managerial_price: true,
         broker_note_ref: OPENING_BATCH_REF,
         source_batch_id: batchId,
