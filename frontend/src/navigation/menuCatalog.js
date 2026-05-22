@@ -63,8 +63,18 @@ export const MENU_CATALOG = [
         resourceKey: 'screen.invest.dashboard',
       },
       {
-        label: 'Portfólio',
+        label: 'AÇÕES/FIIs',
         path: '/invest/portfolio',
+        resourceKey: 'screen.invest.portfolio',
+      },
+      {
+        label: 'Opções',
+        path: '/invest/opcoes',
+        resourceKey: 'screen.invest.portfolio',
+      },
+      {
+        label: 'Títulos, RF e CDB',
+        path: '/invest/titulos',
         resourceKey: 'screen.invest.portfolio',
       },
       {

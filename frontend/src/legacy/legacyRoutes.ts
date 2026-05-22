@@ -27,6 +27,8 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/cockpit/client/storage', loader: ClientCockpitPage },
   { path: '/invest', loader: InvestDashboardPage },
   { path: '/invest/portfolio', loader: InvestPortfolioPage },
+  { path: '/invest/opcoes', loader: InvestPortfolioPage },
+  { path: '/invest/titulos', loader: InvestPortfolioPage },
   { path: '/invest/carteira-acoes-fiis', loader: InvestPortfolioPage },
   { path: '/invest/resultado', loader: InvestPortfolioPage },
   { path: '/invest/ganhos-por-acao', loader: InvestStockGainPivotPage },

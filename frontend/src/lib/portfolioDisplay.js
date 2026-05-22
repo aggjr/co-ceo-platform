@@ -415,6 +415,21 @@ export function buildInvestOptionsColumns() {
       },
     },
     {
+      key: 'cv',
+      label: 'C/V',
+      type: 'text',
+      width: '48px',
+      align: 'center',
+      render: (row) => {
+        const span = document.createElement('span');
+        const q = Number(row.quantity);
+        span.textContent = q > 0 ? 'C' : q < 0 ? 'V' : '—';
+        span.style.fontWeight = '600';
+        span.className = q > 0 ? 'portfolio-pnl--up' : q < 0 ? 'portfolio-pnl--down' : 'muted';
+        return span;
+      },
+    },
+    {
       key: 'optionExpiryDate',
       label: 'Vencimento',
       type: 'date',
@@ -635,6 +650,21 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
         }
         el.innerHTML = html;
         return el;
+      },
+    },
+    {
+      key: 'cv',
+      label: 'C/V',
+      type: 'text',
+      width: '48px',
+      align: 'center',
+      render: (row) => {
+        const span = document.createElement('span');
+        const q = Number(row.quantity);
+        span.textContent = q > 0 ? 'C' : q < 0 ? 'V' : '—';
+        span.style.fontWeight = '600';
+        span.className = q > 0 ? 'portfolio-pnl--up' : q < 0 ? 'portfolio-pnl--down' : 'muted';
+        return span;
       },
     },
     {
@@ -888,15 +918,11 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
 let portfolioTableSeq = 0;
 
 function buildSheetCaption(title, items, sheetKey) {
-  const n = items.length;
-  let caption = `${title} <span class="muted">(${n})</span>`;
-  if (sheetKey === 'options' && n > 0) {
-    const callTotal = sumShortCallQtyAbs(items);
-    if (callTotal > 0) {
-      caption += ` <span class="portfolio-options-call-total muted">— CALL vendidas: <strong>${formatNumber(callTotal, 0)}</strong></span>`;
-    }
+  if (sheetKey === 'options') {
+    return title;
   }
-  return caption;
+  const n = items.length;
+  return `${title} <span class="muted">(${n})</span>`;
 }
 
 function renderTableSection(
@@ -1167,7 +1193,6 @@ function renderCashTransitInner(cashStatementBalance, cashInTransit) {
   `;
 }
 
-/** Tela Portfólio: ações/FIIs, opções (venc. &gt; hoje), caixa/trânsito. */
 export function renderInvestPortfolioPage(
   items,
   underlyingFilter = '',
@@ -1178,7 +1203,6 @@ export function renderInvestPortfolioPage(
   const openItems = filterOpenPortfolioItems(items);
   const filtered = filterByUnderlying(openItems, underlyingFilter);
   const { equities } = splitPortfolioBySheet(filtered);
-  const options = filterOptionsVencimentoAfterToday(filtered);
   const coverageOptions = collectCallCoverageOptionRows(openItems, null);
 
   const filterNote = underlyingFilter
@@ -1195,16 +1219,44 @@ export function renderInvestPortfolioPage(
     coverageOptions,
   });
 
-  const optionsSection = renderTableSection('Opções com vencimento &gt; hoje', options, {
+  return `${filterNote}${equitySection}`;
+}
+
+export function renderInvestOpcoesPage(
+  items,
+  underlyingFilter = ''
+) {
+  clearCoCeoExcelMounts();
+  portfolioTableSeq = 0;
+  const openItems = filterOpenPortfolioItems(items);
+  const filtered = filterByUnderlying(openItems, underlyingFilter);
+  const options = filterOptionsVencimentoAfterToday(filtered);
+  const coverageOptions = collectCallCoverageOptionRows(openItems, null);
+
+  const filterNote = underlyingFilter
+    ? `<p class="portfolio-filter-active muted">Filtro: <strong>${underlyingFilter}</strong></p>`
+    : '';
+
+  const optionsSection = renderTableSection('Opções Vigentes', options, {
     showUnderlying: true,
     showExpiryColumn: true,
     emptyLabel: underlyingFilter
-      ? 'Nenhuma opção com vencimento futuro para este filtro.'
-      : 'Nenhuma opção com vencimento após hoje.',
+      ? 'Nenhuma opção vigente para este filtro.'
+      : 'Nenhuma opção vigente (vencimento após hoje).',
     sheetKey: 'options',
     allOptions: options,
     coverageOptions,
   });
+
+  return `${filterNote}${optionsSection}`;
+}
+
+export function renderInvestTitulosPage(
+  items,
+  { cashStatementBalance = 0, cashInTransit = null } = {}
+) {
+  clearCoCeoExcelMounts();
+  portfolioTableSeq = 0;
 
   const cashSection = renderCashLikePortfolioSection(
     items,
@@ -1212,7 +1264,7 @@ export function renderInvestPortfolioPage(
     cashInTransit
   );
 
-  return `${filterNote}${equitySection}${optionsSection}${cashSection}`;
+  return cashSection;
 }
 
 /** Somente ações e FIIs em custódia aberta (legado). */

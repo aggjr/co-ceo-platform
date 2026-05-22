@@ -9,12 +9,14 @@ import {
   getUnderlyingFilter,
   mountPortfolioExcelTables,
   renderInvestPortfolioPage,
+  renderInvestOpcoesPage,
+  renderInvestTitulosPage,
   renderPortfolioPatrimonyHeader,
   renderUnderlyingFilterSelect,
   setUnderlyingFilter,
 } from '../lib/portfolioDisplay.js';
 
-function bindPortfolioView(container, items, cashMeta) {
+function bindPortfolioView(container, items, cashMeta, pageType) {
   const patrimonyHost = container.querySelector('#portfolio-patrimony-host');
   const host = container.querySelector('#portfolio-positions');
   const filterEl = container.querySelector('#portfolio-underlying-filter');
@@ -22,11 +24,17 @@ function bindPortfolioView(container, items, cashMeta) {
 
   const paint = () => {
     const underlying = getUnderlyingFilter();
-    const totals = computePortfolioPatrimonyFromTables(items, underlying, cashMeta);
-    if (patrimonyHost) {
+    if (pageType === 'equities' && patrimonyHost) {
+      const totals = computePortfolioPatrimonyFromTables(items, underlying, cashMeta);
       patrimonyHost.innerHTML = renderPortfolioPatrimonyHeader(totals);
     }
-    host.innerHTML = renderInvestPortfolioPage(items, underlying, cashMeta);
+    if (pageType === 'options') {
+      host.innerHTML = renderInvestOpcoesPage(items, underlying);
+    } else if (pageType === 'titulos') {
+      host.innerHTML = renderInvestTitulosPage(items, cashMeta);
+    } else {
+      host.innerHTML = renderInvestPortfolioPage(items, underlying, cashMeta);
+    }
     mountPortfolioExcelTables(host);
   };
 
@@ -44,17 +52,33 @@ export async function InvestPortfolioPage(container) {
     return;
   }
 
+  const path = window.location.pathname;
+  let pageType = 'equities';
+  if (path.includes('/invest/opcoes')) pageType = 'options';
+  else if (path.includes('/invest/titulos')) pageType = 'titulos';
+
   const underlyingFilter = getUnderlyingFilter();
-  let body = '<p class="muted">Carregando portfólio...</p>';
+  
+  let pageTitle = 'AÇÕES/FIIs';
+  let pageSubtitle = 'Ações e FIIs em custódia aberta.';
+  if (pageType === 'options') {
+    pageTitle = 'Opções';
+    pageSubtitle = 'Opções vigentes com vencimento futuro.';
+  } else if (pageType === 'titulos') {
+    pageTitle = 'Títulos, RF e CDB';
+    pageSubtitle = 'Conta corrente, ativos de baixo risco e trânsito.';
+  }
+
+  let body = `<p class="muted">Carregando ${pageTitle.toLowerCase()}...</p>`;
 
   if (isGlobalSession()) {
     body = `
       <div class="card">
-        <h2 style="font-size:16px;margin-bottom:8px">Portfólio</h2>
+        <h2 style="font-size:16px;margin-bottom:8px">${pageTitle}</h2>
         <p class="muted">Personifique o titular da holding para ver a carteira.</p>
       </div>
     `;
-    await renderShell(container, { title: 'INVEST — Portfólio', contentHtml: body });
+    await renderShell(container, { title: `INVEST — ${pageTitle}`, contentHtml: body });
     return;
   }
 
@@ -70,27 +94,27 @@ export async function InvestPortfolioPage(container) {
       <div class="card">
         <div class="portfolio-toolbar">
           <div>
-            <h2>Portfólio</h2>
+            <h2>${pageTitle}</h2>
             <p class="muted" style="margin:4px 0 0">
-              Ações/FIIs e opções com risco de mercado; caixa e baixo risco (conta, CDB, Tesouro) + trânsito.
+              ${pageSubtitle}
             </p>
           </div>
           <div class="portfolio-toolbar-actions">
             ${renderUnderlyingFilterSelect(items, underlyingFilter)}
           </div>
         </div>
-        <div id="portfolio-patrimony-host"></div>
+        ${pageType === 'equities' ? '<div id="portfolio-patrimony-host"></div>' : ''}
         <div id="portfolio-positions"></div>
       </div>
     `;
 
     await renderShell(container, {
-      title: 'INVEST — Portfólio',
+      title: `INVEST — ${pageTitle}`,
       contentHtml: body,
     });
-    bindPortfolioView(container, items, cashMeta);
+    bindPortfolioView(container, items, cashMeta, pageType);
   } catch (err) {
-    body = `<div class="error-banner">${err.message || 'Não foi possível carregar o portfólio.'}</div>`;
-    await renderShell(container, { title: 'INVEST — Portfólio', contentHtml: body });
+    body = `<div class="error-banner">${err.message || `Não foi possível carregar ${pageTitle}.`}</div>`;
+    await renderShell(container, { title: `INVEST — ${pageTitle}`, contentHtml: body });
   }
 }
