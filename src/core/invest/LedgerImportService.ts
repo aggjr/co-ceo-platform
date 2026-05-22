@@ -14,20 +14,12 @@ import {
   type OpeningImportPayload,
 } from './ledgerTypes';
 import { CoreModelSync } from '../../modules/invest/sync/CoreModelSync';
+import { LedgerEventProjection } from '../../modules/invest/sync/LedgerEventProjection';
 
 /** Abertura de custódia — fonte BTG/Necton (não myProfit). */
 const OPENING_BATCH_REF = 'OPENING-BTG-2026-01-01';
 const LEGACY_OPENING_BATCH_REF = 'OPENING-MYPROFIT-2025-12-31';
 import { syncAutoPendingSettlements } from './AutoPendingSettlementSync';
-
-function normalizeLedgerDate(value: unknown): string {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
-  }
-  const s = String(value ?? '').trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  return s.slice(0, 10);
-}
 
 function parseDate(value: string): string {
   const d = value.trim().slice(0, 10);
@@ -142,9 +134,11 @@ async function ensureAsset(
 
 export class LedgerImportService {
   private readonly coreSync: CoreModelSync;
+  private readonly projection: LedgerEventProjection;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.coreSync = new CoreModelSync(gateway);
+    this.projection = new LedgerEventProjection(gateway);
   }
 
   async importPortfolio(ctx: UserContext, payload: LedgerImportPayload) {
@@ -518,41 +512,22 @@ export class LedgerImportService {
     });
   }
 
+  /**
+   * Fonte unica de leitura para os engines (CustodyEngine, threePricesEngine,
+   * PnLPivotEngine, PatrimonyMtmDailyEngine). Le do nucleo patrimonial via
+   * LedgerEventProjection — patrimony_ledger_entries + financial_ledger_entries
+   * sao reconstruidos no shape LedgerEvent que os engines consomem.
+   *
+   * Toda escrita no legado dispara CoreModelSync.syncFromLegacy no fim de
+   * importPortfolio/importOpeningOnly/importEntriesOnly, mantendo o nucleo
+   * sempre atualizado.
+   */
   async listLedgerEvents(
     ctx: UserContext,
     from: string,
     to: string
   ): Promise<LedgerEvent[]> {
-    const orgId = ctx.organizationId;
-    if (!orgId) {
-      throw new GatewayError('INVALID_CONTEXT', 'Organização obrigatória.', 400);
-    }
-    const rows = await this.gateway.readQuery(ctx, 'invest_ledger_with_assets', [
-      orgId,
-      from,
-      to,
-    ]);
-    return rows.map((r) => ({
-      id: String(r.id),
-      transaction_date: normalizeLedgerDate(r.transaction_date),
-      broker_note_ref: r.broker_note_ref ? String(r.broker_note_ref) : null,
-      notes: r.notes ? String(r.notes) : null,
-      asset_id: String(r.asset_id),
-      asset_ticker: String(r.asset_ticker),
-      asset_type: String(r.asset_type),
-      underlying_ticker: r.underlying_ticker ? String(r.underlying_ticker) : null,
-      transaction_type: String(r.transaction_type),
-      quantity: Number(r.quantity),
-      unit_price: Number(r.unit_price),
-      total_net_value: Number(r.total_net_value),
-      brokerage_fee: Number(r.brokerage_fee ?? 0),
-      b3_fees: Number(r.b3_fees ?? 0),
-      irrf_tax: Number(r.irrf_tax ?? 0),
-      impacts_managerial_price:
-        r.impacts_managerial_price == null
-          ? null
-          : Boolean(r.impacts_managerial_price),
-    }));
+    return this.projection.listLedgerEvents(ctx, from, to);
   }
 
   async reconcileCustody(ctx: UserContext) {

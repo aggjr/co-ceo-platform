@@ -225,6 +225,7 @@ export class InvestOperations {
       description: 'Saldo inicial',
       status: 'cleared',
       settlementDate: asOfDate,
+      metadata: { legacy_op: 'opening_balance' },
     });
 
     return { accountId: account.id, entryId: entry.id };
