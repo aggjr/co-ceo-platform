@@ -68,8 +68,9 @@ const TABLES: TableDefinition[] = [
   def('iam_config_audit', 'system', { softDelete: false, countsTowardStorage: false }),
   def('field_permissions', 'tenant', { softDelete: false }),
   def('custom_field_labels', 'tenant', { softDelete: false }),
-  def('invest_assets', 'tenant'),
-  def('invest_ledger_entries', 'tenant'),
+  // invest_assets, invest_ledger_entries: REMOVIDOS — substituidos por
+  // patrimony_items + invest_position_ext + patrimony_ledger_entries +
+  // financial_accounts + financial_ledger_entries.
   def('invest_daily_snapshots', 'tenant', { softDelete: false }),
   def('invest_portfolio_daily', 'tenant', { softDelete: false }),
   def('invest_options_chain', 'global', {

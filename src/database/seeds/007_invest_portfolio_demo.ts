@@ -6,8 +6,8 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import { CoCeoDataGateway } from '../../core/dal';
 import { installerContext } from './lib/installerContext';
-import { ensureInsert } from './lib/seedHelpers';
-import { CoreModelSync } from '../../modules/invest/sync/CoreModelSync';
+import { buildInvestOperations } from '../../modules/invest';
+import type { InvestAssetClass } from '../../modules/invest/types';
 
 dotenv.config();
 
@@ -112,30 +112,28 @@ async function runSeed() {
   });
 
   const gateway = new CoCeoDataGateway(pool);
-  const ctx = installerContext();
+  const ctx = { ...installerContext(), organizationId: HOLDING_ORG_ID };
+  const operations = buildInvestOperations(gateway);
 
   console.log(`[007] Portfólio demo → org ${HOLDING_ORG_ID} (${positions.length} posições)...`);
 
+  const asOfDate = new Date().toISOString().slice(0, 10);
+  let inserted = 0;
   for (const pos of positions) {
-    await ensureInsert(gateway, ctx, 'invest_assets', pos.id, {
-      organization_id: HOLDING_ORG_ID,
-      asset_ticker: pos.asset_ticker,
-      asset_type: pos.asset_type,
-      current_quantity: pos.current_quantity,
-      managerial_avg_price: pos.managerial_avg_price,
-      metadata: JSON.stringify(pos.metadata),
-      status: 'active',
+    const result = await operations.recordOperation(ctx, {
+      date: asOfDate,
+      ticker: pos.asset_ticker,
+      operation: 'opening_balance',
+      quantity: pos.current_quantity,
+      unit_price: pos.managerial_avg_price,
+      asset_type: pos.asset_type as InvestAssetClass,
+      notes: 'Seed demo',
+      broker_note_ref: `SEED-DEMO:${pos.asset_ticker}`,
     });
+    if (!result.skipped) inserted += 1;
   }
 
-  console.log('Portfolio demo inserido (ids estaveis — reexecutar eh idempotente).');
-
-  const syncCtx = { ...ctx, organizationId: HOLDING_ORG_ID };
-  const sync = new CoreModelSync(gateway);
-  const result = await sync.syncFromLegacy(syncCtx);
-  console.log(
-    `[007] Projetado no nucleo: items=${result.itemsUpserted} ledger=${result.patrimonyLedgerInserted} cash=${result.accountsUpserted} fin=${result.financialLedgerInserted}`
-  );
+  console.log(`[007] ${inserted} ativos inseridos no nucleo (reexecutar eh idempotente).`);
 
   await pool.end();
 }

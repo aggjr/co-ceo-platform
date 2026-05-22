@@ -230,16 +230,37 @@ Antes deste documento, INVEST tinha:
 
 Tudo isso é removido na migração para este modelo.
 
-## Estado da migração (vivo neste branch)
+## Estado da migração (concluído)
 
-A transição do schema legado para o canônico é progressiva. Hoje os dois schemas coexistem e a sincronia é garantida por dois adaptadores espelhados:
+O regime de espelho legado/núcleo foi removido. A fonte única de verdade é o
+núcleo canônico:
 
-- **`LegacyMirror`** (`src/modules/invest/legacy/LegacyMirror.ts`) — sentido NÚCLEO → LEGADO. Toda escrita feita via `InvestOperations` é espelhada em `invest_assets` / `invest_ledger_entries` com `broker_note_ref = 'MIRROR-FROM-CORE'` (constante `LegacyMirror.MIRROR_REF`).
-- **`CoreModelSync`** (`src/modules/invest/sync/CoreModelSync.ts`) — sentido LEGADO → NÚCLEO. Roda no fim de cada `LedgerImportService.importPortfolio/importOpeningOnly/importEntriesOnly` e projeta `invest_assets`/`invest_ledger_entries` em `patrimony_items` + `invest_position_ext` + `financial_accounts` + `patrimony_ledger_entries` + `financial_ledger_entries`. Idempotente:
-  - Marca cada lançamento projetado com `external_ref = 'LEGACY:<legacy_id>'`.
-  - Pula entradas cujo `broker_note_ref` começa com `MIRROR-FROM-CORE` (já vieram do núcleo).
-- **`InvestQuoteSyncService`** atualiza `metadata.last_price` em `invest_assets` (legado) e espelha em `invest_position_ext.last_price` no núcleo.
+- **Escrita**: `LedgerImportService.importPortfolio/importOpeningOnly/importEntriesOnly`
+  e `InvestOperations.recordOpeningPosition/recordOpeningCash/recordOperation`
+  gravam DIRETO em `patrimony_items`, `invest_position_ext`, `invest_option_ext`,
+  `financial_accounts`, `patrimony_ledger_entries` e `financial_ledger_entries`.
+- **Leitura para engines** (`CustodyEngine`, `threePricesEngine`, `PnLPivotEngine`,
+  `PatrimonyMtmDailyEngine`): `LedgerImportService.listLedgerEvents` →
+  `LedgerEventProjection` reconstrói `LedgerEvent[]` a partir do núcleo. Os
+  engines não sabem que o schema mudou.
+- **Leitura de ativos no formato legado** (controllers e serviços que pediam
+  `findWhere('invest_assets')`): `InvestAssetProjection.listActiveAssets`
+  monta o mesmo shape lendo de `patrimony_items` + `invest_position_ext` +
+  `invest_option_ext` + `financial_accounts`.
+- **Cotações** (`InvestQuoteSyncService`): grava `last_price` em
+  `invest_position_ext.last_price` e strikes de opção em
+  `invest_option_ext.strike_price`. Sem mais escrita no metadata legado.
 
-**Engines de leitura** (`CustodyEngine`, `threePricesEngine`, `PnLPivotEngine`, `PatrimonyMtmDailyEngine`) ainda consomem o schema legado. Cada um deles vai ser portado para ler do núcleo em iterações futuras; quando o último for migrado, removem-se `LegacyMirror` + `CoreModelSync` e dropam-se `invest_assets`, `invest_ledger_entries`, `invest_daily_snapshots`, `invest_portfolio_daily`.
+Tabelas removidas (migration `15_drop_legacy_invest_tables.sql`):
+- `invest_assets`
+- `invest_ledger_entries`
+- view `invest_ledger_with_assets`
 
-Critério de saída do regime de espelho: nenhum engine/serviço consultando `invest_assets` ou `invest_ledger_entries` diretamente.
+Tabelas mantidas (caches/projeções derivadas, ainda úteis):
+- `invest_portfolio_daily` — série diária consolidada de patrimônio (otimização
+  de leitura para o histórico).
+- `invest_daily_snapshots` — snapshots históricos de cotações (auditoria).
+
+Idempotência: `InvestOperations.recordOperation` usa
+`external_ref = 'BROKER_REF:<broker_note_ref>'` para evitar reimport
+duplicado da mesma nota.

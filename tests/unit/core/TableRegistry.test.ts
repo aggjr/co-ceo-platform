@@ -6,14 +6,14 @@ describe('TableRegistry', () => {
     expect(() => TableRegistry.assertRegistered('tabela_inexistente')).toThrow(GatewayError);
   });
 
-  it('registra invest_assets', () => {
-    const t = TableRegistry.assertRegistered('invest_assets');
+  it('registra patrimony_items (nucleo canonico)', () => {
+    const t = TableRegistry.assertRegistered('patrimony_items');
     expect(t.kind).toBe('tenant');
     expect(t.softDelete).toBe(true);
   });
 
   it('bloqueia organization_id no payload do cliente', () => {
-    const t = TableRegistry.assertRegistered('invest_assets');
+    const t = TableRegistry.assertRegistered('patrimony_items');
     expect(() =>
       TableRegistry.filterWritablePayload(t, { organization_id: 'hack' }, { isInstaller: false })
     ).toThrow(GatewayError);

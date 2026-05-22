@@ -98,7 +98,7 @@ export class InvestController {
       const filtered = await FieldPolicyService.filterRowForRead(
         ctx.roleId,
         ctx.organizationId,
-        'invest_assets',
+        'patrimony_items',
         row
       );
       const meta =

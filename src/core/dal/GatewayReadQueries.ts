@@ -22,8 +22,6 @@ export type GatewayReadQueryKey =
   | 'cockpit_client_org_tree'
   | 'cockpit_impersonation_targets'
   | 'cockpit_contract_team'
-  | 'invest_ledger_with_assets'
-  | 'invest_ledger_note_refs'
   | 'invest_portfolio_daily_range'
   | 'invest_portfolio_daily_before';
 
@@ -212,28 +210,6 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
           LEFT JOIN roles r ON r.id = ur.role_id
           WHERE cu.contract_id = ?
           GROUP BY cu.user_id, cu.status, cu.default_organization_id, u.email, u.full_name`,
-  },
-  invest_ledger_with_assets: {
-    sql: `SELECT e.id, e.organization_id, e.asset_id, e.underlying_ticker, e.transaction_date,
-                 e.transaction_type, e.quantity, e.unit_price, e.total_gross_value,
-                 e.brokerage_fee, e.b3_fees, e.irrf_tax, e.total_net_value,
-                 e.impacts_managerial_price, e.broker_note_ref, e.notes, e.created_at,
-                 a.asset_ticker, a.asset_type
-          FROM invest_ledger_entries e
-          INNER JOIN invest_assets a ON a.id = e.asset_id AND a.deleted_at IS NULL
-          WHERE e.organization_id = ?
-            AND e.transaction_date >= ?
-            AND e.transaction_date <= ?
-            AND e.deleted_at IS NULL
-          ORDER BY e.transaction_date ASC, e.created_at ASC`,
-  },
-  invest_ledger_note_refs: {
-    sql: `SELECT DISTINCT broker_note_ref
-          FROM invest_ledger_entries
-          WHERE organization_id = ?
-            AND broker_note_ref IS NOT NULL
-            AND broker_note_ref <> ''
-            AND deleted_at IS NULL`,
   },
   invest_portfolio_daily_range: {
     sql: `SELECT id, organization_id, snapshot_date, patrimony, patrimony_gross, cash,

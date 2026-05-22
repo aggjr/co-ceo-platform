@@ -174,14 +174,14 @@ export class CockpitController {
   /** Exemplo: leitura de registro com máscara de campos */
   getInvestAssetMasked = async (req: Request, res: Response) => {
     const ctx = req.userContext!;
-    const row = await this.gateway.findById(ctx, 'invest_assets', req.params.id);
+    const row = await this.gateway.findById(ctx, 'patrimony_items', req.params.id);
     if (!row) {
       return res.status(404).json({ success: false, error: 'Não encontrado.' });
     }
     const filtered = await FieldPolicyService.filterRowForRead(
       ctx.roleId,
       ctx.organizationId,
-      'invest_assets',
+      'patrimony_items',
       row
     );
     return res.json({ success: true, data: filtered });
