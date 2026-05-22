@@ -1,4 +1,12 @@
-node_modules/
+node_modules
+
+# Sem dados de runtime no repositório
+# (ver .cursor/rules/no-runtime-data-files.mdc)
+data/invest/
+data/**/*.json
+data/**/*.pdf
+data/**/sources/
+frontend/public/data/
 dist/
 frontend/dist/
 coverage/
@@ -7,6 +15,8 @@ reports/
 .env
 config/deploy-credentials.env
 config/easypanel-app.env
+config/easypanel-ambiente-FASE2-COLE-AQUI.txt
+config/easypanel-ambiente-COLE-AQUI.txt
 deploy-credentials.env
 .claude/settings.local.json
 *.log
