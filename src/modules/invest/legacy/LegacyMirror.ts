@@ -113,12 +113,18 @@ export class LegacyMirror {
       irrf_tax: 0,
       total_net_value: signedNet,
       impacts_managerial_price: true,
-      broker_note_ref: null,
+      broker_note_ref: LegacyMirror.MIRROR_REF,
       source_batch_id: sourceBatchId,
       notes: input.notes ?? 'Saldo inicial',
     };
     await this.gateway.insert(ctx, 'invest_ledger_entries', payload);
   }
+
+  /**
+   * Marca os lançamentos gerados pelo mirror (NOVO -> LEGADO) para que o
+   * CoreModelSync (LEGADO -> NOVO) saiba que não precisa reprocessá-los.
+   */
+  static readonly MIRROR_REF = 'MIRROR-FROM-CORE';
 
   private buildLegacyMetadata(input: OpeningPositionInput): string | null {
     if (

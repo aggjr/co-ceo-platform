@@ -13,6 +13,7 @@ import {
   type LedgerImportPayload,
   type OpeningImportPayload,
 } from './ledgerTypes';
+import { CoreModelSync } from '../../modules/invest/sync/CoreModelSync';
 
 /** Abertura de custódia — fonte BTG/Necton (não myProfit). */
 const OPENING_BATCH_REF = 'OPENING-BTG-2026-01-01';
@@ -140,7 +141,11 @@ async function ensureAsset(
 }
 
 export class LedgerImportService {
-  constructor(private readonly gateway: CoCeoDataGateway) {}
+  private readonly coreSync: CoreModelSync;
+
+  constructor(private readonly gateway: CoCeoDataGateway) {
+    this.coreSync = new CoreModelSync(gateway);
+  }
 
   async importPortfolio(ctx: UserContext, payload: LedgerImportPayload) {
     const orgId = ctx.organizationId;
@@ -261,6 +266,7 @@ export class LedgerImportService {
 
     const reconcile = await this.reconcileCustody(ctx);
     const pendingSync = await this.syncAutoPendingSettlements(ctx);
+    await this.coreSync.syncFromLegacy(ctx);
     return {
       batchId,
       inserted,
@@ -386,6 +392,7 @@ export class LedgerImportService {
     }
 
     const reconcile = await this.reconcileCustody(ctx);
+    await this.coreSync.syncFromLegacy(ctx);
     return { batchId, inserted, skipped, openingDate, reconcile };
   }
 
@@ -486,6 +493,7 @@ export class LedgerImportService {
     }
 
     const reconcile = await this.reconcileCustody(ctx);
+    await this.coreSync.syncFromLegacy(ctx);
     return { batchId, inserted, skipped, reconcile };
   }
 
