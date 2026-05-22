@@ -37,11 +37,22 @@ Ou use o script:
 
 Lê `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` do `.env` na raiz do projeto.
 
+## Importar como `co_ceo_platform` (EasyPanel / deploy novo)
+
+O dump no repo ainda declara `co_ceo_db`. Para o schema novo:
+
+```bash
+# .env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME=co_ceo_platform
+node scripts/import-full-dump.js
+```
+
+Ver também [docs/DEPLOY_EASYPANEL.md](../../docs/DEPLOY_EASYPANEL.md).
+
 ## Após importar no servidor novo
 
-1. Ajuste `.env` do app: `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME=co_ceo_db`
+1. Ajuste `.env` do app: `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME=co_ceo_platform` (ou `co_ceo_db` se for legado)
 2. `JWT_SECRET` pode ser o mesmo ou novo (tokens antigos invalidam se mudar)
-3. Suba API + frontend: `npm run dev`
+3. Suba API + frontend: `npm run build && npm start` (produção) ou `npm run dev` (local)
 
 ## Segurança
 

@@ -25,7 +25,11 @@
     "seed:portfolio": "node ./node_modules/ts-node/dist/bin.js src/database/seeds/007_invest_portfolio_demo.ts",
     "record:patrimony:daily": "node ./node_modules/ts-node/dist/bin.js scripts/record-daily-patrimony.ts",
     "fetch:b3:quotes": "node ./node_modules/ts-node/dist/bin.js scripts/fetch-b3-quotes.ts",
-    "invest:daily-close": "node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts"
+    "invest:daily-close": "node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts",
+    "db:import:full": "node scripts/import-full-dump.js"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
