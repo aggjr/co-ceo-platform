@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import type { CoCeoDataGateway, UserContext, SecurePayload } from '../../core/dal';
 import { GatewayError } from '../../core/dal/errors';
 import type { InventoryLedger, InventoryRegistry } from '../../core/inventory';
@@ -12,6 +13,7 @@ import type {
   OpeningBatchResult,
   OpeningPositionInput,
 } from './types';
+import { LegacyMirror } from './legacy/LegacyMirror';
 
 /**
  * Orquestrador do modulo INVEST: combina o nucleo (inventory + financial) com
@@ -22,13 +24,17 @@ import type {
  * (que sera reconstruido como camada de compatibilidade chamando isto aqui).
  */
 export class InvestOperations {
+  private readonly legacyMirror: LegacyMirror;
+
   constructor(
     private readonly gateway: CoCeoDataGateway,
     private readonly inventoryRegistry: InventoryRegistry,
     private readonly inventoryLedger: InventoryLedger,
     private readonly accountRegistry: FinancialAccountRegistry,
     private readonly financialLedger: FinancialLedger
-  ) {}
+  ) {
+    this.legacyMirror = new LegacyMirror(gateway);
+  }
 
   /** Categoria canonica em module_categories.subcategory para cada asset_class. */
   private static subcategoryOf(cls: InvestAssetClass): string {
@@ -108,11 +114,15 @@ export class InvestOperations {
    * Importa um saldo inicial de posicao (acao, opcao, FII, renda fixa).
    * Cria o patrimony_item, registra opening_balance no inventory_ledger e
    * sincroniza invest_position_ext (e invest_option_ext quando aplicavel).
+   *
+   * Espelha em invest_assets/invest_ledger_entries via LegacyMirror para
+   * manter compatibilidade com codigo antigo (will be removed).
    */
   async recordOpeningPosition(
     ctx: UserContext,
     asOfDate: string,
-    input: OpeningPositionInput
+    input: OpeningPositionInput,
+    options: { legacyBatchId?: string } = {}
   ): Promise<{ itemId: string; entryId: string }> {
     if (input.assetClass === 'option_call' || input.assetClass === 'option_put') {
       if (!input.optionUnderlying || !input.optionStrike || !input.optionExpiration) {
@@ -154,6 +164,21 @@ export class InvestOperations {
         strikePrice: input.optionStrike!,
         expirationDate: input.optionExpiration!,
       });
+    }
+
+    if (ctx.organizationId) {
+      const legacyAssetId = await this.legacyMirror.ensureLegacyAsset(
+        ctx,
+        ctx.organizationId,
+        input
+      );
+      await this.legacyMirror.recordLegacyOpeningEntry(
+        ctx,
+        legacyAssetId,
+        asOfDate,
+        input,
+        options.legacyBatchId ?? randomUUID()
+      );
     }
 
     return { itemId: item.id, entryId: entry.id };
@@ -224,13 +249,16 @@ export class InvestOperations {
       totalPatrimony: 0,
     };
 
+    const legacyBatchId = randomUUID();
     for (const p of input.positions) {
       const before = await this.inventoryRegistry.findByIdentifier(
         ctx,
         'INVEST',
         p.ticker
       );
-      const { entryId } = await this.recordOpeningPosition(ctx, input.asOfDate, p);
+      const { entryId } = await this.recordOpeningPosition(ctx, input.asOfDate, p, {
+        legacyBatchId,
+      });
       if (!before) result.patrimonyItemsCreated += 1;
       if (entryId) result.ledgerEntriesCreated += 1;
       const value = p.quantity * p.unitPrice;
