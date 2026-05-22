@@ -6,7 +6,9 @@
 import { parseBrNumber } from './BtgExtractLineParser';
 
 const DATE_LINE = /^(\d{2})\/(\d{2})\/(\d{4})\s*(.*)$/;
-const BR_AMOUNT = /\d{1,3}(?:\.\d{3})*,\d{2}/g;
+// Sinal negativo opcional ANTES do numero. Saldo do BTG fica negativo quando a
+// compra (ex. exercicio de PUT vendida) excede o caixa disponivel.
+const BR_AMOUNT = /-?\d{1,3}(?:\.\d{3})*,\d{2}/g;
 
 export function extractBrAmountsFromGluedLine(line: string): number[] {
   return [...line.matchAll(BR_AMOUNT)].map((m) => parseBrNumber(m[0]));
@@ -19,30 +21,35 @@ export function resolveBalanceAndMovement(
 ): { balance: number; movement: number } {
   const [a, b] = amounts;
   const tol = 0.02;
+  const near = (x: number, y: number) => Math.abs(x - y) <= tol;
   const hi = Math.max(a, b);
   const lo = Math.min(a, b);
 
-  /** Grande saída: saldo residual (lo) após débito (hi) maior que o saldo anterior. */
-  const near = (a: number, b: number) => Math.abs(a - b) <= tol;
-
-  if (
-    lo > 50 &&
-    lo < previousBalance * 0.01 &&
-    hi > previousBalance * 0.5 &&
-    hi > lo * 10 &&
-    near(Math.abs(previousBalance - lo), hi)
-  ) {
+  // Caso ambíguo: a + b ≈ previousBalance significa que prev = saldo + movimento (saída).
+  // Dois cenários se confundem aqui:
+  //   1) Taxa/IRRF pequeno: hi ≈ prev, lo é o valor da taxa (pequeno em absoluto).
+  //   2) Grande saída (compra TD, transferência): saldo cai para lo (pode ser pequeno
+  //      relativamente, ex. R$ 2.765 de R$ 455k), movimento foi hi.
+  // Heurística: classifica como taxa pequena quando hi/prev > 0.999 OU lo < 100
+  // (taxas costumam ser de poucos reais; grandes saídas deixam resíduo de centenas/milhares).
+  if (near(a + b, previousBalance) && previousBalance > 0) {
+    const hiRatio = hi / previousBalance;
+    if (hiRatio > 0.999 || lo < 100) {
+      return { balance: hi, movement: lo };
+    }
     return { balance: lo, movement: hi };
   }
-  if (hi < previousBalance && near(Math.abs(previousBalance - hi), lo)) {
-    return { balance: hi, movement: lo };
-  }
-  if (hi > previousBalance && near(Math.abs(hi - previousBalance), lo)) {
-    return { balance: hi, movement: lo };
-  }
 
-  if (a >= b) return { balance: a, movement: b };
-  return { balance: b, movement: a };
+  // a = saldo após, b = movimento: |prev - a| ≈ b
+  const fitA = near(Math.abs(previousBalance - a), b);
+  // b = saldo após, a = movimento: |prev - b| ≈ a
+  const fitB = near(Math.abs(previousBalance - b), a);
+
+  if (fitA && !fitB) return { balance: a, movement: b };
+  if (fitB && !fitA) return { balance: b, movement: a };
+
+  // Fallback: assume o maior como saldo (cenário comum de pequenos movimentos).
+  return { balance: hi, movement: lo };
 }
 
 function formatBr(n: number): string {
@@ -65,6 +72,91 @@ function isNoiseLine(line: string): boolean {
   return false;
 }
 
+type RawTuple = {
+  dd: string;
+  mm: string;
+  yyyy: string;
+  description: string;
+  amounts: [number, number];
+};
+
+type Resolution = { balance: number; movement: number };
+
+/**
+ * Resolve toda a sequência de tuplas via backtracking: para cada tupla, tenta
+ * as hipóteses (balance=a, mov=b) e (balance=b, mov=a) que satisfazem
+ * |prev - balance| ≈ mov. Se ambas batem (a + b ≈ prev), explora as duas
+ * recursivamente — a primeira ramificação que chega ao fim sem inconsistência vence.
+ * Cai num fallback heurístico se nenhuma cadeia se completa.
+ */
+/**
+ * Mede quantos passos à frente uma hipótese de saldo (prev) consegue avançar
+ * antes de bater num impasse. Limita profundidade para evitar explosão.
+ */
+function chainLength(
+  prev: number,
+  tuples: RawTuple[],
+  startIdx: number,
+  maxDepth: number
+): number {
+  if (maxDepth === 0 || startIdx >= tuples.length) return 0;
+  const tol = 0.02;
+  const near = (x: number, y: number) => Math.abs(x - y) <= tol;
+  const [a, b] = tuples[startIdx]!.amounts;
+  const fitA = near(Math.abs(prev - a), b);
+  const fitB = near(Math.abs(prev - b), a);
+  if (!fitA && !fitB) return 0;
+  if (fitA && !fitB) {
+    return 1 + chainLength(a, tuples, startIdx + 1, maxDepth - 1);
+  }
+  if (fitB && !fitA) {
+    return 1 + chainLength(b, tuples, startIdx + 1, maxDepth - 1);
+  }
+  // Ambíguo: maior dos dois ramos.
+  const la = chainLength(a, tuples, startIdx + 1, maxDepth - 1);
+  const lb = chainLength(b, tuples, startIdx + 1, maxDepth - 1);
+  return 1 + Math.max(la, lb);
+}
+
+/**
+ * Resolve a sequência inteira de tuplas. Para cada tupla, se a resolução for
+ * ambígua (a + b ≈ prev), escolhe a hipótese cuja cadeia avança mais profundo
+ * sem bater em impasse (lookahead com depth limitado).
+ */
+function resolveSequence(opening: number, tuples: RawTuple[]): Resolution[] {
+  const tol = 0.02;
+  const near = (x: number, y: number) => Math.abs(x - y) <= tol;
+  const LOOKAHEAD = 10;
+
+  const result: Resolution[] = [];
+  let prev = opening;
+
+  for (let i = 0; i < tuples.length; i++) {
+    const [a, b] = tuples[i]!.amounts;
+    const fitA = near(Math.abs(prev - a), b);
+    const fitB = near(Math.abs(prev - b), a);
+
+    let chosen: Resolution;
+    if (fitA && !fitB) {
+      chosen = { balance: a, movement: b };
+    } else if (fitB && !fitA) {
+      chosen = { balance: b, movement: a };
+    } else if (fitA && fitB) {
+      // Ambíguo — usa lookahead para diferenciar.
+      const la = chainLength(a, tuples, i + 1, LOOKAHEAD);
+      const lb = chainLength(b, tuples, i + 1, LOOKAHEAD);
+      if (la >= lb) chosen = { balance: a, movement: b };
+      else chosen = { balance: b, movement: a };
+    } else {
+      // Nem A nem B batem: cai no fallback heurístico.
+      chosen = resolveBalanceAndMovement(prev, [a, b]);
+    }
+    result.push(chosen);
+    prev = chosen.balance;
+  }
+  return result;
+}
+
 /**
  * Converte texto cru do pdf-parse em bloco “Movimentação - Conta Corrente” normalizado.
  */
@@ -76,40 +168,18 @@ export function normalizeBtgExtractPdfText(raw: string): string {
     'Data Descrição Débito Saldo\tCrédito',
   ];
 
-  let prev: number | null = null;
+  let opening: number | null = null;
+  const tuples: RawTuple[] = [];
   let pendingDesc: string | null = null;
 
-  const flushPending = (amountLine: string) => {
-    if (!pendingDesc || prev == null) return false;
-    const amounts = extractBrAmountsFromGluedLine(amountLine);
-    if (amounts.length !== 2) return false;
-    const { balance, movement } = resolveBalanceAndMovement(prev, [
-      amounts[0]!,
-      amounts[1]!,
-    ]);
-    const dateMatch = pendingDesc.match(DATE_LINE);
-    if (!dateMatch) return false;
-    const [, dd, mm, yyyy, rest] = dateMatch;
-    const description = rest.trim();
-    out.push(
-      `${dd}/${mm}/${yyyy} ${description} ${formatBr(balance)}\t${formatBr(movement)}`
-    );
-    prev = balance;
-    pendingDesc = null;
-    return true;
-  };
-
+  // ---- Passada 1: coleta todas as tuplas (data, descrição, [a, b]) sem resolver.
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (isNoiseLine(line)) continue;
 
     if (/Saldo Inicial/i.test(line)) {
       const amounts = extractBrAmountsFromGluedLine(line);
-      const opening = amounts[0];
-      if (opening != null) {
-        prev = opening;
-        out.push(`Saldo Inicial ${formatBr(opening)}`);
-      }
+      if (amounts[0] != null) opening = amounts[0];
       pendingDesc = null;
       continue;
     }
@@ -119,17 +189,16 @@ export function normalizeBtgExtractPdfText(raw: string): string {
     const dateMatch = line.match(DATE_LINE);
     if (dateMatch) {
       const amounts = extractBrAmountsFromGluedLine(line);
-      if (amounts.length >= 2 && prev != null) {
+      if (amounts.length >= 2) {
         const rest = dateMatch[4]!.replace(BR_AMOUNT, '').trim();
-        const { balance, movement } = resolveBalanceAndMovement(prev, [
-          amounts[amounts.length - 2]!,
-          amounts[amounts.length - 1]!,
-        ]);
         const [, dd, mm, yyyy] = dateMatch;
-        out.push(
-          `${dd}/${mm}/${yyyy} ${rest} ${formatBr(balance)}\t${formatBr(movement)}`
-        );
-        prev = balance;
+        tuples.push({
+          dd: dd!,
+          mm: mm!,
+          yyyy: yyyy!,
+          description: rest,
+          amounts: [amounts[amounts.length - 2]!, amounts[amounts.length - 1]!],
+        });
         pendingDesc = null;
         continue;
       }
@@ -139,9 +208,32 @@ export function normalizeBtgExtractPdfText(raw: string): string {
 
     const amounts = extractBrAmountsFromGluedLine(line);
     if (amounts.length === 2 && pendingDesc) {
-      flushPending(line);
-      continue;
+      const dateMatch2 = pendingDesc.match(DATE_LINE);
+      if (dateMatch2) {
+        const [, dd, mm, yyyy, rest] = dateMatch2;
+        tuples.push({
+          dd: dd!,
+          mm: mm!,
+          yyyy: yyyy!,
+          description: rest!.trim(),
+          amounts: [amounts[0]!, amounts[1]!],
+        });
+      }
+      pendingDesc = null;
     }
+  }
+
+  if (opening == null) return out.join('\n');
+  out.push(`Saldo Inicial ${formatBr(opening)}`);
+
+  // ---- Passada 2: resolve toda a sequência via backtracking com lookahead profundo.
+  const resolutions = resolveSequence(opening, tuples);
+  for (let i = 0; i < tuples.length; i++) {
+    const t = tuples[i]!;
+    const r = resolutions[i]!;
+    out.push(
+      `${t.dd}/${t.mm}/${t.yyyy} ${t.description} ${formatBr(r.balance)}\t${formatBr(r.movement)}`
+    );
   }
 
   return out.join('\n');

@@ -20,12 +20,23 @@ describe('btgExtractPdfText', () => {
       movement: 399.48,
     });
     expect(resolveBalanceAndMovement(60955.87, [6795.79, 54160.08])).toEqual({
-      balance: 54160.08,
-      movement: 6795.79,
+      balance: 6795.79,
+      movement: 54160.08,
     });
     expect(resolveBalanceAndMovement(455989.21, [2765.56, 453223.65])).toEqual({
       balance: 2765.56,
       movement: 453223.65,
+    });
+    // Taxa pequena: a+b ≈ prev mas lo << 1% do prev. balance = hi (saldo praticamente
+    // intacto), movement = lo (taxa de R$ 1,72).
+    expect(resolveBalanceAndMovement(6800.77, [6799.05, 1.72])).toEqual({
+      balance: 6799.05,
+      movement: 1.72,
+    });
+    // Corretagem BTC pequena: idem.
+    expect(resolveBalanceAndMovement(226784.76, [226782.72, 2.04])).toEqual({
+      balance: 226782.72,
+      movement: 2.04,
     });
   });
 

@@ -3,10 +3,14 @@ node_modules
 # Sem dados de runtime no repositório
 # (ver .cursor/rules/no-runtime-data-files.mdc)
 data/invest/
+data/btg/
 data/**/*.json
 data/**/*.pdf
+data/**/*.txt
 data/**/sources/
 frontend/public/data/
+dados importação/
+dados\ importação/
 dist/
 frontend/dist/
 coverage/

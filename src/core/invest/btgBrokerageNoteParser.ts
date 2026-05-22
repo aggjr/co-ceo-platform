@@ -163,8 +163,11 @@ function inferCategoryFromPath(filePath: string): BtgNoteCategory {
 function parseTradeLine(line: string): BtgBrokerageNoteTrade | null {
   const trimmed = line.replace(/\s+/g, ' ').trim();
   if (!trimmed.startsWith('1-BOVESPA')) return null;
+  // No PDF cru, o lado (C/V) frequentemente vem colado na palavra seguinte:
+  // "1-BOVESPA VEXERC OPC COMPRA ..." ou "1-BOVESPA VOPCAO DE VENDA ...".
+  // Por isso aceitamos \s* (zero ou mais espaços) entre o C/V e o resto.
   const m = trimmed.match(
-    /^1-BOVESPA\s+([CV])\s+(.+)\s+([\d.]+,\d{2}|\d+,\d{2}|\d+)\s+([\d.,]+)\s+([\d.,]+)\s+([CD])$/
+    /^1-BOVESPA\s+([CV])\s*(.+?)\s+([\d.]+,\d{2}|\d+,\d{2}|\d+)\s+([\d.,]+)\s+([\d.,]+)\s+([CD])$/
   );
   if (!m) return null;
 
@@ -335,7 +338,11 @@ export function parseBtgBrokerageNoteBlocks(
   }
 
   for (const block of blocks) {
-    const noteNumber = block[1] || '';
+    // No PDF cru, "27994603 Nr. nota" vem em UMA linha; em amostras de teste
+    // vem em duas. Tentamos os dois formatos: pega digitos iniciais da segunda
+    // linha do bloco, ou da linha imediatamente antes de "Nr. nota".
+    const firstDigits = (s: string) => (s.match(/^(\d{6,})/) || [, ''])[1] || '';
+    let noteNumber = firstDigits(block[1] || '');
     let sheet = '';
     let pregaoRaw = '';
     let clientCode = '004176105';
@@ -345,11 +352,25 @@ export function parseBtgBrokerageNoteBlocks(
 
     for (let i = 0; i < block.length; i++) {
       const line = block[i];
+      // "<digits> Nr. nota" em UMA linha
+      const numNrInline = line!.match(/^(\d{6,})\s+Nr\.?\s*nota/i);
+      if (numNrInline) noteNumber = numNrInline[1]!;
+      // "Nr. nota" em linha propria, com noteNumber na anterior
+      if (line === 'Nr. nota' && block[i - 1]) {
+        const prev = firstDigits(block[i - 1] || '');
+        if (prev) noteNumber = prev;
+      }
+      // "<sheet> Folha" em UMA linha
+      const folhaInline = line!.match(/^(\d+)\s+Folha/i);
+      if (folhaInline) sheet = folhaInline[1]!;
       if (line === 'Nr. nota' && block[i + 2] === 'Folha') sheet = block[i + 1] || '';
+      // "DD/MM/YYYY Data pregão" em UMA linha
+      const dateInline = line!.match(/^(\d{2}\/\d{2}\/\d{4})\s+Data\s+preg[aã]o/i);
+      if (dateInline) pregaoRaw = dateInline[1]!;
       if (line === 'Data pregão' && block[i - 1]) pregaoRaw = block[i - 1];
-      if (/^004176105$/.test(line)) clientCode = line;
-      if (line.startsWith('Negócios realizados')) inTrades = true;
-      if (line.startsWith('Resumo dos Negócios')) inTrades = false;
+      if (/^004176105$/.test(line!)) clientCode = line!;
+      if (line!.startsWith('Negócios realizados')) inTrades = true;
+      if (line!.startsWith('Resumo dos Negócios')) inTrades = false;
 
       if (inTrades) {
         const trade = parseTradeLine(line);
