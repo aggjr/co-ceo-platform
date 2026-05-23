@@ -39,7 +39,7 @@ function git(cmd: string): string {
 
 function refExists(ref: string): boolean {
   try {
-    git(`git rev-parse --verify ${ref}^{commit}`);
+    git(`git rev-parse --verify "${ref}"`);
     return true;
   } catch {
     return false;
@@ -47,7 +47,7 @@ function refExists(ref: string): boolean {
 }
 
 function changedFilesSince(base: string, head: string): Set<string> {
-  const out = git(`git diff --name-only ${base}...${head}`);
+  const out = git(`git diff --name-only "${base}...${head}"`);
   if (!out) return new Set();
   return new Set(
     out
@@ -87,8 +87,8 @@ function main(): void {
     process.exit(1);
   }
 
-  const baseCurrent = git(`git merge-base ${integrationRef} ${current}`);
-  const basePeer = git(`git merge-base ${integrationRef} ${peer}`);
+  const baseCurrent = git(`git merge-base "${integrationRef}" "${current}"`);
+  const basePeer = git(`git merge-base "${integrationRef}" "${peer}"`);
 
   const mine = changedFilesSince(baseCurrent, current);
   const theirs = changedFilesSince(basePeer, peer);
