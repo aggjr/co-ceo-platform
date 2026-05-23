@@ -51,6 +51,7 @@ export type OpeningPositionInput = {
   optionType?: 'CALL' | 'PUT';
   name?: string;
   notes?: string;
+  brokerNoteRef?: string;
 };
 
 export type OpeningCashInput = {

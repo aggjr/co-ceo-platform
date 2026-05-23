@@ -59,6 +59,13 @@ import {
 } from '../core/invest/portfolioThreePrices';
 import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
 import { validateEquityThreePrices } from '../core/invest/threePricesValidation';
+import {
+  buildCostAdjustmentIndex,
+  buildNotesTradeSummary,
+  inferFromCashDescription,
+  isDuplicateManualOpeningCash,
+  normalizeBrokerNoteRef,
+} from '../core/invest/extractLedgerEnrichment';
 import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
 
 export class InvestController {
@@ -612,13 +619,6 @@ export class InvestController {
     const cashEvents = events.filter((e) => e.asset_type === 'cash');
     const tradeEvents = events.filter((e) => e.asset_type !== 'cash');
 
-    const notesTradeSummary = new Map<string, {
-      netValue: number,
-      tickers: Set<string>,
-      tradeDate: string,
-      settlementDate: string,
-    }>();
-
     const addDays = (dateStr: string, days: number) => {
       const d = new Date(dateStr + 'T00:00:00Z');
       d.setUTCDate(d.getUTCDate() + days);
@@ -627,62 +627,64 @@ export class InvestController {
       return d.toISOString().slice(0, 10);
     };
 
-    for (const e of tradeEvents) {
-      if (e.broker_note_ref && e.transaction_date) {
-        const t = e.asset_ticker?.toUpperCase() || '';
-        const isOptionsOrFixed = e.asset_type === 'option_call' || e.asset_type === 'option_put' || 
-          t.startsWith('LFT') || t.startsWith('CDB') || t.startsWith('LTN') || t.startsWith('NTN');
-        const daysToSettle = isOptionsOrFixed ? 1 : 2;
-        const settlement = addDays(e.transaction_date, daysToSettle);
-        
-        let summary = notesTradeSummary.get(e.broker_note_ref);
-        if (!summary) {
-          summary = { netValue: 0, tickers: new Set(), tradeDate: e.transaction_date, settlementDate: settlement };
-          notesTradeSummary.set(e.broker_note_ref, summary);
-        }
-        summary.netValue += e.total_net_value;
-        if (e.asset_ticker) summary.tickers.add(e.asset_ticker);
-        
-        if (settlement > summary.settlementDate) {
-          summary.settlementDate = settlement;
-        }
-      }
-    }
+    const notesTradeSummary = buildNotesTradeSummary(tradeEvents, addDays);
+    const costByDate = buildCostAdjustmentIndex(tradeEvents);
 
     const rows = [];
     let balance = 0;
 
     for (const ce of cashEvents) {
+      if (isDuplicateManualOpeningCash(ce, cashEvents)) continue;
+
       const amount = ce.total_net_value;
       balance += amount;
       let obs = '';
       let originDate = '';
       let ticker = '';
-      let noteNum = ce.broker_note_ref || '';
+      const noteNum = normalizeBrokerNoteRef(ce.broker_note_ref) || ce.broker_note_ref || '';
 
       if (noteNum && notesTradeSummary.has(noteNum)) {
         const summary = notesTradeSummary.get(noteNum)!;
         originDate = summary.tradeDate;
         ticker = Array.from(summary.tickers).join(', ');
-        
-        // trade netValue is positive for BUYS. Cash amount is negative for OUTFLOW (buys).
-        // So cashAmount + tradeNetValue should be 0.
+
         const expectedCash = -summary.netValue;
         const diffReal = Math.abs(amount - expectedCash);
-        
+
         if (diffReal > 0.02) {
           obs = `Diferença valor: Liq. ${expectedCash.toFixed(2)} vs Caixa ${amount.toFixed(2)}`;
         }
-        
+
         if (ce.transaction_date !== summary.settlementDate) {
           obs += (obs ? '. ' : '') + `Liquidou em ${ce.transaction_date}, esperado ${summary.settlementDate}`;
         }
-      } else if (ce.transaction_type === 'capital_deposit' || ce.transaction_type === 'capital_withdrawal') {
-         // TED normal
-      } else if (ce.transaction_type === 'opening_balance') {
-         // Saldo inicial
-      } else if (amount !== 0) {
-        obs = 'Sem relação encontrada ou sem nota (LIQ BOLSA?)';
+      } else {
+        const desc = String(ce.notes || '');
+        const inferred = inferFromCashDescription(desc, ce.transaction_date || '');
+        if (inferred) {
+          originDate = inferred.originDate;
+          ticker = inferred.ticker;
+        } else if (
+          ce.transaction_type === 'fee' ||
+          /taxa|emolumento|cust[oó]dia|corretagem/i.test(desc)
+        ) {
+          const absAmt = Math.round(Math.abs(amount) * 100) / 100;
+          const hints = costByDate.get(ce.transaction_date || '') || [];
+          const hit = hints.find((h) => Math.abs(h.amount - absAmt) < 0.03);
+          if (hit) {
+            ticker = hit.ticker;
+            originDate = hit.date;
+          }
+        }
+        if (
+          !ticker &&
+          ce.transaction_type !== 'capital_deposit' &&
+          ce.transaction_type !== 'capital_withdrawal' &&
+          ce.transaction_type !== 'opening_balance' &&
+          amount !== 0
+        ) {
+          obs = 'Sem vínculo automático — conferir nota ou extrato';
+        }
       }
 
       const isoDateToBr = (iso: string | undefined | null) => {
