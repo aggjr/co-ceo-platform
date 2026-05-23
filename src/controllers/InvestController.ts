@@ -69,6 +69,8 @@ import {
 import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
 import { validateEquityThreePrices } from '../core/invest/threePricesValidation';
 import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
+import pool from '../config/database';
+import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
 
 export class InvestController {
   private readonly ledger: LedgerImportService;
@@ -763,6 +765,30 @@ export class InvestController {
       success: true,
       rows,
     });
+  };
+
+  /** Popula CDI + ação benchmark (PRIO3) em tabelas globais — escopo plataforma. */
+  seedMarketBenchmarks = async (req: Request, res: Response) => {
+    if (req.userContext?.scope !== 'global') {
+      return res.status(403).json({
+        success: false,
+        error: 'Somente sessão plataforma (escopo global) pode popular benchmarks de mercado.',
+      });
+    }
+    const from = String(req.body?.from || req.query.from || '2025-12-01').slice(0, 10);
+    const to = String(req.body?.to || req.query.to || new Date().toISOString().slice(0, 10)).slice(0, 10);
+    const stockTicker = String(
+      req.body?.stockTicker || req.query.stockTicker || process.env.INVEST_CHART_BENCHMARK_TICKER || 'PRIO3'
+    )
+      .trim()
+      .toUpperCase();
+    try {
+      const result = await seedMarketBenchmarks(this.gateway, pool, { from, to, stockTicker });
+      return res.json({ success: true, ...result });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ success: false, error: message });
+    }
   };
 
 }
