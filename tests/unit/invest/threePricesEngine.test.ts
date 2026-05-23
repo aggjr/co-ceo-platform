@@ -491,6 +491,67 @@ describe('threePricesEngine', () => {
     expect(p.gerencial).toBeCloseTo((1200 * 41.43 - premioTotal) / 1200, 2);
   });
 
+  it('nota BTG ITUB4: exercício PUT com ref #9 abate prêmio no B3', () => {
+    const out = computeThreePricesByUnderlying([
+      putSell('ITUBQ413', 'ITUB4', 1200, 377, '2026-04-27'),
+      {
+        id: nextId(),
+        asset_id: 'ITUB4',
+        asset_ticker: 'ITUB4',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        transaction_date: '2026-05-15',
+        quantity: 1200,
+        unit_price: 41.43,
+        total_net_value: 49716,
+        broker_note_ref: 'BTG-NOTA-99999#2026-05-15#9',
+        notes: 'Exercício/atribuição — ITUBQ413E (Notas BTG 2026)',
+      },
+    ]);
+    const p = out.get('ITUB4')!;
+    expect(p.b3).toBeLessThan(p.estrito);
+    expect(p.b3).toBeCloseTo((1200 * 41.43 - 377) / 1200, 2);
+  });
+
+  it('nota BTG (ref com índice de perna): compra por exercício de PUT abate prêmio no B3', () => {
+    const out = computeThreePricesByUnderlying([
+      putSell('PRIOP620', 'PRIO3', 1000, 2100, '2026-03-25'),
+      putSell('PRIOP640', 'PRIO3', 3000, 3510, '2026-03-31'),
+      {
+        id: nextId(),
+        asset_id: 'PRIO3',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        transaction_date: '2026-04-17',
+        quantity: 1000,
+        unit_price: 62,
+        total_net_value: 62000,
+        broker_note_ref: 'BTG-NOTA-31444906#2026-04-17#4',
+        notes: 'Exercício/atribuição — PRIOP620E (Notas BTG 2026 (conferência))',
+      },
+      {
+        id: nextId(),
+        asset_id: 'PRIO3',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        transaction_date: '2026-04-17',
+        quantity: 3000,
+        unit_price: 64,
+        total_net_value: 192000,
+        broker_note_ref: 'BTG-NOTA-31444906#2026-04-17#5',
+        notes: 'Exercício/atribuição — PRIOP640E (Notas BTG 2026 (conferência))',
+      },
+    ]);
+    const p = out.get('PRIO3')!;
+    expect(p.qty).toBe(4000);
+    expect(p.estrito).toBeCloseTo(63.5, 2);
+    expect(p.b3).toBeLessThan(p.estrito);
+    expect(p.b3).toBeCloseTo((4000 * 63.5 - 2100 - 3510) / 4000, 2);
+    expect(p.gerencial).toBeCloseTo(p.b3, 4);
+  });
+
   it('opening_balance de short herdado (total_net negativo) abate prêmio no gerencial', () => {
     const out = computeThreePricesByUnderlying([
       {

@@ -17,7 +17,7 @@ if (-not $integration) {
   Write-Error "Defina: git config coceo.integrationBranch <branch-integracao>"
 }
 if (-not $machine) {
-  Write-Error "Defina: git config coceo.machineBranch note-gamer ou note-guto"
+  Write-Error "Defina: git config coceo.machineBranch note-gamer | note-guto | antigravity-gamer | antigravity-guto"
 }
 
 $current = git branch --show-current

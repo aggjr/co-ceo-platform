@@ -141,17 +141,18 @@ function classifyCustodyLink(
   }
   if (/LIQ\s+BOLSA.+TAXA\s+SOBRE\s+VALOR\s+EM\s+CUST|LIQ\s+BOLSA.+CUST[ÓO]DIA/i.test(u)) {
     return {
-      link: 'rv_custodia_liq_bolsa',
+      link: 'liq_bolsa_custodia_caixa',
       impacts: 'nao',
       issue:
-        'Taxa de custódia RV liquidada via LIQ BOLSA; hoje vira fee em CAIXA — não entra nos 3 preços das ações/opções em custódia',
+        'LIQ BOLSA custódia no extrato → fee em CAIXA. Ações/opções não têm taxa de custódia nos 3 PM; custódia patrimonial é só LFT/TD (cost_adjustment no título).',
     };
   }
   if (/TAXA\s+DE\s+CUST|CUST[ÓO]DIA|REEMBOLSO\s+DE\s+CUST/i.test(u) && !/TESOURO|LFT/i.test(u)) {
     return {
-      link: 'custodia_mensal_caixa',
+      link: 'custodia_caixa_sem_ticker',
       impacts: 'nao',
-      issue: 'Custódia mensal genérica em CAIXA; ratear por ativo em custódia para PM estrito/gerencial',
+      issue:
+        'Linha genérica de custódia em CAIXA (sem ticker). Não ratear em ações — se for TD/LFT, deve casar com cost_adjustment no LFT; senão permanece só no financeiro.',
     };
   }
   if (/JUROS\s+SOBRE\s+SALDO\s+NEGATIVO|IOF\s+SOBRE\s+SALDO/i.test(u)) {

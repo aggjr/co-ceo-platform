@@ -1,68 +1,72 @@
 ---
-description: Fluxo Git — main integra; note-gamer e note-guto são branches de trabalho por máquina.
+description: Fluxo Git — main integra; branches de trabalho por máquina/agente.
 alwaysApply: true
 ---
 
-# Git — main + note-gamer / note-guto
+# Git — main + branches de máquina
 
 Fonte da verdade: **GitHub**. Nunca sincronizar código via Google Drive.
+
+Lista canônica: **`scripts/git-machines.json`**
 
 ## Branches
 
 | Branch | Papel |
 |--------|--------|
-| **`main`** | Código **integrado** — sempre o mais atualizado; base para testar o sistema inteiro |
-| **`note-gamer`** | Só a máquina **note-gamer** commita aqui |
-| **`note-guto`** | Só a máquina **note-guto** commita aqui |
+| **`main`** | Código **integrado** — sempre o mais atualizado |
+| **`note-gamer`** | Máquina física note-gamer |
+| **`note-guto`** | Máquina física note-guto |
+| **`antigravity-gamer`** | Agente/processos paralelos (estação gamer) |
+| **`antigravity-guto`** | Agente/processos paralelos (estação guto) |
 
-Regra: **não commitar na branch da outra máquina.** Integrar em `main` via merge/rebase explícito.
+Regra: **não commitar na branch de outra máquina/agente.** Integrar em `main` via `npm run git:integrate`.
 
-Config Git local (uma vez por máquina):
+Config Git local (uma vez por clone/processo):
 
 ```bash
-# note-gamer
 git config coceo.integrationBranch main
-git config coceo.machineBranch note-gamer
-
-# note-guto
-git config coceo.integrationBranch main
-git config coceo.machineBranch note-guto
+git config coceo.machineBranch <sua-branch>   # uma das quatro acima
 ```
 
-Arquivo `scripts/branch-peer.local.env`: `PEER_BRANCH=origin/note-guto` (gamer) ou `origin/note-gamer` (guto).
+Primeira vez em branch nova:
+
+```bash
+git checkout -b antigravity-guto origin/main
+git push -u origin antigravity-guto
+```
 
 ## Antes de cada commit
 
 ```bash
 git fetch origin
-.\scripts\git-sync-before-commit.ps1   # puxa main -> sua branch
+.\scripts\git-sync-before-commit.ps1
 npm run check:branch-overlap
 ```
 
-Se `check:branch-overlap` listar sobreposição com a branch par, **avisar o usuário** antes do commit.
+`check:branch-overlap` compara com **todas** as outras branches de `git-machines.json` que existirem no remoto.
 
-## Ritmo obrigatório (cada máquina, cada commit)
+## Ritmo obrigatório (cada máquina/agente, cada commit)
 
 **Antes do commit**
 
 1. `git fetch origin`
-2. `.\scripts\git-sync-before-commit.ps1` — traz `main` → sua branch; **resolve conflito aqui se houver**
+2. `.\scripts\git-sync-before-commit.ps1`
 3. `npm run check:branch-overlap`
-4. `git commit` na **sua** branch (`note-guto` ou `note-gamer`)
+4. `git commit` na **sua** branch
 
-**Imediatamente após o commit** (não esperar o usuário pedir)
+**Imediatamente após o commit**
 
-5. `.\scripts\git-publish-to-main.ps1` (ou `npm run git:integrate`) — merge sua branch → `main`, depois branch **par** → `main`, **bump de versão** (`version.json` + `package.json` + `APP_VERSION`), commit `chore(release): Vx.y.z`, push `main`, realinha sua branch com `main`
-6. Se o script sair com **CONFLITO**: parar, listar arquivos, resolver na hora com o usuário, rodar de novo
-7. Ao terminar sem erro: sua branch e `main` estão no mesmo código integrado e na **mesma versão** exibida em `/api/version`
+5. `npm run git:integrate` — merge sua branch → `main`, depois **cada branch par** → `main`, bump unificado (`version.json` + `package.json` + `APP_VERSION`), commit `chore(release): Vx.y.z`, push `main`, realinha sua branch
+6. Se **CONFLITO**: parar, resolver, rodar de novo
+7. Ao terminar: sua branch e `main` no mesmo código e **mesma versão** (`/api/version`)
 
-O agente executor **sempre** segue os passos 5–7 após cada commit que fizer nesta máquina.
+O agente executor **sempre** segue os passos 5–7 após cada commit nesta máquina.
 
 ## Atualizar a branch da máquina a partir de main (sempre)
 
 ```bash
 git fetch origin
-git checkout note-gamer   # ou note-guto
+git checkout note-gamer   # ou note-guto / antigravity-*
 git rebase origin/main
 git push --force-with-lease origin note-gamer   # só na branch própria
 ```
@@ -74,26 +78,16 @@ git checkout main
 git pull origin main
 git merge origin/note-gamer -m "merge(note-gamer): ..."
 git merge origin/note-guto -m "merge(note-guto): ..."
+git merge origin/antigravity-gamer -m "merge(antigravity-gamer): ..."
+git merge origin/antigravity-guto -m "merge(antigravity-guto): ..."
+node scripts/bump-version.js --integrate
+git add version.json package.json src/generated/version.ts frontend/src/generated/version.js
+git commit -m "chore(release): V... - integracao main"
 git push origin main
 ```
-
-Depois realinhar **as duas** máquinas com `git rebase origin/main` na branch local.
-
-## GitHub CLI (`gh`) nesta máquina
-
-O `gh` usa o mesmo token do `git` via:
-
-```powershell
-.\scripts\invoke-gh.ps1 repo view
-.\scripts\invoke-gh.ps1 pr list
-```
-
-Integração: branch padrão do repo = **`main`**.
-
-Opcional (uma vez, no browser): `gh auth refresh -h github.com -s read:org` — só se precisar de comandos que exigem escopo de organização.
 
 ## Proibido
 
 - `--force` em `main`
-- Commit direto em `note-gamer` / `note-guto` pela máquina errada
+- Commit na branch de outra máquina/agente
 - Ignorar sobreposição reportada por `check:branch-overlap`

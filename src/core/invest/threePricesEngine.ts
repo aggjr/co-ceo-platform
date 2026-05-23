@@ -130,6 +130,12 @@ function applyProportionalReduction(s: UnderlyingState, qtyOut: number): void {
   if (s.qty <= 1e-9) resetState(s);
 }
 
+function normalizeExerciseOptionTicker(raw: string): string | null {
+  const t = raw.trim().toUpperCase().replace(/[EF]$/, '');
+  if (/^[A-Z]{4}[A-Z0-9]+$/.test(t)) return t;
+  return null;
+}
+
 function parseExerciseOptionTicker(e: LedgerEvent): string | null {
   const ref = String(e.broker_note_ref ?? '');
   const notes = String(e.notes ?? '');
@@ -137,13 +143,24 @@ function parseExerciseOptionTicker(e: LedgerEvent): string | null {
     return null;
   }
 
+  // Nota BTG: "Exercício/atribuição — PRIOP620E (Notas BTG ...)" — ticker no meio.
+  const notesMatch = notes.match(
+    /exerc(?:[íi]cio)?(?:\/atribui[cç][aã]o)?\s*[—-]\s*([A-Z]{4}[A-Z0-9]+)[EF]?\b/i
+  );
+  if (notesMatch?.[1]) {
+    const fromNotes = normalizeExerciseOptionTicker(notesMatch[1]);
+    if (fromNotes) return fromNotes;
+  }
+
   const parts = ref.split('#');
   if (parts.length >= 3) {
-    return parts[parts.length - 1].trim().toUpperCase().replace(/[EF]$/, '');
+    const fromRef = normalizeExerciseOptionTicker(parts[parts.length - 1]);
+  // BTG-EXERCISE termina com ticker; BTG-NOTA termina com índice da perna (#1).
+    if (fromRef) return fromRef;
   }
 
   const tailMatch = notes.match(/([A-Z]{4}[A-Z0-9]+)[EF]?\s*$/i);
-  if (tailMatch?.[1]) return tailMatch[1].toUpperCase().replace(/[EF]$/, '');
+  if (tailMatch?.[1]) return normalizeExerciseOptionTicker(tailMatch[1]);
 
   return null;
 }
