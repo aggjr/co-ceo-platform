@@ -230,13 +230,16 @@ export function mergeOptionStrikeIntoAssetRow(
   return { ...row, metadata: JSON.stringify(meta) };
 }
 
+export type MarketQuoteHint = { price: number; asOf?: string };
+
 export function enrichPortfolioRow(
   row: Record<string, unknown>,
   threePrices?: ThreeAvgPrices,
   strikeHints?: {
     ledgerStrikeByTicker?: Map<string, number>;
     marketCatalog?: Map<string, OptionMarketRow>;
-  }
+  },
+  marketQuote?: MarketQuoteHint | null
 ): PortfolioItemDto {
   const meta = parseMetadata(row.metadata);
   const qty = Number(row.current_quantity ?? 0);
@@ -275,13 +278,30 @@ export function enrichPortfolioRow(
     displayAvg = prices.managerial > 0 ? prices.managerial : avg;
   }
 
+  const marketPx =
+    marketQuote != null &&
+    Number.isFinite(marketQuote.price) &&
+    marketQuote.price > 0
+      ? marketQuote.price
+      : null;
+  const equityLike = isEquityPortfolioItem(assetType, optionLike);
+
   let lastPrice = metaLast > 0 ? metaLast : displayAvg;
+  let updatedQuote: number | null = null;
+
   if (optionLike) {
     if (metaLast > 0) lastPrice = metaLast;
     else if (custodyUnitMark > 0) lastPrice = custodyUnitMark;
     else if (displayAvg > 0) lastPrice = displayAvg;
+    updatedQuote =
+      metaLast > 0 ? metaLast : custodyUnitMark > 0 ? custodyUnitMark : null;
+  } else if (equityLike) {
+    // Cotação de mercado (market_quotes_daily / brapi) — nunca confundir com PM do livro.
+    updatedQuote = marketPx;
+    lastPrice = marketPx ?? 0;
+  } else {
+    updatedQuote = metaLast > 0 ? metaLast : null;
   }
-  const updatedQuote = metaLast > 0 ? metaLast : optionLike && custodyUnitMark > 0 ? custodyUnitMark : null;
   const pmB3 = prices.b3 > 0 ? prices.b3 : displayAvg;
   let marketValue = qty * lastPrice;
   let costBasis = qty * displayAvg;
@@ -322,12 +342,13 @@ export function enrichPortfolioRow(
     }
   }
 
-  if (isEquityPortfolioItem(assetType, optionLike)) {
-    const quote = updatedQuote ?? lastPrice;
+  if (equityLike) {
+    const quote = updatedQuote ?? 0;
     const b3Cost = pmB3 > 0 ? pmB3 : displayAvg;
     costBasis = Math.round(qty * b3Cost * 100) / 100;
-    marketValue = Math.round(qty * quote * 100) / 100;
-    if (pmB3 > 0) {
+    marketValue =
+      quote > 0 ? Math.round(qty * quote * 100) / 100 : Math.round(qty * b3Cost * 100) / 100;
+    if (pmB3 > 0 && quote > 0) {
       pnl = equityResultFromB3Quote(pmB3, quote, qty);
     } else {
       pnl = Math.round((marketValue - costBasis) * 100) / 100;
@@ -336,8 +357,8 @@ export function enrichPortfolioRow(
 
   const pnlPct = optionLike
     ? optionPriceReturnPct(lastPrice, displayAvg)
-    : isEquityPortfolioItem(assetType, optionLike) && pmB3 > 0
-      ? optionPriceReturnPct(updatedQuote ?? lastPrice, pmB3)
+    : equityLike && pmB3 > 0 && updatedQuote != null && updatedQuote > 0
+      ? optionPriceReturnPct(updatedQuote, pmB3)
       : costBasis > 0
         ? (pnl / costBasis) * 100
         : 0;

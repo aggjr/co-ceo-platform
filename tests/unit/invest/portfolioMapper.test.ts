@@ -12,39 +12,54 @@ import {
 
 describe('portfolioMapper', () => {
   it('marca só o item mais específico via alocação derivada', () => {
-    const row = enrichPortfolioRow({
-      id: 'a1',
-      asset_ticker: 'PRIO3',
-      asset_type: 'stock',
-      current_quantity: 100,
-      managerial_avg_price: 40,
-      metadata: JSON.stringify({ name: 'PetroRio', last_price: 50 }),
-      status: 'active',
-    });
+    const row = enrichPortfolioRow(
+      {
+        id: 'a1',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        current_quantity: 100,
+        managerial_avg_price: 40,
+        metadata: JSON.stringify({ name: 'PetroRio', last_price: 50 }),
+        status: 'active',
+      },
+      undefined,
+      undefined,
+      { price: 50 }
+    );
     expect(row.costBasis).toBe(4000);
     expect(row.marketValue).toBe(5000);
     expect(row.name).toBe('PetroRio');
   });
 
   it('calcula % da carteira quando ausente no metadata', () => {
-    const a = enrichPortfolioRow({
-      id: 'a1',
-      asset_ticker: 'A',
-      asset_type: 'stock',
-      current_quantity: 1,
-      managerial_avg_price: 100,
-      metadata: { last_price: 100 },
-      status: 'active',
-    });
-    const b = enrichPortfolioRow({
-      id: 'a2',
-      asset_ticker: 'B',
-      asset_type: 'stock',
-      current_quantity: 1,
-      managerial_avg_price: 100,
-      metadata: { last_price: 300 },
-      status: 'active',
-    });
+    const a = enrichPortfolioRow(
+      {
+        id: 'a1',
+        asset_ticker: 'A',
+        asset_type: 'stock',
+        current_quantity: 1,
+        managerial_avg_price: 100,
+        metadata: { last_price: 100 },
+        status: 'active',
+      },
+      undefined,
+      undefined,
+      { price: 100 }
+    );
+    const b = enrichPortfolioRow(
+      {
+        id: 'a2',
+        asset_ticker: 'B',
+        asset_type: 'stock',
+        current_quantity: 1,
+        managerial_avg_price: 100,
+        metadata: { last_price: 300 },
+        status: 'active',
+      },
+      undefined,
+      undefined,
+      { price: 300 }
+    );
     const items = applyAllocationPercents([a, b]);
     expect(items[0].allocationPct).toBe(25);
     expect(items[1].allocationPct).toBe(75);
@@ -106,15 +121,20 @@ describe('portfolioMapper', () => {
   });
 
   it('calcula notional e distância ao strike mesmo com tipo stock no cadastro', () => {
-    const stock = enrichPortfolioRow({
-      id: 's1',
-      asset_ticker: 'PRIO3',
-      asset_type: 'stock',
-      current_quantity: 1000,
-      managerial_avg_price: 40,
-      metadata: { last_price: 42.5 },
-      status: 'active',
-    });
+    const stock = enrichPortfolioRow(
+      {
+        id: 's1',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        current_quantity: 1000,
+        managerial_avg_price: 40,
+        metadata: { last_price: 42.5 },
+        status: 'active',
+      },
+      undefined,
+      undefined,
+      { price: 42.5 }
+    );
     const optMis = enrichPortfolioRow({
       id: 'o-mis',
       asset_ticker: 'PRIOR407',
@@ -192,7 +212,9 @@ describe('portfolioMapper', () => {
         metadata: { last_price: 68.82 },
         status: 'active',
       },
-      { strict: 60, b3: 64.38, managerial: 55.7 }
+      { strict: 60, b3: 64.38, managerial: 55.7 },
+      undefined,
+      { price: 68.82 }
     );
     expect(equityResultFromB3Quote(64.38, 68.82, 12700)).toBeCloseTo(56388, 0);
     expect(row.pnl).toBeCloseTo(56388, 0);
@@ -217,15 +239,20 @@ describe('portfolioMapper', () => {
   });
 
   it('opção vendida: prêmio, resultado e notional a partir da custódia', () => {
-    const stock = enrichPortfolioRow({
-      id: 's1',
-      asset_ticker: 'PRIO3',
-      asset_type: 'stock',
-      current_quantity: 5400,
-      managerial_avg_price: 38.33,
-      metadata: { last_price: 65.4 },
-      status: 'active',
-    });
+    const stock = enrichPortfolioRow(
+      {
+        id: 's1',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        current_quantity: 5400,
+        managerial_avg_price: 38.33,
+        metadata: { last_price: 65.4 },
+        status: 'active',
+      },
+      undefined,
+      undefined,
+      { price: 65.4 }
+    );
     const opt = enrichPortfolioRow(
       {
         id: 'o1',
@@ -249,6 +276,27 @@ describe('portfolioMapper', () => {
     expect(enriched.notional).toBeCloseTo(6500 * 40.7, 0);
     expect(enriched.underlyingLastPrice).toBe(65.4);
     expect(enriched.strikeDistanceBrl).not.toBeNull();
+  });
+
+  it('ação: cotação de mercado não replica PM B3 (metadata com PM errado)', () => {
+    const row = enrichPortfolioRow(
+      {
+        id: 's-itub',
+        asset_ticker: 'ITUB4',
+        asset_type: 'stock',
+        current_quantity: 100,
+        managerial_avg_price: 41.16,
+        metadata: { last_price: 41.16 },
+        status: 'active',
+      },
+      { strict: 40, b3: 41.16, managerial: 41.16 },
+      undefined,
+      { price: 38.5, asOf: '2026-05-22' }
+    );
+    expect(row.updatedQuote).toBe(38.5);
+    expect(row.prices?.b3).toBe(41.16);
+    expect(row.marketValue).toBeCloseTo(3850, 0);
+    expect(row.pnl).toBeCloseTo((38.5 - 41.16) * 100, 0);
   });
 
   it('mantém ação vendida a descoberto na custódia aberta', () => {
