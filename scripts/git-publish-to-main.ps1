@@ -133,7 +133,7 @@ $appVersion = "V$($versionJson.major).$($versionJson.minor).$($versionJson.patch
 git add version.json package.json src/generated/version.ts frontend/src/generated/version.js
 git diff --cached --quiet
 if ($LASTEXITCODE -ne 0) {
-  git commit -m "chore(release): $appVersion — integracao main"
+  git commit -m "chore(release): $appVersion - integracao main"
   if ($LASTEXITCODE -ne 0) {
     Write-Error "Falha ao commitar bump de versao"
   }
