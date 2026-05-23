@@ -10,6 +10,21 @@ import {
   mountExcelTables,
 } from '../lib/excelTable.js';
 
+function makeCostRender(key) {
+  return (row) => {
+    const v = Number(row[key]);
+    const span = document.createElement('span');
+    if (!v || !Number.isFinite(v)) {
+      span.className = 'muted';
+      span.textContent = '—';
+      return span;
+    }
+    span.className = 'notes-cost--negative';
+    span.textContent = v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    return span;
+  };
+}
+
 const COLUMNS = [
   { key: 'pregaoDateBr', label: 'Data', type: 'text' },
   { key: 'ticker', label: 'Ticker', type: 'text' },
@@ -41,13 +56,13 @@ const COLUMNS = [
       return span;
     },
   },
-  { key: 'unitPrice', label: 'Preço', type: 'currency' },
-  { key: 'settlementTax', label: 'Taxa liq./CCP', type: 'currency' },
-  { key: 'registrationTax', label: 'Taxa registro', type: 'currency' },
-  { key: 'emoluments', label: 'Emolumentos', type: 'currency' },
-  { key: 'cblcTotal', label: 'Total CBLC', type: 'currency' },
-  { key: 'bovespaTotal', label: 'Total Bovespa', type: 'currency' },
-  { key: 'irrf', label: 'IRRF', type: 'currency' },
+  { key: 'unitPrice', label: 'Prêmio', type: 'currency' },
+  { key: 'settlementTax', label: 'Taxa liq./CCP', type: 'currency', render: makeCostRender('settlementTax') },
+  { key: 'registrationTax', label: 'Taxa registro', type: 'currency', render: makeCostRender('registrationTax') },
+  { key: 'emoluments', label: 'Emolumentos', type: 'currency', render: makeCostRender('emoluments') },
+  { key: 'cblcTotal', label: 'Total CBLC', type: 'currency', render: makeCostRender('cblcTotal') },
+  { key: 'bovespaTotal', label: 'Total Bovespa', type: 'currency', render: makeCostRender('bovespaTotal') },
+  { key: 'irrf', label: 'IRRF', type: 'currency', render: makeCostRender('irrf') },
   {
     key: 'grossValue',
     label: 'Valor contrato',
