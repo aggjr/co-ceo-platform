@@ -1,21 +1,47 @@
 /**
- * Fila central de tarefas para multiplos agentes/máquinas.
+ * Fila central — fonte humana: tasks/FILA.md
  *
  *   npm run task:list
  *   npm run task:add -- --id W2-02 --title "..." --spec tasks/wave-2/02.md --priority 50
  *   npm run task:claim
- *   npm run task:start -- --id W2-02
  *   npm run task:done -- --id W2-02
- *   npm run task:release -- --id W2-02 --reason "bloqueado: falta spec"
  */
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
+const filaPath = path.join(root, 'tasks', 'FILA.md');
 const queuePath = path.join(root, 'tasks', 'queue.json');
 const boardPath = path.join(root, 'tasks', 'QUEUE.md');
 const ACTIVE = new Set(['claimed', 'in_progress']);
+const FILA_HEADER = `# Fila de trabalho
+
+> **Arquiteto (Augusto):** descreva as proximas tarefas nos blocos \`## ID\` abaixo (texto livre + campos).  
+> **Agentes:** usem \`npm run task:claim\` — o script atualiza \`status\` / \`agente\` e publica em \`main\`. Nao marquem claim a mao.
+
+Copie o bloco modelo, cole no fim da lista e preencha.
+
+---
+
+## _MODELO
+
+prioridade: 50
+status: pending
+agente:
+spec:
+assumida:
+concluida:
+release:
+
+titulo: Titulo curto para o quadro
+
+Descreva aqui o trabalho em quantos paragrafos precisar.
+Criterio de aceite, arquivos, banco remoto, etc.
+
+---
+
+`;
 
 function run(cmd, opts = {}) {
   return execSync(cmd, { cwd: root, encoding: 'utf8', stdio: opts.silent ? 'pipe' : 'inherit', ...opts });
@@ -57,15 +83,96 @@ function resolveAgent(args) {
   process.exit(1);
 }
 
-function readQueue() {
-  if (!fs.existsSync(queuePath)) {
-    return { schema_version: 1, updated_at: new Date().toISOString(), tasks: [] };
+function parseFieldsAndBody(blockLines) {
+  const fields = {};
+  const body = [];
+  for (const line of blockLines) {
+    const kv = line.match(/^(prioridade|status|agente|spec|assumida|concluida|release|titulo):\s*(.*)$/i);
+    if (kv) {
+      fields[kv[1].toLowerCase()] = kv[2].trim();
+    } else {
+      body.push(line);
+    }
   }
-  return JSON.parse(fs.readFileSync(queuePath, 'utf8'));
+  while (body.length && body[0].trim() === '') body.shift();
+  while (body.length && body[body.length - 1].trim() === '') body.pop();
+  return { fields, body };
+}
+
+function parseFila(content) {
+  const tasks = [];
+  const chunks = content.split(/\n(?=## )/);
+  for (const chunk of chunks) {
+    if (!chunk.startsWith('## ')) continue;
+    const lines = chunk.split('\n');
+    const id = lines[0].replace(/^##\s+/, '').trim();
+    if (!id || id === '_MODELO' || id.startsWith('_')) continue;
+    const { fields, body } = parseFieldsAndBody(lines.slice(1));
+    const description = body.join('\n');
+    const firstBodyLine = body.find((l) => l.trim()) || '';
+    tasks.push({
+      id,
+      title: fields.titulo || firstBodyLine.slice(0, 120) || id,
+      spec: fields.spec || null,
+      priority: Number(fields.prioridade || 0),
+      status: (fields.status || 'pending').toLowerCase(),
+      claimed_by: fields.agente || null,
+      claimed_at: fields.assumida || null,
+      started_at: null,
+      completed_at: fields.concluida || null,
+      release_version: fields.release || null,
+      description,
+      notes: '',
+    });
+  }
+  return tasks;
+}
+
+function taskToBlock(t) {
+  const lines = [
+    `## ${t.id}`,
+    '',
+    `prioridade: ${t.priority ?? 0}`,
+    `status: ${t.status}`,
+    `agente: ${t.claimed_by || ''}`,
+    `spec: ${t.spec || ''}`,
+    `assumida: ${t.claimed_at || ''}`,
+    `concluida: ${t.completed_at || ''}`,
+    `release: ${t.release_version || ''}`,
+    '',
+    `titulo: ${t.title}`,
+    '',
+  ];
+  if (t.description) {
+    lines.push(t.description);
+    if (!t.description.endsWith('\n')) lines.push('');
+  }
+  return lines.join('\n');
+}
+
+function serializeFila(tasks) {
+  const real = tasks.filter((t) => t.id !== '_MODELO');
+  const blocks = real
+    .slice()
+    .sort((a, b) => (b.priority || 0) - (a.priority || 0) || String(a.id).localeCompare(String(b.id)))
+    .map(taskToBlock);
+  return `${FILA_HEADER}${blocks.length ? `${blocks.join('\n---\n\n')}\n` : ''}`;
+}
+
+function readQueue() {
+  if (fs.existsSync(filaPath)) {
+    const tasks = parseFila(fs.readFileSync(filaPath, 'utf8'));
+    return { schema_version: 1, updated_at: new Date().toISOString(), tasks };
+  }
+  if (fs.existsSync(queuePath)) {
+    return JSON.parse(fs.readFileSync(queuePath, 'utf8'));
+  }
+  return { schema_version: 1, updated_at: new Date().toISOString(), tasks: [] };
 }
 
 function writeQueue(queue) {
   queue.updated_at = new Date().toISOString();
+  fs.writeFileSync(filaPath, serializeFila(queue.tasks), 'utf8');
   fs.writeFileSync(queuePath, `${JSON.stringify(queue, null, 2)}\n`, 'utf8');
   writeBoard(queue);
 }
@@ -100,9 +207,9 @@ function writeBoard(queue) {
     .sort((a, b) => (b.priority || 0) - (a.priority || 0) || String(a.id).localeCompare(String(b.id)));
 
   const lines = [
-    '# Fila de trabalho — agentes',
+    '# Quadro resumo (gerado)',
     '',
-    `> Gerado em **${queue.updated_at}** a partir de \`tasks/queue.json\`. **Nao edite esta tabela a mao.**`,
+    `> De \`tasks/FILA.md\` em **${queue.updated_at}**. Edite a fila em **FILA.md**, nao aqui.`,
     '',
     '| ID | P | Titulo | Spec | Status | Agente | Assumida | Concluida | Release |',
     '|----|---|--------|------|--------|--------|----------|-----------|---------|',
@@ -117,29 +224,7 @@ function writeBoard(queue) {
       );
     }
   }
-
-  lines.push(
-    '',
-    '## Arquiteto — adicionar tarefa',
-    '',
-    '```bash',
-    'npm run task:add -- --id W3-01 --title "Barramento canonico INVEST" --spec tasks/wave-3/01.md --priority 80',
-    '```',
-    '',
-    'Ou edite `tasks/queue.json` (novo item com `"status": "pending"`) e rode `npm run task:sync`.',
-    '',
-    '## Agente — ritmo',
-    '',
-    '1. `npm run git:ensure-sync`',
-    '2. `npm run task:claim` — assume a proxima `pending` e publica em `main`',
-    '3. Implementar spec, banco/scripts se a task pedir, testes verdes',
-    '4. `npm run git:ship -- -Message "..."` apos alteracao de codigo',
-    '5. `npm run task:done -- --id <ID>`',
-    '',
-    'Se travar: `npm run task:release -- --id <ID> --reason "..."`',
-    ''
-  );
-
+  lines.push('');
   fs.writeFileSync(boardPath, lines.join('\n'), 'utf8');
 }
 
@@ -149,7 +234,7 @@ function escapeCell(s) {
 
 function fmtDate(iso) {
   if (!iso) return '—';
-  return iso.slice(0, 16).replace('T', ' ');
+  return String(iso).slice(0, 16).replace('T', ' ');
 }
 
 function printList(queue) {
@@ -157,7 +242,7 @@ function printList(queue) {
     .slice()
     .sort((a, b) => (b.priority || 0) - (a.priority || 0) || String(a.id).localeCompare(String(b.id)));
   if (!rows.length) {
-    console.log('[task-queue] Fila vazia. Adicione com: npm run task:add -- --id ... --title "..."');
+    console.log('[task-queue] Fila vazia. Escreva em tasks/FILA.md ou: npm run task:add -- --id ... --title "..."');
     return;
   }
   console.log('ID\tP\tStatus\t\tAgente\t\tTitulo');
@@ -165,6 +250,8 @@ function printList(queue) {
     console.log(`${t.id}\t${t.priority ?? 0}\t${t.status.padEnd(12)}\t${(t.claimed_by || '—').padEnd(12)}\t${t.title}`);
   }
 }
+
+const QUEUE_FILES = ['tasks/FILA.md', 'tasks/queue.json', 'tasks/QUEUE.md'];
 
 function ensureCleanForPublish() {
   const porcelain = runQuiet('git status --porcelain');
@@ -174,7 +261,7 @@ function ensureCleanForPublish() {
     .filter(Boolean)
     .every((line) => {
       const file = line.slice(3).trim();
-      return file === 'tasks/queue.json' || file === 'tasks/QUEUE.md';
+      return QUEUE_FILES.includes(file);
     });
   if (!onlyQueue) {
     console.error('[task-queue] Working tree suja (alem da fila). Commit ou descarte antes.');
@@ -185,7 +272,7 @@ function ensureCleanForPublish() {
 
 function publishQueue(commitMsg) {
   ensureCleanForPublish();
-  run('git add tasks/queue.json tasks/QUEUE.md');
+  run(`git add ${QUEUE_FILES.join(' ')}`);
   const staged = runQuiet('git diff --cached --name-only');
   if (!staged) {
     const porcelain = runQuiet('git status --porcelain');
@@ -200,7 +287,7 @@ function publishQueue(commitMsg) {
 }
 
 function discardQueueChanges() {
-  run('git checkout -- tasks/queue.json tasks/QUEUE.md', { silent: true });
+  run(`git checkout -- ${QUEUE_FILES.join(' ')}`, { silent: true });
 }
 
 function cmdAdd(args) {
@@ -226,11 +313,12 @@ function cmdAdd(args) {
     started_at: null,
     completed_at: null,
     release_version: null,
-    notes: args.notes || '',
+    description: args.notes || title,
+    notes: '',
   });
   writeQueue(queue);
   publishQueue(`chore(tasks): adicionar ${id} na fila`);
-  console.log(`[task-queue] Adicionada: ${id}`);
+  console.log(`[task-queue] Adicionada em tasks/FILA.md: ${id}`);
 }
 
 function cmdClaim(args) {
@@ -245,12 +333,13 @@ function cmdClaim(args) {
     if (current) {
       console.log(`[task-queue] ${agent} ja tem tarefa ativa: ${current.id} (${current.status})`);
       console.log(`[task-queue] Spec: ${current.spec || '(sem spec)'}`);
+      console.log(`[task-queue] Detalhes: tasks/FILA.md ## ${current.id}`);
       return;
     }
 
     const next = pickNext(queue);
     if (!next) {
-      console.log('[task-queue] Nenhuma tarefa pending na fila.');
+      console.log('[task-queue] Nenhuma tarefa pending em tasks/FILA.md');
       return;
     }
 
@@ -267,13 +356,14 @@ function cmdClaim(args) {
       }
       console.log(`[task-queue] ${agent} assumiu: ${next.id} — ${next.title}`);
       if (next.spec) console.log(`[task-queue] Spec: ${next.spec}`);
+      console.log(`[task-queue] Detalhes: tasks/FILA.md ## ${next.id}`);
       return;
     } catch {
       console.error(`[task-queue] Conflito ao publicar claim (tentativa ${attempt}/${maxRetries}). Realinhando...`);
       discardQueueChanges();
     }
   }
-  console.error('[task-queue] Nao foi possivel publicar o claim apos varias tentativas. Resolva conflitos em tasks/queue.json e tente de novo.');
+  console.error('[task-queue] Nao foi possivel publicar o claim. Resolva conflitos em tasks/FILA.md e tente de novo.');
   process.exit(1);
 }
 
@@ -336,6 +426,7 @@ function cmdRelease(args) {
   }
   const stamp = new Date().toISOString().slice(0, 16);
   task.notes = `${task.notes ? `${task.notes}\n` : ''}[${stamp}] ${agent} liberou: ${reason}`;
+  task.description = `${task.description}\n\n[${stamp}] Liberado: ${reason}`.trim();
   task.status = 'pending';
   task.claimed_by = null;
   task.claimed_at = null;
@@ -347,8 +438,8 @@ function cmdRelease(args) {
 
 function cmdSync() {
   const queue = readQueue();
-  writeBoard(queue);
-  console.log('[task-queue] QUEUE.md atualizado (rode commit+integrate se quiser publicar).');
+  writeQueue(queue);
+  console.log('[task-queue] FILA.md / queue.json / QUEUE.md sincronizados.');
 }
 
 function main() {

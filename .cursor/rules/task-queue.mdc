@@ -5,17 +5,22 @@ alwaysApply: true
 
 # Fila de trabalho multi-agente
 
-Fonte da verdade: **`tasks/queue.json`** (estado) + **`tasks/QUEUE.md`** (quadro legivel, gerado).
+Fonte da verdade humana: **`tasks/FILA.md`** (voce descreve as tarefas em texto livre).  
+Espelho gerado: `tasks/queue.json` + `tasks/QUEUE.md` (nao editar a mao).
 
 ## Arquiteto (Augusto)
 
-Adiciona proximas tarefas:
+**Edite `tasks/FILA.md`:** copie o bloco `## _MODELO`, cole no fim, troque o ID e descreva o trabalho.
+
+Campos (uma linha cada): `prioridade`, `status: pending`, `spec`, `titulo`, depois paragrafos livres.
+
+Ou via terminal:
 
 ```bash
 npm run task:add -- --id W3-01 --title "Titulo curto" --spec tasks/wave-3/01.md --priority 80
 ```
 
-Prioridade maior = sai primeiro na fila. Sem spec, o agente so ve o titulo — prefira sempre `--spec`.
+Prioridade maior = sai primeiro. Depois `npm run git:ship` para publicar a fila em `main`.
 
 ## Agente executor — obrigatorio (sozinho, sem o usuario pedir)
 
@@ -26,9 +31,9 @@ npm run git:ensure-sync
 npm run task:claim
 ```
 
-Isso le `tasks/queue.json`, escolhe a proxima `pending` (maior prioridade), marca `claimed` com seu `coceo.machineBranch`, publica em `main` e mostra o `spec` a abrir.
+Isso le `tasks/FILA.md`, escolhe a proxima `pending`, atualiza `status`/`agente`, publica em `main` e mostra o bloco + `spec`.
 
-**Nao** leia `queue.json` e escolha tarefa na mao — outro agente pode pegar a mesma no mesmo segundo. **Use sempre** `task:claim`.
+**Nao** leia a FILA e marque `claimed` na mao — use sempre `task:claim` (evita duas maquinas na mesma tarefa).
 
 - Se ja tiver tarefa `claimed` / `in_progress` no seu agente, **continue essa** — nao pegue outra.
 - Se a fila estiver vazia, **pare** e avise o usuario — nao invente escopo.
@@ -52,6 +57,7 @@ Nao deixe tarefa `claimed` abandonada sem `done` ou `release`.
 
 ## Proibido
 
-- Trabalhar em task sem estar `claimed` / `in_progress` no seu agente em `queue.json` em `main`
-- Assumir tarefa de outro agente (`claimed_by` diferente do seu `coceo.machineBranch`)
-- Editar `tasks/QUEUE.md` a mao (so `queue.json` ou `task:add`)
+- Trabalhar em task sem `task:claim` publicado em `main`
+- Assumir tarefa de outro agente (`agente:` na FILA diferente do seu `coceo.machineBranch`)
+- Editar `status` / `agente` em `tasks/FILA.md` a mao (use `task:claim`, `task:done`, `task:release`)
+- Editar `tasks/QUEUE.md` a mao

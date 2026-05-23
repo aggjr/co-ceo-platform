@@ -59,7 +59,7 @@ Tentativa de inserir lançamentos com **mesma data + mesmo ativo + mesmos valore
 
 ## Fluxo de trabalho ao receber uma task
 
-1. **Sem o usuario pedir:** `npm run git:ensure-sync` e **`npm run task:claim`** — o agente busca sozinho a proxima tarefa em `tasks/queue.json` (ver `.cursor/rules/task-queue.mdc`). Nao escolher tarefa lendo o arquivo; usar o script.
+1. **Sem o usuario pedir:** `npm run git:ensure-sync` e **`npm run task:claim`** — proxima tarefa em `tasks/FILA.md` (ver `.cursor/rules/task-queue.mdc`). Nao marcar claim na mao no arquivo.
 2. **Leia a task inteira** da spec retornada pelo claim antes de tocar código.
 3. Identifique o **critério de aceite** (comando de teste / verificação). Esse é o contrato. Sem ele verde, a task não está pronta.
 4. Faça as alterações estritamente no escopo da task. Resista à tentação de "melhorar enquanto está aqui".

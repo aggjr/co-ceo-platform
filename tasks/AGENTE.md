@@ -1,16 +1,18 @@
 # Instrucao para agentes executores
 
-Ao iniciar qualquer sessao neste repositorio, **voce** executa (nao espere o usuario pedir):
+**Primeira acao da sessao** (sem o usuario pedir):
 
 ```bash
 npm run git:ensure-sync
 npm run task:claim
 ```
 
-O script le `tasks/queue.json`, reserva a proxima tarefa `pending` no seu agente (`coceo.machineBranch`) e publica em `main` para os outros nao pegarem a mesma.
+O script le **`tasks/FILA.md`**, reserva a proxima tarefa `pending` e publica em `main`.
 
-Depois abra o arquivo **spec** que o comando imprimir (ex.: `tasks/wave-2/01-....md`).
+Depois abra o bloco `## <ID>` em **FILA.md** e a **spec** indicada (se houver).
 
 Ao terminar: `npm run git:ship -- -Message "..."` → `npm run task:done -- --id <ID>`.
 
-Quadro para humanos: `tasks/QUEUE.md` (somente leitura).
+**Nao** altere `status` / `agente` na FILA a mao — use os comandos `task:*`.
+
+Quadro resumo: `tasks/QUEUE.md` (somente leitura).

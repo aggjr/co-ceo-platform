@@ -12,10 +12,11 @@ Spec ruim = código ruim. A qualidade da execução é proporcional à precisão
 
 | Arquivo | Papel |
 |---------|--------|
-| **`queue.json`** | Estado da fila (pending, claimed, done, …) — fonte para scripts |
-| **`QUEUE.md`** | Quadro legível (gerado; não editar à mão) |
+| **`FILA.md`** | **Você escreve aqui** — descrição das próximas tarefas (texto livre + campos) |
+| **`queue.json`** | Espelho para scripts (gerado; não editar à mão) |
+| **`QUEUE.md`** | Quadro resumo (gerado; não editar à mão) |
 
-**Arquiteto** — enfileira trabalho:
+**Arquiteto** — edite **`tasks/FILA.md`** (copie o bloco `## _MODELO`) ou:
 
 ```bash
 npm run task:add -- --id W3-01 --title "Barramento canônico" --spec tasks/wave-3/01.md --priority 80
@@ -30,8 +31,9 @@ Detalhes: [`AGENTE.md`](AGENTE.md) e [`.cursor/rules/task-queue.mdc`](../.cursor
 ```
 tasks/
 ├── README.md           — este arquivo
-├── queue.json          — fila de trabalho (estado)
-├── QUEUE.md            — quadro gerado para leitura
+├── FILA.md             — fila humana (arquiteto edita)
+├── queue.json          — espelho gerado
+├── QUEUE.md            — quadro resumo gerado
 ├── _template.md        — template para criar nova task spec
 ├── wave-2/             — ondas de trabalho do INVEST (engine 3 preços)
 │   ├── 01-...md

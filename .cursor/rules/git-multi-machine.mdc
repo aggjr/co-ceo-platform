@@ -28,7 +28,7 @@ npm run git:ensure-sync
 npm run task:claim
 ```
 
-Estado em `tasks/queue.json` / quadro `tasks/QUEUE.md` — ver `.cursor/rules/task-queue.mdc`.
+Fila humana: `tasks/FILA.md` — ver `.cursor/rules/task-queue.mdc`.
 
 ## Após qualquer alteração de código (sem perguntar)
 
