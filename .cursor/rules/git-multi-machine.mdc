@@ -63,7 +63,10 @@ git push -u origin antigravity-guto
 
 ```bash
 npm run git:ensure-sync
+npm run task:claim
 ```
+
+Fila: `tasks/queue.json` / `tasks/QUEUE.md` — ver `.cursor/rules/task-queue.mdc`.
 
 ## Antes de cada commit
 

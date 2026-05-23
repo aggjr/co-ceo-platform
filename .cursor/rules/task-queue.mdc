@@ -1,0 +1,51 @@
+---
+description: Fila central de tarefas — claim antes de codar; done apos integrar.
+alwaysApply: true
+---
+
+# Fila de trabalho multi-agente
+
+Fonte da verdade: **`tasks/queue.json`** (estado) + **`tasks/QUEUE.md`** (quadro legivel, gerado).
+
+## Arquiteto (Augusto)
+
+Adiciona proximas tarefas:
+
+```bash
+npm run task:add -- --id W3-01 --title "Titulo curto" --spec tasks/wave-3/01.md --priority 80
+```
+
+Prioridade maior = sai primeiro na fila. Sem spec, o agente so ve o titulo — prefira sempre `--spec`.
+
+## Agente executor — obrigatorio
+
+**Antes de implementar** (apos `npm run git:ensure-sync`):
+
+```bash
+npm run task:claim
+```
+
+- Se ja tiver tarefa `claimed` / `in_progress` no seu `coceo.machineBranch`, **continue essa** — nao pegue outra.
+- Se a fila estiver vazia, **pare** e avise o usuario — nao invente escopo.
+
+**Durante:** opcional `npm run task:start -- --id <ID>` ao comecar a editar codigo.
+
+**Ao terminar** (codigo commitado, `npm run git:integrate` feito, banco/scripts da task se houver):
+
+```bash
+npm run task:done -- --id <ID>
+```
+
+**Se travar** (spec ambigua, conflito de modelagem, dependencia externa):
+
+```bash
+npm run task:release -- --id <ID> --reason "motivo objetivo"
+```
+
+Nao deixe tarefa `claimed` abandonada sem `done` ou `release`.
+
+## Proibido
+
+- Trabalhar em task sem estar `claimed` / `in_progress` no seu agente em `queue.json` em `main`
+- Assumir tarefa de outro agente (`claimed_by` diferente do seu `coceo.machineBranch`)
+- Editar `tasks/QUEUE.md` a mao (so `queue.json` ou `task:add`)
