@@ -23,7 +23,7 @@ npm run task:add -- --id W3-01 --title "Barramento canônico" --spec tasks/wave-
 
 **Agente** — ao iniciar sessão: `npm run git:ensure-sync` → `npm run task:claim` → executa a spec → `npm run git:ship` → `npm run task:done -- --id W3-01`.
 
-Detalhes: [`.cursor/rules/task-queue.mdc`](../.cursor/rules/task-queue.mdc).
+Detalhes: [`AGENTE.md`](AGENTE.md) e [`.cursor/rules/task-queue.mdc`](../.cursor/rules/task-queue.mdc).
 
 ## Estrutura
 
