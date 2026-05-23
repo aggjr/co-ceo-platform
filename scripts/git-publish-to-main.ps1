@@ -80,20 +80,20 @@ if ($current -ne $machine) {
   git checkout $machine
 }
 
-Write-Host "=== 1/6 fetch ===" -ForegroundColor Cyan
+Write-Host "=== 1/7 fetch ===" -ForegroundColor Cyan
 git fetch origin
 
-Write-Host "=== 2/6 alinhar $machine com origin/$integration ===" -ForegroundColor Cyan
+Write-Host "=== 2/7 alinhar $machine com origin/$integration ===" -ForegroundColor Cyan
 git merge "origin/$integration" -m "merge($machine): integrar $integration antes de publicar"
 if ($LASTEXITCODE -ne 0) {
   if (Show-Conflicts "pre-push") { exit 1 }
   Write-Error "Falha ao integrar $integration em $machine"
 }
 
-Write-Host "=== 3/6 push $machine ===" -ForegroundColor Cyan
+Write-Host "=== 3/7 push $machine ===" -ForegroundColor Cyan
 git push -u origin $machine
 
-Write-Host "=== 4/6 merge $machine -> $integration ===" -ForegroundColor Cyan
+Write-Host "=== 4/7 merge $machine -> $integration ===" -ForegroundColor Cyan
 git checkout $integration
 git pull origin $integration
 git merge $machine -m "merge($integration): integrar $machine"
@@ -104,25 +104,25 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 if ($peerRefs.Count -eq 0) {
-  Write-Host "=== 5/6 nenhuma branch par configurada (scripts/git-machines.json) ===" -ForegroundColor Cyan
+  Write-Host "=== 5/7 nenhuma branch par (git-machines.json) ===" -ForegroundColor Cyan
 } else {
   $peerIndex = 0
   foreach ($peer in $peerRefs) {
     $peerIndex += 1
     if (Test-GitRef $peer) {
-      Write-Host "=== 5/$($peerIndex + 5) merge par $peer -> $integration ===" -ForegroundColor Cyan
+      Write-Host "=== 5/7 merge par $peer -> $integration ===" -ForegroundColor Cyan
       git merge $peer -m "merge($integration): integrar $peer"
       if ($LASTEXITCODE -ne 0) {
         if (Show-Conflicts "merge-par-$peer") { exit 1 }
         Write-Error "Falha ao integrar branch par $peer"
       }
     } else {
-      Write-Host "=== 5/$($peerIndex + 5) par $peer ausente no remoto (ok) ===" -ForegroundColor Cyan
+      Write-Host "=== 5/7 par $peer ausente no remoto (ok) ===" -ForegroundColor Cyan
     }
   }
 }
 
-Write-Host "=== 5b/6 bump versao unificada (main + par) ===" -ForegroundColor Cyan
+Write-Host "=== 6/7 bump versao unificada ===" -ForegroundColor Cyan
 node scripts/bump-version.js --integrate
 if ($LASTEXITCODE -ne 0) {
   Write-Error "Falha ao bump de versao unificada"
@@ -141,7 +141,7 @@ if ($LASTEXITCODE -ne 0) {
   Write-Host "Versao ja estava atualizada (sem commit de release)." -ForegroundColor DarkGray
 }
 
-Write-Host "=== 6/6 push $integration e realinhar $machine ===" -ForegroundColor Cyan
+Write-Host "=== 7/7 push $integration e realinhar $machine ===" -ForegroundColor Cyan
 git push origin $integration
 
 git checkout $machine
@@ -158,4 +158,4 @@ $versionJson = Get-Content -Raw version.json | ConvertFrom-Json
 $appVersion = "V$($versionJson.major).$($versionJson.minor).$($versionJson.patch)"
 Write-Host ""
 Write-Host "OK. main e $machine em $sha | versao $appVersion (sem conflitos pendentes)." -ForegroundColor Green
-Write-Host "Tipos: git log -1 --oneline" -ForegroundColor DarkGray
+Write-Host "Tip: git log -1 --oneline" -ForegroundColor DarkGray

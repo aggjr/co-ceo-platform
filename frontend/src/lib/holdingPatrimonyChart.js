@@ -40,7 +40,14 @@ function renderCashTransitBlock(cashInTransit) {
   </div>`;
 }
 
-export function renderHoldingPatrimonySummary(series, performance, btgReference, cashInTransit) {
+export function renderHoldingPatrimonySummary(
+  series,
+  performance,
+  btgReference,
+  cashInTransit,
+  cdiComparison,
+  stockBenchmark
+) {
   const today = new Date().toISOString().slice(0, 10);
   const clipped = (series || []).filter((p) => String(p.date).slice(0, 10) <= today);
   if (!clipped.length) {
@@ -71,6 +78,21 @@ export function renderHoldingPatrimonySummary(series, performance, btgReference,
             TWR por fechamentos mensais (âncoras): ${formatPct(performance.monthAnchorTwr)}
           </span>`
         : '';
+    const cdiLine =
+      cdiComparison && cdiComparison.cdiPeriodReturn != null
+        ? `<span class="muted" style="font-size:12px;display:block;margin-top:4px">
+            CDI no período: <strong>${formatPct(cdiComparison.cdiPeriodReturn)}</strong>
+            · Carteira (índice): ${formatPct(cdiComparison.portfolioPeriodReturn)}
+            · vs CDI: <strong class="${cdiComparison.excessReturn >= 0 ? 'is-positive' : 'is-negative'}">${cdiComparison.excessReturn >= 0 ? '+' : ''}${formatPct(cdiComparison.excessReturn)}</strong>
+          </span>`
+        : '';
+    const stockLine =
+      stockBenchmark?.available && stockBenchmark.periodReturn != null
+        ? `<span class="muted" style="font-size:12px;display:block;margin-top:2px">
+            ${stockBenchmark.ticker} buy &amp; hold: <strong>${formatPct(stockBenchmark.periodReturn)}</strong>
+            <span class="muted"> (${stockBenchmark.observationDays} pregões)</span>
+          </span>`
+        : '';
     return `
     <div class="holding-summary">
       <div class="holding-summary-main">
@@ -91,6 +113,8 @@ export function renderHoldingPatrimonySummary(series, performance, btgReference,
             : ''
         }
         ${anchorLine}
+        ${cdiLine}
+        ${stockLine}
         ${btgLine}
       </div>
       <div class="holding-summary-side muted">
@@ -132,7 +156,11 @@ export function renderHoldingPatrimonySummary(series, performance, btgReference,
 /**
  * @param {HTMLCanvasElement} canvas
  * @param {Array<{ date: string, patrimony: number }>} series
- * @param {{ datasetLabel?: string }} [opts]
+ * @param {{
+ *   datasetLabel?: string,
+ *   cdiBenchmark?: { available?: boolean, series?: Array<{ date: string, indexedLevel: number }> },
+ *   stockBenchmark?: { available?: boolean, ticker?: string, series?: Array<{ date: string, indexedLevel: number }> },
+ * }} [opts]
  */
 export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
   if (activeChart) {
@@ -153,25 +181,78 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
 
   const gold = '#DAB177';
   const goldFill = 'rgba(218, 177, 119, 0.12)';
+  const white = '#FFFFFF';
+  const cdiByDate = new Map(
+    (opts.cdiBenchmark?.series || []).map((p) => [String(p.date).slice(0, 10), Number(p.indexedLevel)])
+  );
+  const stockTicker = String(opts.stockBenchmark?.ticker || 'PRIO3').toUpperCase();
+  const stockByDate = new Map(
+    (opts.stockBenchmark?.series || []).map((p) => [
+      String(p.date).slice(0, 10),
+      Number(p.indexedLevel),
+    ])
+  );
+  const hasCdi = opts.cdiBenchmark?.available && cdiByDate.size > 0;
+  const hasStock = opts.stockBenchmark?.available && stockByDate.size > 0;
+  const hasIndexAxis = hasCdi || hasStock;
+  const cdiValues = labels.map((d) => (cdiByDate.has(d) ? cdiByDate.get(d) : null));
+  const stockValues = labels.map((d) => (stockByDate.has(d) ? stockByDate.get(d) : null));
+  const stockOrange = '#FB923C';
+
+  /** @type {import('chart.js').ChartDataset[]} */
+  const datasets = [
+    {
+      label: opts.datasetLabel || 'Patrimônio diário',
+      data: values,
+      borderColor: gold,
+      backgroundColor: goldFill,
+      borderWidth: 2.5,
+      tension: 0.35,
+      fill: true,
+      pointRadius: 0,
+      pointHitRadius: 8,
+      pointHoverRadius: 4,
+      yAxisID: 'y',
+    },
+  ];
+
+  if (hasCdi) {
+    datasets.push({
+      label: 'CDI (índice 100)',
+      data: cdiValues,
+      borderColor: white,
+      borderWidth: 2,
+      borderDash: [6, 4],
+      tension: 0.15,
+      fill: false,
+      pointRadius: 0,
+      pointHitRadius: 8,
+      pointHoverRadius: 3,
+      yAxisID: 'yIndex',
+    });
+  }
+
+  if (hasStock) {
+    datasets.push({
+      label: `${stockTicker} buy & hold (índice 100)`,
+      data: stockValues,
+      borderColor: stockOrange,
+      borderWidth: 2,
+      borderDash: [4, 3],
+      tension: 0.2,
+      fill: false,
+      pointRadius: 0,
+      pointHitRadius: 8,
+      pointHoverRadius: 3,
+      yAxisID: 'yIndex',
+    });
+  }
 
   activeChart = new Chart(canvas, {
     type: 'line',
     data: {
       labels,
-      datasets: [
-        {
-          label: opts.datasetLabel || 'Patrimônio diário',
-          data: values,
-          borderColor: gold,
-          backgroundColor: goldFill,
-          borderWidth: 2.5,
-          tension: 0.35,
-          fill: true,
-          pointRadius: 0,
-          pointHitRadius: 8,
-          pointHoverRadius: 4,
-        },
-      ],
+      datasets,
     },
     options: {
       responsive: true,
@@ -181,6 +262,14 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
         legend: {
           position: 'bottom',
           labels: { color: '#94A3B8', boxWidth: 12, padding: 16 },
+          onClick(_evt, legendItem, legend) {
+            const chart = legend.chart;
+            const index = legendItem.datasetIndex;
+            if (index == null) return;
+            const visible = chart.isDatasetVisible(index);
+            chart.setDatasetVisibility(index, !visible);
+            chart.update();
+          },
         },
         tooltip: {
           backgroundColor: '#0A1D30',
@@ -194,13 +283,19 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
               return i != null ? formatDateBr(labels[i]) : '';
             },
             label(ctx) {
-              return `Patrimônio: ${formatBrl(ctx.parsed.y)}`;
+              const y = ctx.parsed.y;
+              if (ctx.dataset.yAxisID === 'yIndex') {
+                const ret = y != null ? ((Number(y) / 100 - 1) * 100).toFixed(2) : '—';
+                return `${ctx.dataset.label}: ${ret}%`;
+              }
+              return `Patrimônio: ${formatBrl(y)}`;
             },
           },
         },
       },
       scales: {
         y: {
+          position: 'left',
           grid: { color: 'rgba(255,255,255,0.06)' },
           ticks: {
             color: '#94A3B8',
@@ -208,6 +303,24 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
             callback: (v) => formatBrl(Number(v)),
           },
         },
+        ...(hasIndexAxis
+          ? {
+              yIndex: {
+                position: 'right',
+                grid: { drawOnChartArea: false },
+                ticks: {
+                  color: 'rgba(255,255,255,0.65)',
+                  maxTicksLimit: 6,
+                  callback: (v) => {
+                    const n = Number(v);
+                    if (!Number.isFinite(n)) return '';
+                    const pct = ((n / 100 - 1) * 100).toFixed(1);
+                    return `${pct}%`;
+                  },
+                },
+              },
+            }
+          : {}),
         x: {
           grid: { display: false },
           ticks: {

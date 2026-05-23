@@ -85,10 +85,7 @@ function readGitVersion(ref, fileName) {
 }
 
 function collectIntegrateCandidates() {
-  const candidates = [
-    readVersionJson(versionFile),
-    readPackageVersion(),
-  ].filter(Boolean);
+  const candidates = [readVersionJson(versionFile), readPackageVersion()].filter(Boolean);
 
   for (const ref of ['HEAD', 'origin/main']) {
     candidates.push(readGitVersion(ref, 'version.json'));

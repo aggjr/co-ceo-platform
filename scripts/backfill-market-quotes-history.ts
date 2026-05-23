@@ -50,6 +50,40 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+/** Fallback sem BRAPI_TOKEN — Yahoo Finance (.SA). */
+async function fetchYahooHistory(
+  ticker: string,
+  from: string,
+  to: string
+): Promise<BrapiBar[]> {
+  const symbol = `${ticker.toUpperCase()}.SA`;
+  const period1 = Math.floor(new Date(`${from}T12:00:00Z`).getTime() / 1000);
+  const period2 = Math.floor(new Date(`${to}T23:59:59Z`).getTime() / 1000);
+  const url =
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}` +
+    `?period1=${period1}&period2=${period2}&interval=1d`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) {
+    throw new Error(`Yahoo ${symbol} HTTP ${res.status}`);
+  }
+  const json = (await res.json()) as {
+    chart?: { result?: Array<{ timestamp?: number[]; indicators?: { quote?: Array<{ close?: (number | null)[] }> } }> };
+  };
+  const result = json.chart?.result?.[0];
+  const stamps = result?.timestamp || [];
+  const closes = result?.indicators?.quote?.[0]?.close || [];
+  const bars: BrapiBar[] = [];
+  for (let i = 0; i < stamps.length; i++) {
+    const close = closes[i];
+    if (close == null || !Number.isFinite(close) || close <= 0) continue;
+    bars.push({ date: stamps[i]!, close });
+  }
+  return bars;
+}
+
 async function fetchHistoryBatch(
   tickers: string[],
   range: string
@@ -88,7 +122,7 @@ async function main() {
     host: process.env.DB_HOST || '127.0.0.1',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'co_ceo_platform',
+    database: process.env.DB_NAME || 'co_ceo_db',
   });
 
   const gateway = new CoCeoDataGateway(pool);
@@ -109,8 +143,29 @@ async function main() {
     return;
   }
 
-  console.log(`brapi range=${args.range}  ${args.from || ''}${args.from ? ` → ${args.to}` : ''}`);
-  const series = await fetchHistoryBatch(tickers, args.range);
+  const fromIso = args.from || '2020-01-01';
+  const toIso = args.to || new Date().toISOString().slice(0, 10);
+  const series = new Map<string, BrapiBar[]>();
+
+  const token = process.env.BRAPI_TOKEN || '';
+  if (token) {
+    console.log(`brapi range=${args.range}  ${fromIso} → ${toIso}`);
+    const brapi = await fetchHistoryBatch(tickers, args.range);
+    for (const [t, bars] of brapi.entries()) series.set(t, bars);
+  } else {
+    console.log('BRAPI_TOKEN ausente — histórico via Yahoo Finance (.SA)');
+  }
+
+  for (const ticker of tickers) {
+    if (series.has(ticker) && (series.get(ticker)?.length ?? 0) > 0) continue;
+    try {
+      const bars = await fetchYahooHistory(ticker, fromIso, toIso);
+      series.set(ticker, bars);
+      console.log(`  Yahoo ${ticker}: ${bars.length} barra(s)`);
+    } catch (e) {
+      console.warn(`  Yahoo ${ticker} falhou:`, e instanceof Error ? e.message : e);
+    }
+  }
 
   let totalBars = 0;
   let totalSaved = 0;
@@ -132,8 +187,8 @@ async function main() {
         ticker,
         quoteDate: date,
         closingPrice: bar.close,
-        source: 'brapi',
-        metadata: { kind: 'close', backfill: true },
+        source: token ? 'brapi' : 'user_manual',
+        metadata: { kind: 'close', backfill: true, provider: token ? 'brapi' : 'yahoo_finance' },
       });
       savedTicker += 1;
       totalBars += 1;

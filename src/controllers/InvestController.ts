@@ -25,6 +25,15 @@ import {
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
+import {
+  buildCdiBenchmarkForChart,
+  buildPatrimonyIndexedSeries,
+  buildStockBenchmarkForChart,
+} from '../core/market/indexBenchmark';
+
+/** Ação principal da holding para curva buy-and-hold no gráfico de Resultado Histórico. */
+const CHART_BENCHMARK_STOCK =
+  (process.env.INVEST_CHART_BENCHMARK_TICKER || 'PRIO3').trim().toUpperCase();
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import {
   mergeStoredPatrimonySeries,
@@ -67,6 +76,8 @@ import {
   normalizeBrokerNoteRef,
 } from '../core/invest/extractLedgerEnrichment';
 import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
+import pool from '../config/database';
+import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
 
 export class InvestController {
   private readonly ledger: LedgerImportService;
@@ -326,9 +337,64 @@ export class InvestController {
 
     const cashInTransit = buildCashInTransitSummary(events, to);
 
+    const chartDates = result.series.map((p) => String(p.date).slice(0, 10));
+    let cdiRows = await this.marketQuoteRepo.loadIndexRange(ctx, 'CDI', from, to);
+    let prioQuotes = await this.marketQuoteRepo.loadQuoteRange(
+      ctx,
+      CHART_BENCHMARK_STOCK,
+      from,
+      to
+    );
+    if (!cdiRows.length || !prioQuotes.length) {
+      try {
+        await seedMarketBenchmarks(this.gateway, pool, {
+          from,
+          to,
+          stockTicker: CHART_BENCHMARK_STOCK,
+        });
+        cdiRows = await this.marketQuoteRepo.loadIndexRange(ctx, 'CDI', from, to);
+        prioQuotes = await this.marketQuoteRepo.loadQuoteRange(
+          ctx,
+          CHART_BENCHMARK_STOCK,
+          from,
+          to
+        );
+      } catch {
+        /* seed best-effort */
+      }
+    }
+    const cdiBenchmark = buildCdiBenchmarkForChart(cdiRows, from, to, chartDates);
+    const stockBenchmark = buildStockBenchmarkForChart(
+      prioQuotes.map((q) => ({ quote_date: q.quote_date, closing_price: q.closing_price })),
+      chartDates,
+      CHART_BENCHMARK_STOCK
+    );
+    const portfolioIndexed = buildPatrimonyIndexedSeries(result.series);
+    const portfolioPeriodReturn =
+      portfolioIndexed.length >= 2
+        ? portfolioIndexed[portfolioIndexed.length - 1]!.periodReturnToDate
+        : null;
+    const cdiComparison =
+      cdiBenchmark.available &&
+      cdiBenchmark.periodReturn != null &&
+      portfolioPeriodReturn != null
+        ? {
+            portfolioPeriodReturn,
+            cdiPeriodReturn: cdiBenchmark.periodReturn,
+            excessReturn:
+              Math.round((portfolioPeriodReturn - cdiBenchmark.periodReturn) * 1_000_000) /
+              1_000_000,
+          }
+        : null;
+
     return res.json({
       success: true,
       ...result,
+      cdiBenchmark,
+      stockBenchmark,
+      chartBenchmarkTicker: CHART_BENCHMARK_STOCK,
+      portfolioIndexed,
+      cdiComparison,
       cashInTransit,
       btgReference,
       extractReconciliation: {
@@ -358,6 +424,12 @@ export class InvestController {
           ? 'Série com calibração às âncoras mensais BTG.'
           : 'Série econômica: livro-razão × cotação do dia (ou PM quando sem cotação).',
         'TWR: fluxos externos apenas capital_deposit/withdrawal (TEDs).',
+        cdiBenchmark.available
+          ? `CDI: ${cdiBenchmark.observationDays} dia(s) em market_index_daily (índice 100 no gráfico).`
+          : 'CDI indisponível — rode npm run sync:market:indices e confira migration 22.',
+        stockBenchmark.available
+          ? `${CHART_BENCHMARK_STOCK}: ${stockBenchmark.observationDays} fechamento(s) em market_quotes_daily (buy-and-hold índice 100).`
+          : `${CHART_BENCHMARK_STOCK} sem histórico — rode npm run seed:market:benchmarks.`,
       ],
       patrimonySource: calibrateToAnchors
         ? 'ledger_plus_btg_anchors'
@@ -713,6 +785,30 @@ export class InvestController {
       success: true,
       rows,
     });
+  };
+
+  /** Popula CDI + ação benchmark (PRIO3) em tabelas globais — escopo plataforma. */
+  seedMarketBenchmarks = async (req: Request, res: Response) => {
+    if (req.userContext?.scope !== 'global') {
+      return res.status(403).json({
+        success: false,
+        error: 'Somente sessão plataforma (escopo global) pode popular benchmarks de mercado.',
+      });
+    }
+    const from = String(req.body?.from || req.query.from || '2025-12-01').slice(0, 10);
+    const to = String(req.body?.to || req.query.to || new Date().toISOString().slice(0, 10)).slice(0, 10);
+    const stockTicker = String(
+      req.body?.stockTicker || req.query.stockTicker || process.env.INVEST_CHART_BENCHMARK_TICKER || 'PRIO3'
+    )
+      .trim()
+      .toUpperCase();
+    try {
+      const result = await seedMarketBenchmarks(this.gateway, pool, { from, to, stockTicker });
+      return res.json({ success: true, ...result });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ success: false, error: message });
+    }
   };
 
 }

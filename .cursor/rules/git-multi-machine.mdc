@@ -56,9 +56,20 @@ npm run check:branch-overlap
 
 **Imediatamente após o commit**
 
-5. `npm run git:integrate` — merge sua branch → `main`, depois **cada branch par** → `main`, bump de versão unificado, push `main`, realinha sua branch
+5. `npm run git:integrate` — merge sua branch → `main`, depois **cada branch par** → `main`, bump unificado (`version.json` + `package.json` + `APP_VERSION`), commit `chore(release): Vx.y.z`, push `main`, realinha sua branch
 6. Se **CONFLITO**: parar, resolver, rodar de novo
-7. Ao terminar: sua branch e `main` no mesmo código integrado
+7. Ao terminar: sua branch e `main` no mesmo código e **mesma versão** (`/api/version`)
+
+O agente executor **sempre** segue os passos 5–7 após cada commit nesta máquina.
+
+## Atualizar a branch da máquina a partir de main (sempre)
+
+```bash
+git fetch origin
+git checkout note-gamer   # ou note-guto / antigravity-*
+git rebase origin/main
+git push --force-with-lease origin note-gamer   # só na branch própria
+```
 
 ## Integração manual em main
 
@@ -71,7 +82,7 @@ git merge origin/antigravity-gamer -m "merge(antigravity-gamer): ..."
 git merge origin/antigravity-guto -m "merge(antigravity-guto): ..."
 node scripts/bump-version.js --integrate
 git add version.json package.json src/generated/version.ts frontend/src/generated/version.js
-git commit -m "chore(release): V... — integracao main"
+git commit -m "chore(release): V... - integracao main"
 git push origin main
 ```
 
