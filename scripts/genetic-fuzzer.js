@@ -19,7 +19,7 @@ const TARGET_ENDPOINTS = [
 
 const POPULATION_SIZE = 20;
 const GENERATIONS = 5;
-const CLIENT_THRESHOLD = 50;
+const MAX_HISTORICAL_SEEDS = 100; // Priorização: Limita a base de testes crescendo infinito
 
 // Genes possíveis
 const MUTATIONS = [
@@ -118,42 +118,26 @@ function evaluateFitness(res) {
 }
 
 async function runFuzzer() {
-  console.log("Iniciando bateria de Fuzzing Genético...");
-  
-  // 1. Validar Gatilho (Regra dos 50 clientes)
-  try {
-    const conn = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || 'root',
-      database: process.env.DB_NAME || 'co_ceo_db'
-    });
-    const [rows] = await conn.execute('SELECT COUNT(id) as total FROM contracts WHERE status = "active"');
-    const activeClients = rows[0].total;
-    await conn.end();
-    
-    if (activeClients < CLIENT_THRESHOLD) {
-      console.log(`\n[AVISO] Skipped stress tests: O volume de clientes reais (${activeClients}) não atingiu o limite crítico (${CLIENT_THRESHOLD}). Testes de carga adiados.`);
-      fs.writeFileSync('fuzzing_report.json', JSON.stringify([{ status: 'Skipped', reason: 'Client threshold not met (< 50)' }], null, 2));
-      return;
-    }
-  } catch (e) {
-    console.log("Erro ao conectar no banco para checar limite. Assumindo que não bateu a cota.", e.message);
-    return;
-  }
+  console.log("Iniciando bateria de Fuzzing Genético Funcional...");
 
-  // 2. Carregar Retroalimentação (Seeds do dia anterior)
+  // 1. Carregar Retroalimentação (Seeds do dia anterior) com PRIORIZAÇÃO
   let initialSeeds = [];
   try {
     if (fs.existsSync('fuzzing_report.json')) {
-      const prev = JSON.parse(fs.readFileSync('fuzzing_report.json', 'utf-8'));
+      let prev = JSON.parse(fs.readFileSync('fuzzing_report.json', 'utf-8'));
       if (Array.isArray(prev)) {
-        initialSeeds = prev.filter(r => r.payload).map(r => r.payload).slice(0, POPULATION_SIZE);
+        // Remove 'Skipped' records and prioritize by fitness/status
+        prev = prev.filter(r => r.payload && typeof r.fitness === 'number');
+        prev.sort((a, b) => b.fitness - a.fitness);
+        
+        // Limita a base histórica para não crescer infinitamente
+        prev = prev.slice(0, MAX_HISTORICAL_SEEDS);
+        initialSeeds = prev.map(r => r.payload).slice(0, POPULATION_SIZE);
       }
     }
   } catch(e) {}
   if (initialSeeds.length > 0) {
-    console.log(`[INFO] Carregadas ${initialSeeds.length} sementes de falhas anteriores para retroalimentar a evolução.`);
+    console.log(`[INFO] Carregadas ${initialSeeds.length} sementes de falhas prioritárias para retroalimentar a evolução.`);
   }
 
   const report = [];
