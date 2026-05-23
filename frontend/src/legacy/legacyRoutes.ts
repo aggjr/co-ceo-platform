@@ -6,7 +6,7 @@ import { ClientCockpitPage } from '../pages/ClientCockpitPage.js';
 import { InvestDashboardPage } from '../pages/InvestDashboardPage.js';
 import { InvestPortfolioPage } from '../pages/InvestPortfolioPage.js';
 import { InvestStockGainPivotPage } from '../pages/InvestStockGainPivotPage.js';
-import { InvestBrokerageNotesPage } from '../pages/InvestBrokerageNotesPage.js';
+import { InvestHistoricoOperacoesPage } from '../pages/InvestHistoricoOperacoesPage.js';
 import { InvestExtratosPage } from '../pages/InvestExtratosPage.js';
 import { QualityRegressionPage } from '../pages/QualityRegressionPage.js';
 
@@ -32,7 +32,7 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/invest/carteira-acoes-fiis', loader: InvestPortfolioPage },
   { path: '/invest/resultado', loader: InvestPortfolioPage },
   { path: '/invest/ganhos-por-acao', loader: InvestStockGainPivotPage },
-  { path: '/invest/historico-operacoes', loader: InvestBrokerageNotesPage },
+  { path: '/invest/historico-operacoes', loader: InvestHistoricoOperacoesPage },
   { path: '/invest/extratos', loader: InvestExtratosPage },
   { path: '/invest/transacoes-finalizadas', loader: InvestPortfolioPage },
 ];

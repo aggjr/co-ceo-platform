@@ -1,5 +1,5 @@
 import '../styles/coceo-excel-table.css';
-import '../styles/invest-brokerage-notes.css';
+import '../styles/invest-historico-operacoes.css';
 import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
@@ -115,7 +115,7 @@ function bindFilters(container, allRows, remount) {
   search?.addEventListener('input', apply);
 }
 
-export async function InvestBrokerageNotesPage(container) {
+export async function InvestHistoricoOperacoesPage(container) {
   if (!isAuthenticated()) {
     navigate('/login');
     return;
