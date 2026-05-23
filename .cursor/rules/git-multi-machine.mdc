@@ -21,6 +21,19 @@ Lista canônica: **`scripts/git-machines.json`**
 
 Regra: **não commitar na branch de outra máquina/agente.** Integrar em `main` via `npm run git:integrate`.
 
+## Versão do sistema — auto-alinhamento (obrigatório para o agente)
+
+A versão canônica esta em **`version.json`** / **`package.json`** / `APP_VERSION` (gerados apos cada integracao em `main`).
+
+**Antes de implementar, auditar ou responder sobre codigo em producao**, o agente executor deve:
+
+1. Ler `version.json` local e comparar mentalmente com o que o usuario ou `/api/version` espera.
+2. Rodar **`npm run git:ensure-sync`** (ou `node scripts/ensure-code-synced.js --check-only` para so verificar).
+3. Se local **<** `origin/main` (ex.: local V0.0.50 e main V0.0.51): **nao continuar na versao velha** — o script faz `git fetch` + merge de `origin/main` na branch da maquina (working tree limpa).
+4. So entao editar codigo, rodar scripts no remoto ou concluir que o deploy esta atualizado.
+
+Se `git:ensure-sync` falhar por working tree suja: commitar ou descartar primeiro, depois rodar de novo.
+
 Config Git local (uma vez por clone/processo):
 
 ```bash
@@ -35,9 +48,16 @@ git checkout -b antigravity-guto origin/main
 git push -u origin antigravity-guto
 ```
 
+## Antes de cada tarefa de codigo (nao so antes do commit)
+
+```bash
+npm run git:ensure-sync
+```
+
 ## Antes de cada commit
 
 ```bash
+npm run git:ensure-sync
 git fetch origin
 .\scripts\git-sync-before-commit.ps1
 npm run check:branch-overlap
