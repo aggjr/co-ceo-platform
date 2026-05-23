@@ -1,6 +1,6 @@
 {
   "name": "co-ceo-core",
-  "version": "0.0.54",
+  "version": "0.0.55",
   "description": "co-CEO Platform Core API",
   "main": "dist/index.js",
   "scripts": {
@@ -39,6 +39,13 @@
     "audit:btg:notes-fees": "node ./node_modules/ts-node/dist/bin.js scripts/audit-btg-notes-fees-only.ts",
     "invest:purge-keep-opening": "node ./node_modules/ts-node/dist/bin.js scripts/purge-holding-keep-opening.ts",
     "invest:rebuild-btg-notes": "node ./node_modules/ts-node/dist/bin.js scripts/rebuild-holding-from-btg-notes.ts",
+    "task:list": "node scripts/task-queue.js list",
+    "task:add": "node scripts/task-queue.js add",
+    "task:claim": "node scripts/task-queue.js claim",
+    "task:start": "node scripts/task-queue.js start",
+    "task:done": "node scripts/task-queue.js done",
+    "task:release": "node scripts/task-queue.js release",
+    "task:sync": "node scripts/task-queue.js sync",
     "git:ensure-sync": "node scripts/ensure-code-synced.js",
     "git:check-version": "node scripts/ensure-code-version.js --check",
     "git:ensure-version": "node scripts/ensure-code-version.js",

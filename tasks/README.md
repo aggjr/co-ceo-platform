@@ -8,11 +8,30 @@ O arquiteto (Augusto) e o agente estratégico (Claude / Opus) tomam decisões de
 
 Spec ruim = código ruim. A qualidade da execução é proporcional à precisão da spec. Por isso o template em [`_template.md`](_template.md) força o autor da spec a ser explícito sobre escopo, contrato e critério de aceite.
 
+## Fila central (multi-agente)
+
+| Arquivo | Papel |
+|---------|--------|
+| **`queue.json`** | Estado da fila (pending, claimed, done, …) — fonte para scripts |
+| **`QUEUE.md`** | Quadro legível (gerado; não editar à mão) |
+
+**Arquiteto** — enfileira trabalho:
+
+```bash
+npm run task:add -- --id W3-01 --title "Barramento canônico" --spec tasks/wave-3/01.md --priority 80
+```
+
+**Agente** — ao iniciar sessão: `npm run git:ensure-sync` → `npm run task:claim` → executa a spec → `npm run git:ship` → `npm run task:done -- --id W3-01`.
+
+Detalhes: [`.cursor/rules/task-queue.mdc`](../.cursor/rules/task-queue.mdc).
+
 ## Estrutura
 
 ```
 tasks/
 ├── README.md           — este arquivo
+├── queue.json          — fila de trabalho (estado)
+├── QUEUE.md            — quadro gerado para leitura
 ├── _template.md        — template para criar nova task spec
 ├── wave-2/             — ondas de trabalho do INVEST (engine 3 preços)
 │   ├── 01-...md
@@ -26,13 +45,14 @@ Cada onda é um conjunto de tarefas relacionadas. Numere as tasks em ordem de ex
 ## Fluxo do agente executor
 
 1. Leia [`/.cursor/rules/co-ceo.mdc`](../.cursor/rules/co-ceo.mdc) (Cursor injeta automaticamente) ou [`/docs/architecture/AI_HANDOFF.md`](../docs/architecture/AI_HANDOFF.md). Doutrina não-negociável.
-2. Abra a task spec inteira. Não execute parcialmente.
-3. Confirme que entendeu o **critério de aceite** — esse é o contrato.
-4. Crie branch `feat/...`, `refactor/...`, `fix/...` antes de tocar código.
-5. Faça as alterações **estritamente** no escopo. Não refatore além do pedido.
+2. `npm run git:ensure-sync` e **`npm run task:claim`** (ou continue a tarefa já assumida no seu agente).
+3. Abra a task spec inteira indicada no claim. Não execute parcialmente.
+4. Confirme que entendeu o **critério de aceite** — esse é o contrato.
+5. Commit na sua branch (`coceo.machineBranch`); alterações **estritamente** no escopo.
 6. Rode `npx tsc --noEmit` e o critério de aceite até verde.
-7. Commit em português seguindo a convenção. PR referencia o caminho da task.
-8. Se travar, **não invente** — descreva no PR/comentário o que tentou e o erro exato.
+7. `npm run git:integrate` e, se a task pedir, scripts de banco/remoto.
+8. `npm run task:done -- --id <ID>`.
+9. Se travar: `npm run task:release -- --id <ID> --reason "..."` — não invente escopo.
 
 ## Fluxo de quem escreve a task
 

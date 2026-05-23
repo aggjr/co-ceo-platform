@@ -21,12 +21,21 @@ Lista canônica: **`scripts/git-machines.json`**
 
 Regra: **não commitar na branch de outra máquina/agente.**
 
+## Fila de tarefas (antes de codar)
+
+```bash
+npm run git:ensure-sync
+npm run task:claim
+```
+
+Estado em `tasks/queue.json` / quadro `tasks/QUEUE.md` — ver `.cursor/rules/task-queue.mdc`.
+
 ## Após qualquer alteração de código (sem perguntar)
 
 1. Commit na **sua** branch (`coceo.machineBranch`).
 2. **`npm run git:ship -- -Message "tipo(escopo): assunto"`** — merge em `main`, branches par, **bump obrigatório**, push.
 
-**Não pedir autorização** para integrar nem incrementar versão. Tarefa **só concluída** quando `main` no remoto tem release nova. Exceção: conflito de merge.
+**Não pedir autorização** para integrar nem incrementar versão. Tarefa **só concluída** quando `main` no remoto tem release nova e `npm run task:done` foi executado. Exceção: conflito de merge.
 
 Ver `agent-publish-after-change.mdc`.
 
@@ -65,3 +74,4 @@ npm run git:ship -- -Message "..."
 - Commit na branch de outra máquina/agente
 - Ignorar sobreposição reportada por `check:branch-overlap`
 - Perguntar se deve integrar ou subir versão
+- Trabalhar em task sem `task:claim` publicado em `main`
