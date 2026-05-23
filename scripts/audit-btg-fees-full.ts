@@ -179,6 +179,10 @@ async function auditNotes(): Promise<{
 
   for (const note of kept) {
     if (note.category === 'LOAN') continue;
+    const isExerciseDay = note.trades.some(
+      (t) => /EXERC/i.test(String(t.marketType || '')) || /EXERC/i.test(String(t.negotiation || ''))
+    );
+    if (isExerciseDay) continue;
     const gross = note.trades.reduce((s, t) => s + Math.abs(t.grossValue), 0);
     totalGross += gross;
     const fees =

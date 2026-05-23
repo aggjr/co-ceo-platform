@@ -1,5 +1,5 @@
 /**
- * Lista arquivos alterados na branch atual E na branch par (outra máquina)
+ * Lista arquivos alterados na branch atual E nas outras branches de máquina
  * desde o ancestral comum com a branch de integração.
  *
  * Uso (antes do commit):
@@ -12,6 +12,20 @@ import path from 'path';
 
 const ROOT = path.join(__dirname, '..');
 const LOCAL_ENV = path.join(__dirname, 'branch-peer.local.env');
+const MACHINES_CONFIG = path.join(__dirname, 'git-machines.json');
+
+type MachinesConfig = {
+  integrationBranch: string;
+  machineBranches: string[];
+};
+
+function loadMachinesConfig(): MachinesConfig {
+  const cfg = JSON.parse(fs.readFileSync(MACHINES_CONFIG, 'utf8')) as MachinesConfig;
+  return {
+    integrationBranch: String(cfg.integrationBranch || 'main').trim(),
+    machineBranches: (cfg.machineBranches || []).map((b) => String(b).trim()).filter(Boolean),
+  };
+}
 
 function loadLocalEnv(): void {
   if (!fs.existsSync(LOCAL_ENV)) return;
@@ -57,22 +71,29 @@ function changedFilesSince(base: string, head: string): Set<string> {
   );
 }
 
+function resolvePeerRefs(branchName: string): string[] {
+  const { machineBranches } = loadMachinesConfig();
+  const fromConfig = machineBranches
+    .filter((b) => b !== branchName)
+    .map((b) => `origin/${b}`);
+
+  const extra = (process.env.PEER_BRANCHES || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const single = arg('peer') || process.env.PEER_BRANCH;
+  const all = single ? [...fromConfig, single, ...extra] : [...fromConfig, ...extra];
+
+  return [...new Set(all)].filter((ref) => ref !== `origin/${branchName}`);
+}
+
 function main(): void {
   loadLocalEnv();
 
-  const branchNameEarly = git('git rev-parse --abbrev-ref HEAD');
-  const defaultPeer =
-    branchNameEarly === 'note-guto'
-      ? 'origin/note-gamer'
-      : branchNameEarly === 'note-gamer'
-        ? 'origin/note-guto'
-        : 'origin/note-gamer';
-
+  const { integrationBranch } = loadMachinesConfig();
   const integration =
-    arg('integration') ||
-    process.env.INTEGRATION_BRANCH ||
-    'main';
-  const peer = arg('peer') || process.env.PEER_BRANCH || defaultPeer;
+    arg('integration') || process.env.INTEGRATION_BRANCH || integrationBranch;
   const current = 'HEAD';
   const integrationRef = refExists(`origin/${integration}`)
     ? `origin/${integration}`
@@ -84,49 +105,58 @@ function main(): void {
     // offline ou sem remote — segue com refs locais
   }
 
-  if (!refExists(peer)) {
-    console.log(`Branch par não encontrada: ${peer}`);
-    console.log('Crie a branch na outra máquina ou ajuste PEER_BRANCH em scripts/branch-peer.local.env');
-    process.exit(0);
-  }
   if (!refExists(integrationRef)) {
     console.error(`Branch de integração não encontrada: ${integrationRef}`);
     process.exit(1);
   }
 
-  const baseCurrent = git(`git merge-base "${integrationRef}" "${current}"`);
-  const basePeer = git(`git merge-base "${integrationRef}" "${peer}"`);
-
-  const mine = changedFilesSince(baseCurrent, current);
-  const theirs = changedFilesSince(basePeer, peer);
-  const overlap = [...mine].filter((f) => theirs.has(f)).sort();
-
   const branchName = git('git rev-parse --abbrev-ref HEAD');
+  const peerRefs = resolvePeerRefs(branchName).filter((ref) => refExists(ref));
+
+  if (peerRefs.length === 0) {
+    console.log('Nenhuma branch par encontrada no remoto.');
+    console.log('Ajuste scripts/git-machines.json ou PEER_BRANCH em branch-peer.local.env');
+    process.exit(0);
+  }
+
+  const baseCurrent = git(`git merge-base "${integrationRef}" "${current}"`);
+  const mine = changedFilesSince(baseCurrent, current);
 
   console.log('--- check-branch-overlap ---');
   console.log(`Integração: ${integrationRef}`);
   console.log(`Branch atual: ${branchName}`);
-  console.log(`Branch par:   ${peer}`);
   console.log(`Arquivos só na atual: ${mine.size}`);
-  console.log(`Arquivos só na par:    ${theirs.size}`);
-  console.log(`Sobreposição:          ${overlap.length}`);
+  console.log(`Branches par: ${peerRefs.join(', ')}`);
 
-  if (overlap.length === 0) {
-    console.log('\nOK — nenhum arquivo em comum com a outra máquina neste intervalo.');
-    process.exit(0);
+  let exitCode = 0;
+  for (const peer of peerRefs) {
+    const basePeer = git(`git merge-base "${integrationRef}" "${peer}"`);
+    const theirs = changedFilesSince(basePeer, peer);
+    const overlap = [...mine].filter((f) => theirs.has(f)).sort();
+
+    console.log(`\n--- vs ${peer} ---`);
+    console.log(`Arquivos só na par: ${theirs.size}`);
+    console.log(`Sobreposição:       ${overlap.length}`);
+
+    if (overlap.length === 0) {
+      console.log('OK — nenhum arquivo em comum neste intervalo.');
+      continue;
+    }
+
+    exitCode = 2;
+    console.log('Arquivos que AMBAS alteraram (revisar antes do merge):');
+    for (const f of overlap) {
+      console.log(`  ${f}`);
+    }
+    console.log(
+      `Sugestão: git diff ${integrationRef}...HEAD -- <arquivo> e git diff ${integrationRef}...${peer} -- <arquivo>`
+    );
   }
 
-  console.log('\nArquivos que AMBAS as branches alteraram (revisar antes do merge):');
-  for (const f of overlap) {
-    console.log(`  ${f}`);
+  if (exitCode === 0) {
+    console.log('\nOK — sem sobreposição com nenhuma branch par.');
   }
-  console.log(
-    '\nSugestão: git diff ' +
-      `${integrationRef}...HEAD -- <arquivo>` +
-      ' e ' +
-      `git diff ${integrationRef}...${peer} -- <arquivo>`
-  );
-  process.exit(2);
+  process.exit(exitCode);
 }
 
 main();

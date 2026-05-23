@@ -236,6 +236,52 @@ describe('LedgerEventProjection', () => {
     expect(events[0].total_net_value).toBeCloseTo(-1000, 4);
   });
 
+  it('cost_adjustment LFT projeta tipo e total_net_value pelo unit_value (nao qty*price)', async () => {
+    const gw = makeGateway({
+      patrimony_items: [
+        {
+          id: 'item-lft',
+          organization_id: ORG,
+          source_module: 'INVEST',
+          subcategory: 'fixed_income',
+          identifier: 'LFT-20310301',
+        },
+      ],
+      invest_position_ext: [
+        {
+          patrimony_item_id: 'item-lft',
+          organization_id: ORG,
+          asset_class: 'fixed_income',
+          underlying_ticker: null,
+        },
+      ],
+      patrimony_ledger_entries: [
+        {
+          id: 'led-lft-adj',
+          organization_id: ORG,
+          patrimony_item_id: 'item-lft',
+          transaction_date: '2026-04-22',
+          movement_type: 'cost_adjustment',
+          quantity_delta: 0,
+          unit_value: 7618.65,
+          total_value: 7618.65,
+          impacts_valuation: true,
+          metadata: JSON.stringify({
+            legacy_op: 'fee',
+            broker_note_ref: 'BTG-EXT-2026-04-22#02',
+          }),
+          notes: 'IRRF Tesouro Direto',
+        },
+      ],
+    });
+    const proj = new LedgerEventProjection(gw);
+    const events = await proj.listLedgerEvents(ctx, '2026-01-01', '2026-12-31');
+    expect(events.length).toBe(1);
+    expect(events[0].transaction_type).toBe('cost_adjustment');
+    expect(events[0].total_net_value).toBeCloseTo(7618.65, 2);
+    expect(events[0].quantity).toBe(0);
+  });
+
   it('janela de datas filtra eventos fora de [from, to]', async () => {
     const gw = makeGateway({
       patrimony_items: [

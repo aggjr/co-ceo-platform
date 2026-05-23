@@ -1,0 +1,9 @@
+{
+  "integrationBranch": "main",
+  "machineBranches": [
+    "note-gamer",
+    "note-guto",
+    "antigravity-gamer",
+    "antigravity-guto"
+  ]
+}

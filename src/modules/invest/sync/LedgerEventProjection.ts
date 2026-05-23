@@ -188,14 +188,19 @@ export class LedgerEventProjection {
       const totalValue = Number(row.total_value ?? 0);
       const impactsValuation = row.impacts_valuation == null ? null : Boolean(row.impacts_valuation);
 
-      const txType: LedgerTransactionType = (legacyOp as LedgerTransactionType) ||
-        LedgerEventProjection.movementTypeToLegacy(movementType, assetClass, signedQty);
+      const txType: LedgerTransactionType =
+        movementType === 'cost_adjustment'
+          ? 'cost_adjustment'
+          : ((legacyOp as LedgerTransactionType) ||
+              LedgerEventProjection.movementTypeToLegacy(movementType, assetClass, signedQty));
 
       // Replica convencao do LegacyMirror.recordLegacyOpeningEntry:
       //   total_net_value = input.quantity * input.unitPrice (signed pelo delta)
-      // O CustodyEngine antigo trata buyCost(net<0 ? -net : q*p), entao essa
-      // convencao "esquisita" eh idempotente com a leitura existente.
-      const totalNet = signedQty * unitPrice;
+      // cost_adjustment: qty_delta=0, custo absoluto em unit_value (IRRF/custodia LFT).
+      const totalNet =
+        movementType === 'cost_adjustment'
+          ? Math.abs(unitPrice) || Math.abs(totalValue)
+          : signedQty * unitPrice;
 
       const brokerNoteRef = typeof meta.broker_note_ref === 'string'
         ? (meta.broker_note_ref as string)

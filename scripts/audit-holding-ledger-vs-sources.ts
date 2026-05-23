@@ -22,6 +22,12 @@ import { buildLedgerDedupIndex } from '../src/core/invest/ledgerOperationDedup';
 dotenv.config();
 
 const ORG = process.env.PORTFOLIO_ORG_ID || 'org-holding-001';
+
+/** Pernas removidas de propósito (duplicata caixa na mesma nota). */
+const KNOWN_REMOVED_NOTE_REFS = new Set([
+  'BTG-NOTA-31582497#2026-04-27#9',
+  'BTG-NOTA-31609259#2026-04-28#5',
+]);
 const TXT_DIR = path.join(process.cwd(), 'dados importação', 'documentos_txt_extraidos');
 const OUT = path.join(process.cwd(), 'local-import', 'btg-sources', 'auditoria');
 
@@ -84,6 +90,7 @@ async function main() {
 
   const missingInLedger: string[] = [];
   for (const ref of expectedRefs) {
+    if (KNOWN_REMOVED_NOTE_REFS.has(ref)) continue;
     if (!index.byRef.has(ref) && !ledgerRefs.has(ref)) {
       missingInLedger.push(ref);
     }

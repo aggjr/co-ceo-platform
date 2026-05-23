@@ -1,10 +1,12 @@
-# Depois de commitar na branch da maquina: integra em main e realinha a branch local.
+# Depois de commitar na branch da maquina: integra em main, unifica versao e realinha a branch local.
 # Uso (na raiz, com working tree limpa apos o commit):
 #   .\scripts\git-publish-to-main.ps1
 #
 # Config (uma vez):
 #   git config coceo.integrationBranch main
 #   git config coceo.machineBranch note-gamer
+#   # ou note-guto | antigravity-gamer | antigravity-guto
+# Branches de maquina: scripts/git-machines.json
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
@@ -34,6 +36,26 @@ function Read-PeerBranchFromEnv {
   return $null
 }
 
+function Read-MachineBranchesFromConfig {
+  $cfgPath = Join-Path $PSScriptRoot "git-machines.json"
+  if (-not (Test-Path $cfgPath)) { return @() }
+  $cfg = Get-Content -Raw $cfgPath | ConvertFrom-Json
+  return @($cfg.machineBranches | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+}
+
+function Resolve-PeerRemoteRefs {
+  param([string]$MachineBranch)
+  $refs = New-Object System.Collections.Generic.List[string]
+  foreach ($b in (Read-MachineBranchesFromConfig)) {
+    if ($b -ne $MachineBranch) {
+      $refs.Add("origin/$b")
+    }
+  }
+  $legacy = Read-PeerBranchFromEnv
+  if ($legacy) { $refs.Add($legacy) }
+  return @($refs | Select-Object -Unique)
+}
+
 function Test-GitRef($ref) {
   git rev-parse --verify "$ref" 2>$null | Out-Null
   return $LASTEXITCODE -eq 0
@@ -43,14 +65,10 @@ $integration = git config --get coceo.integrationBranch
 if (-not $integration) { $integration = "main" }
 $machine = git config --get coceo.machineBranch
 if (-not $machine) {
-  Write-Error "Defina: git config coceo.machineBranch note-gamer (ou note-guto)"
+  Write-Error "Defina: git config coceo.machineBranch note-gamer | note-guto | antigravity-gamer | antigravity-guto"
 }
 
-$peer = Read-PeerBranchFromEnv
-if (-not $peer) {
-  if ($machine -eq "note-guto") { $peer = "origin/note-gamer" }
-  elseif ($machine -eq "note-gamer") { $peer = "origin/note-guto" }
-}
+$peerRefs = Resolve-PeerRemoteRefs -MachineBranch $machine
 
 if (git status --porcelain) {
   Write-Error "Working tree suja. Faca o commit antes de publicar em main."
@@ -85,15 +103,42 @@ if ($LASTEXITCODE -ne 0) {
   Write-Error "Falha no merge para $integration"
 }
 
-if ($peer -and (Test-GitRef $peer)) {
-  Write-Host "=== 5/6 merge par $peer -> $integration ===" -ForegroundColor Cyan
-  git merge $peer -m "merge($integration): integrar $peer"
+if ($peerRefs.Count -eq 0) {
+  Write-Host "=== 5/6 nenhuma branch par configurada (scripts/git-machines.json) ===" -ForegroundColor Cyan
+} else {
+  $peerIndex = 0
+  foreach ($peer in $peerRefs) {
+    $peerIndex += 1
+    if (Test-GitRef $peer) {
+      Write-Host "=== 5/$($peerIndex + 5) merge par $peer -> $integration ===" -ForegroundColor Cyan
+      git merge $peer -m "merge($integration): integrar $peer"
+      if ($LASTEXITCODE -ne 0) {
+        if (Show-Conflicts "merge-par-$peer") { exit 1 }
+        Write-Error "Falha ao integrar branch par $peer"
+      }
+    } else {
+      Write-Host "=== 5/$($peerIndex + 5) par $peer ausente no remoto (ok) ===" -ForegroundColor Cyan
+    }
+  }
+}
+
+Write-Host "=== 5b/6 bump versao unificada (main + par) ===" -ForegroundColor Cyan
+node scripts/bump-version.js --integrate
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "Falha ao bump de versao unificada"
+}
+
+$versionJson = Get-Content -Raw version.json | ConvertFrom-Json
+$appVersion = "V$($versionJson.major).$($versionJson.minor).$($versionJson.patch)"
+git add version.json package.json src/generated/version.ts frontend/src/generated/version.js
+git diff --cached --quiet
+if ($LASTEXITCODE -ne 0) {
+  git commit -m "chore(release): $appVersion — integracao main"
   if ($LASTEXITCODE -ne 0) {
-    if (Show-Conflicts "merge-par") { exit 1 }
-    Write-Error "Falha ao integrar branch par $peer"
+    Write-Error "Falha ao commitar bump de versao"
   }
 } else {
-  Write-Host "=== 5/6 par $peer ausente no remoto (ok) ===" -ForegroundColor Cyan
+  Write-Host "Versao ja estava atualizada (sem commit de release)." -ForegroundColor DarkGray
 }
 
 Write-Host "=== 6/6 push $integration e realinhar $machine ===" -ForegroundColor Cyan
@@ -109,6 +154,8 @@ if ($LASTEXITCODE -ne 0) {
 git push origin $machine
 
 $sha = (git rev-parse --short HEAD).Trim()
+$versionJson = Get-Content -Raw version.json | ConvertFrom-Json
+$appVersion = "V$($versionJson.major).$($versionJson.minor).$($versionJson.patch)"
 Write-Host ""
-Write-Host "OK. main e $machine em $sha (sem conflitos pendentes)." -ForegroundColor Green
+Write-Host "OK. main e $machine em $sha | versao $appVersion (sem conflitos pendentes)." -ForegroundColor Green
 Write-Host "Tipos: git log -1 --oneline" -ForegroundColor DarkGray
