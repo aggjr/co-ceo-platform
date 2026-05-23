@@ -37,6 +37,8 @@ import {
 import { rebuildCustodyFromLedger } from '../core/invest/CustodyEngine';
 import { resolveCashInvestDisplayBalance } from '../core/invest/cashInvestLedger';
 import { buildCashInTransitSummary } from '../core/invest/cashInTransit';
+import { loadOptionMarketCatalog } from '../core/invest/optionMarketCatalog';
+import { buildOptionStrikeMapFromLedgerEvents } from '../core/invest/optionStrikeFromLedger';
 import {
   applyAllocationPercents,
   applyCashInvestBalanceToItems,
@@ -44,6 +46,7 @@ import {
   attachUnderlyingMarketData,
   consolidateTesouroPortfolioItems,
   mergeLedgerCustodyIntoAssetRows,
+  mergeOptionStrikeIntoAssetRow,
   partitionPortfolioPositions,
   summarizePortfolio,
 } from '../core/invest/portfolioMapper';
@@ -51,6 +54,8 @@ import {
   buildThreeAvgPricesByUnderlying,
   resolveThreePricesForAsset,
 } from '../core/invest/portfolioThreePrices';
+import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
+import { validateEquityThreePrices } from '../core/invest/threePricesValidation';
 import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
 
 export class InvestController {
@@ -92,9 +97,18 @@ export class InvestController {
       ledgerCustody
     );
     const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
+    const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents);
+    const ledgerStrikeByTicker = buildOptionStrikeMapFromLedgerEvents(ledgerEvents);
+    const marketCatalog = await loadOptionMarketCatalog(this.gateway);
+    const strikeHints = { ledgerStrikeByTicker, marketCatalog };
 
     const items = [];
-    for (const row of rowsMerged) {
+    for (const raw of rowsMerged) {
+      const row = mergeOptionStrikeIntoAssetRow(
+        raw,
+        ledgerStrikeByTicker,
+        marketCatalog
+      );
       const filtered = await FieldPolicyService.filterRowForRead(
         ctx.roleId,
         ctx.organizationId,
@@ -118,7 +132,31 @@ export class InvestController {
         threeByUnderlying,
         Number(filtered.managerial_avg_price ?? 0)
       );
-      items.push(enrichPortfolioRow(filtered, three));
+      const item = enrichPortfolioRow(filtered, three, strikeHints);
+      const ticker = String(filtered.asset_ticker ?? '').toUpperCase();
+      const assetType = String(item.assetType ?? '');
+      if (
+        (assetType === 'stock' || assetType === 'fii') &&
+        Math.abs(item.quantity) > 1e-6
+      ) {
+        const und = String(
+          meta.underlying_ticker || ticker
+        ).toUpperCase();
+        item.threePricesValidation = validateEquityThreePrices({
+          ticker,
+          custodyQty: Number(filtered.current_quantity ?? 0),
+          engineSnapshot: engineSnapshots.get(und) ?? engineSnapshots.get(ticker) ?? null,
+          storedExt: {
+            strict:
+              filtered.pm_estrito != null ? Number(filtered.pm_estrito) : null,
+            b3: filtered.pm_b3 != null ? Number(filtered.pm_b3) : null,
+            managerial:
+              filtered.pm_gerencial != null ? Number(filtered.pm_gerencial) : null,
+          },
+          displayed: three,
+        });
+      }
+      items.push(item);
     }
 
     const withUnderlyingQuotes = attachUnderlyingMarketData(items);
@@ -143,6 +181,26 @@ export class InvestController {
       cashInTransit.settledCashBalance
     );
 
+    const threePricesAudit = { ok: 0, warn: 0, error: 0, pending: [] as Array<{
+      ticker: string;
+      status: string;
+      observation: string;
+    }> };
+    for (const it of withCash) {
+      const v = it.threePricesValidation;
+      if (!v) continue;
+      if (v.status === 'ok') threePricesAudit.ok += 1;
+      else if (v.status === 'warn') threePricesAudit.warn += 1;
+      else threePricesAudit.error += 1;
+      if (v.status !== 'ok') {
+        threePricesAudit.pending.push({
+          ticker: it.ticker,
+          status: v.status,
+          observation: v.observation,
+        });
+      }
+    }
+
     return res.json({
       success: true,
       items: withCash,
@@ -150,6 +208,7 @@ export class InvestController {
       summary: summarizePortfolio(withCash),
       cashStatementBalance: cashInTransit.settledCashBalance,
       cashInTransit,
+      threePricesAudit,
       source: 'custody',
     });
   };

@@ -46,8 +46,8 @@ describe('portfolioMapper', () => {
       status: 'active',
     });
     const items = applyAllocationPercents([a, b]);
-    expect(items[0].allocationPct).toBe(50);
-    expect(items[1].allocationPct).toBe(50);
+    expect(items[0].allocationPct).toBe(25);
+    expect(items[1].allocationPct).toBe(75);
     const summary = summarizePortfolio(items);
     expect(summary.totalMarketValue).toBe(400);
     expect(summary.totalCostBasis).toBe(200);
@@ -214,6 +214,41 @@ describe('portfolioMapper', () => {
     expect(optionPriceReturnPct(0.01, 2.2)).toBeCloseTo(-99.55, 1);
     expect(row.pnlPct).toBeCloseTo(-99.55, 1);
     expect(row.pnl).toBeGreaterThan(0);
+  });
+
+  it('opção vendida: prêmio, resultado e notional a partir da custódia', () => {
+    const stock = enrichPortfolioRow({
+      id: 's1',
+      asset_ticker: 'PRIO3',
+      asset_type: 'stock',
+      current_quantity: 5400,
+      managerial_avg_price: 38.33,
+      metadata: { last_price: 65.4 },
+      status: 'active',
+    });
+    const opt = enrichPortfolioRow(
+      {
+        id: 'o1',
+        asset_ticker: 'PRIOR407',
+        asset_type: 'option_put',
+        current_quantity: -6500,
+        managerial_avg_price: 0.912254,
+        acquisition_value: -5930,
+        current_value: -5811.2,
+        metadata: { option_strike: 40.7, underlying_ticker: 'PRIO3' },
+        status: 'active',
+      },
+      undefined,
+      { ledgerStrikeByTicker: new Map(), marketCatalog: new Map() }
+    );
+    expect(opt.premiumReceived).toBeCloseTo(5930, 0);
+    expect(opt.optionStrike).toBe(40.7);
+    expect(opt.lastPrice).toBeGreaterThan(0);
+    const items = attachUnderlyingMarketData([stock, opt]);
+    const enriched = items.find((i) => i.ticker === 'PRIOR407')!;
+    expect(enriched.notional).toBeCloseTo(6500 * 40.7, 0);
+    expect(enriched.underlyingLastPrice).toBe(65.4);
+    expect(enriched.strikeDistanceBrl).not.toBeNull();
   });
 
   it('mantém ação vendida a descoberto na custódia aberta', () => {

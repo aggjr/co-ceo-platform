@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import { formatDateBr } from './dateFormat.js';
 import { formatBrl } from './portfolioDisplay.js';
 
 Chart.register(
@@ -23,11 +24,6 @@ Chart.register(
 );
 
 let activeChart = null;
-
-function formatDateBr(iso) {
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  return `${d}/${m}/${y}`;
-}
 
 function formatPct(n) {
   if (n == null || Number.isNaN(n)) return '—';

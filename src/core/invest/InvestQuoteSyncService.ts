@@ -1,6 +1,7 @@
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
-import { inferAssetType } from './assetClassifier';
+import { inferAssetType, inferUnderlyingTicker } from './assetClassifier';
+import { inferOptionExpiryDate, inferOptionMonthFromTicker } from './optionExpiry';
 import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
@@ -176,9 +177,26 @@ export class InvestQuoteSyncService {
       { patrimony_item_id: itemId },
       { limit: 1 }
     );
-    if (!ext.length) return false;
-    await this.gateway.update(ctx, 'invest_option_ext', itemId, {
-      strike_price: Math.round(strike * 10000) / 10000,
+    const rounded = Math.round(strike * 10000) / 10000;
+    if (ext.length) {
+      await this.gateway.update(ctx, 'invest_option_ext', itemId, {
+        strike_price: rounded,
+      });
+      return true;
+    }
+
+    const month = inferOptionMonthFromTicker(ticker);
+    const expiration = inferOptionExpiryDate(ticker);
+    const underlying = inferUnderlyingTicker(ticker);
+    if (!month || !expiration || !underlying) return false;
+
+    await this.gateway.insert(ctx, 'invest_option_ext', {
+      patrimony_item_id: itemId,
+      option_type: month.optionSide === 'call' ? 'CALL' : 'PUT',
+      underlying_ticker: underlying,
+      strike_price: rounded,
+      expiration_date: expiration,
+      european_american: 'A',
     });
     return true;
   }

@@ -19,6 +19,7 @@ import type {
   OpeningPositionInput,
 } from './types';
 import { inferAssetType, inferUnderlyingTicker } from '../../core/invest/assetClassifier';
+import { inferOptionExpiryDate } from '../../core/invest/optionExpiry';
 import type { LedgerImportLine } from '../../core/invest/ledgerTypes';
 
 const PASSIVE_INCOME_OPS = new Set(['dividend', 'jcp', 'cash_yield', 'securities_lending']);
@@ -469,6 +470,7 @@ export class InvestOperations {
         return { skipped: false };
       }
       const cls = (assetType as InvestAssetClass);
+      const und = inferUnderlyingTicker(ticker, line.underlying_ticker) ?? undefined;
       await this.recordOpeningPosition(
         ctx,
         line.date,
@@ -477,8 +479,15 @@ export class InvestOperations {
           assetClass: cls,
           quantity: Number(line.quantity),
           unitPrice: Number(line.unit_price),
-          optionUnderlying: inferUnderlyingTicker(ticker, line.underlying_ticker) ?? undefined,
+          optionUnderlying: und,
           optionStrike: line.option_strike,
+          optionExpiration:
+            line.option_expiration?.slice(0, 10) ||
+            (cls === 'option_call' || cls === 'option_put'
+              ? inferOptionExpiryDate(ticker)
+              : undefined),
+          optionType:
+            cls === 'option_call' ? 'CALL' : cls === 'option_put' ? 'PUT' : undefined,
           notes: line.notes,
         },
         { businessEventId }
@@ -676,8 +685,28 @@ export class InvestOperations {
       notes: line.notes ?? op,
       externalRef: ref ? `BROKER_REF:${ref}` : undefined,
       businessEventId,
-      metadata: { legacy_op: op, broker_note_ref: ref ?? null },
+      metadata: {
+        legacy_op: op,
+        broker_note_ref: ref ?? null,
+        ...(line.option_strike != null && line.option_strike > 0
+          ? { option_strike: line.option_strike }
+          : {}),
+      },
     });
+
+    const isOptionTrade =
+      assetClass === 'option_call' || assetClass === 'option_put' || OPTION_OPS.has(op);
+    if (isOptionTrade && line.option_strike != null && line.option_strike > 0) {
+      const und = inferUnderlyingTicker(ticker, line.underlying_ticker);
+      if (und) {
+        await this.upsertOptionExt(ctx, item.id, {
+          optionType: assetClass === 'option_call' ? 'CALL' : 'PUT',
+          underlyingTicker: und,
+          strikePrice: line.option_strike,
+          expirationDate: inferOptionExpiryDate(ticker),
+        });
+      }
+    }
 
     if (cashDirection) {
       const { accountId } = await this.resolveCashAccount(ctx, 'CAIXA-DEFAULT', line.date);

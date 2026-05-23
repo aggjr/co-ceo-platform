@@ -1,4 +1,4 @@
-export type OptionStrikeSource = 'metadata' | null;
+export type OptionStrikeSource = 'metadata' | 'market_catalog' | 'ledger_exercise' | null;
 
 export type PortfolioStrikeMeta = {
   option_strike?: number | null;
@@ -23,8 +23,14 @@ export function strikeFromMetadata(meta: PortfolioStrikeMeta | null | undefined)
 export function resolveOptionStrike(input: {
   meta?: PortfolioStrikeMeta | null;
   ticker: string;
+  marketStrike?: number | null;
+  ledgerExerciseStrike?: number | null;
 }): { strike: number | null; source: OptionStrikeSource } {
   const fromMeta = strikeFromMetadata(input.meta);
   if (fromMeta != null) return { strike: fromMeta, source: 'metadata' };
+  const fromLedger = parseStrikeValue(input.ledgerExerciseStrike);
+  if (fromLedger != null) return { strike: fromLedger, source: 'ledger_exercise' };
+  const fromMarket = parseStrikeValue(input.marketStrike);
+  if (fromMarket != null) return { strike: fromMarket, source: 'market_catalog' };
   return { strike: null, source: null };
 }

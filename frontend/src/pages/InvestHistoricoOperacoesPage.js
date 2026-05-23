@@ -4,6 +4,7 @@ import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
+import { formatDateBr, formatDateTimeBr } from '../lib/dateFormat.js';
 import {
   renderExcelTableShell,
   registerExcelTable,
@@ -136,7 +137,11 @@ function formatRow(r) {
     tradeType: resolveTradeType(r),
     ticker: r.ticker || '—',
     underlyingStock: r.underlyingStock || '—',
-    maturity: r.maturity || '—',
+    maturity: (() => {
+      const br = formatDateBr(r.maturity);
+      if (br !== '—') return br;
+      return r.maturity || '—';
+    })(),
     quantity: Number(r.quantity) || 0,
     unitPrice: Number(r.unitPrice) || 0,
     grossValue: Number(r.grossValue) || 0,
@@ -229,7 +234,7 @@ export async function InvestHistoricoOperacoesPage(container) {
         </p>
         <p class="muted" style="margin:0">
           Notas/Operações: <strong>${stats.notesKept ?? 0}</strong> · Transações: <strong>${lineCount}</strong>
-          · Atualizado em: ${(data.generatedAt || '').slice(0, 19).replace('T', ' ')}
+          · Atualizado em: ${formatDateTimeBr(data.generatedAt)}
         </p>
       </div>
       ${
@@ -238,7 +243,7 @@ export async function InvestHistoricoOperacoesPage(container) {
         <pre style="font-size:12px;overflow:auto;max-height:200px">${dup
           .map(
             (d) =>
-              `${d.pregaoDate} · ${d.category} · nota ${d.noteNumber} · ${d.sourceFile} (dup de ${d.duplicateOf})`
+              `${d.pregaoDateBr || formatDateBr(d.pregaoDate)} · ${d.category} · nota ${d.noteNumber} · ${d.sourceFile} (dup de ${d.duplicateOf})`
           )
           .join('\n')}</pre></details>`
           : ''

@@ -1,5 +1,6 @@
 import type { CoCeoDataGateway, UserContext } from '../../../core/dal';
 import { SYSTEM_INSTALLER_USER_ID } from '../../../core/dal/types';
+import { inferUnderlyingTicker, isOptionTicker } from '../../../core/invest/assetClassifier';
 
 export type InvestAssetRow = {
   id: string;
@@ -9,6 +10,11 @@ export type InvestAssetRow = {
   status: string;
   current_quantity: number;
   managerial_avg_price: number;
+  acquisition_value?: number;
+  current_value?: number;
+  pm_estrito?: number | null;
+  pm_b3?: number | null;
+  pm_gerencial?: number | null;
   metadata: string | null;
 };
 
@@ -85,11 +91,22 @@ export class InvestAssetProjection {
       const subcategory = String(item.subcategory ?? '');
       const assetType = ext ? String(ext.asset_class ?? subcategory) : subcategory;
 
+      const qty = Number(item.quantity ?? 0);
+      const acqVal = Number(item.acquisition_value ?? 0);
+      const curVal = Number(item.current_value ?? 0);
+      const unitFromCustody =
+        Math.abs(qty) > 1e-9 ? Math.round((Math.abs(acqVal / qty)) * 1000000) / 1000000 : 0;
+
       const meta: Record<string, unknown> = {};
+      const underlying =
+        (optionExt && String(optionExt.underlying_ticker || '')) ||
+        (ext && String(ext.underlying_ticker || '')) ||
+        inferUnderlyingTicker(ticker);
+      if (underlying) meta.underlying_ticker = underlying;
+
       if (ext) {
         if (ext.last_price != null) meta.last_price = Number(ext.last_price);
         if (ext.last_price_as_of) meta.quote_as_of = String(ext.last_price_as_of).slice(0, 10);
-        if (ext.underlying_ticker) meta.underlying_ticker = String(ext.underlying_ticker);
         if (ext.sector) meta.sector = String(ext.sector);
         if (ext.issuer_name) meta.name = String(ext.issuer_name);
       }
@@ -97,10 +114,25 @@ export class InvestAssetProjection {
         if (optionExt.strike_price != null) meta.option_strike = Number(optionExt.strike_price);
         if (optionExt.expiration_date) meta.option_expiration = String(optionExt.expiration_date).slice(0, 10);
       }
+      if (
+        (isOptionTicker(ticker) || subcategory === 'option_call' || subcategory === 'option_put') &&
+        unitFromCustody > 0
+      ) {
+        if (meta.last_price == null) meta.last_price = unitFromCustody;
+      }
       const itemMeta = parseMetadata(item.metadata);
       for (const k of Object.keys(itemMeta)) {
         if (meta[k] === undefined) meta[k] = itemMeta[k];
       }
+
+      const pmGerencial =
+        ext?.pm_gerencial != null
+          ? Number(ext.pm_gerencial)
+          : unitFromCustody > 0
+            ? unitFromCustody
+            : Math.abs(qty) > 1e-9
+              ? Math.abs(curVal / qty)
+              : 0;
 
       rows.push({
         id: itemId,
@@ -108,10 +140,13 @@ export class InvestAssetProjection {
         asset_ticker: ticker,
         asset_type: assetType,
         status,
-        current_quantity: Number(item.quantity ?? 0),
-        managerial_avg_price: ext?.pm_gerencial != null
-          ? Number(ext.pm_gerencial)
-          : Number(item.current_value ?? 0) / Math.max(Number(item.quantity ?? 1), 1),
+        current_quantity: qty,
+        managerial_avg_price: pmGerencial,
+        acquisition_value: acqVal,
+        current_value: curVal,
+        pm_estrito: ext?.pm_estrito != null ? Number(ext.pm_estrito) : null,
+        pm_b3: ext?.pm_b3 != null ? Number(ext.pm_b3) : null,
+        pm_gerencial: ext?.pm_gerencial != null ? Number(ext.pm_gerencial) : null,
         metadata: Object.keys(meta).length ? JSON.stringify(meta) : null,
       });
     }

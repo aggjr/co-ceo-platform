@@ -82,8 +82,23 @@ export async function InvestPortfolioPage(container) {
       cashStatementBalance: data.cashStatementBalance ?? 0,
       cashInTransit: data.cashInTransit ?? null,
     };
+    const audit = data.threePricesAudit;
+    const auditBanner =
+      audit && pageType === 'equities' && (audit.warn > 0 || audit.error > 0)
+        ? `<div class="card portfolio-3p-audit-banner" style="margin-bottom:12px;padding:12px 16px;border:1px solid rgba(218,177,119,0.4)">
+            <strong>Batimento três preços:</strong>
+            <span class="portfolio-3p-obs--ok">${audit.ok} OK</span> ·
+            <span class="portfolio-3p-obs--warn">${audit.warn} atenção</span> ·
+            <span class="portfolio-3p-obs--error">${audit.error} erro</span>
+            <span class="muted" style="display:block;margin-top:6px;font-size:12px">
+              Coluna <em>Observação (3 preços)</em> na tabela — detalhe por linha. Relatório:
+              docs/validacao-tres-precos-${new Date().toISOString().slice(0, 10)}.md
+            </span>
+          </div>`
+        : '';
 
     body = `
+      ${auditBanner}
       <div class="card">
         <div class="portfolio-toolbar">
           <div>

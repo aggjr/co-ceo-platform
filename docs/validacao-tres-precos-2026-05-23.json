@@ -1,0 +1,93 @@
+{
+  "ok": 0,
+  "warn": 4,
+  "err": 0,
+  "report": [
+    {
+      "ticker": "PRIO3",
+      "qty": 12700,
+      "status": "warn",
+      "codes": [
+        "EXT_VS_ENGINE_E",
+        "EXT_VS_ENGINE_B",
+        "EXT_VS_ENGINE_G"
+      ],
+      "observation": "[EXT_VS_ENGINE_E, EXT_VS_ENGINE_B, EXT_VS_ENGINE_G] Ext Estrito 38,33 ≠ livro 64,4543 · Ext B3 38,33 ≠ livro 64,4543 · Ext Ger. 38,33 ≠ livro 63,5087",
+      "engine": {
+        "strict": 64.4543,
+        "b3": 64.4543,
+        "managerial": 63.5087
+      },
+      "storedExt": {
+        "strict": 38.33,
+        "b3": 38.33,
+        "managerial": 38.33
+      },
+      "displayed": {
+        "strict": 64.4543,
+        "b3": 64.4543,
+        "managerial": 63.5087
+      }
+    },
+    {
+      "ticker": "ITUB4",
+      "qty": 5100,
+      "status": "warn",
+      "codes": [
+        "EXT_AUSENTE"
+      ],
+      "observation": "[EXT_AUSENTE] invest_position_ext sem PM — tela usa só recálculo do livro",
+      "engine": {
+        "strict": 41.542,
+        "b3": 41.542,
+        "managerial": 41.5184
+      },
+      "storedExt": null,
+      "displayed": {
+        "strict": 41.542,
+        "b3": 41.542,
+        "managerial": 41.5184
+      }
+    },
+    {
+      "ticker": "WEGE3",
+      "qty": 800,
+      "status": "warn",
+      "codes": [
+        "EXT_AUSENTE"
+      ],
+      "observation": "[EXT_AUSENTE] invest_position_ext sem PM — tela usa só recálculo do livro",
+      "engine": {
+        "strict": 44.2413,
+        "b3": 44.2413,
+        "managerial": 43.8787
+      },
+      "storedExt": null,
+      "displayed": {
+        "strict": 44.2413,
+        "b3": 44.2413,
+        "managerial": 43.8787
+      }
+    },
+    {
+      "ticker": "BBAS3",
+      "qty": 6000,
+      "status": "warn",
+      "codes": [
+        "EXT_AUSENTE"
+      ],
+      "observation": "[EXT_AUSENTE] invest_position_ext sem PM — tela usa só recálculo do livro",
+      "engine": {
+        "strict": 21.2542,
+        "b3": 21.2542,
+        "managerial": 21.2298
+      },
+      "storedExt": null,
+      "displayed": {
+        "strict": 21.2542,
+        "b3": 21.2542,
+        "managerial": 21.2298
+      }
+    }
+  ]
+}

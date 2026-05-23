@@ -11,7 +11,9 @@ import {
   isOptionExpired,
   localTodayIso,
 } from './optionExpiry';
+import type { OptionMarketRow } from './optionMarketCatalog';
 import { resolveOptionStrike, type OptionStrikeSource } from './optionStrike';
+import type { ThreePricesValidation } from './threePricesValidation';
 import type { ThreeAvgPrices } from './portfolioThreePrices';
 import { isCashInvestTicker } from './cashInvestLedger';
 import {
@@ -100,6 +102,7 @@ export type PortfolioMetadata = {
   /** Strike de exercício (R$) — obrigatório para notional/distância; não inferir do ticker. */
   option_strike?: number;
   option_strike_as_of?: string;
+  option_expiration?: string;
 };
 
 export type PortfolioItemDto = {
@@ -139,6 +142,8 @@ export type PortfolioItemDto = {
   strikeDistanceBrl: number | null;
   /** (Spot − strike) / strike × 100. */
   strikeDistancePct: number | null;
+  /** Batimento dos três preços (ações/FIIs) — revisão manual. */
+  threePricesValidation?: ThreePricesValidation | null;
 };
 
 export type PortfolioSummaryDto = {
@@ -187,9 +192,51 @@ function parseMetadata(raw: unknown): PortfolioMetadata {
   return {};
 }
 
+/** Injeta strike/underlying do catálogo ou exercícios antes de enrichPortfolioRow. */
+export function mergeOptionStrikeIntoAssetRow(
+  row: Record<string, unknown>,
+  ledgerStrikeByTicker: Map<string, number>,
+  marketCatalog: Map<string, OptionMarketRow>
+): Record<string, unknown> {
+  const ticker = String(row.asset_ticker ?? '').toUpperCase();
+  if (!isOptionTicker(ticker)) return row;
+  const meta = parseMetadata(row.metadata);
+  let changed = false;
+  if (meta.option_strike == null) {
+    const ledger = ledgerStrikeByTicker.get(ticker);
+    const market = marketCatalog.get(ticker);
+    if (ledger != null && ledger > 0) {
+      meta.option_strike = ledger;
+      changed = true;
+    } else if (market?.strikePrice != null && market.strikePrice > 0) {
+      meta.option_strike = market.strikePrice;
+      changed = true;
+    }
+  }
+  if (!meta.underlying_ticker) {
+    const und =
+      marketCatalog.get(ticker)?.underlyingTicker ||
+      inferUnderlyingTicker(ticker, meta.underlying_ticker as string | undefined);
+    if (und) {
+      meta.underlying_ticker = und;
+      changed = true;
+    }
+  }
+  if (!meta.option_expiration && marketCatalog.get(ticker)?.expirationDate) {
+    meta.option_expiration = marketCatalog.get(ticker)!.expirationDate;
+    changed = true;
+  }
+  if (!changed) return row;
+  return { ...row, metadata: JSON.stringify(meta) };
+}
+
 export function enrichPortfolioRow(
   row: Record<string, unknown>,
-  threePrices?: ThreeAvgPrices
+  threePrices?: ThreeAvgPrices,
+  strikeHints?: {
+    ledgerStrikeByTicker?: Map<string, number>;
+    marketCatalog?: Map<string, OptionMarketRow>;
+  }
 ): PortfolioItemDto {
   const meta = parseMetadata(row.metadata);
   const qty = Number(row.current_quantity ?? 0);
@@ -211,14 +258,34 @@ export function enrichPortfolioRow(
   } else if (!assetType || (assetType === 'stock' && isFixedIncomeTicker(ticker))) {
     assetType = inferred;
   }
-  const displayAvg = prices.managerial > 0 ? prices.managerial : avg;
-  const lastPrice = metaLast > 0 ? metaLast : displayAvg;
-  const updatedQuote = metaLast > 0 ? metaLast : null;
+  const optionLike = isOptionTicker(ticker) || isOptionAssetType(assetType);
+  const acqVal = Number(row.acquisition_value ?? 0);
+  const curVal = Number(row.current_value ?? 0);
+  const custodyUnitPm =
+    Math.abs(qty) > QTY_ZERO_EPS ? Math.abs(acqVal / qty) : 0;
+  const custodyUnitMark =
+    Math.abs(qty) > QTY_ZERO_EPS ? Math.abs(curVal / qty) : 0;
+
+  let displayAvg = prices.managerial > 0 ? prices.managerial : avg;
+  if (optionLike) {
+    if (custodyUnitPm > 0) displayAvg = custodyUnitPm;
+    else if (avg > 0) displayAvg = avg;
+    else if (avg < 0) displayAvg = Math.abs(avg);
+  } else {
+    displayAvg = prices.managerial > 0 ? prices.managerial : avg;
+  }
+
+  let lastPrice = metaLast > 0 ? metaLast : displayAvg;
+  if (optionLike) {
+    if (metaLast > 0) lastPrice = metaLast;
+    else if (custodyUnitMark > 0) lastPrice = custodyUnitMark;
+    else if (displayAvg > 0) lastPrice = displayAvg;
+  }
+  const updatedQuote = metaLast > 0 ? metaLast : optionLike && custodyUnitMark > 0 ? custodyUnitMark : null;
   const pmB3 = prices.b3 > 0 ? prices.b3 : displayAvg;
   let marketValue = qty * lastPrice;
   let costBasis = qty * displayAvg;
   let pnl = marketValue - costBasis;
-  const optionLike = isOptionTicker(ticker) || isOptionAssetType(assetType);
   if (optionLike && !isOptionAssetType(assetType)) {
     const inferredSide = inferOptionMonthFromTicker(ticker)?.optionSide;
     assetType = inferredSide === 'put' ? 'option_put' : 'option_call';
@@ -226,17 +293,34 @@ export function enrichPortfolioRow(
   const optionMonth = optionLike ? inferOptionMonthFromTicker(ticker) : null;
   const optionExpiryDate = optionMonth ? inferOptionExpiryDate(ticker) : null;
   const strikeResolved = optionLike
-    ? resolveOptionStrike({ meta, ticker })
+    ? resolveOptionStrike({
+        meta,
+        ticker,
+        ledgerExerciseStrike: strikeHints?.ledgerStrikeByTicker?.get(ticker),
+        marketStrike: strikeHints?.marketCatalog?.get(ticker)?.strikePrice,
+      })
     : { strike: null, source: null };
   const optionStrike = strikeResolved.strike;
   const premiumReceived =
-    isOptionAssetType(assetType) && qty < 0 && avg > 0
-      ? Math.round(Math.abs(qty) * avg * 100) / 100
+    optionLike && qty < 0 && displayAvg > 0
+      ? Math.round(Math.abs(qty) * displayAvg * 100) / 100
       : 0;
   const notional =
     optionStrike != null && optionStrike > 0
       ? Math.round(Math.abs(qty) * optionStrike * 100) / 100
       : null;
+
+  if (optionLike && Math.abs(qty) > QTY_ZERO_EPS && displayAvg > 0) {
+    const absQ = Math.abs(qty);
+    const mark = lastPrice > 0 ? lastPrice : displayAvg;
+    costBasis = Math.round(displayAvg * absQ * 100) / 100;
+    marketValue = Math.round(mark * absQ * 100) / 100;
+    if (qty < 0) {
+      pnl = Math.round((displayAvg - mark) * absQ * 100) / 100;
+    } else {
+      pnl = Math.round((mark - displayAvg) * absQ * 100) / 100;
+    }
+  }
 
   if (isEquityPortfolioItem(assetType, optionLike)) {
     const quote = updatedQuote ?? lastPrice;
@@ -447,9 +531,15 @@ export function applyCashInvestBalanceToItems(
 
 export function applyAllocationPercents(items: PortfolioItemDto[]): PortfolioItemDto[] {
   const total = items.reduce((s, i) => {
-    if (i.assetType !== 'stock' && i.assetType !== 'fii') return s;
     if (Math.abs(i.quantity) < QTY_ZERO_EPS) return s;
-    return s + i.costBasis;
+    if (
+      i.assetType === 'stock' ||
+      i.assetType === 'fii' ||
+      isPortfolioOptionItem(i)
+    ) {
+      return s + Math.abs(i.marketValue);
+    }
+    return s;
   }, 0);
   if (total <= 0) return items;
   return items.map((item) => ({
@@ -457,8 +547,10 @@ export function applyAllocationPercents(items: PortfolioItemDto[]): PortfolioIte
     allocationPct:
       item.allocationPct != null
         ? item.allocationPct
-        : item.assetType === 'stock' || item.assetType === 'fii'
-          ? Math.round((item.costBasis / total) * 1000) / 10
+        : item.assetType === 'stock' ||
+            item.assetType === 'fii' ||
+            isPortfolioOptionItem(item)
+          ? Math.round((Math.abs(item.marketValue) / total) * 1000) / 10
           : null,
   }));
 }

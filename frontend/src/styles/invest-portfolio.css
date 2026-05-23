@@ -370,3 +370,17 @@
 .portfolio-excel-section .table-footer-summary .excel-footer-right {
   display: none;
 }
+
+.portfolio-3p-obs--ok {
+  color: #34d399;
+}
+
+.portfolio-3p-obs--warn {
+  color: #fbbf24;
+  font-weight: 600;
+}
+
+.portfolio-3p-obs--error {
+  color: #f87171;
+  font-weight: 700;
+}

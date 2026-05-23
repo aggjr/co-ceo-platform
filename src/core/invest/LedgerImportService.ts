@@ -208,6 +208,7 @@ export class LedgerImportService {
         unit_price: Number(line.unit_price),
         underlying_ticker: line.underlying_ticker,
         asset_type: assetType,
+        option_strike: line.option_strike,
         notes: line.notes ? `${notePrefix} — ${line.notes}` : `${notePrefix} (short herdado)`,
         broker_note_ref: `${OPENING_BATCH_REF}:${ticker}`,
         event_source_ref: openingEventRef,

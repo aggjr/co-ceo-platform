@@ -100,6 +100,7 @@ export type LedgerImportLine = {
   impacts_managerial_price?: boolean;
   /** Strike de exercício (R$) — persiste em metadata do ativo. */
   option_strike?: number;
+  option_expiration?: string;
   /**
    * Header canonico (business_events.id) que esta linha pertence. Quando o
    * caller (ex: import-btg-notes) ja agrupou as N pernas de uma mesma nota,
@@ -141,6 +142,9 @@ export type OpeningShortOptionLine = {
   quantity: number;
   unit_price: number;
   underlying_ticker?: string;
+  /** Strike de exercício (R$) — obrigatório para notional na carteira. */
+  option_strike?: number;
+  option_expiration?: string;
   notes?: string;
 };
 

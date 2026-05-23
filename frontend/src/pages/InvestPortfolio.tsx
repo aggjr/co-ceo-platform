@@ -2,6 +2,7 @@ import { Show, createMemo, createResource, For } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import { apiRequest } from '../api/client.js';
+import { formatDateBr } from '../lib/dateFormat.js';
 import '../styles/invest-portfolio-solid.css';
 
 type ThreePrices = { strict: number; b3: number; managerial: number };
@@ -220,8 +221,8 @@ export function InvestPortfolio() {
                     <For each={data()!.cashInTransit!.lines}>
                       {(line) => (
                         <tr>
-                          <td>{line.tradeDate}</td>
-                          <td>{line.settleDate}</td>
+                          <td>{formatDateBr(line.tradeDate)}</td>
+                          <td>{formatDateBr(line.settleDate)}</td>
                           <td>{line.ticker}</td>
                           <td>{line.rule}</td>
                           <td class={`num ${resultClass(line.amount)}`}>{formatBrl(line.amount)}</td>

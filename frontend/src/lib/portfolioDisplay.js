@@ -111,6 +111,7 @@ function isFixedIncomeTicker(ticker) {
   );
 }
 
+import { formatDateBr } from './dateFormat.js';
 import {
   attachCallCoverageToEquities,
   buildShortCallPremiumPendingByUnderlying,
@@ -232,8 +233,11 @@ function hasDistinctAssetName(item) {
 }
 
 function formatOptionExpiryLabel(item) {
-  if (!isOptionLike(item) || !item.optionMonthName) return '—';
-  const year = item.optionExpiryDate ? item.optionExpiryDate.slice(0, 4) : '';
+  if (!isOptionLike(item)) return '—';
+  const br = formatDateBr(item.optionExpiryDate);
+  if (br !== '—') return br;
+  if (!item.optionMonthName) return '—';
+  const year = item.optionExpiryDate ? String(item.optionExpiryDate).slice(0, 4) : '';
   const letter = item.optionMonthLetter ? ` (${item.optionMonthLetter})` : '';
   return year ? `${item.optionMonthName}/${year.slice(2)}${letter}` : `${item.optionMonthName}${letter}`;
 }
@@ -284,14 +288,6 @@ export function buildCustodyTableFooterColumnTotals(rows) {
     }
     return cells;
   };
-}
-
-function formatExpiryDateBr(iso) {
-  if (!iso || String(iso).startsWith('0000')) return '—';
-  const parts = String(iso).slice(0, 10).split('-');
-  if (parts.length !== 3) return '—';
-  const [y, m, d] = parts;
-  return `${d}/${m}/${y}`;
 }
 
 /** Resultado ações/FIIs: (cotação atual. − PM B3) × quantidade. */
@@ -437,7 +433,7 @@ export function buildInvestOptionsColumns() {
       width: '100px',
       render: (row) => {
         const span = document.createElement('span');
-        span.textContent = formatExpiryDateBr(row.optionExpiryDate);
+        span.textContent = formatDateBr(row.optionExpiryDate);
         return span;
       },
     },
@@ -732,6 +728,37 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
             width: '96px',
             render: (row) =>
               renderPriceCell(row.prices?.managerial ?? row.avgPrice),
+          },
+          {
+            key: 'threePricesObservation',
+            label: 'Observação (3 preços)',
+            type: 'text',
+            width: '280px',
+            render: (row) => {
+              const v = row.threePricesValidation;
+              const span = document.createElement('span');
+              if (!v?.observation) {
+                span.className = 'muted';
+                span.textContent = '—';
+                return span;
+              }
+              span.textContent = v.observation;
+              span.style.fontSize = '12px';
+              span.style.lineHeight = '1.35';
+              span.style.display = 'block';
+              span.style.maxWidth = '320px';
+              span.style.whiteSpace = 'normal';
+              if (v.status === 'error') {
+                span.className = 'portfolio-3p-obs--error';
+                span.title = v.messages?.join('\n') || v.observation;
+              } else if (v.status === 'warn') {
+                span.className = 'portfolio-3p-obs--warn';
+                span.title = v.messages?.join('\n') || v.observation;
+              } else {
+                span.className = 'portfolio-3p-obs--ok';
+              }
+              return span;
+            },
           },
         ]
       : [
@@ -1138,8 +1165,8 @@ function renderCashTransitInner(cashStatementBalance, cashInTransit) {
           const amt = Number(ln.amount) || 0;
           const cls = amt >= 0 ? 'is-positive' : 'is-negative';
           return `<tr>
-            <td>${String(ln.tradeDate || '—').slice(0, 10)}</td>
-            <td>${String(ln.settleDate || '—').slice(0, 10)}</td>
+            <td>${formatDateBr(ln.tradeDate)}</td>
+            <td>${formatDateBr(ln.settleDate)}</td>
             <td>${ln.ticker || '—'}</td>
             <td>${ln.transactionType || '—'}</td>
             <td class="num ${cls}">${formatBrl(amt)}</td>

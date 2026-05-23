@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../../lib/coCeoApiConfig.js';
+import { formatDateBr, normalizeToIsoDate } from '../../lib/dateFormat.js';
 import { GridPreferences } from './GridPreferences.js';
 
 /**
@@ -30,25 +31,6 @@ function columnWidthToLayoutPx(widthVal, fallbackPx = 88) {
     }
     const loose = parseFloat(s);
     return Number.isFinite(loose) && loose > 0 ? Math.round(loose) : fallbackPx;
-}
-
-function normalizeToIsoDate(v) {
-    if (!v || v === '0000-00-00') return '';
-    if (typeof v === 'string') {
-        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-        if (v.includes('T')) {
-            const d = v.split('T')[0];
-            if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-        }
-        const pt = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
-        if (pt) return `${pt[3]}-${pt[2]}-${pt[1]}`;
-    }
-    const d = new Date(v);
-    if (Number.isNaN(d.getTime())) return '';
-    const yy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yy}-${mm}-${dd}`;
 }
 
 function dateRangePreset(op) {
@@ -194,11 +176,8 @@ export class ExcelTable {
     }
 
     formatDate(dateString) {
-        if (!dateString) return '-';
-        const iso = normalizeToIsoDate(dateString);
-        if (!iso) return '-';
-        const [year, month, day] = iso.split('-');
-        return `${day}/${month}/${year}`;
+        const br = formatDateBr(dateString);
+        return br === '—' ? '-' : br;
     }
 
     getValueForCol(item, key) {
@@ -1579,8 +1558,8 @@ export class ExcelTable {
             if (colType === 'currency') return fmtCur(v);
             if (colType === 'number')   return fmtNum(v);
             if (colType === 'date') {
-                const [y, m, d] = String(v).split('-');
-                return d && m && y ? `${d}/${m}/${y}` : v;
+                const br = formatDateBr(v);
+                return br !== '—' ? br : String(v);
             }
             return String(v);
         };

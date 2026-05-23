@@ -60,6 +60,7 @@ const PAYLOAD: OpeningImportPayload = {
       quantity: 31_200,
       unit_price: 1.426748,
       underlying_ticker: 'PRIO3',
+      option_strike: 43,
       notes: 'PUT vendida — prêmio recebido por ação',
     },
     {
@@ -68,6 +69,7 @@ const PAYLOAD: OpeningImportPayload = {
       quantity: 6_300,
       unit_price: 0.912254,
       underlying_ticker: 'PRIO3',
+      option_strike: 40.7,
       notes: 'PUT vendida — prêmio recebido por ação',
     },
     {
@@ -76,6 +78,7 @@ const PAYLOAD: OpeningImportPayload = {
       quantity: 5_400,
       unit_price: 0.626905,
       underlying_ticker: 'PRIO3',
+      option_strike: 40.7,
       notes: 'CALL vendida — prêmio recebido por ação',
     },
   ],
