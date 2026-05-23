@@ -62,20 +62,20 @@ if ($current -ne $machine) {
   git checkout $machine
 }
 
-Write-Host "=== 1/6 fetch ===" -ForegroundColor Cyan
+Write-Host "=== 1/7 fetch ===" -ForegroundColor Cyan
 git fetch origin
 
-Write-Host "=== 2/6 alinhar $machine com origin/$integration ===" -ForegroundColor Cyan
+Write-Host "=== 2/7 alinhar $machine com origin/$integration ===" -ForegroundColor Cyan
 git merge "origin/$integration" -m "merge($machine): integrar $integration antes de publicar"
 if ($LASTEXITCODE -ne 0) {
   if (Show-Conflicts "pre-push") { exit 1 }
   Write-Error "Falha ao integrar $integration em $machine"
 }
 
-Write-Host "=== 3/6 push $machine ===" -ForegroundColor Cyan
+Write-Host "=== 3/7 push $machine ===" -ForegroundColor Cyan
 git push -u origin $machine
 
-Write-Host "=== 4/6 merge $machine -> $integration ===" -ForegroundColor Cyan
+Write-Host "=== 4/7 merge $machine -> $integration ===" -ForegroundColor Cyan
 git checkout $integration
 git pull origin $integration
 git merge $machine -m "merge($integration): integrar $machine"
@@ -93,10 +93,25 @@ if ($peer -and (Test-GitRef $peer)) {
     Write-Error "Falha ao integrar branch par $peer"
   }
 } else {
-  Write-Host "=== 5/6 par $peer ausente no remoto (ok) ===" -ForegroundColor Cyan
+  Write-Host "=== 5/7 par $peer ausente no remoto (ok) ===" -ForegroundColor Cyan
 }
 
-Write-Host "=== 6/6 push $integration e realinhar $machine ===" -ForegroundColor Cyan
+Write-Host "=== 6/7 bump versao do sistema (integracao unificada) ===" -ForegroundColor Cyan
+node (Join-Path $PSScriptRoot "bump-version.js")
+if ($LASTEXITCODE -ne 0) { Write-Error "bump-version.js falhou" }
+git add version.json package.json frontend/src/generated/version.js src/generated/version.ts
+$stagedBump = git diff --cached --name-only
+if ($stagedBump) {
+  $verJson = Get-Content (Join-Path (Split-Path -Parent $PSScriptRoot) "version.json") -Raw | ConvertFrom-Json
+  $label = "V$($verJson.major).$($verJson.minor).$($verJson.patch)"
+  git commit -m "chore(release): $label apos integracao em $integration"
+  if ($LASTEXITCODE -ne 0) { Write-Error "Falha ao commitar bump de versao" }
+  Write-Host "Versao: $label" -ForegroundColor Green
+} else {
+  Write-Host "Versao ja estava atualizada (nada a commitar)." -ForegroundColor DarkGray
+}
+
+Write-Host "=== 7/7 push $integration e realinhar $machine ===" -ForegroundColor Cyan
 git push origin $integration
 
 git checkout $machine

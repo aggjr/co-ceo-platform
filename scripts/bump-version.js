@@ -15,7 +15,15 @@ if (process.env.BUMP_VERSION !== '0') {
 
 fs.writeFileSync(versionFile, `${JSON.stringify(version, null, 2)}\n`);
 
-const display = `V${version.major}.${version.minor}.${version.patch}`;
+const semver = `${version.major}.${version.minor}.${version.patch}`;
+const pkgPath = path.join(root, 'package.json');
+const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+if (pkg.version !== semver) {
+  pkg.version = semver;
+  fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+}
+
+const display = `V${semver}`;
 const js = `export const APP_VERSION = '${display}';\n`;
 const ts = `export const APP_VERSION = '${display}';\n`;
 
