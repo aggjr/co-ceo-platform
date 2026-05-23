@@ -70,6 +70,19 @@ git push origin main
 
 Depois realinhar **as duas** máquinas com `git rebase origin/main` na branch local.
 
+## GitHub CLI (`gh`) nesta máquina
+
+O `gh` usa o mesmo token do `git` via:
+
+```powershell
+.\scripts\invoke-gh.ps1 repo view
+.\scripts\invoke-gh.ps1 pr list
+```
+
+Integração: branch padrão do repo = **`main`**.
+
+Opcional (uma vez, no browser): `gh auth refresh -h github.com -s read:org` — só se precisar de comandos que exigem escopo de organização.
+
 ## Proibido
 
 - `--force` em `main`
