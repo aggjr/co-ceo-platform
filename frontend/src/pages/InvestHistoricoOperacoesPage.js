@@ -47,13 +47,34 @@ const COLUMNS = [
 function resolveTradeType(r) {
   if (r.isExercise) return 'EXEC';
   if (r.category === 'LOAN') return 'BTC';
+  
   const mt = String(r.marketType || '').toUpperCase();
   if (/OPCAO\s+DE\s+COMPRA/i.test(mt)) return 'CALL';
   if (/OPCAO\s+DE\s+VENDA/i.test(mt)) return 'PUT';
   if (/EXERC/i.test(mt)) return 'EXEC';
+  
   const t = String(r.ticker || '').toUpperCase();
-  if (t.length >= 6 && /^[A-Z]{4}[A-L]/.test(t)) return 'CALL';
-  if (t.length >= 6 && /^[A-Z]{4}[M-X]/.test(t)) return 'PUT';
+  
+  // Tesouro e Renda Fixa
+  if (t.startsWith('LFT')) return 'LFT';
+  if (t.startsWith('LTN')) return 'LTN';
+  if (t.startsWith('NTN')) return 'NTN';
+  if (t.startsWith('CDB')) return 'CDB';
+  if (t.startsWith('CRA')) return 'CRA';
+  if (t.startsWith('CRI')) return 'CRI';
+  if (t.startsWith('LCI')) return 'LCI';
+  if (t.startsWith('LCA')) return 'LCA';
+  if (t.startsWith('DEB')) return 'DEBÊNTURE';
+  
+  // Opções
+  if (t.length >= 5 && /^[A-Z]{4}[A-L]\d/.test(t)) return 'CALL';
+  if (t.length >= 5 && /^[A-Z]{4}[M-X]\d/.test(t)) return 'PUT';
+  
+  // FIIs, Ações, BDRs
+  if (/^[A-Z]{4}11F?\b/.test(t)) return 'FII';
+  if (/^[A-Z]{4}[3456]F?\b/.test(t)) return 'AÇÃO';
+  if (/^[A-Z]{4}3[23459]F?\b/.test(t)) return 'BDR';
+  
   return '—';
 }
 
