@@ -57,8 +57,12 @@ function Resolve-PeerRemoteRefs {
 }
 
 function Test-GitRef($ref) {
-  git rev-parse --verify "$ref" 2>$null | Out-Null
-  return $LASTEXITCODE -eq 0
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = 'SilentlyContinue'
+  $null = git rev-parse --verify "$ref" 2>&1
+  $ok = $LASTEXITCODE -eq 0
+  $ErrorActionPreference = $prev
+  return $ok
 }
 
 $integration = git config --get coceo.integrationBranch
