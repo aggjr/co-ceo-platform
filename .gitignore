@@ -29,6 +29,7 @@ deploy-credentials.env
 .claude/settings.local.json
 # Scripts locais com credenciais hardcoded — nunca versionar
 scripts/q.js
+scripts/branch-peer.local.env
 check-cash.ts
 *.log
 .DS_Store
