@@ -1,0 +1,62 @@
+---
+description: Fluxo Git com duas máquinas (agente 24h + estação de trabalho) — branches separadas e detecção de sobreposição antes do commit.
+alwaysApply: true
+---
+
+# Git — duas máquinas, branches separadas
+
+Nunca sincronizar o projeto via Google Drive / pasta compartilhada. Fonte da verdade: **GitHub**.
+
+## Branches
+
+| Branch | Quem |
+|--------|------|
+| `integracao` (hoje: `feat/invest-custody-validation-2026-05` até existir `main` estável) | Código **integrado** — sempre o mais atualizado para testar o sistema inteiro |
+| `feat/machine-agent` | Máquina agente 24h — **só esta máquina commita aqui** |
+| `feat/machine-workstation` | Estação interativa (Cursor local) — **só esta máquina commita aqui** |
+
+Regra: **não commitar na branch da outra máquina.** Integrar via merge/rebase em `integracao`.
+
+## Antes de cada commit (obrigatório nas duas máquinas)
+
+```bash
+git fetch origin
+npm run check:branch-overlap
+```
+
+Se listar arquivos em **sobreposição** com a branch par (`feat/machine-*` da outra máquina), **avisar o usuário** antes de concluir o commit. Não resolver conflito silenciosamente — descrever o que cada lado mudou e propor merge em `integracao`.
+
+Configurar a branch par em `scripts/branch-peer.local.env` (copiar de `branch-peer.env.template`).
+
+## Ritmo diário
+
+1. `git checkout feat/machine-<esta-maquina>`
+2. `git pull --rebase origin integracao` (ou a branch de integração vigente)
+3. Trabalhar, commits pequenos
+4. `npm run check:branch-overlap` → `git push origin feat/machine-<esta-maquina>`
+5. Quando o usuário pedir integração: merge `feat/machine-agent` + `feat/machine-workstation` → `integracao`, resolver conflitos com análise explícita, push `integracao`
+
+## Integração (merge para branch compartilhada)
+
+```bash
+git checkout feat/invest-custody-validation-2026-05   # ou main
+git pull origin feat/invest-custody-validation-2026-05
+git merge origin/feat/machine-agent -m "merge(agent): ..."
+git merge origin/feat/machine-workstation -m "merge(workstation): ..."
+# resolver conflitos; testar tsc + critério de aceite da task
+git push origin feat/invest-custody-validation-2026-05
+```
+
+Depois, **cada máquina** atualiza sua branch de trabalho:
+
+```bash
+git checkout feat/machine-<local>
+git rebase origin/feat/invest-custody-validation-2026-05
+git push --force-with-lease origin feat/machine-<local>   # só na branch própria, nunca na integracao
+```
+
+## O que o agente NÃO faz
+
+- Push com `--force` na branch de integração
+- Commit direto na branch da outra máquina
+- Ignorar saída de `check:branch-overlap` quando houver sobreposição
