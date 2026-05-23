@@ -1,5 +1,6 @@
 const http = require('http');
 const fs = require('fs');
+const path = require('path');
 const mysql = require('mysql2/promise');
 
 /**
@@ -10,12 +11,35 @@ const mysql = require('mysql2/promise');
  */
 
 const TARGET_URL = 'http://localhost:3000/api';
-const TARGET_ENDPOINTS = [
-  { path: '/invest/brokerage-notes/review', method: 'GET', requiresAuth: true },
-  { path: '/invest/cash/extract', method: 'GET', requiresAuth: true },
-  { path: '/auth/login', method: 'POST', requiresAuth: false },
-  { path: '/cockpit/platform/users', method: 'GET', requiresAuth: true }
-];
+
+// Extrai dinamicamente os endpoints do arquivo de rotas para garantir que testes
+// cubram todos os novos módulos desenvolvidos (ex: Cockpit, Invest e futuros).
+function extractEndpointsFromRoutes() {
+  const apiFile = fs.readFileSync(path.join(__dirname, '../src/routes/api.ts'), 'utf-8');
+  const endpoints = [];
+  
+  // Regex para capturar router.get|post|put|delete('/caminho', ...)
+  const routeRegex = /router\.(get|post|put|delete|patch)\s*\(\s*['"]([^'"]+)['"]/g;
+  let match;
+  
+  while ((match = routeRegex.exec(apiFile)) !== null) {
+    const method = match[1].toUpperCase();
+    let routePath = match[2];
+    
+    // Substitui params de rota (ex: /:contractId) por valores dummy para o fuzzer não falhar no path
+    routePath = routePath.replace(/:[a-zA-Z0-9_]+/g, '12345');
+    
+    endpoints.push({
+      path: routePath,
+      method: method,
+      requiresAuth: apiFile.substring(match.index, match.index + 200).includes('AuthMiddleware.protect')
+    });
+  }
+  
+  return endpoints;
+}
+
+const TARGET_ENDPOINTS = extractEndpointsFromRoutes();
 
 const POPULATION_SIZE = 20;
 const GENERATIONS = 5;

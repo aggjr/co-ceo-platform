@@ -23,5 +23,8 @@ config/easypanel-ambiente-FASE2-COLE-AQUI.txt
 config/easypanel-ambiente-COLE-AQUI.txt
 deploy-credentials.env
 .claude/settings.local.json
+# Scripts locais com credenciais hardcoded — nunca versionar
+scripts/q.js
+check-cash.ts
 *.log
 .DS_Store
