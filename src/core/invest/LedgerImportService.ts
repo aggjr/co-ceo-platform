@@ -15,11 +15,9 @@ import {
 } from './ledgerTypes';
 import { buildLedgerDedupIndex } from './ledgerOperationDedup';
 import { LedgerEventProjection } from '../../modules/invest/sync/LedgerEventProjection';
-import {
-  buildInvestOperations,
-  type InvestOperations,
-} from '../../modules/invest';
+import { buildInvestOperations, type InvestOperations } from '../../modules/invest';
 import { syncAutoPendingSettlements } from './AutoPendingSettlementSync';
+import { PatrimonyDailyStore } from './PatrimonyDailyStore';
 
 /** Abertura de custódia — referência única usada para idempotência. */
 const OPENING_BATCH_REF = 'OPENING-BTG-2026-01-01';
@@ -35,10 +33,12 @@ function parseDate(value: string): string {
 export class LedgerImportService {
   private readonly projection: LedgerEventProjection;
   private readonly operations: InvestOperations;
+  private readonly patrimonyStore: PatrimonyDailyStore;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.projection = new LedgerEventProjection(gateway);
     this.operations = buildInvestOperations(gateway);
+    this.patrimonyStore = new PatrimonyDailyStore(gateway);
   }
 
   async importPortfolio(ctx: UserContext, payload: LedgerImportPayload) {
@@ -138,6 +138,17 @@ export class LedgerImportService {
     }
 
     const pendingSync = await this.syncAutoPendingSettlements(ctx);
+
+    if (inserted > 0) {
+      // Find the earliest date in the imported entries (opening or entries)
+      let minDate = openingDate;
+      for (const line of allLines) {
+        if (line.date < minDate) minDate = parseDate(line.date);
+      }
+      // Invalidate snapshots from minDate onwards so the chart dynamically reflects the new reality
+      await this.patrimonyStore.invalidateFromDate(ctx, minDate);
+    }
+
     return {
       batchId,
       inserted,
@@ -219,6 +230,10 @@ export class LedgerImportService {
       else inserted += 1;
     }
 
+    if (inserted > 0) {
+      await this.patrimonyStore.invalidateFromDate(ctx, openingDate);
+    }
+
     return { batchId, inserted, skipped, openingDate };
   }
 
@@ -275,6 +290,15 @@ export class LedgerImportService {
       if (result.skipped) skipped += 1;
       else inserted += 1;
       if (result.enriched) enriched += 1;
+    }
+
+    if (inserted > 0 || enriched > 0) {
+      let minDate = entries?.[0]?.date ? parseDate(entries[0].date) : today;
+      for (const line of entries || []) {
+        const d = parseDate(line.date);
+        if (d < minDate) minDate = d;
+      }
+      await this.patrimonyStore.invalidateFromDate(ctx, minDate);
     }
 
     return { batchId, inserted, skipped, enriched };

@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import pool from '../../config/database';
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
 import type { DailyPatrimonyPoint } from './PatrimonyDailyEngine';
@@ -98,6 +99,27 @@ export class PatrimonyDailyStore {
       beforeDate,
     ]);
     return rows[0] ? rowToStored(rows[0]) : null;
+  }
+
+  /**
+   * Apaga as consolidações a partir de uma data de corte.
+   * Isso força o gráfico histórico a recalcular tudo dinamicamente
+   * do dia da alteração em diante, caso novos dados retroativos entrem.
+   */
+  async invalidateFromDate(ctx: UserContext, fromDate: string): Promise<void> {
+    if (!ctx.organizationId) return;
+    try {
+      await pool.query(
+        `DELETE FROM invest_portfolio_daily WHERE organization_id = ? AND snapshot_date >= ?`,
+        [ctx.organizationId, fromDate]
+      );
+      await pool.query(
+        `DELETE FROM invest_daily_snapshots WHERE organization_id = ? AND snapshot_date >= ?`,
+        [ctx.organizationId, fromDate]
+      );
+    } catch (err) {
+      console.error('Falha ao invalidar patrimônio diário retroativo:', err);
+    }
   }
 
   async upsertPortfolioDay(ctx: UserContext, input: RecordPortfolioDayInput): Promise<StoredPortfolioDay> {
