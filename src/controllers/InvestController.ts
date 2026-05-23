@@ -459,28 +459,126 @@ export class InvestController {
     }
   };
 
-  /** Conferência de notas BTG — somente leitura; não importa ao livro razão. */
-  listBrokerageNotesReview = async (_req: Request, res: Response) => {
-    const file = path.join(
-      process.cwd(),
-      'data',
-      'invest',
-      'btg-brokerage-notes-review-2026.json'
-    );
-    if (!fs.existsSync(file)) {
-      return res.status(404).json({
+  /** Histórico de operações da base de dados. */
+  listBrokerageNotesReview = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
         success: false,
-        error:
-          'Arquivo de revisão não encontrado. Rode: npx ts-node scripts/build-btg-brokerage-notes-review.ts',
+        error: 'Selecione uma organização (personifique a holding).',
       });
     }
-    const data = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+    const tradeEvents = events.filter((e) => e.asset_type !== 'cash');
+
+    const isoDateToBr = (iso: string): string => {
+      const m = String(iso || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return iso;
+      return `${m[3]}/${m[2]}/${m[1]}`;
+    };
+
+    const rows = [];
+    const notesCount = new Set<string>();
+    const noteNets = new Map<string, number>();
+
+    for (const e of tradeEvents) {
+      if (e.broker_note_ref) {
+        const current = noteNets.get(e.broker_note_ref) || 0;
+        noteNets.set(e.broker_note_ref, current + e.total_net_value);
+      }
+    }
+
+    const noteLineCount = new Map<string, number>();
+
+    for (const e of tradeEvents) {
+      const noteNum = e.broker_note_ref || '—';
+      const lineNo = (noteLineCount.get(noteNum) || 0) + 1;
+      noteLineCount.set(noteNum, lineNo);
+      if (e.broker_note_ref) {
+        notesCount.add(e.broker_note_ref);
+      }
+
+      let side: 'C' | 'V' | '—' = '—';
+      if (e.transaction_type.includes('buy')) {
+        side = 'C';
+      } else if (e.transaction_type.includes('sell')) {
+        side = 'V';
+      } else if (e.transaction_type === 'acquisition') {
+        side = 'C';
+      } else if (e.transaction_type === 'disposition') {
+        side = 'V';
+      } else if (e.quantity > 0) {
+        side = 'C';
+      } else if (e.quantity < 0) {
+        side = 'V';
+      }
+
+      let category = 'SPOT';
+      if (e.asset_type === 'option_call' || e.asset_type === 'option_put') {
+        category = 'OPTIONS';
+      } else if (e.transaction_type === 'loan' || e.asset_type === 'loan') {
+        category = 'LOAN';
+      }
+
+      const grossValue = Math.abs(e.total_net_value);
+      const isExercise = e.transaction_type === 'option_exercise';
+
+      const pregaoDate = e.transaction_date || today;
+      rows.push({
+        dedupeKey: `DB|${e.id}`,
+        noteNumber: noteNum,
+        pregaoDate: pregaoDate,
+        pregaoDateBr: isoDateToBr(pregaoDate),
+        category,
+        sourceFile: e.notes || 'Livro razão',
+        netOperations: e.broker_note_ref ? noteNets.get(e.broker_note_ref) : e.total_net_value,
+        settlementTax: 0,
+        registrationTax: 0,
+        cblcTotal: 0,
+        emoluments: 0,
+        bovespaTotal: 0,
+        irrf: e.irrf_tax || 0,
+        duplicateSkipped: false,
+        duplicateOf: null,
+        lineNo,
+        side,
+        sideLabel: side === 'C' ? 'Compra' : side === 'V' ? 'Venda' : '—',
+        marketType: isExercise ? 'EXERCÍCIO' : category === 'OPTIONS' ? 'OPÇÕES' : 'VISTA',
+        operationLabel: isExercise ? 'Exercício' : side === 'C' ? 'Compra' : 'Venda',
+        maturity: null,
+        ticker: e.asset_ticker,
+        underlyingStock: e.underlying_ticker || e.asset_ticker,
+        isExercise,
+        specification: '',
+        quantity: Math.abs(e.quantity),
+        unitPrice: e.unit_price,
+        grossValue,
+        dc: side === 'C' ? 'D' : side === 'V' ? 'C' : '—',
+      });
+    }
+
+    rows.sort((a, b) => {
+      const d = String(a.pregaoDate).localeCompare(String(b.pregaoDate));
+      if (d !== 0) return d;
+      return String(a.noteNumber).localeCompare(String(b.noteNumber));
+    });
+
     return res.json({
       success: true,
-      ledgerImport: false,
-      message:
-        'Dados apenas para conferência. Não foram lançados no livro caixa. Cruze depois com extrato da conta.',
-      ...data,
+      ledgerImport: true,
+      message: 'Dados lidos diretamente do banco de dados.',
+      generatedAt: new Date().toISOString(),
+      stats: {
+        notesRaw: notesCount.size,
+        notesKept: notesCount.size,
+        notesDuplicateSkipped: 0,
+        tradeLines: rows.length,
+      },
+      duplicatesSkipped: [],
+      notes: [],
+      rows,
     });
   };
 

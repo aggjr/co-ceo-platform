@@ -158,17 +158,17 @@ export async function InvestBrokerageNotesPage(container) {
         <div id="brokerage-notes-grid-host"></div>
       </div>
       <div class="card notes-meta" style="margin-bottom:16px">
-        <h2 style="font-size:16px;margin:0 0 8px">Conferência — notas BTG 2026</h2>
+        <h2 style="font-size:16px;margin:0 0 8px">Histórico de operações registradas</h2>
         <p class="muted" style="margin:0 0 12px">
-          <strong>Não importado ao livro caixa.</strong> Revise operações, taxas e emolumentos antes de subir os extratos da conta corrente.
+          Operações de compra, venda, aluguel e exercícios registradas na base de dados (livro razão).
         </p>
         <p class="muted notes-legend" style="margin:0 0 12px">
           <strong class="notes-contract-value">Valor contrato</strong> — líquido de cada negócio/contrato.
-          <strong class="notes-note-net">Líq. nota (caixa)</strong> — total da nota (repetido em todas as linhas da mesma nota).
+          <strong class="notes-note-net">Líq. nota (caixa)</strong> — total líquido da nota/operação.
         </p>
         <p class="muted" style="margin:0">
-          Notas: <strong>${stats.notesKept ?? 0}</strong> · Linhas na grade: <strong>${lineCount}</strong>
-          · Gerado em: ${(data.generatedAt || '').slice(0, 19).replace('T', ' ')}
+          Notas/Operações: <strong>${stats.notesKept ?? 0}</strong> · Transações: <strong>${lineCount}</strong>
+          · Atualizado em: ${(data.generatedAt || '').slice(0, 19).replace('T', ' ')}
         </p>
       </div>
       ${
