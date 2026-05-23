@@ -194,6 +194,12 @@ router.get(
   requirePermission('invest:ledger:read'),
   invest.listBrokerageNotesReview.bind(invest)
 );
+router.get(
+  '/invest/cash/extract',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.getExtract.bind(invest)
+);
 
 // --- Core ---
 router.get('/core/storage', AuthMiddleware.protect, requirePermission('cockpit:storage:read'), async (req, res) => {

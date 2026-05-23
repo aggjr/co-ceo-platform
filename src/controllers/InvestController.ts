@@ -582,4 +582,116 @@ export class InvestController {
     });
   };
 
+  getExtract = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({ success: false, error: 'Sem organização.' });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+    const cashEvents = events.filter((e) => e.asset_type === 'cash');
+    const tradeEvents = events.filter((e) => e.asset_type !== 'cash');
+
+    const notesTradeSummary = new Map<string, {
+      netValue: number,
+      tickers: Set<string>,
+      tradeDate: string,
+      settlementDate: string,
+    }>();
+
+    const addDays = (dateStr: string, days: number) => {
+      const d = new Date(dateStr + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + days);
+      if (d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 2);
+      if (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() + 1);
+      return d.toISOString().slice(0, 10);
+    };
+
+    for (const e of tradeEvents) {
+      if (e.broker_note_ref && e.transaction_date) {
+        const t = e.asset_ticker?.toUpperCase() || '';
+        const isOptionsOrFixed = e.asset_type === 'option_call' || e.asset_type === 'option_put' || 
+          t.startsWith('LFT') || t.startsWith('CDB') || t.startsWith('LTN') || t.startsWith('NTN');
+        const daysToSettle = isOptionsOrFixed ? 1 : 2;
+        const settlement = addDays(e.transaction_date, daysToSettle);
+        
+        let summary = notesTradeSummary.get(e.broker_note_ref);
+        if (!summary) {
+          summary = { netValue: 0, tickers: new Set(), tradeDate: e.transaction_date, settlementDate: settlement };
+          notesTradeSummary.set(e.broker_note_ref, summary);
+        }
+        summary.netValue += e.total_net_value;
+        if (e.asset_ticker) summary.tickers.add(e.asset_ticker);
+        
+        if (settlement > summary.settlementDate) {
+          summary.settlementDate = settlement;
+        }
+      }
+    }
+
+    const rows = [];
+    let balance = 0;
+
+    for (const ce of cashEvents) {
+      const amount = ce.total_net_value;
+      balance += amount;
+      let obs = '';
+      let originDate = '';
+      let ticker = '';
+      let noteNum = ce.broker_note_ref || '';
+
+      if (noteNum && notesTradeSummary.has(noteNum)) {
+        const summary = notesTradeSummary.get(noteNum)!;
+        originDate = summary.tradeDate;
+        ticker = Array.from(summary.tickers).join(', ');
+        
+        // trade netValue is positive for BUYS. Cash amount is negative for OUTFLOW (buys).
+        // So cashAmount + tradeNetValue should be 0.
+        const expectedCash = -summary.netValue;
+        const diffReal = Math.abs(amount - expectedCash);
+        
+        if (diffReal > 0.02) {
+          obs = `Diferença valor: Liq. ${expectedCash.toFixed(2)} vs Caixa ${amount.toFixed(2)}`;
+        }
+        
+        if (ce.transaction_date !== summary.settlementDate) {
+          obs += (obs ? '. ' : '') + `Liquidou em ${ce.transaction_date}, esperado ${summary.settlementDate}`;
+        }
+      } else if (ce.transaction_type === 'capital_deposit' || ce.transaction_type === 'capital_withdrawal') {
+         // TED normal
+      } else if (ce.transaction_type === 'opening_balance') {
+         // Saldo inicial
+      } else if (amount !== 0) {
+        obs = 'Sem relação encontrada ou sem nota (LIQ BOLSA?)';
+      }
+
+      const isoDateToBr = (iso: string | undefined | null) => {
+        const m = String(iso || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : iso || '';
+      };
+
+      rows.push({
+        id: ce.id,
+        date: ce.transaction_date || '',
+        dateBr: isoDateToBr(ce.transaction_date),
+        description: ce.notes || (ce.transaction_type === 'opening_balance' ? 'Saldo Inicial' : 'Movimentação'),
+        inflow: amount > 0 ? amount : null,
+        outflow: amount < 0 ? Math.abs(amount) : null,
+        balance: balance,
+        originDate: isoDateToBr(originDate),
+        ticker,
+        noteNum,
+        observation: obs,
+      });
+    }
+    
+    rows.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+    return res.json({
+      success: true,
+      rows,
+    });
+  };
+
 }
