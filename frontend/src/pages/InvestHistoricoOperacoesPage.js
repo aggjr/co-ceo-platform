@@ -11,6 +11,8 @@ import {
   mountExcelTables,
 } from '../lib/excelTable.js';
 import { getPageTexts } from '../navigation/pageTexts.js';
+import { loadUiManifest } from '../navigation/uiManifest.js';
+import { applyTradeTypeTheme, renderTradeTypeCell } from '../navigation/domainValues.js';
 
 function makeCostRender(key) {
   return (row) => {
@@ -27,7 +29,7 @@ function makeCostRender(key) {
   };
 }
 
-function buildColumns(t) {
+function buildColumns(t, manifest) {
   return [
     { key: 'pregaoDateBr', label: t['column.invest.historico_operacoes.date'] || 'Data', type: 'text' },
     { key: 'ticker', label: t['column.invest.historico_operacoes.ticker'] || 'Ticker', type: 'text' },
@@ -35,18 +37,7 @@ function buildColumns(t) {
       key: 'tradeType',
       label: t['column.invest.historico_operacoes.type'] || 'TIPO',
       type: 'text',
-      render: (row) => {
-        const tv = String(row.tradeType || '—');
-        const span = document.createElement('span');
-        span.textContent = tv;
-        if (tv === 'CALL') span.className = 'notes-type--call';
-        else if (tv === 'PUT') span.className = 'notes-type--put';
-        else if (tv === 'EXEC') span.className = 'notes-type--exec';
-        else if (tv === 'BTC') span.className = 'notes-type--btc';
-        else if (tv === 'LFT' || tv === 'LTN' || tv === 'CDB') span.className = 'notes-type--rf';
-        else if (tv === 'AÇÃO') span.className = 'notes-type--stock';
-        return span;
-      },
+      render: (row) => renderTradeTypeCell(row, manifest),
     },
     { key: 'underlyingStock', label: t['column.invest.historico_operacoes.underlying'] || 'Ação ref.', type: 'text' },
     {
@@ -212,8 +203,16 @@ export async function InvestHistoricoOperacoesPage(container) {
     'column.invest.historico_operacoes.category',
     'screen.invest.historico_operacoes.title',
   ];
+  let manifest = null;
+  try {
+    manifest = await loadUiManifest();
+    applyTradeTypeTheme(manifest);
+  } catch {
+    // fallback de cores/classes em domainValues.js
+  }
+
   const t = await getPageTexts(colKeys);
-  const COLUMNS = buildColumns(t);
+  const COLUMNS = buildColumns(t, manifest);
   const screenTitle = t['screen.invest.historico_operacoes.title'] || 'Histórico de operações';
 
   if (isGlobalSession()) {

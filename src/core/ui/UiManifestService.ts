@@ -27,7 +27,14 @@ interface RawText {
   kind: string;
   module_code: string | null;
   text: string;
+  metadata: unknown;
   is_overridden: 0 | 1 | boolean;
+}
+
+export interface UiTextEntry {
+  text: string;
+  metadata: Record<string, unknown> | null;
+  isOverridden: boolean;
 }
 
 export interface MenuItemDto {
@@ -54,7 +61,26 @@ export interface UiManifest {
   scope: 'global' | 'node';
   menu: MenuModuleDto[];
   texts: Record<string, string>;
+  entries: Record<string, UiTextEntry>;
   overriddenKeys: string[];
+}
+
+function parseMetadata(raw: unknown): Record<string, unknown> | null {
+  if (raw == null) return null;
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 export class UiManifestService {
@@ -74,12 +100,17 @@ export class UiManifestService {
     const texts = textRows as unknown as RawText[];
 
     const textMap: Record<string, string> = {};
+    const entries: Record<string, UiTextEntry> = {};
     const overridden: string[] = [];
     for (const t of texts) {
+      const isOverridden = t.is_overridden === 1 || t.is_overridden === true;
       textMap[t.text_key] = t.text;
-      if (t.is_overridden === 1 || t.is_overridden === true) {
-        overridden.push(t.text_key);
-      }
+      entries[t.text_key] = {
+        text: t.text,
+        metadata: parseMetadata(t.metadata),
+        isOverridden,
+      };
+      if (isOverridden) overridden.push(t.text_key);
     }
 
     let allowed: Set<string> | null = null;
@@ -121,6 +152,7 @@ export class UiManifestService {
       scope: ctx.scope,
       menu,
       texts: textMap,
+      entries,
       overriddenKeys: overridden,
     };
   }

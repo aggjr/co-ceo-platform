@@ -14,7 +14,7 @@ import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import { CoCeoDataGateway } from '../../core/dal';
 import { installerContext } from './lib/installerContext';
-import { ensureInsert } from './lib/seedHelpers';
+import { ensureInsert, findIdByColumn } from './lib/seedHelpers';
 
 dotenv.config();
 
@@ -34,6 +34,15 @@ interface TextSeed {
   kind: TextKind;
   default_text: string;
   description?: string;
+  metadata?: Record<string, unknown>;
+}
+
+function typeMeta(
+  cssClass: string,
+  color: string,
+  cssVar: string
+): Record<string, unknown> {
+  return { cssClass, color, cssVar };
 }
 
 interface MenuSeed {
@@ -356,6 +365,104 @@ const TEXTS: TextSeed[] = [
     kind: 'column_label',
     default_text: 'Mercado',
   },
+
+  // ── Valores de dominio: coluna TIPO (historico operacoes) ───────────
+  {
+    id: '00000000-0000-4003-8000-000000000301',
+    text_key: 'value.invest.trade_type.call',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'CALL',
+    metadata: typeMeta('notes-type--call', '#60a5fa', '--invest-type-call'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000302',
+    text_key: 'value.invest.trade_type.put',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'PUT',
+    metadata: typeMeta('notes-type--put', '#eab308', '--invest-type-put'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000303',
+    text_key: 'value.invest.trade_type.exec',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'EXEC',
+    metadata: typeMeta('notes-type--exec', '#fbbf24', '--invest-type-exec'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000304',
+    text_key: 'value.invest.trade_type.btc',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'BTC',
+    metadata: typeMeta('notes-type--btc', '#94a3b8', '--invest-type-btc'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000305',
+    text_key: 'value.invest.trade_type.lft',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'LFT',
+    metadata: typeMeta('notes-type--rf', '#ec4899', '--invest-type-rf'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000306',
+    text_key: 'value.invest.trade_type.ltn',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'LTN',
+    metadata: typeMeta('notes-type--rf', '#ec4899', '--invest-type-rf'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000307',
+    text_key: 'value.invest.trade_type.cdb',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'CDB',
+    metadata: typeMeta('notes-type--rf', '#ec4899', '--invest-type-rf'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000308',
+    text_key: 'value.invest.trade_type.ntn',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'NTN',
+    metadata: typeMeta('notes-type--rf', '#ec4899', '--invest-type-rf'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000309',
+    text_key: 'value.invest.trade_type.stock',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'AÇÃO',
+    metadata: typeMeta('notes-type--stock', '#f97316', '--invest-type-stock'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000310',
+    text_key: 'value.invest.trade_type.fii',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'FII',
+    metadata: typeMeta('notes-type--fii', '#a78bfa', '--invest-type-fii'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000311',
+    text_key: 'value.invest.trade_type.bdr',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'BDR',
+    metadata: typeMeta('notes-type--bdr', '#38bdf8', '--invest-type-bdr'),
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000312',
+    text_key: 'value.invest.trade_type.debenture',
+    module_code: 'INVEST',
+    kind: 'value_label',
+    default_text: 'DEBÊNTURE',
+    metadata: typeMeta('notes-type--rf', '#ec4899', '--invest-type-rf'),
+  },
 ];
 
 const MENU: MenuSeed[] = [
@@ -586,10 +693,25 @@ async function run() {
         kind: t.kind,
         default_text: t.default_text,
         description: t.description ?? null,
+        metadata: t.metadata ?? null,
       },
       { entityType: 'ui_text_catalog' }
     );
     if (result === 'inserted') textsInserted++;
+    else if (t.metadata) {
+      const existingId = await findIdByColumn(
+        gateway,
+        ctx,
+        'ui_text_catalog',
+        'text_key',
+        t.text_key
+      );
+      if (existingId) {
+        await gateway.update(ctx, 'ui_text_catalog', existingId, {
+          metadata: t.metadata,
+        });
+      }
+    }
   }
 
   const codeToId = new Map<string, string>();

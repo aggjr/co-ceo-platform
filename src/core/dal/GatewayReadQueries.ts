@@ -344,6 +344,7 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
   ui_texts_resolved_for_org: {
     sql: `SELECT c.text_key, c.kind, c.module_code,
                  COALESCE(o.text, c.default_text) AS text,
+                 COALESCE(o.metadata, c.metadata) AS metadata,
                  (o.organization_id IS NOT NULL) AS is_overridden
           FROM ui_text_catalog c
           LEFT JOIN ui_text_overrides o
