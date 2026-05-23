@@ -33,6 +33,9 @@
     "sync:market:indices": "node ./node_modules/ts-node/dist/bin.js scripts/sync-market-indices.ts",
     "backfill:market:quotes": "node ./node_modules/ts-node/dist/bin.js scripts/backfill-market-quotes-history.ts",
     "check:branch-overlap": "node ./node_modules/ts-node/dist/bin.js scripts/check-branch-overlap.ts",
+    "git:sync": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-sync-before-commit.ps1",
+    "git:integrate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-publish-to-main.ps1",
+    "git:publish-main": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-publish-to-main.ps1",
     "db:import:full": "node scripts/import-full-dump.js",
     "fix:duplicate-cash": "ts-node scripts/delete-manual-cash.ts"
   },
