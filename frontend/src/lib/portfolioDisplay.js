@@ -855,12 +855,19 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
             return span;
           }
           span.textContent = formatNumber(row.callsSold, 0);
-          const prem = Number(row.callsPremiumPending);
-          if (prem > 0) {
-            span.title = `CALLs vendidas (soma das posições curtas CALL, incl. PRIOF). Prêmio em trânsito (D+1): ${formatBrl(prem)}`;
+          
+          const rem = Number(row.callsRemaining);
+          if (rem < 0) {
+            span.style.fontWeight = '600';
+            span.className = 'portfolio-calls-uncovered';
+            span.title = `Venda a descoberto: há ${formatNumber(Math.abs(rem), 0)} CALLs vendidas a mais do que a quantidade de ações em custódia. Alto risco de exercício descoberto!`;
           } else {
-            span.title =
-              'CALLs vendidas — soma das posições curtas CALL (planilha Opções + livro-razão)';
+            const prem = Number(row.callsPremiumPending);
+            if (prem > 0) {
+              span.title = `CALLs vendidas (soma das posições curtas CALL, incl. PRIOF). Prêmio em trânsito (D+1): ${formatBrl(prem)}`;
+            } else {
+              span.title = 'CALLs vendidas — soma das posições curtas CALL (planilha Opções + livro-razão)';
+            }
           }
           return span;
         },
@@ -883,32 +890,6 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
           span.style.fontWeight = '600';
           span.className = 'portfolio-call-premium-pending';
           span.title = 'Prêmio das CALLs vendidas — crédito previsto na conta investimento (D+1 útil)';
-          return span;
-        },
-      },
-      {
-        key: 'callsRemaining',
-        label: 'CALLs sobrando',
-        type: 'number',
-        align: 'right',
-        width: '112px',
-        render: (row) => {
-          const span = document.createElement('span');
-          if (row.callsRemaining == null) {
-            span.className = 'muted';
-            span.textContent = '—';
-            return span;
-          }
-          const n = Number(row.callsRemaining);
-          span.textContent = formatNumber(n, 0);
-          span.style.fontWeight = '600';
-          if (n < 0) {
-            span.className = 'portfolio-calls-uncovered';
-            span.title =
-              'Vendido mais CALLs do que ações em custódia — risco de posição descoberta';
-          } else {
-            span.title = 'Ações em custódia − CALLs vendidas (mesma unidade da corretora)';
-          }
           return span;
         },
       }
