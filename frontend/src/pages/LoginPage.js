@@ -1,5 +1,6 @@
 import '../styles/login.css';
 import { APP_VERSION } from '../generated/version.js';
+import { applyAppVersionToDom } from '../lib/appVersion.js';
 import { apiRequest } from '../api/client.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, setToken, setUser } from '../auth/session.js';
@@ -82,6 +83,8 @@ export async function LoginPage(container) {
   const emailInput = container.querySelector('#login-username');
   const pwdInput = container.querySelector('#login-password');
   const togglePwd = container.querySelector('#toggle-pwd');
+
+  void applyAppVersionToDom(container);
 
   const readCredentialsFromDom = () => {
     const fd = new FormData(form);

@@ -42,8 +42,12 @@ if (-not (git status --porcelain)) {
   }
 }
 
-Write-Host "=== 3/4 Integrar em main + bump ===" -ForegroundColor Cyan
+Write-Host "=== 3/4 Verificar superficies de versao (login + sidebar) ===" -ForegroundColor Cyan
+npm run verify:version-ui
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+Write-Host "=== 4/5 Integrar em main + bump + build web ===" -ForegroundColor Cyan
 & (Join-Path $PSScriptRoot "git-publish-to-main.ps1")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "=== 4/4 OK ===" -ForegroundColor Green
+Write-Host "=== 5/5 OK ===" -ForegroundColor Green

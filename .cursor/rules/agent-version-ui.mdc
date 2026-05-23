@@ -1,0 +1,33 @@
+---
+description: Versao na tela de login e barra lateral — sempre sincronizada com bump/integracao.
+alwaysApply: true
+---
+
+# Versao visivel na UI (login + sidebar)
+
+A versao que o usuario ve **nao** pode ficar desatualizada apos `bump-version` / `git:integrate`.
+
+## Fonte canonica
+
+| Camada | Arquivo / endpoint |
+|--------|-------------------|
+| Numero | `version.json` |
+| Build-time | `frontend/src/generated/version.js`, `src/generated/version.ts` |
+| Runtime (UI) | `GET /api/version` via `frontend/src/lib/appVersion.js` |
+| Login | `frontend/src/pages/LoginPage.js` — `.card-version` |
+| Sidebar | `frontend/src/components/layout/Shell.tsx` — `[data-app-version]` |
+
+## O que o agente faz apos alterar codigo
+
+1. `npm run git:ship` (ou `git:integrate`) — bump + **rebuild web** (`build:web` no modo `--integrate`).
+2. `npm run verify:version-ui` deve passar antes de considerar pronto.
+3. **Proibido** hardcodar `V0.0.xx` em `frontend/src/` (exceto `generated/`).
+
+## Novas telas que exibam versao
+
+- Importar `appVersion.js` (`fetchAppVersion` / `applyAppVersionToDom`) ou `APP_VERSION` de `generated/version.js` **e** atualizar via API.
+- Registrar em `scripts/version-ui-surfaces.json` e rodar `verify:version-ui`.
+
+## Deploy
+
+Apos pull em producao: reiniciar API (`tsc` atualiza `APP_VERSION` no servidor) e rodar `npm run build:web` (ou `npm start`, que ja faz build). A UI busca `/api/version` — mesmo bundle antigo mostra versao correta apos reload.

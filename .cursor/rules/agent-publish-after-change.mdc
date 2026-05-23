@@ -15,7 +15,9 @@ Quando o agente executor **terminar** alteracoes de codigo nesta sessao (task, f
 npm run git:ship -- -Message "tipo(escopo): assunto curto"
 ```
 
-Equivalente: commit na branch do agente → `git-publish-to-main` → merge das branches par em `main` → **sempre** incrementa patch em `version.json` / `APP_VERSION` → push `main` e realinha a branch local.
+Equivalente: commit na branch do agente → `git-publish-to-main` → merge das branches par em `main` → **sempre** incrementa patch + `verify:version-ui` + `build:web` → push `main` e realinha a branch local.
+
+Login e sidebar leem `/api/version` (`frontend/src/lib/appVersion.js`) — ver `agent-version-ui.mdc`.
 
 ## Sem perguntar ao usuario
 

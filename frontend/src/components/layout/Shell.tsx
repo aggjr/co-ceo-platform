@@ -1,6 +1,7 @@
-import { JSX, Show, onMount } from 'solid-js';
+import { JSX, Show, createSignal, onMount } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { APP_VERSION } from '../../generated/version.js';
+import { fetchAppVersion } from '../../lib/appVersion.js';
 import { formatOriginalSessionLines } from '../../auth/impersonationLabel.js';
 import { clearSession } from '../../auth/session.js';
 import {
@@ -18,10 +19,11 @@ import '../../styles/cockpit-shell.css';
 
 export function Shell(props: { children?: JSX.Element }) {
   const navigate = useNavigate();
+  const [appVersion, setAppVersion] = createSignal(APP_VERSION);
 
   onMount(() => {
-    // Atualiza o estado dos sinais baseados no armazenamento local no montagem
     refreshSessionState();
+    void fetchAppVersion().then(setAppVersion);
   });
 
   const handleLogout = () => {
@@ -60,8 +62,11 @@ export function Shell(props: { children?: JSX.Element }) {
         <SideNav />
 
         <div class="sidebar-footer">
-          <div style={{ "margin-bottom": "8px", "font-size": "11px", color: "rgba(255, 255, 255, 0.4)", "text-align": "center" }}>
-            {APP_VERSION}
+          <div
+            data-app-version
+            style={{ "margin-bottom": "8px", "font-size": "11px", color: "rgba(255, 255, 255, 0.4)", "text-align": "center" }}
+          >
+            {appVersion()}
           </div>
           <button type="button" class="btn-logout" onClick={handleLogout}>
             Sair

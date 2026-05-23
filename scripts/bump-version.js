@@ -133,5 +133,33 @@ if (fs.existsSync(packageFile)) {
   fs.writeFileSync(packageFile, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
+function syncHtmlPreviews(displayLabel) {
+  const manifestPath = path.join(__dirname, 'version-ui-surfaces.json');
+  if (!fs.existsSync(manifestPath)) return;
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  for (const rel of manifest.syncHtmlPreviews || []) {
+    const abs = path.join(root, rel);
+    if (!fs.existsSync(abs)) continue;
+    let html = fs.readFileSync(abs, 'utf8');
+    html = html.replace(/V\d+\.\d+\.\d+/g, displayLabel);
+    fs.writeFileSync(abs, html);
+  }
+}
+
+syncHtmlPreviews(display);
+
+const { verifyVersionUi } = require('./verify-version-ui');
+try {
+  verifyVersionUi();
+} catch (e) {
+  console.error(`[verify:version-ui] ${e.message}`);
+  process.exit(1);
+}
+
+if (integrateMode && process.env.BUMP_BUILD_WEB !== '0') {
+  console.log('[version] rebuild frontend (login + sidebar no dist)...');
+  execSync('npm run build:web', { cwd: root, stdio: 'inherit' });
+}
+
 const mode = integrateMode ? 'integrate' : 'build';
 console.log(`[version:${mode}] ${display}`);

@@ -1,0 +1,21 @@
+{
+  "generatedFiles": [
+    "frontend/src/generated/version.js",
+    "src/generated/version.ts"
+  ],
+  "uiSurfaces": [
+    {
+      "id": "login",
+      "file": "frontend/src/pages/LoginPage.js",
+      "markers": ["appVersion.js", "card-version"]
+    },
+    {
+      "id": "sidebar",
+      "file": "frontend/src/components/layout/Shell.tsx",
+      "markers": ["appVersion.js", "data-app-version"]
+    }
+  ],
+  "syncHtmlPreviews": [
+    "src/frontend/login_preview.html"
+  ]
+}
