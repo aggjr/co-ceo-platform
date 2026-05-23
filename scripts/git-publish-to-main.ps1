@@ -74,8 +74,9 @@ if (-not $machine) {
 
 $peerRefs = Resolve-PeerRemoteRefs -MachineBranch $machine
 
-if (git status --porcelain) {
-  Write-Error "Working tree suja. Faca o commit antes de publicar em main."
+$dirtyTracked = @(git status --porcelain | Where-Object { $_ -notmatch '^\?\?' })
+if ($dirtyTracked.Count -gt 0) {
+  Write-Error "Ha alteracoes commitadas pendentes. Faca commit antes de publicar em main."
 }
 
 $current = git branch --show-current
