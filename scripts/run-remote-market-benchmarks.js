@@ -30,11 +30,7 @@ async function runLocalSeed(host, user, password, database) {
   execSync(cmd, { cwd: path.join(__dirname, '..'), stdio: 'inherit', env: process.env });
 }
 
-async function ensureRemoteSchema(host, user, password, database) {
-  const sql = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'database', 'migrations', '22_market_quotes_global.sql'),
-    'utf8'
-  );
+async function applyRemoteMigrations(host, user, password, database) {
   const conn = await mysql.createConnection({
     host,
     user,
@@ -42,14 +38,19 @@ async function ensureRemoteSchema(host, user, password, database) {
     database,
     multipleStatements: true,
   });
-  const [t] = await conn.query(
-    `SELECT COUNT(*) AS n FROM information_schema.tables
-     WHERE table_schema = ? AND table_name = 'market_index_daily'`,
-    [database]
-  );
-  if (Number(t[0]?.n ?? 0) === 0) {
-    console.log('Aplicando migration 22...');
-    await conn.query(sql);
+  for (const file of ['22_market_quotes_global.sql', '23_market_benchmark_seed.sql']) {
+    const full = path.join(__dirname, '..', 'src', 'database', 'migrations', file);
+    if (!fs.existsSync(full)) continue;
+    if (file.startsWith('22')) {
+      const [t] = await conn.query(
+        `SELECT COUNT(*) AS n FROM information_schema.tables
+         WHERE table_schema = ? AND table_name = 'market_index_daily'`,
+        [database]
+      );
+      if (Number(t[0]?.n ?? 0) > 0) continue;
+    }
+    console.log('Aplicando', file);
+    await conn.query(fs.readFileSync(full, 'utf8'));
   }
   await conn.end();
 }
@@ -112,7 +113,7 @@ async function runViaApi() {
 
   const host = process.env.REMOTE_DB_HOST || '69.62.99.34';
   const user = process.env.REMOTE_DB_USER || 'root';
-  const password = process.env.REMOTE_DB_PASSWORD || process.env.DB_PASSWORD;
+  const password = process.env.REMOTE_DB_PASSWORD;
   const database = process.env.REMOTE_DB_NAME || 'co_ceo_platform';
 
   if (!password) {
@@ -121,7 +122,7 @@ async function runViaApi() {
   }
 
   try {
-    await ensureRemoteSchema(host, user, password, database);
+    await applyRemoteMigrations(host, user, password, database);
     await runLocalSeed(host, user, password, database);
     console.log('\nOK remoto (MySQL direto).');
   } catch (e) {

@@ -331,14 +331,32 @@ export class InvestController {
     const cashInTransit = buildCashInTransitSummary(events, to);
 
     const chartDates = result.series.map((p) => String(p.date).slice(0, 10));
-    const cdiRows = await this.marketQuoteRepo.loadIndexRange(ctx, 'CDI', from, to);
-    const cdiBenchmark = buildCdiBenchmarkForChart(cdiRows, from, to, chartDates);
-    const prioQuotes = await this.marketQuoteRepo.loadQuoteRange(
+    let cdiRows = await this.marketQuoteRepo.loadIndexRange(ctx, 'CDI', from, to);
+    let prioQuotes = await this.marketQuoteRepo.loadQuoteRange(
       ctx,
       CHART_BENCHMARK_STOCK,
       from,
       to
     );
+    if (!cdiRows.length || !prioQuotes.length) {
+      try {
+        await seedMarketBenchmarks(this.gateway, pool, {
+          from,
+          to,
+          stockTicker: CHART_BENCHMARK_STOCK,
+        });
+        cdiRows = await this.marketQuoteRepo.loadIndexRange(ctx, 'CDI', from, to);
+        prioQuotes = await this.marketQuoteRepo.loadQuoteRange(
+          ctx,
+          CHART_BENCHMARK_STOCK,
+          from,
+          to
+        );
+      } catch {
+        /* seed best-effort */
+      }
+    }
+    const cdiBenchmark = buildCdiBenchmarkForChart(cdiRows, from, to, chartDates);
     const stockBenchmark = buildStockBenchmarkForChart(
       prioQuotes.map((q) => ({ quote_date: q.quote_date, closing_price: q.closing_price })),
       chartDates,
