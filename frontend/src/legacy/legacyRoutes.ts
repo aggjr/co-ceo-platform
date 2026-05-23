@@ -32,7 +32,7 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/invest/carteira-acoes-fiis', loader: InvestPortfolioPage },
   { path: '/invest/resultado', loader: InvestPortfolioPage },
   { path: '/invest/ganhos-por-acao', loader: InvestStockGainPivotPage },
-  { path: '/invest/notas-corretagem', loader: InvestBrokerageNotesPage },
+  { path: '/invest/historico-operacoes', loader: InvestBrokerageNotesPage },
   { path: '/invest/extratos', loader: InvestExtratosPage },
   { path: '/invest/transacoes-finalizadas', loader: InvestPortfolioPage },
 ];

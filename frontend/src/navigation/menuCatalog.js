@@ -84,7 +84,7 @@ export const MENU_CATALOG = [
       },
       {
         label: 'Histórico operações',
-        path: '/invest/notas-corretagem',
+        path: '/invest/historico-operacoes',
         resourceKey: 'screen.invest.results',
       },
       {
