@@ -431,7 +431,7 @@ export function buildInvestOptionsColumns() {
     },
     {
       key: 'optionExpiryDate',
-      label: 'Vencimento',
+      label: 'Data Strike',
       type: 'date',
       align: 'right',
       width: '100px',

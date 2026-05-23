@@ -70,7 +70,7 @@ const COLUMNS = [
     cellClass: () => 'notes-contract-value',
   },
   { key: 'quantity', label: 'Qtd', type: 'number' },
-  { key: 'maturity', label: 'Venc.', type: 'text' },
+  { key: 'maturity', label: 'Data Strike', type: 'text' },
   { key: 'noteNumber', label: 'Nr. nota', type: 'text' },
   { key: 'category', label: 'Mercado', type: 'text' },
   { key: 'lineNo', label: 'Linha', type: 'number' },
