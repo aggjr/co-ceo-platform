@@ -12,8 +12,8 @@ Fonte da verdade: **GitHub**. Nunca sincronizar código via Google Drive.
 | Branch | Papel |
 |--------|--------|
 | **`main`** | Código **integrado** — sempre o mais atualizado; base para testar o sistema inteiro |
-| **`note-gamer`** | Só a máquina **note-gamer** (esta estação) commita aqui |
-| **`note-guto`** | Só a máquina **note-guto** (agente 24h) commita aqui |
+| **`note-gamer`** | Só a máquina **note-gamer** commita aqui |
+| **`note-guto`** | Só a máquina **note-guto** commita aqui |
 
 Regra: **não commitar na branch da outra máquina.** Integrar em `main` via merge/rebase explícito.
 

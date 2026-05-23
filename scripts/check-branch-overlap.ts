@@ -60,11 +60,19 @@ function changedFilesSince(base: string, head: string): Set<string> {
 function main(): void {
   loadLocalEnv();
 
+  const branchNameEarly = git('git rev-parse --abbrev-ref HEAD');
+  const defaultPeer =
+    branchNameEarly === 'note-guto'
+      ? 'origin/note-gamer'
+      : branchNameEarly === 'note-gamer'
+        ? 'origin/note-guto'
+        : 'origin/note-gamer';
+
   const integration =
     arg('integration') ||
     process.env.INTEGRATION_BRANCH ||
     'main';
-  const peer = arg('peer') || process.env.PEER_BRANCH || 'origin/note-guto';
+  const peer = arg('peer') || process.env.PEER_BRANCH || defaultPeer;
   const current = 'HEAD';
   const integrationRef = refExists(`origin/${integration}`)
     ? `origin/${integration}`
