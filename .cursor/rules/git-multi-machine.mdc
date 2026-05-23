@@ -1,62 +1,77 @@
 ---
-description: Fluxo Git com duas máquinas (agente 24h + estação de trabalho) — branches separadas e detecção de sobreposição antes do commit.
+description: Fluxo Git — main integra; note-gamer e note-guto são branches de trabalho por máquina.
 alwaysApply: true
 ---
 
-# Git — duas máquinas, branches separadas
+# Git — main + note-gamer / note-guto
 
-Nunca sincronizar o projeto via Google Drive / pasta compartilhada. Fonte da verdade: **GitHub**.
+Fonte da verdade: **GitHub**. Nunca sincronizar código via Google Drive.
 
 ## Branches
 
-| Branch | Quem |
-|--------|------|
-| `integracao` (hoje: `feat/invest-custody-validation-2026-05` até existir `main` estável) | Código **integrado** — sempre o mais atualizado para testar o sistema inteiro |
-| `feat/machine-agent` | Máquina agente 24h — **só esta máquina commita aqui** |
-| `feat/machine-workstation` | Estação interativa (Cursor local) — **só esta máquina commita aqui** |
+| Branch | Papel |
+|--------|--------|
+| **`main`** | Código **integrado** — sempre o mais atualizado; base para testar o sistema inteiro |
+| **`note-gamer`** | Só a máquina **note-gamer** (esta estação) commita aqui |
+| **`note-guto`** | Só a máquina **note-guto** (agente 24h) commita aqui |
 
-Regra: **não commitar na branch da outra máquina.** Integrar via merge/rebase em `integracao`.
+Regra: **não commitar na branch da outra máquina.** Integrar em `main` via merge/rebase explícito.
 
-## Antes de cada commit (obrigatório nas duas máquinas)
+Config Git local (uma vez por máquina):
+
+```bash
+# note-gamer
+git config coceo.integrationBranch main
+git config coceo.machineBranch note-gamer
+
+# note-guto
+git config coceo.integrationBranch main
+git config coceo.machineBranch note-guto
+```
+
+Arquivo `scripts/branch-peer.local.env`: `PEER_BRANCH=origin/note-guto` (gamer) ou `origin/note-gamer` (guto).
+
+## Antes de cada commit
 
 ```bash
 git fetch origin
+.\scripts\git-sync-before-commit.ps1   # puxa main -> sua branch
 npm run check:branch-overlap
 ```
 
-Se listar arquivos em **sobreposição** com a branch par (`feat/machine-*` da outra máquina), **avisar o usuário** antes de concluir o commit. Não resolver conflito silenciosamente — descrever o que cada lado mudou e propor merge em `integracao`.
+Se `check:branch-overlap` listar sobreposição com a branch par, **avisar o usuário** antes do commit.
 
-Configurar a branch par em `scripts/branch-peer.local.env` (copiar de `branch-peer.env.template`).
+## Ritmo diário (cada máquina)
 
-## Ritmo diário
+1. `git checkout note-<gamer|guto>`
+2. `git pull --rebase origin main` (ou `git-sync-before-commit.ps1`)
+3. Trabalhar; commits pequenos
+4. `npm run check:branch-overlap` → `git push origin note-<local>`
+5. Publicar em `main` quando pedido: `.\scripts\git-publish-to-integration.ps1`
 
-1. `git checkout feat/machine-<esta-maquina>`
-2. `git pull --rebase origin integracao` (ou a branch de integração vigente)
-3. Trabalhar, commits pequenos
-4. `npm run check:branch-overlap` → `git push origin feat/machine-<esta-maquina>`
-5. Quando o usuário pedir integração: merge `feat/machine-agent` + `feat/machine-workstation` → `integracao`, resolver conflitos com análise explícita, push `integracao`
-
-## Integração (merge para branch compartilhada)
+## Atualizar a branch da máquina a partir de main (sempre)
 
 ```bash
-git checkout feat/invest-custody-validation-2026-05   # ou main
-git pull origin feat/invest-custody-validation-2026-05
-git merge origin/feat/machine-agent -m "merge(agent): ..."
-git merge origin/feat/machine-workstation -m "merge(workstation): ..."
-# resolver conflitos; testar tsc + critério de aceite da task
-git push origin feat/invest-custody-validation-2026-05
+git fetch origin
+git checkout note-gamer   # ou note-guto
+git rebase origin/main
+git push --force-with-lease origin note-gamer   # só na branch própria
 ```
 
-Depois, **cada máquina** atualiza sua branch de trabalho:
+## Integração manual em main
 
 ```bash
-git checkout feat/machine-<local>
-git rebase origin/feat/invest-custody-validation-2026-05
-git push --force-with-lease origin feat/machine-<local>   # só na branch própria, nunca na integracao
+git checkout main
+git pull origin main
+git merge origin/note-gamer -m "merge(note-gamer): ..."
+git merge origin/note-guto -m "merge(note-guto): ..."
+git push origin main
 ```
 
-## O que o agente NÃO faz
+Depois realinhar **as duas** máquinas com `git rebase origin/main` na branch local.
 
-- Push com `--force` na branch de integração
-- Commit direto na branch da outra máquina
-- Ignorar saída de `check:branch-overlap` quando houver sobreposição
+## Proibido
+
+- `--force` em `main`
+- Commit direto em `note-gamer` / `note-guto` pela máquina errada
+- Ignorar sobreposição reportada por `check:branch-overlap`

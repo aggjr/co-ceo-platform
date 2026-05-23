@@ -63,9 +63,8 @@ function main(): void {
   const integration =
     arg('integration') ||
     process.env.INTEGRATION_BRANCH ||
-    'feat/invest-custody-validation-2026-05';
-  const peer =
-    arg('peer') || process.env.PEER_BRANCH || 'origin/feat/machine-agent';
+    'main';
+  const peer = arg('peer') || process.env.PEER_BRANCH || 'origin/note-guto';
   const current = 'HEAD';
   const integrationRef = refExists(`origin/${integration}`)
     ? `origin/${integration}`

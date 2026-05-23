@@ -9,7 +9,7 @@ $integration = git config --get coceo.integrationBranch
 $machine = git config --get coceo.machineBranch
 
 if (-not $integration -or -not $machine) {
-  Write-Error "Configure coceo.integrationBranch e coceo.machineBranch (ver git-sync-before-commit.ps1)"
+  Write-Error "Configure coceo.integrationBranch (main) e coceo.machineBranch (note-gamer ou note-guto). Ver git-sync-before-commit.ps1"
 }
 
 if (git status --porcelain) {

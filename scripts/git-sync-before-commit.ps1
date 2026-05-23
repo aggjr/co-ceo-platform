@@ -3,8 +3,9 @@
 #   .\scripts\git-sync-before-commit.ps1
 #
 # Configuracao local (uma vez por maquina):
-#   git config coceo.integrationBranch feat/invest-custody-validation-2026-05
-#   git config coceo.machineBranch work/note-guto
+#   git config coceo.integrationBranch main
+#   git config coceo.machineBranch note-guto
+#   # note-gamer: coceo.machineBranch note-gamer
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
@@ -16,7 +17,7 @@ if (-not $integration) {
   Write-Error "Defina: git config coceo.integrationBranch <branch-integracao>"
 }
 if (-not $machine) {
-  Write-Error "Defina: git config coceo.machineBranch work/<nome-da-maquina>"
+  Write-Error "Defina: git config coceo.machineBranch note-gamer ou note-guto"
 }
 
 $current = git branch --show-current
