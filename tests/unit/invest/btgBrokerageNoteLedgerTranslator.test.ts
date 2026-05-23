@@ -15,6 +15,7 @@ function note(partial: Partial<BtgBrokerageNote> & Pick<BtgBrokerageNote, 'dedup
     trades: [],
     fees: [],
     netOperations: null,
+    netSettlement: null,
     settlementTax: null,
     registrationTax: null,
     cblcTotal: null,
@@ -51,12 +52,16 @@ describe('btgBrokerageNoteLedgerTranslator', () => {
             dc: 'C',
           },
         ],
+        settlementTax: 0.11,
+        emoluments: 0.14,
       }),
     ]);
     expect(lines).toHaveLength(1);
     expect(lines[0].operation).toBe('put_sell');
     expect(lines[0].ticker).toBe('PRIOM385');
     expect(lines[0].broker_note_ref).toContain(BTG_NOTE_LEDGER_REF_PREFIX);
+    expect(lines[0].b3_fees).toBeCloseTo(0.25, 2);
+    expect(lines[0].total_net_value).toBeCloseTo(399.75, 2);
   });
 
   it('mapeia exercício para buy no underlying', () => {

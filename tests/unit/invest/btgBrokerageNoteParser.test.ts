@@ -1,8 +1,10 @@
 import {
+  aggregateNoteFees,
   dedupeBrokerageNotes,
   parseBtgBrokerageNoteBlocks,
   parseBrMoney,
   parseFeeLine,
+  parseNetSettlementLine,
 } from '../../../src/core/invest/btgBrokerageNoteParser';
 
 const SAMPLE = `
@@ -41,6 +43,48 @@ describe('btgBrokerageNoteParser', () => {
   it('parseFeeLine aceita formato R$', () => {
     const f = parseFeeLine('Emolumentos: R$ 0,14 D');
     expect(f?.amount).toBe(0.14);
+  });
+
+  it('ignora Total CBLC a crédito (subtotal, não taxa)', () => {
+    expect(parseFeeLine('399,62 Total CBLC C')).toBeNull();
+    expect(parseFeeLine('0,11 Taxa de liquidação/CCP D')?.amount).toBe(0.11);
+  });
+
+  it('parseNetSettlementLine extrai líquido final da nota', () => {
+    expect(parseNetSettlementLine('Líquido para 06/01/2026 C 399,48')).toBe(399.48);
+  });
+
+  it('não confunde linha de exercício com taxa (EXERC ≠ execução)', () => {
+    expect(
+      parseFeeLine('1-BOVESPA C EXERC OPC COMPRA PRIOD585E ON 700 58,50 40950,00 D')
+    ).toBeNull();
+  });
+
+  it('aggregateNoteFees soma débitos BTG (layout real jan/2026)', () => {
+    const lines = `
+NOTA DE CORRETAGEM
+27421483
+Nr. nota
+1
+Folha
+05/01/2026
+Data pregão
+Negócios realizados
+1-BOVESPA V OPCAO DE VENDA 01/26 PRIOM385 ON 2500 0,16 400,00 C
+Resumo dos Negócios
+400,00 Valor líquido das operações C
+0,11 Taxa de liquidação/CCP D
+0,27 Taxa de registro D
+399,62 Total CBLC C
+0,14 Emolumentos D
+0,14 Total Bovespa / Soma D
+ Total corretagem / Despesas 0,00
+ Líquido para 06/01/2026 C 399,48
+`.trim().split('\n');
+    const notes = parseBtgBrokerageNoteBlocks(lines, 'OPTIONS/test.pdf', 'OPTIONS');
+    const agg = aggregateNoteFees(notes[0]!);
+    expect(agg.totalDebit).toBeCloseTo(0.52, 2);
+    expect(notes[0]!.netSettlement).toBeCloseTo(399.48, 2);
   });
 
   it('parseBrMoney', () => {

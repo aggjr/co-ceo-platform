@@ -41,6 +41,18 @@ export type BtgBrokerageNoteFee = {
   dc: 'C' | 'D';
 };
 
+/** Taxas da nota agregadas (somente débitos reais; ignora subtotais a crédito). */
+export type AggregatedNoteFees = {
+  brokerage: number;
+  settlement: number;
+  registration: number;
+  emoluments: number;
+  bovespa: number;
+  irrf: number;
+  other: number;
+  totalDebit: number;
+};
+
 export type BtgBrokerageNote = {
   dedupeKey: string;
   noteNumber: string;
@@ -52,6 +64,8 @@ export type BtgBrokerageNote = {
   trades: BtgBrokerageNoteTrade[];
   fees: BtgBrokerageNoteFee[];
   netOperations: number | null;
+  /** Líquido final da nota ("Líquido para DD/MM/AAAA") após todas as taxas. */
+  netSettlement: number | null;
   settlementTax: number | null;
   registrationTax: number | null;
   cblcTotal: number | null;
@@ -221,42 +235,137 @@ function parseTradeLine(line: string): BtgBrokerageNoteTrade | null {
   };
 }
 
+function isNotAFeeLabel(label: string): boolean {
+  return /valor das oper|valor l[ií]quido das opera|valor l[ií]quido para|títulos públ|títulos publ|observa|transfer[eê]ncia de ativos|taxa de transfer/i.test(
+    label
+  );
+}
+
+/** Subtotais a crédito no PDF BTG (ex.: "399,62 Total CBLC C") — não são taxa. */
+function isSubtotalCreditLine(label: string, dc: 'C' | 'D'): boolean {
+  if (/total cblc/i.test(label)) return true;
+  if (dc !== 'C') return false;
+  return /valor l[ií]quido das opera|valor l[ií]quido para/i.test(label);
+}
+
+function normalizeParsedFee(fee: BtgBrokerageNoteFee): BtgBrokerageNoteFee | null {
+  if (isNotAFeeLabel(fee.label)) return null;
+  if (isSubtotalCreditLine(fee.label, fee.dc)) return null;
+  return fee;
+}
+
 /** Linha de taxa/emolumento no bloco "Resumo dos Negócios" (vários layouts BTG). */
 export function parseFeeLine(line: string): BtgBrokerageNoteFee | null {
   const trimmed = line.replace(/\s+/g, ' ').trim();
   if (!trimmed || /^resumo/i.test(trimmed)) return null;
+  if (/^1-BOVESPA\s/i.test(trimmed)) return null;
+
+  const looksLikeFeeLabel = (label: string) =>
+    /taxa|emolument|irrf|corretagem|corret\.|bovespa|cblc|registro|liquida|clearing|execu[cç][aã]o|despesa|iss\b|a\.n\.a/i.test(
+      label
+    ) && !/exerc\s+opc/i.test(label);
+
+  let parsed: BtgBrokerageNoteFee | null = null;
 
   // 0,11 Taxa de liquidação/CCP D
   let m = trimmed.match(/^([\d.,]+)\s+(.+?)\s+([CD])$/i);
   if (m) {
     const amount = parseBrMoney(m[1]!);
     if (amount === 0 && !/0,00/.test(m[1]!)) return null;
-    return { label: m[2]!.trim(), amount, dc: m[3]!.toUpperCase() as 'C' | 'D' };
+    parsed = { label: m[2]!.trim(), amount, dc: m[3]!.toUpperCase() as 'C' | 'D' };
   }
 
   // Taxa de liquidação/CCP 0,11 D
-  m = trimmed.match(/^(.+?)\s+([\d.,]+)\s+([CD])$/i);
-  if (m && /taxa|emolument|total|irrf|valor|corret|bovespa|cblc|registro/i.test(m[1]!)) {
-    const amount = parseBrMoney(m[2]!);
-    if (amount === 0 && !/0,00/.test(m[2]!)) return null;
-    return { label: m[1]!.trim(), amount, dc: m[3]!.toUpperCase() as 'C' | 'D' };
+  if (!parsed) {
+    m = trimmed.match(/^(.+?)\s+([\d.,]+)\s+([CD])$/i);
+    if (m && looksLikeFeeLabel(m[1]!)) {
+      const amount = parseBrMoney(m[2]!);
+      if (amount === 0 && !/0,00/.test(m[2]!)) return null;
+      parsed = { label: m[1]!.trim(), amount, dc: m[3]!.toUpperCase() as 'C' | 'D' };
+    }
   }
 
-  // Emolumentos: R$ 0,14 D  |  Taxa de Registro: R$ 0,00
-  m = trimmed.match(/^(.+?):\s*R\$\s*([\d.,-]+)\s*([CD])?\s*$/i);
-  if (m) {
-    const amount = parseBrMoney(m[2]!);
-    if (amount === 0 && !/0,00/.test(m[2]!)) return null;
-    const dc = (m[3]?.toUpperCase() as 'C' | 'D' | undefined) || 'D';
-    return { label: m[1]!.trim(), amount, dc };
+  // Emolumentos: R$ 0,14 D  |  Corret. Execução: R$ 0,15
+  if (!parsed) {
+    m = trimmed.match(/^(.+?):\s*R\$\s*([\d.,-]+)\s*([CD])?\s*$/i);
+    if (m) {
+      const amount = parseBrMoney(m[2]!);
+      if (amount === 0 && !/0,00/.test(m[2]!)) return null;
+      const dc = (m[3]?.toUpperCase() as 'C' | 'D' | undefined) || 'D';
+      parsed = { label: m[1]!.trim(), amount, dc };
+    }
   }
 
-  return null;
+  return parsed ? normalizeParsedFee(parsed) : null;
 }
 
-function pickFeeAmount(fees: BtgBrokerageNoteFee[], pattern: RegExp): number | null {
-  const hit = fees.find((f) => pattern.test(f.label));
-  return hit ? hit.amount : null;
+/** Líquido final: "Líquido para 06/01/2026 C 399,48" */
+export function parseNetSettlementLine(line: string): number | null {
+  const trimmed = line.replace(/\s+/g, ' ').trim();
+  const m = trimmed.match(
+    /^L[ií]quido para\s+(\d{2}\/\d{2}\/\d{4})\s+([CD])\s+([\d.,]+)/i
+  );
+  if (!m) return null;
+  const amount = parseBrMoney(m[3]!);
+  return m[2]!.toUpperCase() === 'C' ? amount : -amount;
+}
+
+function pickFeeDebit(fees: BtgBrokerageNoteFee[], pattern: RegExp): number | null {
+  const hit = fees.find((f) => pattern.test(f.label) && f.dc === 'D');
+  return hit ? Math.abs(hit.amount) : null;
+}
+
+/** Soma taxas reais (débitos) da nota; evita contar Total CBLC a crédito. */
+export function aggregateNoteFees(note: BtgBrokerageNote): AggregatedNoteFees {
+  const agg: AggregatedNoteFees = {
+    brokerage: 0,
+    settlement: 0,
+    registration: 0,
+    emoluments: 0,
+    bovespa: 0,
+    irrf: 0,
+    other: 0,
+    totalDebit: 0,
+  };
+
+  for (const f of note.fees) {
+    if (f.dc !== 'D') continue;
+    if (isNotAFeeLabel(f.label) || isSubtotalCreditLine(f.label, f.dc)) continue;
+    const amt = Math.abs(f.amount);
+    if (amt <= 0) continue;
+    const u = f.label.toUpperCase();
+    if (/CORRET|DESPESA|CLEARING|EXECU/i.test(u)) agg.brokerage += amt;
+    else if (/IRRF|I\.R\.R\.F|IR S\/REND/i.test(u)) agg.irrf += amt;
+    else if (/LIQUIDA|CCP/i.test(u)) agg.settlement += amt;
+    else if (/REGISTRO/i.test(u)) agg.registration += amt;
+    else if (/EMOLUMENT/i.test(u)) agg.emoluments += amt;
+    else if (/BOVESPA|ANA|TERMO\/OP/i.test(u)) agg.bovespa += amt;
+    else agg.other += amt;
+  }
+
+  if (agg.emoluments > 0 && agg.bovespa > 0 && Math.abs(agg.bovespa - agg.emoluments) < 0.02) {
+    agg.bovespa = 0;
+  }
+
+  if (agg.totalDebit === 0) {
+    agg.settlement = Math.abs(Number(note.settlementTax ?? 0));
+    agg.registration = Math.abs(Number(note.registrationTax ?? 0));
+    agg.emoluments = Math.abs(Number(note.emoluments ?? 0));
+    agg.irrf = Math.abs(Number(note.irrf ?? 0));
+    const bov = Math.abs(Number(note.bovespaTotal ?? 0));
+    if (bov > 0 && Math.abs(bov - agg.emoluments) >= 0.02) agg.bovespa = bov;
+  }
+
+  agg.totalDebit =
+    agg.brokerage +
+    agg.settlement +
+    agg.registration +
+    agg.emoluments +
+    agg.bovespa +
+    agg.irrf +
+    agg.other;
+
+  return agg;
 }
 
 function parseLoanMoneyField(section: string, label: string): number | null {
@@ -282,6 +391,7 @@ function parseLoanBlock(block: string[], sourceFile: string): BtgBrokerageNote |
 
   const dedupeKey = `LOAN|${noteNumber}|${pregaoDate}`;
   const trades: BtgBrokerageNoteTrade[] = [];
+  const fees: BtgBrokerageNoteFee[] = [];
 
   for (const section of parseLoanContractSections(text)) {
     const isDoador = /Lado\s+Doador/i.test(section);
@@ -295,6 +405,13 @@ function parseLoanBlock(block: string[], sourceFile: string): BtgBrokerageNote |
     const contractType = section.match(/Tipo do Contrato\s+([^\n]+)/i)?.[1]?.trim() || '';
     const maturity = section.match(/Vencimento:\s*(\d{2}\/\d{2}\/\d{4})/i)?.[1] || null;
     const contractId = section.match(/Contrato:\s*(\S+)/i)?.[1] || '';
+
+    for (const label of ['Emolumentos', 'I.R.R.F', 'Corret. Execução', 'Corret. Clearing']) {
+      const v = parseLoanMoneyField(section, label);
+      if (v != null && v > 0) {
+        fees.push({ label, amount: v, dc: 'D' });
+      }
+    }
 
     trades.push({
       negotiation: 'ALUGUEL',
@@ -328,8 +445,9 @@ function parseLoanBlock(block: string[], sourceFile: string): BtgBrokerageNote |
     sourceFile,
     clientCode: '004176105',
     trades,
-    fees: [],
+    fees,
     netOperations: noteNet > 0 ? noteNet : trades.reduce((s, t) => s + t.grossValue, 0),
+    netSettlement: noteNet > 0 ? noteNet : null,
     settlementTax: null,
     registrationTax: null,
     cblcTotal: null,
@@ -396,6 +514,8 @@ export function parseBtgBrokerageNoteBlocks(
     const trades: BtgBrokerageNoteTrade[] = [];
     const fees: BtgBrokerageNoteFee[] = [];
     let inTrades = false;
+    let inFeeSection = false;
+    let netSettlement: number | null = null;
 
     for (let i = 0; i < block.length; i++) {
       const line = block[i];
@@ -416,20 +536,34 @@ export function parseBtgBrokerageNoteBlocks(
       if (dateInline) pregaoRaw = dateInline[1]!;
       if (line === 'Data pregão' && block[i - 1]) pregaoRaw = block[i - 1];
       if (/^004176105$/.test(line!)) clientCode = line!;
-      if (line!.startsWith('Negócios realizados')) inTrades = true;
-      if (line!.startsWith('Resumo dos Negócios')) inTrades = false;
+      if (line!.startsWith('Negócios realizados')) {
+        inTrades = true;
+        inFeeSection = false;
+      }
+      if (line!.startsWith('Resumo dos Negócios') || line!.startsWith('Resumo Financeiro')) {
+        inTrades = false;
+        inFeeSection = true;
+      }
 
       if (inTrades) {
         const trade = parseTradeLine(line);
         if (trade) trades.push(trade);
       }
 
-      const fee = parseFeeLine(line);
-      if (fee) fees.push(fee);
+      if (inFeeSection) {
+        const fee = parseFeeLine(line);
+        if (fee) fees.push(fee);
+      }
+
+      const net = parseNetSettlementLine(line!);
+      if (net != null) netSettlement = net;
     }
 
     const pregaoDate = brDateToIso(pregaoRaw);
     const dedupeKey = `${cat}|${noteNumber}|${pregaoDate}`;
+    const netOpsCredit = fees.find(
+      (f) => /valor l[ií]quido das opera/i.test(f.label) && f.dc === 'C'
+    );
 
     notes.push({
       dedupeKey,
@@ -441,13 +575,16 @@ export function parseBtgBrokerageNoteBlocks(
       clientCode,
       trades,
       fees,
-      netOperations: pickFeeAmount(fees, /valor l[ií]quido das opera/i),
-      settlementTax: pickFeeAmount(fees, /taxa de liquida/i),
-      registrationTax: pickFeeAmount(fees, /taxa de registro/i),
-      cblcTotal: pickFeeAmount(fees, /total cblc/i),
-      emoluments: pickFeeAmount(fees, /emolumentos/i),
-      bovespaTotal: pickFeeAmount(fees, /total bovespa/i),
-      irrf: pickFeeAmount(fees, /irrf|ir s\/rendimento/i),
+      netOperations:
+        netSettlement ??
+        (netOpsCredit ? Math.abs(netOpsCredit.amount) : null),
+      netSettlement,
+      settlementTax: pickFeeDebit(fees, /taxa de liquida/i),
+      registrationTax: pickFeeDebit(fees, /taxa de registro/i),
+      cblcTotal: pickFeeDebit(fees, /^total cblc$/i),
+      emoluments: pickFeeDebit(fees, /emolumentos/i),
+      bovespaTotal: pickFeeDebit(fees, /total bovespa/i),
+      irrf: pickFeeDebit(fees, /irrf|ir s\/rendimento/i),
       duplicateSkipped: false,
       duplicateOf: null,
     });

@@ -5,7 +5,11 @@
 import { inferAssetType } from './assetClassifier';
 import { mapBrokerOrderToLedger } from './brokerOrderMapper';
 import { cashSettlementDate } from './settlementCalendar';
-import type { BtgBrokerageNote, BtgBrokerageNoteTrade } from './btgBrokerageNoteParser';
+import {
+  aggregateNoteFees,
+  type BtgBrokerageNote,
+  type BtgBrokerageNoteTrade,
+} from './btgBrokerageNoteParser';
 import type { LedgerImportLine } from './ledgerTypes';
 
 export const BTG_NOTE_LEDGER_REF_PREFIX = 'BTG-NOTA';
@@ -24,18 +28,23 @@ function eventSourceRefForNote(note: BtgBrokerageNote): string {
 }
 
 type NoteFees = {
+  brokerage: number;
   settlement: number;
   registration: number;
   emoluments: number;
+  bovespa: number;
   irrf: number;
 };
 
 function noteFees(note: BtgBrokerageNote): NoteFees {
+  const a = aggregateNoteFees(note);
   return {
-    settlement: Math.abs(Number(note.settlementTax ?? 0)),
-    registration: Math.abs(Number(note.registrationTax ?? 0)),
-    emoluments: Math.abs(Number(note.emoluments ?? 0)),
-    irrf: Math.abs(Number(note.irrf ?? 0)),
+    brokerage: a.brokerage,
+    settlement: a.settlement,
+    registration: a.registration,
+    emoluments: a.emoluments,
+    bovespa: a.bovespa,
+    irrf: a.irrf,
   };
 }
 
@@ -45,17 +54,18 @@ function feeShareForTrade(
   fees: NoteFees
 ): Pick<LedgerImportLine, 'brokerage_fee' | 'b3_fees' | 'irrf_tax'> {
   const totalGross = trades.reduce((s, t) => s + Math.abs(Number(t.grossValue) || 0), 0);
+  const b3Pool = fees.settlement + fees.registration + fees.emoluments + fees.bovespa;
   if (totalGross <= 0) {
     return {
-      brokerage_fee: 0,
-      b3_fees: fees.settlement + fees.registration + fees.emoluments,
+      brokerage_fee: fees.brokerage,
+      b3_fees: b3Pool,
       irrf_tax: fees.irrf,
     };
   }
   const frac = Math.abs(Number(trade.grossValue) || 0) / totalGross;
   return {
-    brokerage_fee: 0,
-    b3_fees: Math.round((fees.settlement + fees.registration + fees.emoluments) * frac * 100) / 100,
+    brokerage_fee: Math.round(fees.brokerage * frac * 100) / 100,
+    b3_fees: Math.round(b3Pool * frac * 100) / 100,
     irrf_tax: Math.round(fees.irrf * frac * 100) / 100,
   };
 }

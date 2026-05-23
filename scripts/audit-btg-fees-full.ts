@@ -29,9 +29,12 @@ import {
 
 const DEFAULT_BASE = path.join(process.cwd(), 'local-import', 'btg-sources');
 const base = path.resolve(process.argv[2] || DEFAULT_BASE);
-const extratoPdf = path.join(base, 'extrato', 'extrato.pdf');
-const notasRoot = path.join(base, 'notas-corretagem');
-const outDir = path.join(base, 'auditoria');
+const notasSub = path.join(base, 'notas-corretagem');
+/** Aceita btg-sources/notas-corretagem ou pasta direta (ex.: Google Drive/Notas Corretagem). */
+const notasRoot = fs.existsSync(notasSub) ? notasSub : base;
+const extratoSub = path.join(base, 'extrato', 'extrato.pdf');
+const extratoPdf = fs.existsSync(extratoSub) ? extratoSub : '';
+const outDir = path.join(fs.existsSync(notasSub) ? base : path.dirname(base), 'auditoria');
 
 async function pdfToLines(filePath: string): Promise<string[]> {
   const buf = fs.readFileSync(filePath);
