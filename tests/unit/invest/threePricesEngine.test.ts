@@ -491,6 +491,38 @@ describe('threePricesEngine', () => {
     expect(p.gerencial).toBeCloseTo((1200 * 41.43 - premioTotal) / 1200, 2);
   });
 
+  it('opening_balance de short herdado (total_net negativo) abate prêmio no gerencial', () => {
+    const out = computeThreePricesByUnderlying([
+      {
+        id: 'a-open-stock',
+        asset_id: 'PRIO3',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-01',
+        quantity: 1000,
+        unit_price: 40,
+        total_net_value: 40000,
+      },
+      {
+        id: 'b-open-put',
+        asset_id: 'PRIOQ43',
+        asset_ticker: 'PRIOQ43',
+        asset_type: 'option_put',
+        underlying_ticker: 'PRIO3',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-01',
+        quantity: 500,
+        unit_price: 1.5,
+        total_net_value: -750,
+      },
+    ]);
+    const p = out.get('PRIO3')!;
+    expect(p.qty).toBe(1000);
+    expect(p.estrito).toBe(40);
+    expect(p.gerencial).toBeLessThan(p.estrito);
+  });
+
   it('operações de opção (put_sell/put_buy/etc.) com impacts=false são ignoradas — marcadores contábeis', () => {
     const out = computeThreePricesByUnderlying([
       buy('PRIO3', 100, 40, '2026-01-10'),

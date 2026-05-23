@@ -397,6 +397,27 @@ function applyEvent(s: UnderlyingState, e: LedgerEvent): void {
       applyOptionExercise(s, e);
       return;
     }
+    // Shorts herdados em 01/01 entram como opening_balance (total_net < 0).
+    if (type === 'opening_balance') {
+      const rawNet = Number(e.total_net_value ?? 0);
+      if (rawNet < -0.005) {
+        applyOptionTrade(s, {
+          ...e,
+          transaction_type:
+            assetType === 'option_put' ? 'put_sell' : 'call_sell',
+        });
+        return;
+      }
+      if (rawNet > 0.005) {
+        applyOptionTrade(s, {
+          ...e,
+          transaction_type:
+            assetType === 'option_put' ? 'put_buy' : 'call_buy',
+        });
+        return;
+      }
+      return;
+    }
     if (!impactsPrice(e.impacts_managerial_price)) return;
     if (OPTION_SELL_TX.has(type) || OPTION_BUY_TX.has(type)) {
       applyOptionTrade(s, e);

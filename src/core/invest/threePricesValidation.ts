@@ -39,9 +39,10 @@ function fmtPm(n: number | null): string {
 }
 
 function joinObservation(codes: string[], messages: string[]): string {
-  if (!messages.length) return 'OK — batido com livro e extensão';
-  const head = codes.length ? `[${codes.join(', ')}]` : '';
-  return `${head} ${messages.join(' · ')}`.trim();
+  if (!messages.length) return '';
+  const head = codes.length ? `[${codes.slice(0, 2).join(', ')}]` : '';
+  const body = messages.slice(0, 2).join(' · ');
+  return `${head} ${body}`.trim();
 }
 
 export type ValidateEquityThreePricesInput = {

@@ -594,7 +594,7 @@ const MENU: MenuSeed[] = [
     code: 'invest.portfolio',
     parent_code: 'invest',
     module_code: 'INVEST',
-    path: '/invest/portfolio',
+    path: '/invest/opcoes',
     icon: null,
     order_index: 20,
     text_key: 'menu.invest.portfolio',
@@ -606,7 +606,7 @@ const MENU: MenuSeed[] = [
     code: 'invest.options',
     parent_code: 'invest',
     module_code: 'INVEST',
-    path: '/invest/opcoes',
+    path: '/invest/portfolio',
     icon: null,
     order_index: 30,
     text_key: 'menu.invest.options',
@@ -740,6 +740,17 @@ async function run() {
       { entityType: 'ui_menu_nodes' }
     );
     if (result === 'inserted') menuInserted++;
+    else {
+      const existingId = await findIdByColumn(gateway, ctx, 'ui_menu_nodes', 'code', m.code);
+      if (existingId) {
+        await gateway.update(ctx, 'ui_menu_nodes', existingId, {
+          path: m.path,
+          text_key: m.text_key,
+          order_index: m.order_index,
+          access_resource_key: m.access_resource_key,
+        });
+      }
+    }
   }
 
   console.log(

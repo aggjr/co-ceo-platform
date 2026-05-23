@@ -227,6 +227,7 @@ export class InvestOperations {
       name: input.name ?? input.ticker,
     });
 
+    const brokerRef = input.brokerNoteRef?.trim();
     const { entry, state } = await this.inventoryLedger.recordMovement(ctx, {
       itemId: item.id,
       transactionDate: asOfDate,
@@ -235,6 +236,14 @@ export class InvestOperations {
       unitValue: input.unitPrice,
       notes: input.notes ?? 'Saldo inicial',
       businessEventId: options.businessEventId ?? null,
+      externalRef: brokerRef ? `BROKER_REF:${brokerRef}` : null,
+      metadata: {
+        legacy_op: 'opening_balance',
+        broker_note_ref: brokerRef ?? null,
+        underlying_ticker: input.optionUnderlying ?? null,
+        option_strike: input.optionStrike ?? null,
+        option_expiration: input.optionExpiration ?? null,
+      },
     });
 
     await this.upsertPositionExt(ctx, item.id, input.assetClass, {
@@ -247,12 +256,17 @@ export class InvestOperations {
     // invest_option_ext so eh preenchido se strike + expiration vierem
     // explicitos. Opcao herdada (opening short) pode entrar sem esses
     // metadados — a Calendar/B3 popula depois via cron de cotacao.
-    if (isOption && input.optionStrike && input.optionExpiration) {
+    if (isOption && input.optionStrike) {
+      const exp =
+        input.optionExpiration?.slice(0, 10) ||
+        inferOptionExpiryDate(input.ticker, Number(asOfDate.slice(0, 4)));
       await this.upsertOptionExt(ctx, item.id, {
-        optionType: input.assetClass === 'option_call' ? 'CALL' : 'PUT',
+        optionType:
+          input.optionType ||
+          (input.assetClass === 'option_call' ? 'CALL' : 'PUT'),
         underlyingTicker: input.optionUnderlying!,
         strikePrice: input.optionStrike,
-        expirationDate: input.optionExpiration,
+        expirationDate: exp,
       });
     }
 
@@ -656,6 +670,7 @@ export class InvestOperations {
           optionType:
             cls === 'option_call' ? 'CALL' : cls === 'option_put' ? 'PUT' : undefined,
           notes: line.notes,
+          brokerNoteRef: ref,
         },
         { businessEventId }
       );

@@ -450,7 +450,14 @@ export function buildInvestOptionsColumns() {
       },
     },
     { key: 'avgPrice', label: 'Preço médio', type: 'currency', align: 'right', width: '104px' },
-    { key: 'lastPrice', label: 'Último', type: 'currency', align: 'right', width: '96px' },
+    {
+      key: 'updatedQuote',
+      label: 'Cotação opção',
+      type: 'currency',
+      align: 'right',
+      width: '100px',
+      render: (row) => renderPriceCell(row.updatedQuote ?? row.lastPrice),
+    },
     {
       key: 'premiumReceived',
       label: 'Prêmio recebido',
@@ -731,32 +738,28 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
           },
           {
             key: 'threePricesObservation',
-            label: 'Observação (3 preços)',
+            label: 'Obs. 3 preços',
             type: 'text',
-            width: '280px',
+            width: '160px',
             render: (row) => {
               const v = row.threePricesValidation;
               const span = document.createElement('span');
-              if (!v?.observation) {
+              if (!v || v.status === 'ok' || !v.observation) {
                 span.className = 'muted';
                 span.textContent = '—';
                 return span;
               }
               span.textContent = v.observation;
-              span.style.fontSize = '12px';
-              span.style.lineHeight = '1.35';
+              span.style.fontSize = '11px';
+              span.style.lineHeight = '1.3';
               span.style.display = 'block';
-              span.style.maxWidth = '320px';
-              span.style.whiteSpace = 'normal';
-              if (v.status === 'error') {
-                span.className = 'portfolio-3p-obs--error';
-                span.title = v.messages?.join('\n') || v.observation;
-              } else if (v.status === 'warn') {
-                span.className = 'portfolio-3p-obs--warn';
-                span.title = v.messages?.join('\n') || v.observation;
-              } else {
-                span.className = 'portfolio-3p-obs--ok';
-              }
+              span.style.maxWidth = '200px';
+              span.style.overflow = 'hidden';
+              span.style.textOverflow = 'ellipsis';
+              span.style.whiteSpace = 'nowrap';
+              span.className =
+                v.status === 'error' ? 'portfolio-3p-obs--error' : 'portfolio-3p-obs--warn';
+              span.title = v.messages?.join('\n') || v.observation;
               return span;
             },
           },
@@ -770,12 +773,11 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
             width: '112px',
           },
         ]),
-    { key: 'lastPrice', label: 'Último', type: 'currency', align: 'right', width: '100px' },
     ...(sheetKey === 'equities'
       ? [
           {
             key: 'updatedQuote',
-            label: 'Cotação atual.',
+            label: 'Cotação atual',
             type: 'currency',
             align: 'right',
             width: '108px',
@@ -793,15 +795,15 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
       render:
         sheetKey === 'equities'
           ? (row) => {
-              const pmB3 = Number(row.prices?.b3 ?? row.avgPrice);
+              const quote = Number(row.updatedQuote ?? row.lastPrice);
               const qty = Number(row.quantity);
               const value =
-                pmB3 > 0 && Number.isFinite(qty)
-                  ? Math.round(pmB3 * qty * 100) / 100
-                  : row.marketValue;
+                quote > 0 && Number.isFinite(qty)
+                  ? Math.round(quote * qty * 100) / 100
+                  : Number(row.marketValue ?? 0);
               const span = document.createElement('span');
               span.textContent = formatBrl(value);
-              span.title = 'PM B3 × quantidade';
+              span.title = 'Cotação atual × quantidade (patrimônio de mercado)';
               return span;
             }
           : undefined,
