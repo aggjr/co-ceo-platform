@@ -1,9 +1,12 @@
 const http = require('http');
 const fs = require('fs');
+const mysql = require('mysql2/promise');
 
 /**
  * Fuzzer Genético Básico
  * Explora endpoints da API com payloads mutantes gerados via algoritmo genético.
+ * REQUISITO: Somente rodar testes de stress quando houver mais de 50 clientes reais
+ * REQUISITO: Retroalimentar dados (carregar falhas anteriores como sementes iniciais)
  */
 
 const TARGET_URL = 'http://localhost:3000/api';
@@ -16,6 +19,7 @@ const TARGET_ENDPOINTS = [
 
 const POPULATION_SIZE = 20;
 const GENERATIONS = 5;
+const CLIENT_THRESHOLD = 50;
 
 // Genes possíveis
 const MUTATIONS = [
@@ -115,11 +119,57 @@ function evaluateFitness(res) {
 
 async function runFuzzer() {
   console.log("Iniciando bateria de Fuzzing Genético...");
+  
+  // 1. Validar Gatilho (Regra dos 50 clientes)
+  try {
+    const conn = await mysql.createConnection({
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || 'root',
+      database: process.env.DB_NAME || 'co_ceo_db'
+    });
+    const [rows] = await conn.execute('SELECT COUNT(id) as total FROM contracts WHERE status = "active"');
+    const activeClients = rows[0].total;
+    await conn.end();
+    
+    if (activeClients < CLIENT_THRESHOLD) {
+      console.log(`\n[AVISO] Skipped stress tests: O volume de clientes reais (${activeClients}) não atingiu o limite crítico (${CLIENT_THRESHOLD}). Testes de carga adiados.`);
+      fs.writeFileSync('fuzzing_report.json', JSON.stringify([{ status: 'Skipped', reason: 'Client threshold not met (< 50)' }], null, 2));
+      return;
+    }
+  } catch (e) {
+    console.log("Erro ao conectar no banco para checar limite. Assumindo que não bateu a cota.", e.message);
+    return;
+  }
+
+  // 2. Carregar Retroalimentação (Seeds do dia anterior)
+  let initialSeeds = [];
+  try {
+    if (fs.existsSync('fuzzing_report.json')) {
+      const prev = JSON.parse(fs.readFileSync('fuzzing_report.json', 'utf-8'));
+      if (Array.isArray(prev)) {
+        initialSeeds = prev.filter(r => r.payload).map(r => r.payload).slice(0, POPULATION_SIZE);
+      }
+    }
+  } catch(e) {}
+  if (initialSeeds.length > 0) {
+    console.log(`[INFO] Carregadas ${initialSeeds.length} sementes de falhas anteriores para retroalimentar a evolução.`);
+  }
+
   const report = [];
 
   for (const endpoint of TARGET_ENDPOINTS) {
     console.log(`\nTestando endpoint: ${endpoint.method} ${endpoint.path}`);
-    let population = Array.from({ length: POPULATION_SIZE }, generateRandomPayload);
+    let population = [];
+    
+    // Injeta sementes retroalimentadas
+    for(let seed of initialSeeds) {
+      population.push(seed);
+    }
+    // Completa com novos aleatórios
+    while(population.length < POPULATION_SIZE) {
+      population.push(generateRandomPayload());
+    }
     
     for (let gen = 0; gen < GENERATIONS; gen++) {
       console.log(`  Geração ${gen + 1}/${GENERATIONS}`);

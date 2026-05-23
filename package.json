@@ -18,6 +18,8 @@
     "test:regression:impact": "node scripts/run-regression.js --mode=impact",
     "test:regression:persist": "node scripts/run-regression.js --mode=full --persist",
     "test:full": "npm run test:regression",
+    "test:fuzzer": "node scripts/genetic-fuzzer.js",
+    "test:cron": "node scripts/cron-tests.js",
     "seed:iam": "node ./node_modules/ts-node/dist/bin.js src/database/seeds/005_iam_catalog.ts",
     "seed:admin": "node ./node_modules/ts-node/dist/bin.js src/database/seeds/001_super_admin.ts",
     "seed:holding": "node ./node_modules/ts-node/dist/bin.js src/database/seeds/002_holding_contract.ts",

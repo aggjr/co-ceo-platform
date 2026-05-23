@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-19",
+  "updatedAt": "2026-05-23",
   "description": "Mapa de unidades de código → arquivos de teste. Atualize com npm run test:catalog:sync",
   "units": [
     {
@@ -16,13 +16,18 @@
         "src/core/dal/**"
       ],
       "testFiles": [
+        "tests/unit/core/EventBus.test.ts",
         "tests/unit/core/GatewayError.test.ts",
         "tests/unit/core/GatewayJunction.test.ts",
+        "tests/unit/core/GeneticTestUtil.test.ts",
         "tests/unit/core/SecurityScope.test.ts",
         "tests/unit/core/StorageMeter.test.ts",
-        "tests/unit/core/TableRegistry.test.ts"
+        "tests/unit/core/TableRegistry.test.ts",
+        "tests/unit/core/financial/SettlementEngine.test.ts",
+        "tests/unit/core/fuzzer-genetic.test.ts",
+        "tests/unit/core/inventory/WeightedAverageValuation.test.ts"
       ],
-      "testCaseCount": 14
+      "testCaseCount": 30
     },
     {
       "id": "core.auth",
@@ -59,9 +64,10 @@
         "src/controllers/TelemetryController.ts"
       ],
       "testFiles": [
+        "tests/unit/core/DatabaseUsageTelemetry.test.ts",
         "tests/unit/core/TelemetryService.test.ts"
       ],
-      "testCaseCount": 3
+      "testCaseCount": 5
     },
     {
       "id": "core.quality",
@@ -113,7 +119,7 @@
     }
   ],
   "stats": {
-    "totalTestFiles": 30,
+    "totalTestFiles": 56,
     "totalUnits": 6,
     "unitsWithTests": 4,
     "unitsWithoutTests": 2
