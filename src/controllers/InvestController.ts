@@ -23,6 +23,7 @@ import {
 } from '../core/invest/patrimonyLedgerGates';
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
+import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import {
   mergeStoredPatrimonySeries,
@@ -64,6 +65,7 @@ export class InvestController {
   private readonly patrimonyRecorder: PatrimonyDailyRecorder;
   private readonly quoteSync: InvestQuoteSyncService;
   private readonly assetProjection: InvestAssetProjection;
+  private readonly marketQuoteRepo: MarketQuoteRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -71,6 +73,7 @@ export class InvestController {
     this.patrimonyRecorder = new PatrimonyDailyRecorder(gateway);
     this.quoteSync = new InvestQuoteSyncService(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
+    this.marketQuoteRepo = new MarketQuoteRepository(gateway);
   }
 
   listPortfolio = async (req: Request, res: Response) => {
@@ -231,6 +234,8 @@ export class InvestController {
     const events = await this.ledger.listLedgerEvents(ctx, from, to);
     const method = String(req.query.method || 'mtm_btg').toLowerCase();
 
+    // Cotações estáticas por cliente (invest_position_ext) — usadas como fallback e para
+    // o snapshot do dia mais recente quando market_quotes_daily ainda não foi populado.
     let stockQuotes: Record<string, number> | undefined;
     if (method === 'mtm_btg') {
       const assets = await this.assetProjection.listActiveAssets(ctx);
@@ -253,6 +258,14 @@ export class InvestController {
       }
     }
 
+    // Cotações históricas de market_quotes_daily — 1 query bulk para o range inteiro.
+    // O engine usa quoteForDate(ticker, date) por dia; cai em stockQuotes se não encontrar.
+    const quoteMap = await this.marketQuoteRepo.loadQuoteMapForRange(ctx, from, to);
+    const quoteForDate =
+      quoteMap.size > 0
+        ? this.marketQuoteRepo.buildQuoteForDateFn(quoteMap)
+        : undefined;
+
     const anchors = loadPatrimonyAnchors();
     const calibrateToAnchors =
       method === 'mtm_btg' && shouldUseBtgAnchorCalibration(events);
@@ -271,6 +284,7 @@ export class InvestController {
             stockQuotes,
             fixedIncomeTotal,
             calibrateToAnchors,
+            quoteForDate,
           });
 
     const storedDays = await this.patrimonyStore.loadRange(ctx, from, to);

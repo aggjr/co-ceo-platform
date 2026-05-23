@@ -26,7 +26,13 @@ export type GatewayReadQueryKey =
   | 'invest_portfolio_daily_before'
   | 'business_event_orphan_patrimony_legs'
   | 'business_event_orphan_financial_legs'
-  | 'invest_ledger_note_refs';
+  | 'invest_ledger_note_refs'
+  | 'market_quotes_daily_range'
+  | 'market_quotes_daily_on_or_before'
+  | 'market_index_daily_range'
+  | 'market_index_daily_on_or_before'
+  | 'market_distinct_tickers_in_use'
+  | 'market_quotes_bulk_range';
 
 export interface GatewayReadQueryDef {
   sql: string;
@@ -269,5 +275,60 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
           WHERE organization_id = ?
             AND external_ref IS NOT NULL
             AND deleted_at IS NULL`,
+  },
+  market_quotes_daily_range: {
+    sql: `SELECT id, ticker, quote_date, closing_price, open_price, min_price, max_price,
+                 volume, currency, source, source_fetched_at, metadata
+          FROM market_quotes_daily
+          WHERE ticker = ?
+            AND quote_date >= ?
+            AND quote_date <= ?
+          ORDER BY quote_date ASC`,
+  },
+  market_quotes_daily_on_or_before: {
+    sql: `SELECT id, ticker, quote_date, closing_price, source
+          FROM market_quotes_daily
+          WHERE ticker = ?
+            AND quote_date <= ?
+          ORDER BY quote_date DESC
+          LIMIT 1`,
+  },
+  market_index_daily_range: {
+    sql: `SELECT id, index_code, reference_date, daily_factor, annualized_rate, source
+          FROM market_index_daily
+          WHERE index_code = ?
+            AND reference_date >= ?
+            AND reference_date <= ?
+          ORDER BY reference_date ASC`,
+  },
+  market_index_daily_on_or_before: {
+    sql: `SELECT id, index_code, reference_date, daily_factor, annualized_rate, source
+          FROM market_index_daily
+          WHERE index_code = ?
+            AND reference_date <= ?
+          ORDER BY reference_date DESC
+          LIMIT 1`,
+  },
+  market_quotes_bulk_range: {
+    sql: `SELECT ticker, quote_date, closing_price, source
+          FROM market_quotes_daily
+          WHERE quote_date >= ?
+            AND quote_date <= ?
+          ORDER BY ticker ASC, quote_date ASC`,
+  },
+  market_distinct_tickers_in_use: {
+    requiresGlobalScope: true,
+    sql: `SELECT DISTINCT pi.identifier AS ticker, ipe.asset_class
+          FROM patrimony_items pi
+          INNER JOIN invest_position_ext ipe ON ipe.patrimony_item_id = pi.id
+          WHERE pi.source_module = 'INVEST'
+            AND pi.status = 'active'
+            AND pi.deleted_at IS NULL
+            AND pi.identifier NOT LIKE 'CAIXA-%'
+            AND pi.identifier NOT LIKE 'TESOURO-%'
+            AND pi.identifier NOT LIKE 'CDB-%'
+            AND pi.identifier NOT LIKE 'LFT-%'
+            AND pi.identifier NOT LIKE 'TD-%'
+          ORDER BY pi.identifier`,
   },
 };

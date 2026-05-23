@@ -119,6 +119,20 @@ const TABLES: TableDefinition[] = [
     primaryKey: 'ticker',
     countsTowardStorage: false,
   }),
+  // ===== Mercado (cotações e índices compartilhados, ver migration 20) =====
+  def('market_instruments', 'global', {
+    softDelete: false,
+    primaryKey: 'ticker',
+    countsTowardStorage: false,
+  }),
+  def('market_quotes_daily', 'global', {
+    softDelete: false,
+    countsTowardStorage: false,
+  }),
+  def('market_index_daily', 'global', {
+    softDelete: false,
+    countsTowardStorage: false,
+  }),
   def('telemetry_events', 'telemetry', {
     softDelete: false,
     countsTowardStorage: false,

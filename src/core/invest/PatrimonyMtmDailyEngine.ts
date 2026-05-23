@@ -29,11 +29,17 @@ export type StockQuoteMap = Record<string, number>;
 export type PatrimonyMtmOptions = {
   riskFreeAnnual?: number;
   anchors?: PatrimonyAnchorFile;
-  /** Cotações de mercado (ações, opções, etc.). Se omitido, usa custo / decaimento. */
+  /** Cotações de mercado para o dia atual (fallback quando quoteForDate não existe). */
   stockQuotes?: StockQuoteMap;
   fixedIncomeTotal?: number;
   /** Se false, patrimônio econômico real (sem ajuste às âncoras BTG). Usado na gravação diária. */
   calibrateToAnchors?: boolean;
+  /**
+   * Cotação de fechamento por (ticker, date). Quando presente tem prioridade sobre stockQuotes.
+   * Alimentado por market_quotes_daily para séries históricas (Fase B).
+   * Retorne undefined para que o engine recorra ao stockQuotes ou ao custo do livro.
+   */
+  quoteForDate?: (ticker: string, date: string) => number | undefined;
 };
 
 export type PositionDailySnapshot = {
@@ -142,6 +148,7 @@ export function buildDailyPatrimonyMtmSeries(
   const fixedIncome =
     options?.fixedIncomeTotal ?? Number(anchors.fixed_income_total ?? 0);
   const stockQuotes = options?.stockQuotes ?? {};
+  const quoteForDate = options?.quoteForDate;
 
   const sorted = [...entries].sort((a, b) =>
     String(a.transaction_date).localeCompare(String(b.transaction_date))
@@ -222,8 +229,10 @@ export function buildDailyPatrimonyMtmSeries(
 
     for (const p of positions.values()) {
       if (Math.abs(p.qty) < 0.0001) continue;
+      // Prioridade: market_quotes_daily (por dia) > stockQuotes (atual) > custo/decaimento
+      const dailyMark = quoteForDate?.(p.ticker, date);
       if (isOptionType(p.assetType)) {
-        const mark = stockQuotes[p.ticker];
+        const mark = dailyMark ?? stockQuotes[p.ticker];
         if (mark != null && Number.isFinite(mark)) {
           optionsFromMarket += p.qty * mark;
         } else {
@@ -232,7 +241,7 @@ export function buildDailyPatrimonyMtmSeries(
         continue;
       }
       if (p.assetType === 'stock' || p.assetType === 'fii') {
-        const mark = stockQuotes[p.ticker] ?? p.unitCost;
+        const mark = dailyMark ?? stockQuotes[p.ticker] ?? p.unitCost;
         stocksValue += p.qty * mark;
       }
     }
@@ -321,7 +330,7 @@ export function buildDailyPatrimonyMtmSeries(
     riskFreeAnnual: options?.riskFreeAnnual ?? 0,
   });
 
-  const positionSnapshots = snapshotOpenPositions(positions, stockQuotes, to);
+  const positionSnapshots = snapshotOpenPositions(positions, stockQuotes, to, quoteForDate);
 
   return {
     from,
@@ -345,13 +354,14 @@ export function buildDailyPatrimonyMtmSeries(
 function snapshotOpenPositions(
   positions: Map<string, DayPosition>,
   stockQuotes: StockQuoteMap,
-  asOf: string
+  asOf: string,
+  quoteForDate?: (ticker: string, date: string) => number | undefined
 ): PositionDailySnapshot[] {
   const out: PositionDailySnapshot[] = [];
   for (const p of positions.values()) {
     if (Math.abs(p.qty) < 0.0001) continue;
     if (isCash(p.assetType, p.ticker) || isFixedIncome(p.assetType, p.ticker)) continue;
-    let closing = stockQuotes[p.ticker];
+    let closing = quoteForDate?.(p.ticker, asOf) ?? stockQuotes[p.ticker];
     if (closing == null || !Number.isFinite(closing)) {
       closing = isOptionType(p.assetType) ? optionTimeMark(p, asOf) / Math.max(Math.abs(p.qty), 1) : p.unitCost;
     }

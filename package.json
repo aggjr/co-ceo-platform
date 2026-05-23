@@ -28,7 +28,11 @@
     "record:patrimony:daily": "node ./node_modules/ts-node/dist/bin.js scripts/record-daily-patrimony.ts",
     "fetch:b3:quotes": "node ./node_modules/ts-node/dist/bin.js scripts/fetch-b3-quotes.ts",
     "invest:daily-close": "node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts",
-    "db:import:full": "node scripts/import-full-dump.js"
+    "sync:market:quotes:stocks": "node ./node_modules/ts-node/dist/bin.js scripts/sync-market-quotes-stocks.ts",
+    "sync:market:indices": "node ./node_modules/ts-node/dist/bin.js scripts/sync-market-indices.ts",
+    "backfill:market:quotes": "node ./node_modules/ts-node/dist/bin.js scripts/backfill-market-quotes-history.ts",
+    "db:import:full": "node scripts/import-full-dump.js",
+    "fix:duplicate-cash": "ts-node scripts/delete-manual-cash.ts"
   },
   "engines": {
     "node": ">=20"
