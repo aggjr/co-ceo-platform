@@ -13,9 +13,34 @@ import {
 const COLUMNS = [
   { key: 'pregaoDateBr', label: 'Data', type: 'text' },
   { key: 'ticker', label: 'Ticker', type: 'text' },
-  { key: 'tradeType', label: 'TIPO', type: 'text' },
+  {
+    key: 'tradeType',
+    label: 'TIPO',
+    type: 'text',
+    render: (row) => {
+      const t = String(row.tradeType || '—');
+      const span = document.createElement('span');
+      span.textContent = t;
+      if (t === 'CALL') span.className = 'notes-type--call';
+      else if (t === 'PUT') span.className = 'notes-type--put';
+      else if (t === 'EXEC') span.className = 'notes-type--exec';
+      else if (t === 'BTC') span.className = 'notes-type--btc';
+      return span;
+    },
+  },
   { key: 'underlyingStock', label: 'Ação ref.', type: 'text' },
-  { key: 'side', label: 'C/V', type: 'text' },
+  {
+    key: 'side',
+    label: 'C/V',
+    type: 'text',
+    render: (row) => {
+      const span = document.createElement('span');
+      span.textContent = row.side || '—';
+      if (row.side === 'C') span.className = 'notes-cv--buy';
+      else if (row.side === 'V') span.className = 'notes-cv--sell';
+      return span;
+    },
+  },
   { key: 'unitPrice', label: 'Preço', type: 'currency' },
   { key: 'settlementTax', label: 'Taxa liq./CCP', type: 'currency' },
   { key: 'registrationTax', label: 'Taxa registro', type: 'currency' },

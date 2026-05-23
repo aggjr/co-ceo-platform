@@ -11,3 +11,39 @@
 .notes-legend .notes-note-net {
   font-weight: 700;
 }
+
+/* C/V — mesmo padrão cromático das outras telas */
+.notes-cv--buy {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.notes-cv--sell {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+/* TIPO — CALL/PUT/EXEC/BTC */
+.notes-type--call {
+  color: #60a5fa;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.notes-type--put {
+  color: #c4b5fd;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.notes-type--exec {
+  color: #fbbf24;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.notes-type--btc {
+  color: #94a3b8;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
