@@ -274,7 +274,14 @@ function applyOptionTrade(s: UnderlyingState, e: LedgerEvent): void {
   if (!ticker) return;
   const series = getOptionSeries(s, ticker);
   const q = Math.abs(Number(e.quantity ?? 0));
-  const net = Number(e.total_net_value ?? 0);
+
+  // LedgerEventProjection gera total_net_value = signedQty * unitPrice.
+  // Para vendas (SELL): signedQty < 0 → total_net_value < 0, mas o premio
+  // RECEBIDO e positivo (entrou dinheiro). Normalizamos para convencao:
+  //   SELL → premio_recebido = +abs(net)  (desconta o custo do lote)
+  //   BUY  → premio_pago     = -abs(net)  (devolve desconto ao recomprar)
+  const rawNet = Number(e.total_net_value ?? 0);
+  const signedPremio = OPTION_SELL_TX.has(type) ? Math.abs(rawNet) : -Math.abs(rawNet);
 
   // Gerencial só conta opção quando a ação está em carteira. Antes do lote
   // abrir (ou após zerar), a série acumula em `premioLiquido` mas não toca em
@@ -282,19 +289,19 @@ function applyOptionTrade(s: UnderlyingState, e: LedgerEvent): void {
   // for exercida e gerar entrada de ações (tratado em applyOptionExercise).
   if (OPTION_SELL_TX.has(type)) {
     series.qtyAtual -= q;
-    series.premioLiquido += net;
+    series.premioLiquido += signedPremio;
     if (s.qty > 0) {
-      s.premioOpcoesPeriodo += net;
-      series.premioContadoGerencial += net;
+      s.premioOpcoesPeriodo += signedPremio;
+      series.premioContadoGerencial += signedPremio;
     }
     return;
   }
   if (OPTION_BUY_TX.has(type)) {
     series.qtyAtual += q;
-    series.premioLiquido += net;
+    series.premioLiquido += signedPremio;
     if (s.qty > 0) {
-      s.premioOpcoesPeriodo += net;
-      series.premioContadoGerencial += net;
+      s.premioOpcoesPeriodo += signedPremio;
+      series.premioContadoGerencial += signedPremio;
     }
     return;
   }
