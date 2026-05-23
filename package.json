@@ -35,6 +35,7 @@
     "seed:market:benchmarks": "node ./node_modules/ts-node/dist/bin.js scripts/seed-market-benchmarks.ts",
     "seed:market:remote": "node scripts/run-remote-market-benchmarks.js",
     "backfill:market:quotes": "node ./node_modules/ts-node/dist/bin.js scripts/backfill-market-quotes-history.ts",
+    "backfill:patrimony:daily": "node ./node_modules/ts-node/dist/bin.js scripts/backfill-daily-patrimony.ts",
     "check:branch-overlap": "node ./node_modules/ts-node/dist/bin.js scripts/check-branch-overlap.ts",
     "audit:btg:notes-fees": "node ./node_modules/ts-node/dist/bin.js scripts/audit-btg-notes-fees-only.ts",
     "invest:purge-keep-opening": "node ./node_modules/ts-node/dist/bin.js scripts/purge-holding-keep-opening.ts",
