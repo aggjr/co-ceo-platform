@@ -36,6 +36,16 @@ export type RecordPortfolioDayInput = {
   stockQuotes: Record<string, number>;
 };
 
+function toIsoDate(value: unknown): string {
+  if (value instanceof Date) {
+    const y = value.getUTCFullYear();
+    const m = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(value.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return String(value ?? '').slice(0, 10);
+}
+
 function rowToStored(row: Record<string, unknown>): StoredPortfolioDay {
   let metadata: Record<string, unknown> | null = null;
   if (row.metadata) {
@@ -51,7 +61,7 @@ function rowToStored(row: Record<string, unknown>): StoredPortfolioDay {
   return {
     id: String(row.id),
     organization_id: String(row.organization_id),
-    snapshot_date: String(row.snapshot_date).slice(0, 10),
+    snapshot_date: toIsoDate(row.snapshot_date),
     patrimony: Number(row.patrimony),
     patrimony_gross: Number(row.patrimony_gross),
     cash: Number(row.cash),
@@ -62,7 +72,7 @@ function rowToStored(row: Record<string, unknown>): StoredPortfolioDay {
     daily_return_simple: row.daily_return_simple != null ? Number(row.daily_return_simple) : null,
     daily_return_twr: row.daily_return_twr != null ? Number(row.daily_return_twr) : null,
     cumulative_twr: row.cumulative_twr != null ? Number(row.cumulative_twr) : null,
-    quotes_as_of: row.quotes_as_of ? String(row.quotes_as_of).slice(0, 10) : null,
+    quotes_as_of: row.quotes_as_of ? toIsoDate(row.quotes_as_of) : null,
     source: String(row.source ?? 'mtm_economic'),
     metadata,
   };
@@ -200,28 +210,59 @@ export class PatrimonyDailyStore {
   }
 }
 
-/** Substitui dias gravados na série calculada (histórico recente = dado real). */
+/** Substitui dias gravados na série calculada; inclui dias só em invest_portfolio_daily. */
 export function mergeStoredPatrimonySeries(
   computed: DailyPatrimonyPoint[],
   stored: StoredPortfolioDay[]
 ): { series: DailyPatrimonyPoint[]; storedDates: string[] } {
   if (!stored.length) return { series: computed, storedDates: [] };
-  const byDate = new Map(stored.map((s) => [s.snapshot_date, s]));
+  const storedByDate = new Map(stored.map((s) => [s.snapshot_date, s]));
+  const computedByDate = new Map(computed.map((p) => [p.date, p]));
+  const allDates = [
+    ...new Set([...computed.map((p) => p.date), ...stored.map((s) => s.snapshot_date)]),
+  ].sort();
+
   const storedDates: string[] = [];
-  const series = computed.map((p) => {
-    const s = byDate.get(p.date);
-    if (!s) return p;
-    storedDates.push(p.date);
-    return {
-      date: p.date,
-      patrimonyGross: s.patrimony_gross,
-      pendingSettlements: s.pending_settlements,
-      scheduledCashPending: p.scheduledCashPending,
-      patrimony: s.patrimony,
-      cash: s.cash,
-      positionsValue: s.positions_value,
-      dailyReturn: s.daily_return_simple ?? p.dailyReturn,
-    };
-  });
+  const series: DailyPatrimonyPoint[] = [];
+
+  for (const date of allDates) {
+    const s = storedByDate.get(date);
+    const c = computedByDate.get(date);
+    if (s) {
+      storedDates.push(date);
+      series.push({
+        date,
+        patrimonyGross: s.patrimony_gross,
+        pendingSettlements: s.pending_settlements,
+        scheduledCashPending: c?.scheduledCashPending ?? 0,
+        patrimony: s.patrimony,
+        cash: s.cash,
+        positionsValue: s.positions_value,
+        dailyReturn: s.daily_return_simple ?? c?.dailyReturn ?? null,
+      });
+    } else if (c) {
+      series.push(c);
+    }
+  }
+
   return { series, storedDates };
+}
+
+/** Remove dias só calculados após o último fechamento gravado com patrimônio zero. */
+export function trimZeroPatrimonyTailAfterLastStored(
+  series: DailyPatrimonyPoint[],
+  stored: StoredPortfolioDay[]
+): DailyPatrimonyPoint[] {
+  if (!stored.length || !series.length) return series;
+  const lastStoredDate = stored[stored.length - 1]!.snapshot_date;
+  let trimmed = series;
+  while (trimmed.length > 0) {
+    const last = trimmed[trimmed.length - 1]!;
+    if (last.date > lastStoredDate && last.patrimony === 0) {
+      trimmed = trimmed.slice(0, -1);
+    } else {
+      break;
+    }
+  }
+  return trimmed;
 }

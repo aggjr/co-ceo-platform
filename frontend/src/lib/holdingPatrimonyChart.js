@@ -129,7 +129,12 @@ export function renderHoldingPatrimonySummary(series, performance, btgReference,
  * @param {HTMLCanvasElement} canvas
  * @param {Array<{ date: string, patrimony: number }>} series
  */
-export function mountHoldingPatrimonyChart(canvas, series) {
+/**
+ * @param {HTMLCanvasElement} canvas
+ * @param {Array<{ date: string, patrimony: number }>} series
+ * @param {{ datasetLabel?: string }} [opts]
+ */
+export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
   if (activeChart) {
     activeChart.destroy();
     activeChart = null;
@@ -155,7 +160,7 @@ export function mountHoldingPatrimonyChart(canvas, series) {
       labels,
       datasets: [
         {
-          label: 'Holding (patrimônio ajustado BTG)',
+          label: opts.datasetLabel || 'Patrimônio diário',
           data: values,
           borderColor: gold,
           backgroundColor: goldFill,

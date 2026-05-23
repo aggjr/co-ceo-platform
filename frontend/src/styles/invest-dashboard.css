@@ -111,10 +111,40 @@
 
 .holding-chart-canvas-wrap {
   position: relative;
-  height: min(320px, 42vh);
-  max-height: 360px;
+  height: min(420px, 50vh);
+  max-height: 480px;
   width: 100%;
   max-width: 100%;
+}
+
+.patrimony-status-host {
+  margin-bottom: 12px;
+}
+
+.patrimony-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.patrimony-status-chip {
+  display: inline-block;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted, #8b949e);
+}
+
+.patrimony-status-chip.is-ok {
+  border-color: rgba(63, 185, 80, 0.35);
+  color: #3fb950;
+}
+
+.patrimony-status-chip.is-warn {
+  border-color: rgba(218, 177, 119, 0.45);
+  color: #dab177;
 }
 
 .shell .content .error-banner {

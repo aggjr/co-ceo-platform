@@ -27,6 +27,7 @@ import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import {
   mergeStoredPatrimonySeries,
+  trimZeroPatrimonyTailAfterLastStored,
   PatrimonyDailyStore,
 } from '../core/invest/PatrimonyDailyStore';
 import { listExternalFlows } from '../core/invest/portfolioPerformance';
@@ -261,6 +262,8 @@ export class InvestController {
     // Cotações históricas de market_quotes_daily — 1 query bulk para o range inteiro.
     // O engine usa quoteForDate(ticker, date) por dia; cai em stockQuotes se não encontrar.
     const quoteMap = await this.marketQuoteRepo.loadQuoteMapForRange(ctx, from, to);
+    let marketQuoteRows = 0;
+    for (const byDate of quoteMap.values()) marketQuoteRows += byDate.size;
     const quoteForDate =
       quoteMap.size > 0
         ? this.marketQuoteRepo.buildQuoteForDateFn(quoteMap)
@@ -268,7 +271,9 @@ export class InvestController {
 
     const anchors = loadPatrimonyAnchors();
     const calibrateToAnchors =
-      method === 'mtm_btg' && shouldUseBtgAnchorCalibration(events);
+      method === 'mtm_btg' &&
+      shouldUseBtgAnchorCalibration(events) &&
+      anchors.month_ends.length > 0;
     const fixedIncomeTotal = calibrateToAnchors
       ? Number(anchors.fixed_income_total ?? 0)
       : fixedIncomeTotalFromLedger(events);
@@ -291,8 +296,9 @@ export class InvestController {
     let storedDates: string[] = [];
     if (storedDays.length > 0) {
       const merged = mergeStoredPatrimonySeries(result.series, storedDays);
-      result = { ...result, series: merged.series };
-      storedDates = merged.storedDates;
+      const series = trimZeroPatrimonyTailAfterLastStored(merged.series, storedDays);
+      result = { ...result, series };
+      storedDates = merged.storedDates.filter((d) => series.some((p) => p.date === d));
     }
 
     const fromMonth = from.slice(0, 7);
@@ -328,16 +334,28 @@ export class InvestController {
         lastStoredDate: storedDays[storedDays.length - 1]?.snapshot_date ?? null,
         recordEndpoint: 'POST /api/invest/patrimony-daily/record',
       },
+      marketQuotes: {
+        tickersWithHistory: quoteMap.size,
+        quoteRowsInRange: marketQuoteRows,
+        usesHistoricalQuotes: quoteForDate != null,
+      },
       performanceNotes: [
         storedDates.length > 0
-          ? `${storedDates.length} dia(s) com fechamento gravado (patrimônio econômico real + cotações do dia).`
-          : 'A partir de agora: execute record-daily-patrimony 1x/dia após atualizar cotações para construir histórico detalhado.',
+          ? `${storedDates.length} dia(s) com fechamento gravado em invest_portfolio_daily.`
+          : 'Sem fechamentos gravados: rode npm run record:patrimony:daily após sync de cotações.',
+        quoteForDate
+          ? `Cotações históricas: ${quoteMap.size} ticker(s), ${marketQuoteRows} preço/dia em market_quotes_daily.`
+          : 'Sem cotações em market_quotes_daily no período — rode sync:market:quotes:stocks e backfill:market:quotes.',
         calibrateToAnchors
-          ? 'Série estimada com âncoras mensais BTG até haver fechamentos gravados dia a dia.'
-          : 'Série somente do livro-razão (sem âncoras BTG). Importe abertura 01/01/2026 e movimentações para evoluir a curva.',
-        'TWR principal em períodos longos: fechamentos mensais BTG; TWR diário gravado usa só TED/aportes como fluxo externo.',
+          ? 'Série com calibração às âncoras mensais BTG.'
+          : 'Série econômica: livro-razão × cotação do dia (ou PM quando sem cotação).',
+        'TWR: fluxos externos apenas capital_deposit/withdrawal (TEDs).',
       ],
-      patrimonySource: calibrateToAnchors ? 'ledger_plus_btg_anchors' : 'ledger_only',
+      patrimonySource: calibrateToAnchors
+        ? 'ledger_plus_btg_anchors'
+        : quoteForDate
+          ? 'ledger_plus_market_quotes'
+          : 'ledger_only',
     });
   };
 
