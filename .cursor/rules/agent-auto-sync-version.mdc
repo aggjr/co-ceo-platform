@@ -1,0 +1,39 @@
+---
+description: Agente deve detectar versao atrasada e baixar codigo de origin/main sozinho.
+alwaysApply: true
+---
+
+# Versao do codigo — auto-sincronizar
+
+`version.json` (e `APP_VERSION` em `src/generated/version.ts`) e o indicador de **codigo integrado**. A referencia e sempre **`origin/main`** (ou `coceo.integrationBranch`).
+
+## Obrigatorio para o agente executor
+
+1. **No inicio de trabalho substantivo** (antes de editar codigo, implementar task ou commitar), verificar se esta atrasado:
+   ```bash
+   npm run git:check-version
+   ```
+   Se retornar atrasado (exit 3) ou a versao local for menor que a de `origin/main`, **nao pedir ao usuario para puxar** — rodar:
+   ```bash
+   npm run git:ensure-version
+   ```
+   Isso faz `git fetch` + merge de `origin/main` na branch do agente.
+
+2. **Se notar versao antiga no meio da sessao** (ex.: ainda `V0.0.50` enquanto `main` ja esta em `V0.0.52`, ou `git show origin/main:version.json` maior que o local), **parar**, sincronizar com `npm run git:ensure-version`, e so entao continuar.
+
+3. **Comparacao rapida sem script** (so leitura):
+   ```bash
+   git fetch origin
+   git show origin/main:version.json
+   type version.json
+   ```
+
+4. **Working tree suja:** `ensure-code-version` pode falhar no merge — avisar o usuario com os arquivos em conflito; nao commitar em cima de base velha.
+
+5. **Apos qualquer alteracao de codigo:** `npm run git:ship` (commit + integrate + bump) **sem perguntar** — ver `agent-publish-after-change.mdc`.
+6. As outras maquinas/agentes rodam `git:ensure-version` na proxima sessao.
+
+## Proibido
+
+- Ignorar descompasso de versao e seguir implementando
+- Pedir ao usuario "de um pull" sem tentar `npm run git:ensure-version` primeiro (exceto se merge impossivel sem decisao humana)

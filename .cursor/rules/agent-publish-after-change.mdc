@@ -1,0 +1,35 @@
+---
+description: Apos qualquer alteracao de codigo — commit, merge em main e bump de versao sem perguntar.
+alwaysApply: true
+---
+
+# Publicar apos alterar codigo (obrigatorio)
+
+Quando o agente executor **terminar** alteracoes de codigo nesta sessao (task, fix, script, regra), **nao perguntar** se deve commitar ou integrar. Fazer sempre:
+
+1. `npm run git:ensure-version` (se ainda nao alinhou no inicio)
+2. `tsc --noEmit` e criterio de aceite da task, se houver
+3. **Commit + integracao + bump** em um fluxo:
+
+```bash
+npm run git:ship -- -Message "tipo(escopo): assunto curto"
+```
+
+Equivalente: commit na branch do agente → `git-publish-to-main` → merge das branches par em `main` → **sempre** incrementa patch em `version.json` / `APP_VERSION` → push `main` e realinha a branch local.
+
+## Sem perguntar ao usuario
+
+- "Quer que eu faca commit?"
+- "Devo integrar em main?"
+- "Incremento a versao?"
+
+Resposta padrao: **sim, sempre**, exceto se o usuario disser explicitamente para **nao** publicar nesta rodada.
+
+## Branch
+
+- **antigravity-gamer** nesta sessao — nunca commitar na branch do outro agente.
+- Conflito de merge: resolver se for obvio; senao parar e reportar arquivos.
+
+## Outros agentes
+
+Apos o push, `main` fica com versao nova; outros agentes/maquinas usam `npm run git:ensure-version` na proxima sessao.
