@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
-import type { CoCeoDataGateway, UserContext, SecurePayload } from '../../core/dal';
+import type { CoCeoDataGateway, SecurePayload, UserContext } from '../../core/dal';
+import { SYSTEM_INSTALLER_USER_ID } from '../../core/dal/types';
 import { GatewayError } from '../../core/dal/errors';
 import type { InventoryLedger, InventoryRegistry } from '../../core/inventory';
 import type {
@@ -21,7 +22,14 @@ import type {
 import { inferAssetType, inferUnderlyingTicker } from '../../core/invest/assetClassifier';
 import { inferOptionExpiryDate } from '../../core/invest/optionExpiry';
 import type { LedgerImportLine } from '../../core/invest/ledgerTypes';
-
+import {
+  type DedupMatchKind,
+  type IndexedLedgerOperation,
+  type LedgerDedupIndex,
+  importLineFeesTotal,
+  lookupDuplicate,
+  wouldDoubleCash,
+} from '../../core/invest/ledgerOperationDedup';
 const PASSIVE_INCOME_OPS = new Set(['dividend', 'jcp', 'cash_yield', 'securities_lending']);
 const PASSIVE_EXPENSE_OPS = new Set(['fee', 'penalty_b3']);
 const CAPITAL_OPS = new Set(['capital_deposit', 'capital_withdrawal']);
@@ -378,6 +386,25 @@ export class InvestOperations {
    * Verifica se ja existe lancamento com este broker_note_ref para evitar
    * duplicacao (idempotencia para reimport de nota).
    */
+  private installerCtx(organizationId: string): UserContext {
+    return {
+      userId: SYSTEM_INSTALLER_USER_ID,
+      organizationId,
+      impersonatorId: null,
+      scope: 'global',
+    };
+  }
+
+  private static parseRowMetadata(raw: unknown): Record<string, unknown> {
+    if (!raw) return {};
+    if (typeof raw === 'object') return raw as Record<string, unknown>;
+    try {
+      return JSON.parse(String(raw)) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+
   private async hasExistingByRef(ctx: UserContext, ref: string): Promise<boolean> {
     if (!ref) return false;
     const inv = await this.gateway.findWhere(
@@ -393,7 +420,98 @@ export class InvestOperations {
       { external_ref: `BROKER_REF:${ref}` },
       { limit: 1 }
     );
-    return fin.length > 0;
+    if (fin.length) return true;
+    const finCash = await this.gateway.findWhere(
+      ctx,
+      'financial_ledger_entries',
+      { external_ref: `BROKER_REF:${ref}:CASH` },
+      { limit: 1 }
+    );
+    return finCash.length > 0;
+  }
+
+  /**
+   * Completa metadata de taxas em lançamento já existente (mesma nota ou mesma
+   * operação). Não cria segunda perna de caixa.
+   */
+  private async enrichExistingFromImportLine(
+    ctx: UserContext,
+    existing: IndexedLedgerOperation,
+    line: LedgerImportLine,
+    incomingRef: string | null
+  ): Promise<boolean> {
+    const orgId = ctx.organizationId;
+    if (!orgId) return false;
+    const incomingFees = importLineFeesTotal(line);
+    if (incomingFees <= 0) return false;
+
+    const ref = existing.brokerNoteRef;
+    if (!ref) return false;
+
+    const ic = this.installerCtx(orgId);
+    let changed = false;
+
+    const patRows = await this.gateway.findWhere(
+      ic,
+      'patrimony_ledger_entries',
+      { external_ref: `BROKER_REF:${ref}` },
+      { limit: 1 }
+    );
+    if (patRows[0]) {
+      const meta = InvestOperations.parseRowMetadata(patRows[0].metadata);
+      const cur =
+        Math.abs(Number(meta.brokerage_fee ?? 0)) +
+        Math.abs(Number(meta.b3_fees ?? 0)) +
+        Math.abs(Number(meta.irrf_tax ?? 0));
+      if (incomingFees > cur + 0.001) {
+        const alt = Array.isArray(meta.alternate_broker_note_refs)
+          ? [...(meta.alternate_broker_note_refs as string[])]
+          : [];
+        if (incomingRef && incomingRef !== ref && !alt.includes(incomingRef)) {
+          alt.push(incomingRef);
+        }
+        await this.gateway.update(ic, 'patrimony_ledger_entries', String(patRows[0].id), {
+          metadata: {
+            ...meta,
+            brokerage_fee: line.brokerage_fee ?? meta.brokerage_fee ?? 0,
+            b3_fees: line.b3_fees ?? meta.b3_fees ?? 0,
+            irrf_tax: line.irrf_tax ?? meta.irrf_tax ?? 0,
+            alternate_broker_note_refs: alt.length ? alt : undefined,
+          },
+        });
+        changed = true;
+      }
+    }
+
+    const cashRows = await this.gateway.findWhere(
+      ic,
+      'financial_ledger_entries',
+      { external_ref: `BROKER_REF:${ref}:CASH` },
+      { limit: 1 }
+    );
+    if (cashRows[0]) {
+      const meta = InvestOperations.parseRowMetadata(cashRows[0].metadata);
+      const cur = Math.abs(Number(meta.fees ?? 0)) || importLineFeesTotal({
+        ...line,
+        brokerage_fee: Number(meta.brokerage_fee ?? 0),
+        b3_fees: Number(meta.b3_fees ?? 0),
+        irrf_tax: Number(meta.irrf_tax ?? 0),
+      });
+      if (incomingFees > cur + 0.001) {
+        await this.gateway.update(ic, 'financial_ledger_entries', String(cashRows[0].id), {
+          metadata: {
+            ...meta,
+            fees: incomingFees,
+            brokerage_fee: line.brokerage_fee ?? 0,
+            b3_fees: line.b3_fees ?? 0,
+            irrf_tax: line.irrf_tax ?? 0,
+          },
+        });
+        changed = true;
+      }
+    }
+
+    return changed;
   }
 
   private static cashTickerToExternalId(ticker: string): string | null {
@@ -440,8 +558,14 @@ export class InvestOperations {
    */
   async recordOperation(
     ctx: UserContext,
-    line: LedgerImportLine
-  ): Promise<{ skipped: boolean; reason?: string }> {
+    line: LedgerImportLine,
+    options?: { dedupIndex?: LedgerDedupIndex }
+  ): Promise<{
+    skipped: boolean;
+    reason?: string;
+    enriched?: boolean;
+    match?: DedupMatchKind;
+  }> {
     const op = String(line.operation);
     const ticker = String(line.ticker || '').toUpperCase().trim();
     if (!ticker) {
@@ -449,7 +573,50 @@ export class InvestOperations {
     }
     const ref = line.broker_note_ref?.trim();
     if (ref && (await this.hasExistingByRef(ctx, ref))) {
-      return { skipped: true, reason: `broker_note_ref ${ref} ja registrado` };
+      const enriched = await this.enrichExistingFromImportLine(
+        ctx,
+        {
+          brokerNoteRef: ref,
+          bareNoteNumber: null,
+          fingerprint: '',
+          date: line.date,
+          ticker,
+          assetType: line.asset_type || inferAssetType(ticker),
+          operation: op,
+          quantity: Math.abs(line.quantity),
+          unitPrice: line.unit_price,
+          cashAmount: null,
+          feesTotal: 0,
+        },
+        line,
+        ref
+      );
+      return {
+        skipped: true,
+        reason: `broker_note_ref ${ref} ja registrado`,
+        enriched,
+        match: 'broker_note_ref',
+      };
+    }
+
+    if (options?.dedupIndex) {
+      const dup = lookupDuplicate(options.dedupIndex, line);
+      if (dup) {
+        const enriched = await this.enrichExistingFromImportLine(
+          ctx,
+          dup.existing,
+          line,
+          ref || null
+        );
+        const doubleCash = wouldDoubleCash(dup.existing, line);
+        const sib = dup.fingerprintSiblings.length > 1 ? '; multiplas pernas no livro' : '';
+        return {
+          skipped: true,
+          reason: `duplicata (${dup.match})${doubleCash ? '; caixa ja registrado' : ''}${sib}`,
+          enriched,
+          match: dup.match,
+        };
+      }
     }
 
     const declaredType = String(line.asset_type ?? '').trim();
@@ -691,6 +858,13 @@ export class InvestOperations {
         ...(line.option_strike != null && line.option_strike > 0
           ? { option_strike: line.option_strike }
           : {}),
+        ...((line.brokerage_fee ?? 0) + (line.b3_fees ?? 0) + (line.irrf_tax ?? 0) > 0
+          ? {
+              brokerage_fee: line.brokerage_fee ?? 0,
+              b3_fees: line.b3_fees ?? 0,
+              irrf_tax: line.irrf_tax ?? 0,
+            }
+          : {}),
       },
     });
 
@@ -729,6 +903,9 @@ export class InvestOperations {
             legacy_op: op,
             broker_note_ref: ref ?? null,
             fees,
+            brokerage_fee: line.brokerage_fee ?? 0,
+            b3_fees: line.b3_fees ?? 0,
+            irrf_tax: line.irrf_tax ?? 0,
           },
         });
       }

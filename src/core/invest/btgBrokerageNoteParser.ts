@@ -221,13 +221,37 @@ function parseTradeLine(line: string): BtgBrokerageNoteTrade | null {
   };
 }
 
-function parseFeeLine(line: string): BtgBrokerageNoteFee | null {
+/** Linha de taxa/emolumento no bloco "Resumo dos Negócios" (vários layouts BTG). */
+export function parseFeeLine(line: string): BtgBrokerageNoteFee | null {
   const trimmed = line.replace(/\s+/g, ' ').trim();
-  const m = trimmed.match(/^([\d.,]+)\s+(.+?)\s+([CD])$/);
-  if (!m) return null;
-  const amount = parseBrMoney(m[1]);
-  if (amount === 0 && !/0,00/.test(m[1])) return null;
-  return { label: m[2].trim(), amount, dc: m[3] as 'C' | 'D' };
+  if (!trimmed || /^resumo/i.test(trimmed)) return null;
+
+  // 0,11 Taxa de liquidação/CCP D
+  let m = trimmed.match(/^([\d.,]+)\s+(.+?)\s+([CD])$/i);
+  if (m) {
+    const amount = parseBrMoney(m[1]!);
+    if (amount === 0 && !/0,00/.test(m[1]!)) return null;
+    return { label: m[2]!.trim(), amount, dc: m[3]!.toUpperCase() as 'C' | 'D' };
+  }
+
+  // Taxa de liquidação/CCP 0,11 D
+  m = trimmed.match(/^(.+?)\s+([\d.,]+)\s+([CD])$/i);
+  if (m && /taxa|emolument|total|irrf|valor|corret|bovespa|cblc|registro/i.test(m[1]!)) {
+    const amount = parseBrMoney(m[2]!);
+    if (amount === 0 && !/0,00/.test(m[2]!)) return null;
+    return { label: m[1]!.trim(), amount, dc: m[3]!.toUpperCase() as 'C' | 'D' };
+  }
+
+  // Emolumentos: R$ 0,14 D  |  Taxa de Registro: R$ 0,00
+  m = trimmed.match(/^(.+?):\s*R\$\s*([\d.,-]+)\s*([CD])?\s*$/i);
+  if (m) {
+    const amount = parseBrMoney(m[2]!);
+    if (amount === 0 && !/0,00/.test(m[2]!)) return null;
+    const dc = (m[3]?.toUpperCase() as 'C' | 'D' | undefined) || 'D';
+    return { label: m[1]!.trim(), amount, dc };
+  }
+
+  return null;
 }
 
 function pickFeeAmount(fees: BtgBrokerageNoteFee[], pattern: RegExp): number | null {

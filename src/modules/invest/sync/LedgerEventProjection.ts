@@ -48,6 +48,22 @@ export class LedgerEventProjection {
     }
   }
 
+  private static feesFromMetadata(meta: Record<string, unknown>): {
+    brokerage: number;
+    b3: number;
+    irrf: number;
+  } {
+    const breakdown =
+      meta.fee_breakdown && typeof meta.fee_breakdown === 'object'
+        ? (meta.fee_breakdown as Record<string, unknown>)
+        : null;
+    return {
+      brokerage: Math.abs(Number(meta.brokerage_fee ?? breakdown?.brokerage ?? 0)),
+      b3: Math.abs(Number(meta.b3_fees ?? breakdown?.b3 ?? meta.fees ?? 0)),
+      irrf: Math.abs(Number(meta.irrf_tax ?? breakdown?.irrf ?? 0)),
+    };
+  }
+
   /**
    * Mapeia movement_type (núcleo) para LedgerTransactionType (legado) quando
    * não há metadata.legacy_op. Usado por lançamentos criados direto via
@@ -195,6 +211,7 @@ export class LedgerEventProjection {
         ? Math.abs(signedQty)
         : signedQty;
 
+      const patFees = LedgerEventProjection.feesFromMetadata(meta);
       events.push({
         id: String(row.id),
         transaction_date: date,
@@ -208,9 +225,9 @@ export class LedgerEventProjection {
         quantity: legacyQty,
         unit_price: unitPrice,
         total_net_value: totalNet,
-        brokerage_fee: 0,
-        b3_fees: 0,
-        irrf_tax: 0,
+        brokerage_fee: patFees.brokerage,
+        b3_fees: patFees.b3,
+        irrf_tax: patFees.irrf,
         impacts_managerial_price: impactsValuation,
         _sortKey: `${date}|${row.created_at ?? ''}|${row.id}`,
       });
@@ -253,6 +270,7 @@ export class LedgerEventProjection {
         ? String(row.external_ref)
         : null;
 
+      const cashFees = LedgerEventProjection.feesFromMetadata(meta);
       events.push({
         id: String(row.id),
         transaction_date: date,
@@ -266,9 +284,9 @@ export class LedgerEventProjection {
         quantity: txType === 'opening_balance' ? Math.abs(amount) : 0,
         unit_price: txType === 'opening_balance' ? 1 : 0,
         total_net_value: totalNet,
-        brokerage_fee: 0,
-        b3_fees: 0,
-        irrf_tax: 0,
+        brokerage_fee: cashFees.brokerage,
+        b3_fees: cashFees.b3,
+        irrf_tax: cashFees.irrf,
         impacts_managerial_price: false,
         _sortKey: `${date}|${row.created_at ?? ''}|${row.id}`,
       });

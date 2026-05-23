@@ -25,9 +25,10 @@ const ORG_ID = process.env.PORTFOLIO_ORG_ID || 'org-holding-001';
 const DEFAULT_JSON = path.join(
   __dirname,
   '..',
-  'data',
-  'invest',
-  'btg-brokerage-notes-review-2026.json'
+  'local-import',
+  'btg-sources',
+  'auditoria',
+  'notas-review.json'
 );
 
 async function main() {

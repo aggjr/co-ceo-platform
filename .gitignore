@@ -2,6 +2,10 @@ node_modules
 
 # Sem dados de runtime no repositório
 # (ver .cursor/rules/no-runtime-data-files.mdc)
+.local/
+# Inputs locais Home Broker (PDFs, extratos) — ver local-import/README.txt
+local-import/*
+!local-import/README.txt
 data/invest/
 data/btg/
 data/**/*.json

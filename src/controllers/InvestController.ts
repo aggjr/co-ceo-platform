@@ -14,6 +14,7 @@ import {
 } from '../core/invest/StockUnderlyingPivotEngine';
 import { buildDailyPatrimonySeries } from '../core/invest/PatrimonyDailyEngine';
 import { buildDailyPatrimonyMtmSeries } from '../core/invest/PatrimonyMtmDailyEngine';
+import { buildBrokerageNoteReviewRows } from '../core/invest/brokerageNotesReviewFromLedger';
 import { buildExtractReconciliationSummary } from '../core/invest/btgExtractCashSeries';
 import { compareToBtgPublished } from '../core/invest/btgPerformanceReference';
 import { loadPatrimonyAnchors } from '../core/invest/patrimonyAnchors';
@@ -562,110 +563,37 @@ export class InvestController {
 
     const today = new Date().toISOString().slice(0, 10);
     const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
-    const tradeEvents = events.filter((e) => e.asset_type !== 'cash');
+    const rows = buildBrokerageNoteReviewRows(events, today);
 
-    const isoDateToBr = (iso: string): string => {
-      const m = String(iso || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (!m) return iso;
-      return `${m[3]}/${m[2]}/${m[1]}`;
-    };
-
-    const rows = [];
     const notesCount = new Set<string>();
-    const noteNets = new Map<string, number>();
-
-    for (const e of tradeEvents) {
-      if (e.broker_note_ref) {
-        const current = noteNets.get(e.broker_note_ref) || 0;
-        noteNets.set(e.broker_note_ref, current + e.total_net_value);
-      }
+    let withFees = 0;
+    let withoutFees = 0;
+    for (const r of rows) {
+      if (r.noteNumber && r.noteNumber !== '—') notesCount.add(r.noteNumber);
+      const feeTotal =
+        Math.abs(Number(r.settlementTax) || 0) +
+        Math.abs(Number(r.registrationTax) || 0) +
+        Math.abs(Number(r.emoluments) || 0) +
+        Math.abs(Number(r.cblcTotal) || 0) +
+        Math.abs(Number(r.bovespaTotal) || 0) +
+        Math.abs(Number(r.irrf) || 0);
+      if (feeTotal > 0.001) withFees += 1;
+      else withoutFees += 1;
     }
-
-    const noteLineCount = new Map<string, number>();
-
-    for (const e of tradeEvents) {
-      const noteNum = e.broker_note_ref || '—';
-      const lineNo = (noteLineCount.get(noteNum) || 0) + 1;
-      noteLineCount.set(noteNum, lineNo);
-      if (e.broker_note_ref) {
-        notesCount.add(e.broker_note_ref);
-      }
-
-      let side: 'C' | 'V' | '—' = '—';
-      if (e.transaction_type.includes('buy')) {
-        side = 'C';
-      } else if (e.transaction_type.includes('sell')) {
-        side = 'V';
-      } else if (e.transaction_type === 'acquisition') {
-        side = 'C';
-      } else if (e.transaction_type === 'disposition') {
-        side = 'V';
-      } else if (e.quantity > 0) {
-        side = 'C';
-      } else if (e.quantity < 0) {
-        side = 'V';
-      }
-
-      let category = 'SPOT';
-      if (e.asset_type === 'option_call' || e.asset_type === 'option_put') {
-        category = 'OPTIONS';
-      } else if (e.transaction_type === 'loan' || e.asset_type === 'loan') {
-        category = 'LOAN';
-      }
-
-      const grossValue = Math.abs(e.total_net_value);
-      const isExercise = e.transaction_type === 'option_exercise';
-
-      const pregaoDate = e.transaction_date || today;
-      rows.push({
-        dedupeKey: `DB|${e.id}`,
-        noteNumber: noteNum,
-        pregaoDate: pregaoDate,
-        pregaoDateBr: isoDateToBr(pregaoDate),
-        category,
-        sourceFile: e.notes || 'Livro razão',
-        netOperations: e.broker_note_ref ? noteNets.get(e.broker_note_ref) : e.total_net_value,
-        settlementTax: 0,
-        registrationTax: 0,
-        cblcTotal: 0,
-        emoluments: 0,
-        bovespaTotal: 0,
-        irrf: e.irrf_tax || 0,
-        duplicateSkipped: false,
-        duplicateOf: null,
-        lineNo,
-        side,
-        sideLabel: side === 'C' ? 'Compra' : side === 'V' ? 'Venda' : '—',
-        marketType: isExercise ? 'EXERCÍCIO' : category === 'OPTIONS' ? 'OPÇÕES' : 'VISTA',
-        operationLabel: isExercise ? 'Exercício' : side === 'C' ? 'Compra' : 'Venda',
-        maturity: null,
-        ticker: e.asset_ticker,
-        underlyingStock: e.underlying_ticker || e.asset_ticker,
-        isExercise,
-        specification: '',
-        quantity: Math.abs(e.quantity),
-        unitPrice: e.unit_price,
-        grossValue,
-        dc: side === 'C' ? 'D' : side === 'V' ? 'C' : '—',
-      });
-    }
-
-    rows.sort((a, b) => {
-      const d = String(a.pregaoDate).localeCompare(String(b.pregaoDate));
-      if (d !== 0) return d;
-      return String(a.noteNumber).localeCompare(String(b.noteNumber));
-    });
 
     return res.json({
       success: true,
       ledgerImport: true,
-      message: 'Dados lidos diretamente do banco de dados.',
+      message:
+        'Dados do livro razão. Taxas vêm da perna de caixa (metadata.fees); linhas sem taxa podem precisar reimportar notas BTG.',
       generatedAt: new Date().toISOString(),
       stats: {
         notesRaw: notesCount.size,
         notesKept: notesCount.size,
         notesDuplicateSkipped: 0,
         tradeLines: rows.length,
+        linesWithFees: withFees,
+        linesWithoutFees: withoutFees,
       },
       duplicatesSkipped: [],
       notes: [],

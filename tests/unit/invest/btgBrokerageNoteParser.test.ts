@@ -2,6 +2,7 @@ import {
   dedupeBrokerageNotes,
   parseBtgBrokerageNoteBlocks,
   parseBrMoney,
+  parseFeeLine,
 } from '../../../src/core/invest/btgBrokerageNoteParser';
 
 const SAMPLE = `
@@ -31,6 +32,17 @@ Data pregão
 `.trim().split('\n');
 
 describe('btgBrokerageNoteParser', () => {
+  it('parseFeeLine aceita label antes do valor', () => {
+    const f = parseFeeLine('Taxa de liquidação/CCP 0,11 D');
+    expect(f?.amount).toBe(0.11);
+    expect(f?.label).toMatch(/liquida/i);
+  });
+
+  it('parseFeeLine aceita formato R$', () => {
+    const f = parseFeeLine('Emolumentos: R$ 0,14 D');
+    expect(f?.amount).toBe(0.14);
+  });
+
   it('parseBrMoney', () => {
     expect(parseBrMoney('220.050,00')).toBe(220050);
     expect(parseBrMoney('0,16')).toBe(0.16);

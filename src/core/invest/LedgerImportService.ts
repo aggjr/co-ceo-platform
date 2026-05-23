@@ -13,6 +13,7 @@ import {
   type LedgerImportPayload,
   type OpeningImportPayload,
 } from './ledgerTypes';
+import { buildLedgerDedupIndex } from './ledgerOperationDedup';
 import { LedgerEventProjection } from '../../modules/invest/sync/LedgerEventProjection';
 import {
   buildInvestOperations,
@@ -237,6 +238,10 @@ export class LedgerImportService {
     const batchId = randomUUID();
     let inserted = 0;
     let skipped = 0;
+    let enriched = 0;
+    const today = new Date().toISOString().slice(0, 10);
+    const existingEvents = await this.listLedgerEvents(ctx, '2000-01-01', today);
+    const dedupIndex = buildLedgerDedupIndex(existingEvents);
 
     for (const line of entries || []) {
       const op = String(line.operation);
@@ -250,24 +255,29 @@ export class LedgerImportService {
         quantity: line.quantity,
         unit_price: line.unit_price,
       });
-      const result = await this.operations.recordOperation(ctx, {
-        ...line,
-        ticker,
-        asset_type: assetType,
-        quantity: norm.quantity,
-        unit_price: norm.unit_price,
-        date: parseDate(line.date),
-        notes: line.notes
-          ? meta?.sourceLabel
-            ? `${line.notes} (${meta.sourceLabel})`
-            : line.notes
-          : meta?.sourceLabel || undefined,
-      });
+      const result = await this.operations.recordOperation(
+        ctx,
+        {
+          ...line,
+          ticker,
+          asset_type: assetType,
+          quantity: norm.quantity,
+          unit_price: norm.unit_price,
+          date: parseDate(line.date),
+          notes: line.notes
+            ? meta?.sourceLabel
+              ? `${line.notes} (${meta.sourceLabel})`
+              : line.notes
+            : meta?.sourceLabel || undefined,
+        },
+        { dedupIndex }
+      );
       if (result.skipped) skipped += 1;
       else inserted += 1;
+      if (result.enriched) enriched += 1;
     }
 
-    return { batchId, inserted, skipped };
+    return { batchId, inserted, skipped, enriched };
   }
 
   /**
