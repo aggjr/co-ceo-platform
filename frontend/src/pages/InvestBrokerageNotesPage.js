@@ -123,7 +123,7 @@ export async function InvestBrokerageNotesPage(container) {
 
   if (isGlobalSession()) {
     await renderShell(container, {
-      title: 'INVEST — Notas de corretagem',
+      title: 'INVEST — Histórico operações',
       contentHtml:
         '<div class="card"><p class="muted">Personifique o titular da holding para conferir as notas.</p></div>',
     });
@@ -188,7 +188,7 @@ export async function InvestBrokerageNotesPage(container) {
   }
 
   await renderShell(container, {
-    title: 'INVEST — Notas de corretagem (conferência)',
+    title: 'INVEST — Histórico operações (conferência)',
     contentHtml: body,
   });
 
@@ -198,7 +198,7 @@ export async function InvestBrokerageNotesPage(container) {
   const tableId = 'brokerage-notes-excel';
   const mountGrid = (rows) => {
     host.innerHTML = renderExcelTableShell({
-      caption: 'Movimentações das notas de corretagem',
+      caption: 'Movimentações do histórico de operações',
       columns: COLUMNS,
       tableId,
     });

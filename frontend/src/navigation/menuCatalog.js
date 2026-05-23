@@ -83,7 +83,7 @@ export const MENU_CATALOG = [
         resourceKey: 'screen.invest.results',
       },
       {
-        label: 'Notas de corretagem',
+        label: 'Histórico operações',
         path: '/invest/notas-corretagem',
         resourceKey: 'screen.invest.results',
       },
