@@ -41,13 +41,25 @@ npm run check:branch-overlap
 
 Se `check:branch-overlap` listar sobreposição com a branch par, **avisar o usuário** antes do commit.
 
+## Fluxo obrigatório do agente (note-gamer nesta máquina)
+
+**A cada commit** na branch da máquina, **na mesma sessão**, sem esperar pedido do usuário:
+
+1. `git fetch origin`
+2. `npm run check:branch-overlap` (avisar se houver sobreposição com `note-guto`)
+3. `git commit` na branch `note-gamer` (nunca em `main` nem em `note-guto`)
+4. **`.\scripts\git-publish-to-main.ps1`** imediatamente após o commit
+5. Se o script sair com conflito: **parar**, listar arquivos, pedir ao usuário o que manter; **não** seguir codando
+6. Se OK: `main` e `note-gamer` ficam no mesmo SHA; working tree limpa
+
+Ordem antes do commit: `.\scripts\git-sync-before-commit.ps1` (traz `main` → branch local).
+
 ## Ritmo diário (cada máquina)
 
 1. `git checkout note-<gamer|guto>`
-2. `git pull --rebase origin main` (ou `git-sync-before-commit.ps1`)
+2. `git-sync-before-commit.ps1` ou `git pull --rebase origin main`
 3. Trabalhar; commits pequenos
-4. `npm run check:branch-overlap` → `git push origin note-<local>`
-5. Publicar em `main` quando pedido: `.\scripts\git-publish-to-integration.ps1`
+4. `npm run check:branch-overlap` → commit → **`git-publish-to-main.ps1`**
 
 ## Atualizar a branch da máquina a partir de main (sempre)
 
