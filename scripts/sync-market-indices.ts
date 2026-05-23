@@ -21,12 +21,32 @@ import { MarketQuoteRepository } from '../src/core/market/MarketQuoteRepository'
 
 dotenv.config();
 
-type IndexSpec = { code: string; sgs: number; sourceTag: string };
+type IndexRateKind = 'daily_pct' | 'annual_pct';
+
+type IndexSpec = { code: string; sgs: number; sourceTag: string; rateKind: IndexRateKind };
 
 const INDICES: IndexSpec[] = [
-  { code: 'CDI', sgs: 11, sourceTag: 'bcb_sgs_11' },
-  { code: 'SELIC', sgs: 1178, sourceTag: 'bcb_sgs_1178' },
+  { code: 'CDI', sgs: 11, sourceTag: 'bcb_sgs_11', rateKind: 'daily_pct' },
+  /** SGS 1178: taxa Selic em % a.a. (não é variação diária como o CDI). */
+  { code: 'SELIC', sgs: 1178, sourceTag: 'bcb_sgs_1178', rateKind: 'annual_pct' },
 ];
+
+function indexFactors(pct: number, rateKind: IndexRateKind): { dailyFactor: number; annualizedRate: number } {
+  if (rateKind === 'annual_pct') {
+    const annual = pct / 100;
+    const dailyFactor = Math.pow(1 + annual, 1 / 252);
+    return {
+      dailyFactor: Math.round(dailyFactor * 1_000_000_000_000) / 1_000_000_000_000,
+      annualizedRate: Math.round(annual * 1_000_000) / 1_000_000,
+    };
+  }
+  const dailyFactor = 1 + pct / 100;
+  const annualized = Math.pow(dailyFactor, 252) - 1;
+  return {
+    dailyFactor: Math.round(dailyFactor * 1_000_000_000_000) / 1_000_000_000_000,
+    annualizedRate: Math.round(annualized * 1_000_000) / 1_000_000,
+  };
+}
 
 function defaultFrom(): string {
   return '2024-01-01';
@@ -101,14 +121,12 @@ async function main() {
       const date = brToIso(r.data);
       const pct = Number(r.valor);
       if (!Number.isFinite(pct)) continue;
-      // BCB devolve a taxa diária em % (ex.: CDI 0.043618 = 0.043618% no dia).
-      const dailyFactor = 1 + pct / 100;
-      const annualized = Math.round((Math.pow(dailyFactor, 252) - 1) * 1_000_000) / 1_000_000;
+      const { dailyFactor, annualizedRate } = indexFactors(pct, idx.rateKind);
       await repo.upsertIndex(ctx, {
         indexCode: idx.code,
         referenceDate: date,
         dailyFactor,
-        annualizedRate: annualized,
+        annualizedRate,
         source: idx.sourceTag,
       });
       saved += 1;
