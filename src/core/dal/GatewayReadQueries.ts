@@ -32,7 +32,10 @@ export type GatewayReadQueryKey =
   | 'market_index_daily_range'
   | 'market_index_daily_on_or_before'
   | 'market_distinct_tickers_in_use'
-  | 'market_quotes_bulk_range';
+  | 'market_quotes_bulk_range'
+  | 'ui_menu_nodes_active'
+  | 'ui_texts_resolved_for_org'
+  | 'ui_catalog_version';
 
 export interface GatewayReadQueryDef {
   sql: string;
@@ -330,5 +333,31 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
             AND pi.identifier NOT LIKE 'LFT-%'
             AND pi.identifier NOT LIKE 'TD-%'
           ORDER BY pi.identifier`,
+  },
+  ui_menu_nodes_active: {
+    sql: `SELECT id, code, parent_id, module_code, path, icon, order_index,
+                 text_key, access_resource_key, visibility
+          FROM ui_menu_nodes
+          WHERE is_active = TRUE
+          ORDER BY parent_id IS NULL DESC, parent_id, order_index, code`,
+  },
+  ui_texts_resolved_for_org: {
+    sql: `SELECT c.text_key, c.kind, c.module_code,
+                 COALESCE(o.text, c.default_text) AS text,
+                 (o.organization_id IS NOT NULL) AS is_overridden
+          FROM ui_text_catalog c
+          LEFT JOIN ui_text_overrides o
+            ON o.text_key = c.text_key
+           AND o.locale = c.locale
+           AND o.organization_id = ?
+          WHERE c.locale = ?`,
+  },
+  ui_catalog_version: {
+    sql: `SELECT
+            COALESCE(MAX(updated_at), '1970-01-01') AS catalog_at,
+            (SELECT COALESCE(MAX(updated_at), '1970-01-01') FROM ui_menu_nodes) AS menu_at,
+            (SELECT COALESCE(MAX(updated_at), '1970-01-01')
+               FROM ui_text_overrides WHERE organization_id = ?) AS overrides_at
+          FROM ui_text_catalog`,
   },
 };

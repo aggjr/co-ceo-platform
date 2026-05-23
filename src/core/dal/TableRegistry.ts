@@ -68,6 +68,16 @@ const TABLES: TableDefinition[] = [
   def('iam_config_audit', 'system', { softDelete: false, countsTowardStorage: false }),
   def('field_permissions', 'tenant', { softDelete: false }),
   def('custom_field_labels', 'tenant', { softDelete: false }),
+  // ===== Catalogo de UI multi-tenant (texto + menu) =====
+  def('ui_text_catalog', 'global', { softDelete: false, countsTowardStorage: false }),
+  def('ui_text_overrides', 'global', {
+    softDelete: false,
+    primaryKey: 'organization_id',
+    primaryKeyColumns: ['organization_id', 'text_key', 'locale'],
+    allowHardDelete: true,
+    countsTowardStorage: false,
+  }),
+  def('ui_menu_nodes', 'global', { softDelete: false, countsTowardStorage: false }),
   // invest_assets, invest_ledger_entries: REMOVIDOS — substituidos por
   // patrimony_items + invest_position_ext + patrimony_ledger_entries +
   // financial_accounts + financial_ledger_entries.

@@ -1,6 +1,7 @@
 import { apiRequest } from '../api/client.js';
 import { isGlobalSession } from '../auth/session.js';
 import { MENU_CATALOG } from './menuCatalog.js';
+import { loadUiManifest } from './uiManifest.js';
 
 function allowedResourceKeys(matrix) {
   const set = new Set();
@@ -21,7 +22,6 @@ function licensedModuleCodesFromApi(modulesPayload) {
   return codes;
 }
 
-/** INVEST no menu se o contrato licencia o módulo ou a matriz libera alguma tela INVEST. */
 function ensureInvestFromScreens(licensed, allowed) {
   if (licensed.has('INVEST')) return;
   for (const key of allowed) {
@@ -32,6 +32,7 @@ function ensureInvestFromScreens(licensed, allowed) {
   }
 }
 
+/** Fallback usado quando o manifesto do banco esta vazio (ambiente sem seed). */
 export function filterMenuCatalog(catalog, { global, allowed, licensed }) {
   return catalog
     .map((mod) => {
@@ -53,9 +54,8 @@ export function filterMenuCatalog(catalog, { global, allowed, licensed }) {
     .filter(Boolean);
 }
 
-export async function loadVisibleMenu() {
+async function loadFallbackMenu() {
   const global = isGlobalSession();
-
   if (global) {
     return filterMenuCatalog(MENU_CATALOG, {
       global: true,
@@ -63,21 +63,33 @@ export async function loadVisibleMenu() {
       licensed: null,
     });
   }
-
   const matrix = await apiRequest('/api/cockpit/me/access-matrix').catch(() => ({
     resources: [],
   }));
   const allowed = allowedResourceKeys(matrix);
-
   const modulesPayload = await apiRequest('/api/cockpit/me/contract-modules').catch(
     () => null
   );
-  let licensed = licensedModuleCodesFromApi(modulesPayload);
+  const licensed = licensedModuleCodesFromApi(modulesPayload);
   ensureInvestFromScreens(licensed, allowed);
-
   return filterMenuCatalog(MENU_CATALOG, {
     global: false,
     allowed,
     licensed,
   });
+}
+
+/**
+ * Carrega o menu visivel para o usuario. Fonte de verdade: GET /api/ui/manifest
+ * (catalogo no banco + overrides por organizacao). Fallback no MENU_CATALOG embutido
+ * apenas quando o manifesto vem vazio (ambiente recem-criado sem seed).
+ */
+export async function loadVisibleMenu() {
+  try {
+    const manifest = await loadUiManifest();
+    if (manifest?.menu?.length) return manifest.menu;
+  } catch {
+    // segue para fallback local
+  }
+  return loadFallbackMenu();
 }

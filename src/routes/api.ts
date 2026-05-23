@@ -8,12 +8,14 @@ import { requireAnyPermission } from '../middlewares/RequireAnyPermission';
 import { dataGateway } from '../config/gateway';
 import { QualityController } from '../controllers/QualityController';
 import { InvestController } from '../controllers/InvestController';
+import { UiManifestController } from '../controllers/UiManifestController';
 
 const router = Router();
 const gateway = dataGateway;
 const cockpit = new CockpitController(gateway);
 const invest = new InvestController(gateway);
 const telemetry = createTelemetryController(gateway);
+const uiManifest = new UiManifestController(gateway);
 
 // --- Auth ---
 router.post('/auth/login', AuthController.login);
@@ -23,6 +25,9 @@ router.post('/auth/impersonate', AuthMiddleware.protect, AuthController.imperson
 
 // --- Telemetria (qualquer usuário autenticado) ---
 router.post('/telemetry/events', AuthMiddleware.protect, telemetry.ingest);
+
+// --- UI manifest (menu + textos resolvidos para o tenant) ---
+router.get('/ui/manifest', AuthMiddleware.protect, uiManifest.getManifest);
 
 // --- Cockpit plataforma (co-CEO) ---
 router.get(
