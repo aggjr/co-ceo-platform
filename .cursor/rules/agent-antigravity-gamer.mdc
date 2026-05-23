@@ -1,0 +1,34 @@
+---
+description: Identidade antigravity-gamer — anexe @agent-antigravity-gamer na sessao deste agente (nao no guto).
+alwaysApply: false
+---
+
+# Agente antigravity-gamer
+
+Esta sessao e o executor **antigravity-gamer**. Na mesma maquina pode existir outro agente (**antigravity-guto**) no mesmo clone — nao compartilhar commits entre branches.
+
+## Obrigatorio nesta sessao
+
+1. **Branch:** `antigravity-gamer` apenas (commits, push, merge para main via publish).
+2. **Nao** commitar em `antigravity-guto`, `note-gamer` ou `note-guto`.
+3. **Nao** alterar `git config coceo.machineBranch` no meio da sessao (outro agente usa o mesmo repo). Preferir perfil por sessao:
+
+```powershell
+. .\scripts\set-agent-profile.ps1 antigravity-gamer
+```
+
+4. Inicio da sessao / versao suspeita: `npm run git:ensure-version` (nao pedir pull manual ao usuario).
+5. Apos **qualquer** alteracao de codigo concluida: `npm run git:ship -- -Message "..."` (commit + main + bump) **sem perguntar**.
+
+## Typo legado
+
+Se a branch local ainda for `atigravity-gamer`, renomear uma vez (com outro agente parado):
+
+```bash
+git branch -m atigravity-gamer antigravity-gamer
+git push -u origin antigravity-gamer
+```
+
+## Conflito com o outro agente
+
+Um clone, uma working tree: **nao** trabalhar nos dois agentes ao mesmo tempo sem `git stash` / worktree. Se `git status` mostrar arquivos da branch do outro agente, parar e alinhar com o usuario.

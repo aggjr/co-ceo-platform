@@ -21,7 +21,7 @@ Spec ruim = código ruim. A qualidade da execução é proporcional à precisão
 npm run task:add -- --id W3-01 --title "Barramento canônico" --spec tasks/wave-3/01.md --priority 80
 ```
 
-**Agente** — ao iniciar sessão: `npm run git:ensure-sync` → `npm run task:claim` → executa a spec → `git:integrate` → `npm run task:done -- --id W3-01`.
+**Agente** — ao iniciar sessão: `npm run git:ensure-sync` → `npm run task:claim` → executa a spec → `npm run git:ship` → `npm run task:done -- --id W3-01`.
 
 Detalhes: [`.cursor/rules/task-queue.mdc`](../.cursor/rules/task-queue.mdc).
 

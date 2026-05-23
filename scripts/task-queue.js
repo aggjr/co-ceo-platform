@@ -133,7 +133,7 @@ function writeBoard(queue) {
     '1. `npm run git:ensure-sync`',
     '2. `npm run task:claim` — assume a proxima `pending` e publica em `main`',
     '3. Implementar spec, banco/scripts se a task pedir, testes verdes',
-    '4. `npm run git:integrate` apos commit de codigo',
+    '4. `npm run git:ship -- -Message "..."` apos alteracao de codigo',
     '5. `npm run task:done -- --id <ID>`',
     '',
     'Se travar: `npm run task:release -- --id <ID> --reason "..."`',
@@ -188,11 +188,14 @@ function publishQueue(commitMsg) {
   run('git add tasks/queue.json tasks/QUEUE.md');
   const staged = runQuiet('git diff --cached --name-only');
   if (!staged) {
-    console.log('[task-queue] Nada a publicar (fila ja commitada).');
-    return false;
+    const porcelain = runQuiet('git status --porcelain');
+    if (!porcelain) {
+      console.log('[task-queue] Nada a publicar (fila ja commitada).');
+      return false;
+    }
   }
-  run(`git commit -m "${commitMsg.replace(/"/g, '\\"')}"`);
-  run('npm run git:integrate', { silent: false });
+  const msg = commitMsg.replace(/"/g, '\\"');
+  run(`npm run git:ship -- -Message "${msg}"`, { silent: false });
   return true;
 }
 

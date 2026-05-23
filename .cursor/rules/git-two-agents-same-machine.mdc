@@ -1,0 +1,38 @@
+---
+description: Duas sessoes de agente no mesmo clone (antigravity-gamer + antigravity-guto).
+alwaysApply: true
+---
+
+# Dois agentes, mesma estacao
+
+O mesmo diretorio Git pode atender **antigravity-gamer** e **antigravity-guto**. Cada sessao Cursor e um agente distinto; cada um commita **so na sua branch**.
+
+| Sessao | Branch | Perfil |
+|--------|--------|--------|
+| Executor gamer | `antigravity-gamer` | `. .\scripts\set-agent-profile.ps1 antigravity-gamer` |
+| Outro agente (guto) | `antigravity-guto` | `. .\scripts\set-agent-profile.ps1 antigravity-guto` |
+
+## Nao usar `git config coceo.machineBranch` como unica fonte
+
+O config e **por repositorio** — o ultimo agente a rodar `git config` sobrescreve o outro. Preferir por sessao:
+
+- `$env:COCEO_AGENT_PROFILE` + `set-agent-profile.ps1`, ou
+- `$env:COCEO_MACHINE_BRANCH`
+
+Arquivos: `scripts/branch-peer.antigravity-gamer.local.env` e `branch-peer.antigravity-guto.local.env`.
+
+## Versao
+
+No inicio da sessao: `npm run git:ensure-version` se local < `origin/main` (ver `agent-auto-sync-version.mdc`).
+
+## Antes de commitar
+
+1. Confirmar perfil (`echo $env:COCEO_MACHINE_BRANCH`).
+2. `git checkout` na **sua** branch (nome canonico `antigravity-*`, nao `atigravity-*`).
+3. `git-sync-before-commit.ps1` + `check:branch-overlap`.
+4. Commit apenas na sua branch.
+5. `npm run git:integrate` — integra as 4 branches em `main`.
+
+## Uma working tree
+
+Nao editar em paralelo nas duas sessoes. Se houver arquivos modificados da outra branch, parar e alinhar com o usuario.

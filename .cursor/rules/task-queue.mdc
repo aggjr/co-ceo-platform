@@ -30,7 +30,7 @@ npm run task:claim
 
 **Durante:** opcional `npm run task:start -- --id <ID>` ao comecar a editar codigo.
 
-**Ao terminar** (codigo commitado, `npm run git:integrate` feito, banco/scripts da task se houver):
+**Ao terminar** (codigo publicado com `npm run git:ship`, banco/scripts da task se houver):
 
 ```bash
 npm run task:done -- --id <ID>

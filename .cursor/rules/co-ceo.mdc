@@ -64,10 +64,10 @@ Tentativa de inserir lançamentos com **mesma data + mesmo ativo + mesmos valore
 3. Identifique o **critério de aceite** (comando de teste / verificação). Esse é o contrato. Sem ele verde, a task não está pronta.
 4. Faça as alterações estritamente no escopo da task. Resista à tentação de "melhorar enquanto está aqui".
 5. Rode `tsc --noEmit` e o critério de aceite. Conserte tudo até ficar verde.
-6. Commit em português, padrão `tipo(escopo): assunto curto`. Tipos: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`. Corpo do commit explica o **porquê**.
-7. **`npm run git:integrate`** — merge em `main`, branches par, bump de versão e push. **Obrigatório após qualquer alteração de código; não perguntar ao usuário.** Ver `.cursor/rules/git-multi-machine.mdc`.
-8. **`npm run task:done -- --id <ID>`** após integrar (e banco/scripts da task, se houver).
-9. Abra PR referenciando a task spec **somente se** a spec pedir PR explícito; o fluxo padrão é integração direta em `main`.
+6. **`npm run git:ship -- -Message "tipo(escopo): assunto"`** — commit + merge em `main` + bump. **Obrigatório; não perguntar.** Ver `agent-publish-after-change.mdc`.
+7. Banco/scripts da task, se houver.
+8. **`npm run task:done -- --id <ID>`** (libera a fila para outros agentes).
+9. Abra PR **somente se** a spec pedir PR explícito; o fluxo padrão é integração direta em `main`.
 
 ## Quando parar e devolver para o arquiteto
 

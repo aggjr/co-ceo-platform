@@ -74,8 +74,9 @@ if (-not $machine) {
 
 $peerRefs = Resolve-PeerRemoteRefs -MachineBranch $machine
 
-if (git status --porcelain) {
-  Write-Error "Working tree suja. Faca o commit antes de publicar em main."
+$dirtyTracked = @(git status --porcelain | Where-Object { $_ -notmatch '^\?\?' })
+if ($dirtyTracked.Count -gt 0) {
+  Write-Error "Ha alteracoes commitadas pendentes. Faca commit antes de publicar em main."
 }
 
 $current = git branch --show-current
@@ -126,7 +127,8 @@ if ($peerRefs.Count -eq 0) {
   }
 }
 
-Write-Host "=== 6/7 bump versao unificada ===" -ForegroundColor Cyan
+Write-Host "=== 6/7 bump versao unificada (sempre incrementa patch) ===" -ForegroundColor Cyan
+$env:BUMP_VERSION = "1"
 node scripts/bump-version.js --integrate
 if ($LASTEXITCODE -ne 0) {
   Write-Error "Falha ao bump de versao unificada"
@@ -135,15 +137,11 @@ if ($LASTEXITCODE -ne 0) {
 $versionJson = Get-Content -Raw version.json | ConvertFrom-Json
 $appVersion = "V$($versionJson.major).$($versionJson.minor).$($versionJson.patch)"
 git add version.json package.json src/generated/version.ts frontend/src/generated/version.js
-git diff --cached --quiet
+git commit -m "chore(release): $appVersion - integracao main"
 if ($LASTEXITCODE -ne 0) {
-  git commit -m "chore(release): $appVersion - integracao main"
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error "Falha ao commitar bump de versao"
-  }
-} else {
-  Write-Host "Versao ja estava atualizada (sem commit de release)." -ForegroundColor DarkGray
+  Write-Error "Falha ao commitar bump de versao"
 }
+Write-Host "Versao publicada: $appVersion" -ForegroundColor Green
 
 Write-Host "=== 7/7 push $integration e realinhar $machine ===" -ForegroundColor Cyan
 git push origin $integration

@@ -19,105 +19,53 @@ Lista canônica: **`scripts/git-machines.json`**
 | **`antigravity-gamer`** | Agente/processos paralelos (estação gamer) |
 | **`antigravity-guto`** | Agente/processos paralelos (estação guto) |
 
-Regra: **não commitar na branch de outra máquina/agente.** Integrar em `main` via `npm run git:integrate`.
+Regra: **não commitar na branch de outra máquina/agente.**
 
-## Após qualquer alteração de código (sem perguntar ao usuário)
-
-Sempre que o agente **alterar arquivos de código** neste repositório (inclui `src/`, `frontend/`, `scripts/` de produto, testes, regras `.cursor/`, `package.json` de runtime):
-
-1. Commit na **sua** branch (`coceo.machineBranch`).
-2. **`npm run git:integrate` imediatamente** — merge em `main`, merge das branches par, **bump de versão** (`chore(release): Vx.y.z`), push de `main` e realinhamento da branch local.
-
-**Não pedir autorização** para integrar nem para incrementar versão. Isso é pré-requisito para os outros agentes/máquinas rodarem o mesmo código via `git:ensure-sync`.
-
-Tarefa **só está concluída** quando `main` no remoto tem o commit + release com versão nova. Exceção: conflito de merge — resolver e rodar `git:integrate` de novo.
-
-## Versão do sistema — auto-alinhamento (obrigatório para o agente)
-
-A versão canônica esta em **`version.json`** / **`package.json`** / `APP_VERSION` (gerados apos cada integracao em `main`).
-
-**Antes de implementar, auditar ou responder sobre codigo em producao**, o agente executor deve:
-
-1. Ler `version.json` local e comparar mentalmente com o que o usuario ou `/api/version` espera.
-2. Rodar **`npm run git:ensure-sync`** (ou `node scripts/ensure-code-synced.js --check-only` para so verificar).
-3. Se local **<** `origin/main` (ex.: local V0.0.50 e main V0.0.51): **nao continuar na versao velha** — o script faz `git fetch` + merge de `origin/main` na branch da maquina (working tree limpa).
-4. So entao editar codigo, rodar scripts no remoto ou concluir que o deploy esta atualizado.
-
-Se `git:ensure-sync` falhar por working tree suja: commitar ou descartar primeiro, depois rodar de novo.
-
-Config Git local (uma vez por clone/processo):
-
-```bash
-git config coceo.integrationBranch main
-git config coceo.machineBranch <sua-branch>   # uma das quatro acima
-```
-
-Primeira vez em branch nova:
-
-```bash
-git checkout -b antigravity-guto origin/main
-git push -u origin antigravity-guto
-```
-
-## Antes de cada tarefa de codigo (nao so antes do commit)
+## Fila de tarefas (antes de codar)
 
 ```bash
 npm run git:ensure-sync
 npm run task:claim
 ```
 
-Fila: `tasks/queue.json` / `tasks/QUEUE.md` — ver `.cursor/rules/task-queue.mdc`.
+Estado em `tasks/queue.json` / quadro `tasks/QUEUE.md` — ver `.cursor/rules/task-queue.mdc`.
+
+## Após qualquer alteração de código (sem perguntar)
+
+1. Commit na **sua** branch (`coceo.machineBranch`).
+2. **`npm run git:ship -- -Message "tipo(escopo): assunto"`** — merge em `main`, branches par, **bump obrigatório**, push.
+
+**Não pedir autorização** para integrar nem incrementar versão. Tarefa **só concluída** quando `main` no remoto tem release nova e `npm run task:done` foi executado. Exceção: conflito de merge.
+
+Ver `agent-publish-after-change.mdc`.
+
+## Versão — auto-alinhamento (obrigatório)
+
+Antes de implementar ou editar código:
+
+```bash
+npm run git:ensure-sync
+```
+
+(Equivalente: `npm run git:ensure-version`.) Se local < `origin/main`, o script faz fetch + merge na branch da máquina. Ver `agent-auto-sync-version.mdc`.
+
+Config Git local (uma vez por clone/processo):
+
+```bash
+git config coceo.integrationBranch main
+git config coceo.machineBranch <sua-branch>
+```
+
+Mesma estação, dois agentes: `. .\scripts\set-agent-profile.ps1 antigravity-gamer` — ver `git-two-agents-same-machine.mdc`.
 
 ## Antes de cada commit
 
 ```bash
 npm run git:ensure-sync
-git fetch origin
 .\scripts\git-sync-before-commit.ps1
 npm run check:branch-overlap
-```
-
-`check:branch-overlap` compara com **todas** as outras branches de `git-machines.json` que existirem no remoto.
-
-## Ritmo obrigatório (cada máquina/agente, cada commit)
-
-**Antes do commit**
-
-1. `git fetch origin`
-2. `.\scripts\git-sync-before-commit.ps1`
-3. `npm run check:branch-overlap`
-4. `git commit` na **sua** branch
-
-**Imediatamente após o commit**
-
-5. `npm run git:integrate` — merge sua branch → `main`, depois **cada branch par** → `main`, bump unificado (`version.json` + `package.json` + `APP_VERSION`), commit `chore(release): Vx.y.z`, push `main`, realinha sua branch
-6. Se **CONFLITO**: parar, resolver, rodar de novo
-7. Ao terminar: sua branch e `main` no mesmo código e **mesma versão** (`/api/version`)
-
-O agente executor **sempre** segue os passos 5–7 após cada commit nesta máquina — **sem perguntar** se deve integrar ou subir versão.
-
-## Atualizar a branch da máquina a partir de main (sempre)
-
-```bash
-git fetch origin
-git checkout note-gamer   # ou note-guto / antigravity-*
-git rebase origin/main
-git push --force-with-lease origin note-gamer   # só na branch própria
-```
-
-## Integração manual em main
-
-```bash
-git checkout main
-git pull origin main
-git merge origin/note-gamer -m "merge(note-gamer): ..."
-git merge origin/note-guto -m "merge(note-guto): ..."
-git merge origin/antigravity-gamer -m "merge(antigravity-gamer): ..."
-git merge origin/antigravity-guto -m "merge(antigravity-guto): ..."
-node scripts/bump-version.js --integrate
-git add version.json package.json src/generated/version.ts frontend/src/generated/version.js
-git commit -m "chore(release): V... - integracao main"
-git push origin main
+git commit -m "..."
+npm run git:ship -- -Message "..."
 ```
 
 ## Proibido
@@ -125,3 +73,5 @@ git push origin main
 - `--force` em `main`
 - Commit na branch de outra máquina/agente
 - Ignorar sobreposição reportada por `check:branch-overlap`
+- Perguntar se deve integrar ou subir versão
+- Trabalhar em task sem `task:claim` publicado em `main`

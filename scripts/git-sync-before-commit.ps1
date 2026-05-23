@@ -1,23 +1,36 @@
-# Sincroniza a branch da maquina com a branch de integracao ANTES de commitar.
-# Uso (na raiz do repo):
+# Sincroniza a branch do agente com a integracao ANTES de commitar.
+# Inclui deteccao de versao atrasada (version.json vs origin/main).
+#
+# Uso:
 #   .\scripts\git-sync-before-commit.ps1
 #
-# Configuracao local (uma vez por maquina):
-#   git config coceo.integrationBranch main
-#   git config coceo.machineBranch note-guto
-#   # note-gamer: coceo.machineBranch note-gamer
+# Mesma estacao, dois agentes:
+#   . .\scripts\set-agent-profile.ps1 antigravity-gamer
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
-$integration = git config --get coceo.integrationBranch
-$machine = git config --get coceo.machineBranch
-
-if (-not $integration) {
-  Write-Error "Defina: git config coceo.integrationBranch <branch-integracao>"
+$profileScript = Join-Path $PSScriptRoot "coceo-git-profile.ps1"
+if (Test-Path $profileScript) {
+  . $profileScript
+  $integration = Get-CoCeoIntegrationBranch
+  $machine = Assert-CoCeoMachineBranch
+} else {
+  $integration = git config --get coceo.integrationBranch
+  if (-not $integration) { $integration = "main" }
+  $machine = git config --get coceo.machineBranch
+  if (-not $machine) {
+    Write-Error "Defina: git config coceo.machineBranch antigravity-gamer (ou outra branch de trabalho)"
+  }
 }
-if (-not $machine) {
-  Write-Error "Defina: git config coceo.machineBranch note-gamer | note-guto | antigravity-gamer | antigravity-guto"
+
+Write-Host "Agente: $machine | Integracao: $integration" -ForegroundColor DarkGray
+
+Write-Host "=== Verificar versao (origin/$integration) ===" -ForegroundColor Cyan
+node (Join-Path $PSScriptRoot "ensure-code-version.js")
+if ($LASTEXITCODE -ne 0) {
+  if ($LASTEXITCODE -eq 3) { exit 3 }
+  exit $LASTEXITCODE
 }
 
 $current = git branch --show-current
@@ -26,19 +39,4 @@ if ($current -ne $machine) {
   git checkout $machine
 }
 
-Write-Host "Fetch origin..."
-git fetch origin
-
-Write-Host "Merge origin/$integration -> $machine (resolva conflitos agora se houver)..."
-git merge "origin/$integration" -m "merge($machine): integrar $integration antes do commit"
-
-if ($LASTEXITCODE -ne 0) {
-  Write-Host ""
-  Write-Host "CONFLITO: resolva os arquivos, depois:" -ForegroundColor Yellow
-  Write-Host "  git add <arquivos>"
-  Write-Host "  git commit   # conclui o merge"
-  Write-Host "  git commit -m 'sua mensagem'   # seus commits em seguida"
-  exit 1
-}
-
-Write-Host "OK. Maquina alinhada com $integration. Pode commitar." -ForegroundColor Green
+Write-Host "OK. Branch alinhada com $integration. Pode commitar." -ForegroundColor Green
