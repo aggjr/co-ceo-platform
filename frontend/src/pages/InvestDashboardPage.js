@@ -3,6 +3,7 @@ import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
+import { getPageTexts } from '../navigation/pageTexts.js';
 import {
   mountHoldingPatrimonyChart,
   renderHoldingPatrimonySummary,
@@ -106,9 +107,15 @@ export async function InvestDashboardPage(container) {
     return;
   }
 
+  const t = await getPageTexts(
+    ['screen.invest.dashboard.title'],
+    { 'screen.invest.dashboard.title': 'Resultado Histórico' }
+  );
+  const screenTitle = t['screen.invest.dashboard.title'];
+
   if (isGlobalSession()) {
     await renderShell(container, {
-      title: 'INVEST — Resultado Histórico',
+      title: `INVEST — ${screenTitle}`,
       contentHtml: `<${D} class="card"><h2 style="font-size:16px">INVEST</h2><p class="muted">Personifique o titular da holding para ver o gráfico patrimonial.</p></${D}>`,
     });
     return;
@@ -118,7 +125,7 @@ export async function InvestDashboardPage(container) {
     <${D} class="card invest-patrimony-card">
       <${D} class="patrimony-toolbar">
         <${D}>
-          <h2 style="font-size:18px;margin:0">Resultado histórico da holding</h2>
+          <h2 style="font-size:18px;margin:0">${screenTitle}</h2>
           <p class="muted" style="margin:4px 0 0;font-size:13px">
             Curva diária (livro-razão + âncoras BTG).
           </p>
@@ -140,7 +147,7 @@ export async function InvestDashboardPage(container) {
   </${D}>`;
 
   await renderShell(container, {
-    title: 'INVEST — Patrimônio',
+    title: `INVEST — ${screenTitle}`,
     contentHtml,
   });
   bindPatrimonyChart(container);

@@ -4,6 +4,7 @@ import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
+import { getPageTexts } from '../navigation/pageTexts.js';
 import {
   clearExcelTableRegistry,
   mountExcelTables,
@@ -154,12 +155,18 @@ export async function InvestStockGainPivotPage(container) {
     return;
   }
 
+  const t = await getPageTexts(
+    ['screen.invest.stock_gain.title'],
+    { 'screen.invest.stock_gain.title': 'Resultados por ação' }
+  );
+  const screenTitle = t['screen.invest.stock_gain.title'];
+
   if (isGlobalSession()) {
     await renderShell(container, {
-      title: 'INVEST — Resultados por ação',
+      title: `INVEST — ${screenTitle}`,
       contentHtml: `
         <div class="card">
-          <h2 style="font-size:16px">Pivot por ação</h2>
+          <h2 style="font-size:16px">${screenTitle}</h2>
           <p class="muted">Personifique o titular da holding para ver o pivot de ganhos.</p>
         </div>
       `,
@@ -171,7 +178,7 @@ export async function InvestStockGainPivotPage(container) {
     <div class="card sgp-page">
       <div class="sgp-toolbar">
         <div>
-          <h2 style="font-size:16px;margin:0">Resultados por ação</h2>
+          <h2 style="font-size:16px;margin:0">${screenTitle}</h2>
           <p class="muted" style="margin:4px 0 0">Preço estrito (PM), opções, proventos, trade, day trade, taxas e ganho aproximado por papel.</p>
         </div>
         <label>De <input type="date" id="sgp-from" value="${defaultFrom()}" /></label>
@@ -184,7 +191,7 @@ export async function InvestStockGainPivotPage(container) {
   `;
 
   await renderShell(container, {
-    title: 'INVEST — Resultados por ação',
+    title: `INVEST — ${screenTitle}`,
     contentHtml: content,
   });
   bindPage(container);

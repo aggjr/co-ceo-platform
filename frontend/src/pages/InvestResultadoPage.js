@@ -4,6 +4,7 @@ import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
+import { getPageTexts } from '../navigation/pageTexts.js';
 import { mountPivotExcelTable, renderPivotTable } from '../lib/pivotDisplay.js';
 import { formatBrl } from '../lib/portfolioDisplay.js';
 
@@ -95,14 +96,20 @@ export async function InvestResultadoPage(container) {
     return;
   }
 
+  const t = await getPageTexts(
+    ['screen.invest.resultado.title'],
+    { 'screen.invest.resultado.title': 'Resultado (pivot)' }
+  );
+  const screenTitle = t['screen.invest.resultado.title'];
+
   if (isGlobalSession()) {
     const body = `
       <div class="card">
-        <h2 style="font-size:16px">Resultado (pivot)</h2>
+        <h2 style="font-size:16px">${screenTitle}</h2>
         <p class="muted">Personifique o titular da holding para importar notas e ver o pivot de lucros.</p>
       </div>
     `;
-    await renderShell(container, { title: 'INVEST — Resultado', contentHtml: body });
+    await renderShell(container, { title: `INVEST — ${screenTitle}`, contentHtml: body });
     return;
   }
 
@@ -133,7 +140,7 @@ export async function InvestResultadoPage(container) {
     </div>
   `;
 
-  await renderShell(container, { title: 'INVEST — Resultado', contentHtml: content });
+  await renderShell(container, { title: `INVEST — ${screenTitle}`, contentHtml: content });
   bindImportPanel(container);
   bindPivotPage(container);
 }

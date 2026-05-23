@@ -10,6 +10,7 @@ import {
   registerExcelTable,
   mountExcelTables,
 } from '../lib/excelTable.js';
+import { getPageTexts } from '../navigation/pageTexts.js';
 
 function makeCostRender(key) {
   return (row) => {
@@ -26,64 +27,68 @@ function makeCostRender(key) {
   };
 }
 
-const COLUMNS = [
-  { key: 'pregaoDateBr', label: 'Data', type: 'text' },
-  { key: 'ticker', label: 'Ticker', type: 'text' },
-  {
-    key: 'tradeType',
-    label: 'TIPO',
-    type: 'text',
-    render: (row) => {
-      const t = String(row.tradeType || '—');
-      const span = document.createElement('span');
-      span.textContent = t;
-      if (t === 'CALL') span.className = 'notes-type--call';
-      else if (t === 'PUT') span.className = 'notes-type--put';
-      else if (t === 'EXEC') span.className = 'notes-type--exec';
-      else if (t === 'BTC') span.className = 'notes-type--btc';
-      return span;
+function buildColumns(t) {
+  return [
+    { key: 'pregaoDateBr', label: t['column.invest.historico_operacoes.date'] || 'Data', type: 'text' },
+    { key: 'ticker', label: t['column.invest.historico_operacoes.ticker'] || 'Ticker', type: 'text' },
+    {
+      key: 'tradeType',
+      label: t['column.invest.historico_operacoes.type'] || 'TIPO',
+      type: 'text',
+      render: (row) => {
+        const tv = String(row.tradeType || '—');
+        const span = document.createElement('span');
+        span.textContent = tv;
+        if (tv === 'CALL') span.className = 'notes-type--call';
+        else if (tv === 'PUT') span.className = 'notes-type--put';
+        else if (tv === 'EXEC') span.className = 'notes-type--exec';
+        else if (tv === 'BTC') span.className = 'notes-type--btc';
+        else if (tv === 'LFT' || tv === 'LTN' || tv === 'CDB') span.className = 'notes-type--rf';
+        else if (tv === 'AÇÃO') span.className = 'notes-type--stock';
+        return span;
+      },
     },
-  },
-  { key: 'underlyingStock', label: 'Ação ref.', type: 'text' },
-  {
-    key: 'side',
-    label: 'C/V',
-    type: 'text',
-    render: (row) => {
-      const span = document.createElement('span');
-      span.textContent = row.side || '—';
-      if (row.side === 'C') span.className = 'notes-cv--buy';
-      else if (row.side === 'V') span.className = 'notes-cv--sell';
-      return span;
+    { key: 'underlyingStock', label: t['column.invest.historico_operacoes.underlying'] || 'Ação ref.', type: 'text' },
+    {
+      key: 'side',
+      label: t['column.invest.historico_operacoes.side'] || 'C/V',
+      type: 'text',
+      render: (row) => {
+        const span = document.createElement('span');
+        span.textContent = row.side || '—';
+        if (row.side === 'C') span.className = 'notes-cv--buy';
+        else if (row.side === 'V') span.className = 'notes-cv--sell';
+        return span;
+      },
     },
-  },
-  { key: 'unitPrice', label: 'Prêmio', type: 'currency' },
-  { key: 'settlementTax', label: 'Taxa liq./CCP', type: 'currency', render: makeCostRender('settlementTax') },
-  { key: 'registrationTax', label: 'Taxa registro', type: 'currency', render: makeCostRender('registrationTax') },
-  { key: 'emoluments', label: 'Emolumentos', type: 'currency', render: makeCostRender('emoluments') },
-  { key: 'cblcTotal', label: 'Total CBLC', type: 'currency', render: makeCostRender('cblcTotal') },
-  { key: 'bovespaTotal', label: 'Total Bovespa', type: 'currency', render: makeCostRender('bovespaTotal') },
-  { key: 'irrf', label: 'IRRF', type: 'currency', render: makeCostRender('irrf') },
-  {
-    key: 'grossValue',
-    label: 'Valor contrato',
-    type: 'currency',
-    cellClass: () => 'notes-contract-value',
-  },
-  { key: 'quantity', label: 'Qtd', type: 'number' },
-  { key: 'maturity', label: 'Data Strike', type: 'text' },
-  { key: 'noteNumber', label: 'Nr. nota', type: 'text' },
-  { key: 'category', label: 'Mercado', type: 'text' },
-  { key: 'lineNo', label: 'Linha', type: 'number' },
-  {
-    key: 'netOperations',
-    label: 'Líq. nota (caixa)',
-    type: 'currency',
-    cellClass: () => 'notes-note-net',
-  },
-  { key: 'dc', label: 'D/C', type: 'text' },
-  { key: 'sourceFile', label: 'Arquivo', type: 'text' },
-];
+    { key: 'unitPrice', label: t['column.invest.historico_operacoes.unit_price'] || 'Valor/Prêmio', type: 'currency' },
+    { key: 'settlementTax', label: t['column.invest.historico_operacoes.settlement_tax'] || 'Taxa liq./CCP', type: 'currency', render: makeCostRender('settlementTax') },
+    { key: 'registrationTax', label: t['column.invest.historico_operacoes.registration_tax'] || 'Taxa registro', type: 'currency', render: makeCostRender('registrationTax') },
+    { key: 'emoluments', label: t['column.invest.historico_operacoes.emoluments'] || 'Emolumentos', type: 'currency', render: makeCostRender('emoluments') },
+    { key: 'cblcTotal', label: t['column.invest.historico_operacoes.cblc_total'] || 'Total CBLC', type: 'currency', render: makeCostRender('cblcTotal') },
+    { key: 'bovespaTotal', label: t['column.invest.historico_operacoes.bovespa_total'] || 'Total Bovespa', type: 'currency', render: makeCostRender('bovespaTotal') },
+    { key: 'irrf', label: t['column.invest.historico_operacoes.irrf'] || 'IRRF', type: 'currency', render: makeCostRender('irrf') },
+    {
+      key: 'grossValue',
+      label: t['column.invest.historico_operacoes.gross_value'] || 'Valor contrato',
+      type: 'currency',
+      cellClass: () => 'notes-contract-value',
+    },
+    { key: 'quantity', label: t['column.invest.historico_operacoes.quantity'] || 'Qtd', type: 'number' },
+    { key: 'maturity', label: t['column.invest.historico_operacoes.maturity'] || 'Data Strike', type: 'text' },
+    { key: 'noteNumber', label: t['column.invest.historico_operacoes.note_number'] || 'Nr. nota', type: 'text' },
+    { key: 'category', label: t['column.invest.historico_operacoes.category'] || 'Mercado', type: 'text' },
+    { key: 'lineNo', label: 'Linha', type: 'number' },
+    {
+      key: 'netOperations',
+      label: 'Líq. nota (caixa)',
+      type: 'currency',
+      cellClass: () => 'notes-note-net',
+    },
+    { key: 'dc', label: 'D/C', type: 'text' },
+    { key: 'sourceFile', label: 'Arquivo', type: 'text' },
+  ];
+}
 
 function resolveTradeType(r) {
   if (r.isExercise) return 'EXEC';
@@ -187,9 +192,33 @@ export async function InvestHistoricoOperacoesPage(container) {
     return;
   }
 
+  const colKeys = [
+    'column.invest.historico_operacoes.date',
+    'column.invest.historico_operacoes.ticker',
+    'column.invest.historico_operacoes.type',
+    'column.invest.historico_operacoes.underlying',
+    'column.invest.historico_operacoes.side',
+    'column.invest.historico_operacoes.unit_price',
+    'column.invest.historico_operacoes.settlement_tax',
+    'column.invest.historico_operacoes.registration_tax',
+    'column.invest.historico_operacoes.emoluments',
+    'column.invest.historico_operacoes.cblc_total',
+    'column.invest.historico_operacoes.bovespa_total',
+    'column.invest.historico_operacoes.irrf',
+    'column.invest.historico_operacoes.gross_value',
+    'column.invest.historico_operacoes.quantity',
+    'column.invest.historico_operacoes.maturity',
+    'column.invest.historico_operacoes.note_number',
+    'column.invest.historico_operacoes.category',
+    'screen.invest.historico_operacoes.title',
+  ];
+  const t = await getPageTexts(colKeys);
+  const COLUMNS = buildColumns(t);
+  const screenTitle = t['screen.invest.historico_operacoes.title'] || 'Histórico de operações';
+
   if (isGlobalSession()) {
     await renderShell(container, {
-      title: 'INVEST — Histórico operações',
+      title: `INVEST — ${screenTitle}`,
       contentHtml:
         '<div class="card"><p class="muted">Personifique o titular da holding para conferir as notas.</p></div>',
     });
@@ -203,6 +232,8 @@ export async function InvestHistoricoOperacoesPage(container) {
     const data = await apiRequest('/api/invest/brokerage-notes/review');
     const stats = data.stats || {};
     const dup = data.duplicatesSkipped || [];
+    const noFees = stats.linesWithoutFees ?? 0;
+    const withFees = stats.linesWithFees ?? 0;
     allRows = (data.rows || []).map(formatRow).filter(isDisplayableRow);
     const lineCount = allRows.length;
 
@@ -224,14 +255,24 @@ export async function InvestHistoricoOperacoesPage(container) {
         <div id="brokerage-notes-grid-host"></div>
       </div>
       <div class="card notes-meta" style="margin-bottom:16px">
-        <h2 style="font-size:16px;margin:0 0 8px">Histórico de operações registradas</h2>
+        <h2 style="font-size:16px;margin:0 0 8px">${screenTitle}</h2>
         <p class="muted" style="margin:0 0 12px">
           Operações de compra, venda, aluguel e exercícios registradas na base de dados (livro razão).
         </p>
         <p class="muted notes-legend" style="margin:0 0 12px">
-          <strong class="notes-contract-value">Valor contrato</strong> — líquido de cada negócio/contrato.
-          <strong class="notes-note-net">Líq. nota (caixa)</strong> — total líquido da nota/operação.
+          <strong class="notes-contract-value">Valor contrato</strong> — quantidade × preço (nominal, sem taxas).
+          Taxas/emolumentos vêm da perna de caixa da mesma nota; se vazias, reimporte notas BTG completas.
+          <strong class="notes-note-net">Líq. nota (caixa)</strong> — soma líquida da nota no livro.
         </p>
+        ${
+          noFees > 0
+            ? `<p class="muted" style="margin:0 0 12px;color:#f59e0b">
+          <strong>${noFees}</strong> linha(s) sem taxas identificadas
+          (${withFees} com taxas). Compare valor contrato × líquido ou rode o script
+          <code>audit-brokerage-note-fees.ts</code> nos PDFs/txt.
+        </p>`
+            : ''
+        }
         <p class="muted" style="margin:0">
           Notas/Operações: <strong>${stats.notesKept ?? 0}</strong> · Transações: <strong>${lineCount}</strong>
           · Atualizado em: ${formatDateTimeBr(data.generatedAt)}
@@ -254,7 +295,7 @@ export async function InvestHistoricoOperacoesPage(container) {
   }
 
   await renderShell(container, {
-    title: 'INVEST — Histórico operações (conferência)',
+    title: `INVEST — ${screenTitle}`,
     contentHtml: body,
   });
 

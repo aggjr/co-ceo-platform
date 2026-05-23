@@ -2,6 +2,7 @@ import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
+import { getPageTexts } from '../navigation/pageTexts.js';
 import {
   renderExcelTableShell,
   registerExcelTable,
@@ -27,9 +28,15 @@ export async function InvestExtratosPage(container) {
     return;
   }
 
+  const t = await getPageTexts(
+    ['screen.invest.extratos.title'],
+    { 'screen.invest.extratos.title': 'Extratos de conta' }
+  );
+  const screenTitle = t['screen.invest.extratos.title'];
+
   if (isGlobalSession()) {
     await renderShell(container, {
-      title: 'INVEST — Extratos de conta',
+      title: `INVEST — ${screenTitle}`,
       contentHtml: '<div class="card"><p class="muted">Personifique o titular da holding para conferir extratos.</p></div>',
     });
     return;
@@ -44,7 +51,7 @@ export async function InvestExtratosPage(container) {
     
     body = `
       <div class="card notes-meta" style="margin-bottom:16px">
-        <h2 style="font-size:16px;margin:0 0 8px">Evolução do Caixa e Batimento</h2>
+        <h2 style="font-size:16px;margin:0 0 8px">${screenTitle}</h2>
         <p class="muted" style="margin:0 0 12px">
           Verificação da liquidação de notas de corretagem (D+1, D+2) e saldo financeiro.
         </p>
@@ -58,7 +65,7 @@ export async function InvestExtratosPage(container) {
   }
 
   await renderShell(container, {
-    title: 'INVEST — Extratos de conta',
+    title: `INVEST — ${screenTitle}`,
     contentHtml: body,
   });
 

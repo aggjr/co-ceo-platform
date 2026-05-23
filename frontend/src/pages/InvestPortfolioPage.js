@@ -4,6 +4,7 @@ import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
+import { getPageTexts } from '../navigation/pageTexts.js';
 import {
   getUnderlyingFilter,
   mountPortfolioExcelTables,
@@ -51,14 +52,27 @@ export async function InvestPortfolioPage(container) {
   else if (path.includes('/invest/titulos')) pageType = 'titulos';
 
   const underlyingFilter = getUnderlyingFilter();
-  
-  let pageTitle = 'AÇÕES/FIIs';
+
+  const t = await getPageTexts(
+    [
+      'screen.invest.portfolio.title',
+      'screen.invest.options.title',
+      'screen.invest.fixed_income.title',
+    ],
+    {
+      'screen.invest.portfolio.title': 'AÇÕES/FIIs',
+      'screen.invest.options.title': 'Opções',
+      'screen.invest.fixed_income.title': 'Títulos, RF e CDB',
+    }
+  );
+
+  let pageTitle = t['screen.invest.portfolio.title'];
   let pageSubtitle = 'Ações e FIIs em custódia aberta.';
   if (pageType === 'options') {
-    pageTitle = 'Opções';
+    pageTitle = t['screen.invest.options.title'];
     pageSubtitle = 'Opções vigentes com vencimento futuro.';
   } else if (pageType === 'titulos') {
-    pageTitle = 'Títulos, RF e CDB';
+    pageTitle = t['screen.invest.fixed_income.title'];
     pageSubtitle = 'Conta corrente, ativos de baixo risco e trânsito.';
   }
 

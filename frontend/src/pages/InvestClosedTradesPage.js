@@ -4,6 +4,7 @@ import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
+import { getPageTexts } from '../navigation/pageTexts.js';
 import { mountPortfolioExcelTables, renderClosedOptionsTable } from '../lib/portfolioDisplay.js';
 
 export async function InvestClosedTradesPage(container) {
@@ -12,9 +13,15 @@ export async function InvestClosedTradesPage(container) {
     return;
   }
 
+  const t = await getPageTexts(
+    ['screen.invest.closed_trades.title'],
+    { 'screen.invest.closed_trades.title': 'Opções finalizadas' }
+  );
+  const screenTitle = t['screen.invest.closed_trades.title'];
+
   if (isGlobalSession()) {
     await renderShell(container, {
-      title: 'INVEST — Transações finalizadas',
+      title: `INVEST — ${screenTitle}`,
       contentHtml:
         '<div class="card"><p class="muted">Personifique o titular da holding para ver opções encerradas.</p></div>',
     });
@@ -27,7 +34,7 @@ export async function InvestClosedTradesPage(container) {
     const closed = data.closedOptions || [];
     body = `
       <div class="card">
-        <h2 style="font-size:16px;margin:0 0 8px">Opções finalizadas</h2>
+        <h2 style="font-size:16px;margin:0 0 8px">${screenTitle}</h2>
         <p class="muted" style="margin:0 0 16px">
           Posições com quantidade zerada (exercício, vencimento ou encerramento).
           Não aparecem em <a href="/invest/portfolio" data-link>Portfólio</a>.
@@ -41,7 +48,7 @@ export async function InvestClosedTradesPage(container) {
   }
 
   await renderShell(container, {
-    title: 'INVEST — Transações finalizadas',
+    title: `INVEST — ${screenTitle}`,
     contentHtml: body,
   });
   const host = container.querySelector('#closed-options-table-host');
