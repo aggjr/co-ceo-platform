@@ -736,33 +736,7 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
             render: (row) =>
               renderPriceCell(row.prices?.managerial ?? row.avgPrice),
           },
-          {
-            key: 'threePricesObservation',
-            label: 'Obs. 3 preços',
-            type: 'text',
-            width: '160px',
-            render: (row) => {
-              const v = row.threePricesValidation;
-              const span = document.createElement('span');
-              if (!v || v.status === 'ok' || !v.observation) {
-                span.className = 'muted';
-                span.textContent = '—';
-                return span;
-              }
-              span.textContent = v.observation;
-              span.style.fontSize = '11px';
-              span.style.lineHeight = '1.3';
-              span.style.display = 'block';
-              span.style.maxWidth = '200px';
-              span.style.overflow = 'hidden';
-              span.style.textOverflow = 'ellipsis';
-              span.style.whiteSpace = 'nowrap';
-              span.className =
-                v.status === 'error' ? 'portfolio-3p-obs--error' : 'portfolio-3p-obs--warn';
-              span.title = v.messages?.join('\n') || v.observation;
-              return span;
-            },
-          },
+
         ]
       : [
           {
