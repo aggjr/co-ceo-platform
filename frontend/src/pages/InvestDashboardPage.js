@@ -88,6 +88,26 @@ function renderDataStatus(data) {
       `<span class="patrimony-status-chip is-ok">Fechamentos gravados: ${rec.storedDaysInRange} dia(s)</span>`
     );
   }
+  if (data?.cdiBenchmark?.available) {
+    lines.push(
+      `<span class="patrimony-status-chip is-ok">CDI: ${data.cdiBenchmark.observationDays} dia(s)</span>`
+    );
+  } else {
+    lines.push(
+      '<span class="patrimony-status-chip is-warn">CDI ausente — npm run seed:market:benchmarks</span>'
+    );
+  }
+  const stk = data?.stockBenchmark;
+  if (stk?.available) {
+    lines.push(
+      `<span class="patrimony-status-chip is-ok">${stk.ticker}: ${stk.observationDays} fechamento(s)</span>`
+    );
+  } else {
+    const t = data?.chartBenchmarkTicker || 'PRIO3';
+    lines.push(
+      `<span class="patrimony-status-chip is-warn">${t} sem histórico — npm run seed:market:benchmarks</span>`
+    );
+  }
   if (data?.extractReconciliation) {
     const ext = data.extractReconciliation;
     lines.push(
@@ -140,7 +160,9 @@ function bindPatrimonyChart(container) {
           series,
           data.performance,
           data.btgReference,
-          data.cashInTransit
+          data.cashInTransit,
+          data.cdiComparison,
+          data.stockBenchmark
         );
       }
 
@@ -148,6 +170,8 @@ function bindPatrimonyChart(container) {
       if (canvas) {
         const result = mountHoldingPatrimonyChart(canvas, series, {
           datasetLabel: chartLegendLabel(data),
+          cdiBenchmark: data.cdiBenchmark,
+          stockBenchmark: data.stockBenchmark,
         });
         if (result.empty) {
           chartHost.innerHTML = `<p class="muted">Sem dados entre ${formatDateBr(from)} e ${formatDateBr(to)}. Importe abertura 01/01/2026, extrato e notas no livro-razão; depois sincronize cotações de mercado.</p>`;
@@ -223,8 +247,8 @@ export async function InvestDashboardPage(container) {
         <${D}>
           <h2 style="font-size:18px;margin:0">${screenTitle}</h2>
           <p class="muted" style="margin:4px 0 0;font-size:13px">
-            Gráfico diário do patrimônio (livro-razão + cotações em <code>market_quotes_daily</code>).
-            Padrão: 01/01/2026 até o último dia fechado.
+            Patrimônio em R$ (esquerda). CDI (branco tracejado) e PRIO3 buy-and-hold (laranja) em índice 100 (direita).
+            Clique na legenda para ocultar qualquer linha. Padrão: 01/01/2026 até ontem.
           </p>
         </${D}>
         <label>De <input type="date" id="patrimony-from" value="${defaultFrom()}" min="${PERIOD_START}" /></label>

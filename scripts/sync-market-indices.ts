@@ -49,7 +49,7 @@ function indexFactors(pct: number, rateKind: IndexRateKind): { dailyFactor: numb
 }
 
 function defaultFrom(): string {
-  return '2024-01-01';
+  return process.env.MARKET_INDEX_SYNC_FROM || '1990-01-01';
 }
 
 function todayIso(): string {
@@ -104,7 +104,7 @@ async function main() {
     host: process.env.DB_HOST || '127.0.0.1',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'co_ceo_platform',
+    database: process.env.DB_NAME || 'co_ceo_db',
   });
 
   const gateway = new CoCeoDataGateway(pool);
