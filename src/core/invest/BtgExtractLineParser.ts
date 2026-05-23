@@ -274,9 +274,24 @@ const IS_GENERIC_CUSTODY_RE = /(?:^|\s)(TAXA\s+DE\s+CUST|CUST[ÓO]DIA|REEMBOLSO\
 const BTC_PRIO3_DESC_RE = /BTC\s*PRIO3|CORRETAGEM\s*BTC|IR\s*-\s*BTC|TAXA.+BTC\s*PRIO3|REMUNERA[ÇC][ÃA]O.+BTC\s*PRIO3/i;
 const NEG_PENALTY_RE = /JUROS\s+SOBRE\s+SALDO\s+NEGATIVO|IOF\s+SOBRE\s+SALDO\s+NEGATIVO/i;
 
+export interface BtgExtractResolvers {
+  /**
+   * Retorna o ticker da opcao vendida (ou ativo principal) no dia util anterior, 
+   * para alocar o IRRF Lei 11.033 como cost_adjustment.
+   */
+  resolveIrrfOpcaoTicker?: (extractDate: string) => { ticker: string; asset_type?: string } | undefined;
+  
+  /**
+   * Retorna lista de ativos comprados no dia util anterior e seus pesos (soma=1.0),
+   * para distribuir a multa/juros de saldo negativo como cost_adjustment.
+   */
+  resolveNegativeBalanceAllocation?: (extractDate: string) => Array<{ ticker: string; weight: number; asset_type?: string; underlying_ticker?: string }> | undefined;
+}
+
 export function btgLinesToImportEntries(
   lines: string[],
-  openingBalance?: number
+  openingBalance?: number,
+  resolvers?: BtgExtractResolvers
 ): BtgExtractEntry[] {
   const out: BtgExtractEntry[] = [];
   let prev = openingBalance ?? null;
@@ -377,11 +392,27 @@ export function btgLinesToImportEntries(
       continue;
     }
 
-    // Caso 1E — IRRF Lei 11.033/04 sobre OPCAO: agregado em header mensal.
-    // TODO: matching com nota BTG do dia anterior pra atribuir ao ticker exato
-    // da opcao vendida que gerou a retencao. Por enquanto, agrupa por mes em
-    // BTG-IRRF-OPCAO-MENSAL:{ym} como header de cash_movement em CAIXA.
+    // Caso 1E — IRRF Lei 11.033/04 sobre OPCAO: agregado em header mensal (ou alocado via resolver).
     if (IRRF_OPCAO_DESC_RE.test(upperDesc)) {
+      const resolved = resolvers?.resolveIrrfOpcaoTicker?.(parsed.date);
+      if (resolved) {
+        out.push({
+          date: parsed.date,
+          ticker: resolved.ticker,
+          operation: 'cost_adjustment',
+          quantity: 0,
+          unit_price: Math.abs(parsed.movementAmount),
+          total_net_value: Math.abs(parsed.movementAmount),
+          asset_type: resolved.asset_type ?? 'option',
+          notes: parsed.description,
+          event_source_ref: eventSourceRefForIrrfOpcaoMensal(ym),
+          extract_category: 1,
+          applies_to_b3: false,
+        });
+        continue;
+      }
+
+      // Fallback: agrupa por mes em BTG-IRRF-OPCAO-MENSAL:{ym} como header de cash_movement em CAIXA.
       out.push({
         date: parsed.date,
         ticker: map.ticker, // CAIXA-BTG
@@ -460,10 +491,31 @@ export function btgLinesToImportEntries(
       continue;
     }
 
-    // Caso 3 — multa/juros saldo negativo: header avulso por agora. TODO:
-    // matchar com nota de corretagem do dia anterior pra ratear nos ativos
-    // comprados (regra "multa entra no estrito e gerencial").
+    // Caso 3 — multa/juros saldo negativo: header avulso por padrao, ou rateado via resolver.
     if (NEG_PENALTY_RE.test(upperDesc)) {
+      const allocation = resolvers?.resolveNegativeBalanceAllocation?.(parsed.date);
+      if (allocation && allocation.length > 0) {
+        const totalAmount = Math.abs(parsed.movementAmount);
+        for (const alloc of allocation) {
+          const allocAmount = Math.round(totalAmount * alloc.weight * 100) / 100;
+          out.push({
+            date: parsed.date,
+            ticker: alloc.ticker,
+            operation: 'cost_adjustment',
+            quantity: 0,
+            unit_price: allocAmount,
+            total_net_value: allocAmount,
+            asset_type: alloc.asset_type || 'stock',
+            underlying_ticker: alloc.underlying_ticker,
+            notes: `Rateio juros/multa: ${parsed.description}`,
+            extract_category: 1,
+            applies_to_b3: false,
+          });
+        }
+        continue;
+      }
+
+      // Fallback
       out.push({
         date: parsed.date,
         ticker: map.ticker,
