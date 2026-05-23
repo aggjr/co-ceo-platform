@@ -10,6 +10,19 @@ import {
   extractMovementBlock,
   loadBtgExtractCashDailySeries,
 } from '../src/core/invest/btgExtractCashSeries';
+import { normalizeLftExtractEntry } from '../src/core/invest/lftVnaEstimator';
+
+/**
+ * Referencia LFT para estimativa de VNA via Selic.
+ * Fonte: opening balance 2026-01-01 (import-opening-2026-01-01.ts).
+ * Selic anual: 14,75% a.a. (vigente no 1S/2026 — atualizar se necessario).
+ * Para precisão máxima, substituir por série histórica do BACEN/SGS 432.
+ */
+const LFT_VNA_REF = {
+  date: '2026-01-01',
+  vna: 1_000_341.65,
+  selicAnual: 0.1475,
+};
 
 const SOURCES = BTG_EXTRACT_SOURCES.map((s) => ({
   file: s.file,
@@ -30,7 +43,31 @@ function main() {
     }
     const text = fs.readFileSync(fp, 'utf8');
     const block = extractMovementBlock(text);
-    const entries = btgLinesToImportEntries(block, spec.openingBalance);
+    const rawEntries = btgLinesToImportEntries(block, spec.openingBalance);
+
+    // Normaliza entradas LFT: converte qty=valor_financeiro + pu=1
+    // para qty=número_de_cotas + pu=VNA_estimado na data da transação.
+    const entries = rawEntries.map((e) => {
+      if (
+        e.asset_type === 'fixed_income' &&
+        e.ticker.startsWith('LFT-') &&
+        (e.operation === 'buy' || e.operation === 'sell') &&
+        e.unit_price === 1
+      ) {
+        const financialAmount = Math.abs(e.quantity);
+        const { quantity, unit_price } = normalizeLftExtractEntry(
+          financialAmount,
+          e.date,
+          LFT_VNA_REF.date,
+          LFT_VNA_REF.vna,
+          LFT_VNA_REF.selicAnual
+        );
+        const signedQty = e.operation === 'sell' ? -quantity : quantity;
+        return { ...e, quantity: signedQty, unit_price };
+      }
+      return e;
+    });
+
     allEntries.push(...entries);
     monthly.push({ month: spec.monthLabel, broker: 'BTG', entries });
     console.log(spec.file, '→', entries.length, 'lançamentos');

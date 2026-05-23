@@ -24,8 +24,6 @@ ALTER TABLE patrimony_ledger_entries
     'split',
     'bonus',
     'write_off',
-    'short_open',
-    'short_close',
     'income_in_kind',
     'cost_adjustment'
   ) NOT NULL;

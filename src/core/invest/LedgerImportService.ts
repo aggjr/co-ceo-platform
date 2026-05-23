@@ -82,7 +82,7 @@ export class LedgerImportService {
       if (!result.skipped) inserted += 1;
     }
 
-    // 2. Shorts de abertura (PUT/CALL vendida) → short_open com qty negativa.
+    // 2. Shorts de abertura (PUT/CALL vendida) → disposition com qty negativa.
     for (const short of payload.opening_short_options || []) {
       const ticker = short.ticker.trim().toUpperCase();
       const op = short.operation; // put_sell | call_sell
