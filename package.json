@@ -1,6 +1,6 @@
 {
   "name": "co-ceo-core",
-  "version": "0.0.52",
+  "version": "0.0.53",
   "description": "co-CEO Platform Core API",
   "main": "dist/index.js",
   "scripts": {
@@ -39,6 +39,7 @@
     "audit:btg:notes-fees": "node ./node_modules/ts-node/dist/bin.js scripts/audit-btg-notes-fees-only.ts",
     "invest:purge-keep-opening": "node ./node_modules/ts-node/dist/bin.js scripts/purge-holding-keep-opening.ts",
     "invest:rebuild-btg-notes": "node ./node_modules/ts-node/dist/bin.js scripts/rebuild-holding-from-btg-notes.ts",
+    "git:ensure-sync": "node scripts/ensure-code-synced.js",
     "git:check-version": "node scripts/ensure-code-version.js --check",
     "git:ensure-version": "node scripts/ensure-code-version.js",
     "git:ship": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-ship-changes.ps1",
