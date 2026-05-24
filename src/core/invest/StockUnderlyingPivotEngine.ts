@@ -271,17 +271,13 @@ export function buildStockUnderlyingPivot(
             }
           }
         } else if (assetType === 'option_put' || assetType === 'option_call') {
-          if (closedQty > 0) {
-            const netOfClosed = qty > 0 ? net * (closedQty / qty) : net;
-            const pnl = wasLong ? netOfClosed - costBasisClosed : netOfClosed + costBasisClosed;
-            
-            if (assetType === 'option_put') {
-              if (wasLong) addToRow(row, 'compra_put', pnl);
-              else addToRow(row, 'venda_put', pnl);
-            } else {
-              if (wasLong) addToRow(row, 'compra_call', pnl);
-              else addToRow(row, 'venda_call', pnl);
-            }
+          const isVenda = ['put_sell', 'call_sell', 'sell'].includes(type) && !['option_exercise'].includes(type);
+          if (assetType === 'option_put') {
+            if (isVenda) addToRow(row, 'venda_put', net);
+            else addToRow(row, 'compra_put', net);
+          } else {
+            if (isVenda) addToRow(row, 'venda_call', net);
+            else addToRow(row, 'compra_call', net);
           }
         }
         break;
