@@ -29,29 +29,27 @@ async function runViaApi() {
     throw new Error(`Login falhou: ${loginJson.error || loginRes.status}`);
   }
 
+  let token = loginJson.token;
   const contexts = loginJson.contexts || loginJson.availableContexts || [];
   const globalCtx = contexts.find((c) => c.scope === 'global');
-  if (!globalCtx?.userRoleId) {
-    throw new Error('Contexto global (plataforma) não encontrado no login.');
+  if (globalCtx?.userRoleId && loginJson.userId) {
+    const ctxRes = await fetch(`${base}/api/auth/select-context`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: loginJson.userId,
+        userRoleId: globalCtx.userRoleId,
+      }),
+    });
+    const ctxJson = await ctxRes.json();
+    if (ctxRes.ok && ctxJson.token) token = ctxJson.token;
   }
-
-  const ctxRes = await fetch(`${base}/api/auth/select-context`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      userId: loginJson.userId,
-      userRoleId: globalCtx.userRoleId,
-    }),
-  });
-  const ctxJson = await ctxRes.json();
-  if (!ctxRes.ok || !ctxJson.token) {
-    throw new Error(`select-context falhou: ${ctxJson.error || ctxRes.status}`);
-  }
+  if (!token) throw new Error('Token de login ausente.');
 
   const syncRes = await fetch(`${base}/api/invest/market/sync-stocks`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${ctxJson.token}`,
+      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },

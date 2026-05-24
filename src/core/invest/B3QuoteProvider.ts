@@ -147,6 +147,9 @@ async function fetchBrapiBatch(
 
   if (!res.ok) {
     const msg = json.message || bodyText.slice(0, 200);
+    if (batch.length === 1 && (res.status === 404 || /opções|options/i.test(msg))) {
+      return [];
+    }
     const planLimit = res.status === 400 && /máximo\s+1\s+ativo/i.test(msg);
     if (planLimit && batch.length > 1) {
       const out: B3QuoteResult[] = [];

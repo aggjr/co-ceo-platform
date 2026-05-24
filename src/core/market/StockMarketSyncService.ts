@@ -1,4 +1,5 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
+import { inferAssetType } from '../invest/assetClassifier';
 import { fetchB3Quotes } from '../invest/B3QuoteProvider';
 import { MarketQuoteRepository } from './MarketQuoteRepository';
 
@@ -21,7 +22,11 @@ export class StockMarketSyncService {
   }
 
   async syncFromBrapi(ctx: UserContext, asOfDate?: string): Promise<StockMarketSyncReport> {
-    const tickers = await this.repo.listTickersInUse(ctx);
+    const allInUse = await this.repo.listTickersInUse(ctx);
+    const tickers = allInUse.filter((t) => {
+      const kind = inferAssetType(t);
+      return kind === 'stock' || kind === 'fii' || kind === 'etf' || kind === 'bdr';
+    });
     if (!tickers.length) {
       return {
         asOf: asOfDate?.slice(0, 10) || new Date().toISOString().slice(0, 10),
@@ -32,30 +37,41 @@ export class StockMarketSyncService {
       };
     }
 
-    const quotes = await fetchB3Quotes(tickers, {
-      asOfDate,
-      token: process.env.BRAPI_TOKEN,
-    });
-
     let saved = 0;
-    for (const q of quotes) {
-      await this.repo.upsertQuote(ctx, {
-        ticker: q.ticker,
-        quoteDate: q.asOf,
-        closingPrice: q.price,
-        source: 'brapi',
-        metadata: { kind: q.kind },
-      });
-      saved += 1;
+    const got = new Set<string>();
+    const missing: string[] = [];
+    let quotesReceived = 0;
+
+    for (const ticker of tickers) {
+      try {
+        const batch = await fetchB3Quotes([ticker], {
+          asOfDate,
+          token: process.env.BRAPI_TOKEN,
+        });
+        quotesReceived += batch.length;
+        const q = batch[0];
+        if (!q) {
+          missing.push(ticker);
+          continue;
+        }
+        await this.repo.upsertQuote(ctx, {
+          ticker: q.ticker,
+          quoteDate: q.asOf,
+          closingPrice: q.price,
+          source: 'brapi',
+          metadata: { kind: q.kind },
+        });
+        got.add(q.ticker);
+        saved += 1;
+      } catch {
+        missing.push(ticker);
+      }
     }
 
-    const got = new Set(quotes.map((q) => q.ticker));
-    const missing = tickers.filter((t) => !got.has(t));
-
     return {
-      asOf: asOfDate?.slice(0, 10) || quotes[0]?.asOf || new Date().toISOString().slice(0, 10),
+      asOf: asOfDate?.slice(0, 10) || new Date().toISOString().slice(0, 10),
       tickersInUse: tickers.length,
-      quotesReceived: quotes.length,
+      quotesReceived,
       saved,
       missing,
     };
