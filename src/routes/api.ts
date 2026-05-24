@@ -199,6 +199,12 @@ router.post(
   invest.seedMarketBenchmarks.bind(invest)
 );
 router.post(
+  '/invest/market/sync-stocks',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  invest.syncMarketStocks.bind(invest)
+);
+router.post(
   '/invest/options/snapshot',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:write'),

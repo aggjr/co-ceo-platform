@@ -57,7 +57,112 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-/** Busca cotações em lotes (máx. ~20 tickers por request). */
+function tickersPerRequest(): number {
+  const n = Number(process.env.BRAPI_TICKERS_PER_REQUEST);
+  if (Number.isFinite(n) && n >= 1) return Math.floor(n);
+  // Plano gratuito brapi: 1 ativo por requisição (lote maior retorna HTTP 400).
+  return 1;
+}
+
+function requestDelayMs(): number {
+  const n = Number(process.env.BRAPI_REQUEST_DELAY_MS);
+  return Number.isFinite(n) && n >= 0 ? n : 400;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseQuoteRows(
+  rows: BrapiQuoteRow[],
+  asOfDate: string | undefined
+): B3QuoteResult[] {
+  const results: B3QuoteResult[] = [];
+  for (const row of rows) {
+    const ticker = String(row.symbol || '').toUpperCase();
+    if (!ticker) continue;
+
+    let price: number | null = null;
+    let kind: 'close' | 'last' = 'last';
+    let asOf = asOfDate || new Date().toISOString().slice(0, 10);
+
+    if (asOfDate) {
+      const close = pickCloseForDate(row, asOfDate);
+      if (close != null) {
+        price = close;
+        kind = 'close';
+        asOf = asOfDate;
+      }
+    }
+    if (price == null) {
+      const last = Number(row.regularMarketPrice);
+      if (Number.isFinite(last) && last > 0) {
+        price = last;
+        kind = 'last';
+      }
+    }
+    if (price == null) continue;
+
+    results.push({
+      ticker,
+      price: Math.round(price * 10000) / 10000,
+      asOf,
+      source: 'brapi',
+      kind,
+    });
+  }
+  return results;
+}
+
+async function fetchBrapiBatch(
+  batch: string[],
+  options: {
+    base: string;
+    token: string;
+    asOfDate?: string;
+    needsHistory: boolean;
+  }
+): Promise<B3QuoteResult[]> {
+  const symbols = batch.join(',');
+  const params = new URLSearchParams();
+  if (options.token) params.set('token', options.token);
+  if (options.needsHistory) {
+    params.set('range', '1mo');
+    params.set('interval', '1d');
+  }
+
+  const url = `${options.base}/quote/${encodeURIComponent(symbols)}?${params.toString()}`;
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(30_000),
+  });
+
+  const bodyText = await res.text().catch(() => '');
+  let json: { results?: BrapiQuoteRow[]; message?: string };
+  try {
+    json = JSON.parse(bodyText) as { results?: BrapiQuoteRow[]; message?: string };
+  } catch {
+    json = {};
+  }
+
+  if (!res.ok) {
+    const msg = json.message || bodyText.slice(0, 200);
+    const planLimit = res.status === 400 && /máximo\s+1\s+ativo/i.test(msg);
+    if (planLimit && batch.length > 1) {
+      const out: B3QuoteResult[] = [];
+      for (const ticker of batch) {
+        out.push(...(await fetchBrapiBatch([ticker], options)));
+        await sleep(requestDelayMs());
+      }
+      return out;
+    }
+    throw new Error(`brapi HTTP ${res.status} (${symbols}): ${msg}`);
+  }
+
+  return parseQuoteRows(json.results || [], options.asOfDate);
+}
+
+/** Busca cotações na brapi (1 ticker/request no plano gratuito). */
 export async function fetchB3Quotes(
   tickers: string[],
   options: FetchB3QuotesOptions = {}
@@ -69,62 +174,20 @@ export async function fetchB3Quotes(
   const token = options.token || process.env.BRAPI_TOKEN || '';
   const asOfDate = options.asOfDate?.slice(0, 10);
   const needsHistory = Boolean(asOfDate);
+  const batchSize = tickersPerRequest();
   const results: B3QuoteResult[] = [];
 
-  for (const batch of chunk(unique, 18)) {
-    const symbols = batch.join(',');
-    const params = new URLSearchParams();
-    if (token) params.set('token', token);
-    if (needsHistory) {
-      params.set('range', '1mo');
-      params.set('interval', '1d');
-    }
-
-    const url = `${base}/quote/${encodeURIComponent(symbols)}?${params.toString()}`;
-    const res = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`brapi HTTP ${res.status} (${symbols}): ${body.slice(0, 200)}`);
-    }
-
-    const json = (await res.json()) as { results?: BrapiQuoteRow[] };
-    for (const row of json.results || []) {
-      const ticker = String(row.symbol || '').toUpperCase();
-      if (!ticker) continue;
-
-      let price: number | null = null;
-      let kind: 'close' | 'last' = 'last';
-      let asOf = asOfDate || new Date().toISOString().slice(0, 10);
-
-      if (asOfDate) {
-        const close = pickCloseForDate(row, asOfDate);
-        if (close != null) {
-          price = close;
-          kind = 'close';
-          asOf = asOfDate;
-        }
-      }
-      if (price == null) {
-        const last = Number(row.regularMarketPrice);
-        if (Number.isFinite(last) && last > 0) {
-          price = last;
-          kind = 'last';
-        }
-      }
-      if (price == null) continue;
-
-      results.push({
-        ticker,
-        price: Math.round(price * 10000) / 10000,
-        asOf,
-        source: 'brapi',
-        kind,
-      });
-    }
+  const batches = chunk(unique, batchSize);
+  for (let i = 0; i < batches.length; i++) {
+    if (i > 0) await sleep(requestDelayMs());
+    results.push(
+      ...(await fetchBrapiBatch(batches[i]!, {
+        base,
+        token,
+        asOfDate,
+        needsHistory,
+      }))
+    );
   }
 
   return results;

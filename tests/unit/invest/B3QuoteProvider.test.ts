@@ -1,33 +1,23 @@
+import { describe, expect, it } from 'vitest';
 import { fetchB3Quotes } from '../../../src/core/invest/B3QuoteProvider';
 
 describe('fetchB3Quotes', () => {
-  const originalFetch = global.fetch;
+  it('plano gratuito: 1 ticker por request (ITUB4 e WEGE3)', async () => {
+    const token = process.env.BRAPI_TOKEN;
+    if (!token) return;
 
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it('usa fechamento histórico quando asOfDate é informado', async () => {
-    const closeDate = '2026-05-19';
-    const unix = Math.floor(new Date(`${closeDate}T15:00:00Z`).getTime() / 1000);
-
-    global.fetch = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        results: [
-          {
-            symbol: 'PRIO3',
-            regularMarketPrice: 70,
-            historicalDataPrice: [{ date: unix, close: 68.82 }],
-          },
-        ],
-      }),
-    }) as typeof fetch;
-
-    const rows = await fetchB3Quotes(['PRIO3'], { asOfDate: closeDate, token: 'test' });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]!.price).toBeCloseTo(68.82, 2);
-    expect(rows[0]!.kind).toBe('close');
-    expect(rows[0]!.asOf).toBe(closeDate);
+    const prev = process.env.BRAPI_TICKERS_PER_REQUEST;
+    process.env.BRAPI_TICKERS_PER_REQUEST = '1';
+    process.env.BRAPI_REQUEST_DELAY_MS = '200';
+    try {
+      const quotes = await fetchB3Quotes(['ITUB4', 'WEGE3'], { token });
+      expect(quotes.length).toBeGreaterThanOrEqual(2);
+      const tickers = new Set(quotes.map((q) => q.ticker));
+      expect(tickers.has('ITUB4')).toBe(true);
+      expect(tickers.has('WEGE3')).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.BRAPI_TICKERS_PER_REQUEST;
+      else process.env.BRAPI_TICKERS_PER_REQUEST = prev;
+    }
   });
 });

@@ -81,6 +81,7 @@ import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
 import pool from '../config/database';
 import { isMissingSchemaError } from '../core/dal/mysqlErrors';
 import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
+import { StockMarketSyncService } from '../core/market/StockMarketSyncService';
 
 export class InvestController {
   private readonly ledger: LedgerImportService;
@@ -878,6 +879,27 @@ export class InvestController {
     try {
       const result = await seedMarketBenchmarks(this.gateway, pool, { from, to, stockTicker });
       return res.json({ success: true, ...result });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ success: false, error: message });
+    }
+  };
+
+  /** Cotações atuais de ações/FIIs em uso → market_quotes_daily (escopo plataforma). */
+  syncMarketStocks = async (req: Request, res: Response) => {
+    if (req.userContext?.scope !== 'global') {
+      return res.status(403).json({
+        success: false,
+        error: 'Somente sessão plataforma pode sincronizar cotações globais de ações.',
+      });
+    }
+    const asOf = req.body?.date ? String(req.body.date).slice(0, 10) : undefined;
+    try {
+      const report = await new StockMarketSyncService(this.gateway).syncFromBrapi(
+        authBootstrapContext(),
+        asOf
+      );
+      return res.json({ success: true, ...report });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       return res.status(500).json({ success: false, error: message });
