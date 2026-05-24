@@ -1,4 +1,5 @@
-import { onMount, onCleanup } from 'solid-js';
+import { onMount, onCleanup, createEffect } from 'solid-js';
+import { useLocation } from '@solidjs/router';
 import { trackScreenView } from '../telemetry/index.js';
 
 export type LegacyPageLoader = (container: HTMLElement) => void | Promise<void>;
@@ -6,13 +7,14 @@ export type LegacyPageLoader = (container: HTMLElement) => void | Promise<void>;
 /** Monta páginas JS legadas (renderShell + portfolioDisplay) dentro do shell Solid. */
 export function LegacyRouteHost(props: { loader: LegacyPageLoader }) {
   let root: HTMLDivElement | undefined;
+  const location = useLocation();
 
   const run = async () => {
     if (!root) {
       console.log('[LegacyRouteHost] run aborted: root is null/undefined');
       return;
     }
-    console.log('[LegacyRouteHost] run starting for loader', props.loader);
+    console.log('[LegacyRouteHost] run starting for loader', props.loader, 'at path', location.pathname);
     const loader = document.getElementById('app-loader');
     if (loader) loader.style.display = 'none';
     root.innerHTML = '';
@@ -30,8 +32,13 @@ export function LegacyRouteHost(props: { loader: LegacyPageLoader }) {
 
   const onRefresh = () => void run();
 
-  onMount(() => {
+  createEffect(() => {
+    // Re-run loader whenever the route path changes or the loader prop changes
+    const currentPath = location.pathname;
     void run();
+  });
+
+  onMount(() => {
     window.addEventListener('coceo:route-refresh', onRefresh);
   });
 
