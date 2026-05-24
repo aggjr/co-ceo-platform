@@ -31,7 +31,7 @@ const RF_FALLBACK = {
 
 const FALLBACK_BY_CODE = {
   CALL: { cssClass: 'notes-type--call', color: '#60a5fa', cssVar: '--invest-type-call' },
-  PUT: { cssClass: 'notes-type--put', color: '#eab308', cssVar: '--invest-type-put' },
+  PUT: { cssClass: 'notes-type--put', color: '#f97316', cssVar: '--invest-type-put' },
   EXEC: { cssClass: 'notes-type--exec', color: '#fbbf24', cssVar: '--invest-type-exec' },
   BTC: { cssClass: 'notes-type--btc', color: '#94a3b8', cssVar: '--invest-type-btc' },
   LFT: RF_FALLBACK,
@@ -71,16 +71,21 @@ export function resolveTradeTypeDisplay(manifest, code) {
 
 /** Injeta CSS variables no :root a partir dos value.invest.trade_type.* do manifesto. */
 export function applyTradeTypeTheme(manifest) {
-  if (!manifest?.entries) return;
   const root = document.documentElement;
-  const seen = new Set();
-  for (const [key, entry] of Object.entries(manifest.entries)) {
-    if (!key.startsWith('value.invest.trade_type.')) continue;
-    const cssVar = entry.metadata?.cssVar;
-    const color = entry.metadata?.color;
-    if (!cssVar || !color || seen.has(cssVar)) continue;
-    root.style.setProperty(String(cssVar), String(color));
-    seen.add(cssVar);
+  if (manifest?.entries) {
+    const seen = new Set();
+    for (const [key, entry] of Object.entries(manifest.entries)) {
+      if (!key.startsWith('value.invest.trade_type.')) continue;
+      const cssVar = entry.metadata?.cssVar;
+      const color = entry.metadata?.color;
+      if (!cssVar || !color || seen.has(cssVar)) continue;
+      root.style.setProperty(String(cssVar), String(color));
+      seen.add(cssVar);
+    }
+  }
+  // Paleta canonica (opcoes + historico) — prevalece sobre manifesto desatualizado no banco.
+  for (const fb of Object.values(FALLBACK_BY_CODE)) {
+    if (fb.cssVar && fb.color) root.style.setProperty(fb.cssVar, fb.color);
   }
 }
 
@@ -96,9 +101,8 @@ export function renderTradeTypeCell(row, manifest) {
     span.textContent = '—';
     return span;
   }
-  const { label, cssClass, color } = resolveTradeTypeDisplay(manifest, code);
+  const { label, cssClass } = resolveTradeTypeDisplay(manifest, code);
   span.textContent = label;
   if (cssClass) span.className = cssClass;
-  if (color) span.style.color = color;
   return span;
 }

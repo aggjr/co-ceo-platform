@@ -58,12 +58,12 @@ export const MENU_CATALOG = [
     moduleCode: 'INVEST',
     items: [
       {
-        label: 'Resultado Histórico',
+        label: 'Resultado histórico',
         path: '/invest',
         resourceKey: 'screen.invest.dashboard',
       },
       {
-        label: 'AÇÕES/FIIs',
+        label: 'Ações/FIIs',
         path: '/invest/portfolio',
         resourceKey: 'screen.invest.portfolio',
       },
@@ -83,7 +83,7 @@ export const MENU_CATALOG = [
         resourceKey: 'screen.invest.results',
       },
       {
-        label: 'Histórico operações',
+        label: 'Histórico de operações',
         path: '/invest/historico-operacoes',
         resourceKey: 'screen.invest.results',
       },
