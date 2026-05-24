@@ -69,14 +69,33 @@ Conecte o app ao MySQL pela rede interna do EasyPanel (não use `localhost` no a
 2. **Redeploy** no painel (ou webhook automático).
 3. Confirme versão: `GET https://<seu-dominio>/api/version` → `V0.0.32`.
 
-## 5. Checklist pós-deploy
+## 5. Cron INVEST (opções.net)
+
+O container **não usa crontab do host** — o agendamento roda **dentro do processo Node** após o deploy (sem `ts-node`).
+
+| Variável | Padrão | Função |
+|----------|--------|--------|
+| `INVEST_CRON_ENABLED` | `1` em `NODE_ENV=production` | `0` desliga; `1` força em dev |
+| `INVEST_CRON_TZ` | `America/Sao_Paulo` | Fuso do horário |
+| `INVEST_CRON_OPTIONS_AT` | `03:15` | Strike/vencimento via opcoes.net → `invest_options_market` |
+| `INVEST_CRON_RUN_ON_STARTUP` | — | `1` roda uma vez ao subir o container (útil após deploy) |
+
+Logs no painel do app: `[cron] options-market — iniciando/concluído`.
+
+Manual (máquina com repo + `REMOTE_DB_*` ou túnel):
+
+```bash
+npm run sync:options:market
+```
+
+## 6. Checklist pós-deploy
 
 - [ ] `GET /health` → `OK`, `database: connected`
 - [ ] Login com usuário do dump (ex. admin da holding)
 - [ ] `/invest/portfolio` carrega sem 500
 - [ ] `JWT_SECRET` definido e não commitado no Git
 
-## 6. Problemas comuns
+## 7. Problemas comuns
 
 | Sintoma | Causa provável |
 |---------|----------------|
