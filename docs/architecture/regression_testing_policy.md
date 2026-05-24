@@ -34,15 +34,17 @@ Princípios:
 
 ---
 
-## 3. Estrutura de pastas (planejada)
+## 3. Estrutura de pastas
 
-Quando a infraestrutura for implementada, os testes seguirão este layout:
+Layout em uso (parcialmente implementado):
 
 ```text
 tests/
   unit/
     core/                 # DAL, auth helpers, hodômetro
     invest/               # PM gerencial, métricas covered call, snapshots
+  parity/                 # Visão do usuário: brapi, opcoes.net vs sistema
+  helpers/                # marketReference.ts (live opcional)
   module/
     invest/               # LedgerService, CustodyService (mocks + fixtures)
   integration/
@@ -302,7 +304,31 @@ Quando o front de suporte existir, a suíte E2E deve validar:
 
 ---
 
-## 14. Fase de implementação (quando desenvolver)
+## 14. Paridade de mercado (visão do usuário) — implementado
+
+Testes em `tests/parity/` validam **dados exibidos**, não só status HTTP:
+
+| Verificação | Fonte externa | Arquivo de referência |
+|-------------|---------------|------------------------|
+| Cotação de ação ≠ PM | brapi (live opcional) | `tests/parity/marketQuoteUserExpectation.test.ts` |
+| Strike/vencimento de opção | opcoes.net (fixture + parser) | `tests/parity/opcoesNetOptionCatalog.test.ts` |
+
+- **Offline (CI):** regras de `portfolioMapper` + fixture `tests/fixtures/opcoes-net-prio3-expiration.json`.
+- **Live:** `npm run test:parity:live` com `BRAPI_TOKEN` — não bloqueia CI sem token.
+
+Unidade de política: `invest.market-parity` em `tests/coverage-policy.json`.
+
+---
+
+## 15. Metas proporcionais (sem teto fixo ~100)
+
+1. **Jest / catálogo:** `tests/coverage-policy.json` com `targets.proportional: true` — `minTestCases` sobe com arquivos e linhas em `sourcePaths` (`scripts/lib/test-proportionality.js`). Sincronizar: `npm run test:catalog:sync`.
+2. **Fuzzer de API:** sementes deduplicadas por **payload** (mesmo conjunto de entrada), cap `max(100, min(500, endpoints × 25))` — ver `scripts/lib/fuzzer-seed-pool.js`.
+3. **Não descartar** casos de teste aleatoriamente; se a suíte crescer, revisar **conjuntos** (unidade funcional no catálogo) e duplicatas, não cortar por índice.
+
+---
+
+## 16. Fase de implementação (quando desenvolver)
 
 A infraestrutura **não** deve anteceder o gateway unificado, mas a **documentação é normativa desde já**: novos PRs devem seguir estas regras na medida do possível (ex.: criar testes manuais em `tests/` mesmo antes do `impact-map.yml` existir).
 
@@ -318,8 +344,9 @@ Ordem sugerida de implementação:
 
 ---
 
-## 15. Histórico de versões
+## 17. Histórico de versões
 
 | Versão | Data | Alteração |
 |--------|------|-----------|
 | 1.0 | 2026-05-18 | Política inicial: impact analysis, reteste completo, geração assistida, pacotes por módulo |
+| 1.1 | 2026-05-23 | Paridade brapi/opcoes.net, metas proporcionais, gate INVEST ativo |

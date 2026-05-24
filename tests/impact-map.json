@@ -45,7 +45,19 @@
     },
     "src/modules/invest/**": {
       "tags": ["invest"],
-      "testPatterns": ["tests/unit/invest/**"]
+      "testPatterns": ["tests/unit/invest/**", "tests/parity/**"]
+    },
+    "src/core/invest/**": {
+      "tags": ["invest", "market"],
+      "testPatterns": ["tests/unit/invest/**", "tests/parity/**"]
+    },
+    "src/core/market/**": {
+      "tags": ["invest", "market", "parity"],
+      "testPatterns": ["tests/unit/market/**", "tests/parity/**"]
+    },
+    "src/controllers/InvestController.ts": {
+      "tags": ["invest"],
+      "testPatterns": ["tests/unit/invest/**", "tests/parity/**"]
     }
   }
 }

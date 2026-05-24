@@ -12,6 +12,8 @@
     "build:web": "vite build --config frontend/vite.config.js",
     "test": "jest",
     "test:unit": "jest --selectProjects unit-core unit-middleware",
+    "test:parity": "jest --selectProjects unit-core --testPathPattern=tests/parity",
+    "test:parity:live": "node scripts/run-parity-live.js",
     "test:catalog:sync": "node scripts/sync-test-catalog.js",
     "test:impact:plan": "node scripts/test-impact.js",
     "test:regression": "node scripts/run-regression.js --mode=full",

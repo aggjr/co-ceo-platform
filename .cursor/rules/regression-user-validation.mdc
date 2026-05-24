@@ -1,0 +1,43 @@
+---
+description: Testes de regressão com visão do usuário (dados corretos), não só HTTP 200.
+alwaysApply: false
+globs:
+  - "src/core/invest/**"
+  - "src/core/market/**"
+  - "src/modules/invest/**"
+  - "src/controllers/InvestController.ts"
+  - "tests/**"
+---
+
+# Regressão — expectativa do usuário
+
+## O que validar
+
+| Área | Expectativa do usuário | Referência |
+|------|------------------------|------------|
+| Ação/FII na carteira | `updatedQuote` = cotação de mercado | brapi (`B3QuoteProvider`) |
+| PM vs cotação | PM B3/gerencial **não** substitui cotação | `portfolioMapper.enrichPortfolioRow` |
+| Opção | Strike/vencimento do catálogo | opcoes.net → `opcoesNetChainParser` |
+| Cotação vazia | Sem fonte → `updatedQuote` null, não inventar PM | testes em `tests/parity/` |
+
+## Onde colocar testes
+
+- **Paridade / visão usuário:** `tests/parity/**` → unidade `invest.market-parity`
+- **Regras de domínio (PM, livro):** `tests/unit/invest/**` → unidade `invest`
+
+## Live (opcional)
+
+```bash
+# BRAPI_TOKEN no .env
+npm run test:parity:live
+```
+
+Sem token, testes `it.skip` de rede não rodam; testes offline com fixture opcoes.net sempre rodam.
+
+## Metas proporcionais
+
+Não fixar teto ~100 casos. Metas em `tests/coverage-policy.json` com `proportional: true` — sincronizar com `npm run test:catalog:sync`.
+
+## Fuzzer de API
+
+`scripts/genetic-fuzzer.js` deduplica sementes por payload (mesmo conjunto de entrada), não descarta por índice aleatório. Cap = `max(100, min(500, endpoints × 25))`.

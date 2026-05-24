@@ -3,6 +3,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { resolveProportionalTargets } = require('./test-proportionality');
 
 function matchGlob(filePath, pattern) {
   const normalized = filePath.replace(/\\/g, '/');
@@ -49,10 +50,15 @@ function loadLineTotalsByRel(rootDir) {
   return map;
 }
 
-function evaluateUnitPolicy(unit, policyEntry, testStats) {
+function evaluateUnitPolicy(unit, policyEntry, testStats, rootDir) {
   const policy = policyEntry || {};
   const lifecycle = policy.lifecycle || 'active';
-  const targets = policy.targets || {};
+  const { targets: resolvedTargets, proportionality } = resolveProportionalTargets(
+    unit,
+    policy,
+    rootDir || path.join(__dirname, '..', '..')
+  );
+  const targets = resolvedTargets;
   const testFiles = unit.testFiles || [];
   const testCaseCount = unit.testCaseCount ?? testStats?.total ?? 0;
 
@@ -65,7 +71,9 @@ function evaluateUnitPolicy(unit, policyEntry, testStats) {
       lineCoveragePct: targets.lineCoveragePct ?? null,
       minTestCases: targets.minTestCases ?? 0,
       minTestFiles: targets.minTestFiles ?? 0,
+      proportional: targets.proportional ?? false,
     },
+    proportionality,
     actual: {
       lineCoveragePct: testStats?.lineCoveragePct ?? null,
       testCases: testCaseCount,
@@ -136,7 +144,8 @@ function evaluateAllUnits(catalog, policyDoc, jestUnitResults, rootDir) {
     const policyEval = evaluateUnitPolicy(
       unit,
       policies[unit.id],
-      mergedStats
+      mergedStats,
+      rootDir
     );
 
     return {

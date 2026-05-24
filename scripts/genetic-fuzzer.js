@@ -41,9 +41,13 @@ function extractEndpointsFromRoutes() {
 
 const TARGET_ENDPOINTS = extractEndpointsFromRoutes();
 
+const {
+  computeSeedPoolCap,
+  selectHistoricalSeeds,
+} = require('./lib/fuzzer-seed-pool');
+
 const POPULATION_SIZE = 20;
 const GENERATIONS = 5;
-const MAX_HISTORICAL_SEEDS = 100; // Priorização: Limita a base de testes crescendo infinito
 
 // Genes possíveis
 const MUTATIONS = [
@@ -152,11 +156,8 @@ async function runFuzzer() {
       if (Array.isArray(prev)) {
         // Remove 'Skipped' records and prioritize by fitness/status
         prev = prev.filter(r => r.payload && typeof r.fitness === 'number');
-        prev.sort((a, b) => b.fitness - a.fitness);
-        
-        // Limita a base histórica para não crescer infinitamente
-        prev = prev.slice(0, MAX_HISTORICAL_SEEDS);
-        initialSeeds = prev.map(r => r.payload).slice(0, POPULATION_SIZE);
+        const seedCap = computeSeedPoolCap(TARGET_ENDPOINTS.length);
+        initialSeeds = selectHistoricalSeeds(prev, seedCap).slice(0, POPULATION_SIZE);
       }
     }
   } catch(e) {}
