@@ -6,9 +6,11 @@ import {
   runMonitoredPlatformJob,
 } from '../core/platform/PlatformJobMonitorService';
 import { OptionMarketSyncService } from '../core/invest/OptionMarketSyncService';
+import { StockMarketSyncService } from '../core/market/StockMarketSyncService';
 import { scheduleDailyWallClock } from './cronSchedule';
 
 let optionSyncRunning = false;
+let stockSyncRunning = false;
 let cronPool: mysql.Pool | null = null;
 
 /** Pool separado — sync noturno não esgota conexões da API (evita 502). */
@@ -28,6 +30,23 @@ function getCronPool(): mysql.Pool {
     });
   }
   return cronPool;
+}
+
+export async function runStockMarketSyncJob(pool = getCronPool()): Promise<void> {
+  if (stockSyncRunning) {
+    console.warn('[cron:stocks-market] execução anterior ainda em andamento — pulando.');
+    return;
+  }
+  stockSyncRunning = true;
+  try {
+    const gateway = new CoCeoDataGateway(pool);
+    const ctx = authBootstrapContext();
+    const service = new StockMarketSyncService(gateway);
+    const report = await service.syncFromBrapi(ctx);
+    console.log('[cron:stocks-market] relatório:', JSON.stringify(report));
+  } finally {
+    stockSyncRunning = false;
+  }
 }
 
 export async function runOptionMarketSyncJob(pool = getCronPool()): Promise<void> {
@@ -73,18 +92,19 @@ export function startInvestMarketCron(): void {
   }
 
   const timeZone = process.env.INVEST_CRON_TZ || 'America/Sao_Paulo';
-  const { hour, minute } = parseHourMinute(
-    process.env.INVEST_CRON_OPTIONS_AT || '03:15',
-    3,
-    15
-  );
+  const optionsAt = parseHourMinute(process.env.INVEST_CRON_OPTIONS_AT || '03:15', 3, 15);
+  const stocksAt = parseHourMinute(process.env.INVEST_CRON_STOCKS_AT || '19:05', 19, 5);
 
   console.log(
-    `[cron] invest ativo — opções.net diário às ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} (${timeZone})`
+    `[cron] invest ativo — opções.net ${String(optionsAt.hour).padStart(2, '0')}:${String(optionsAt.minute).padStart(2, '0')}, ações brapi ${String(stocksAt.hour).padStart(2, '0')}:${String(stocksAt.minute).padStart(2, '0')} (${timeZone})`
   );
 
-  scheduleDailyWallClock(hour, minute, timeZone, 'options-market', () =>
+  scheduleDailyWallClock(optionsAt.hour, optionsAt.minute, timeZone, 'options-market', () =>
     runOptionMarketSyncJob()
+  );
+
+  scheduleDailyWallClock(stocksAt.hour, stocksAt.minute, timeZone, 'stocks-market', () =>
+    runStockMarketSyncJob()
   );
 
   if (process.env.INVEST_CRON_RUN_ON_STARTUP === '1') {

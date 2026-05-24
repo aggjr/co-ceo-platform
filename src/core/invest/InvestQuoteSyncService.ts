@@ -2,7 +2,9 @@ import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
 import { inferAssetType, inferUnderlyingTicker } from './assetClassifier';
 import { inferOptionExpiryDate, inferOptionMonthFromTicker } from './optionExpiry';
+import { authBootstrapContext } from '../auth/authBootstrapContext';
 import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
+import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
 export type QuoteSyncResult = {
@@ -23,9 +25,11 @@ export type SnapshotOptionRow = {
 
 export class InvestQuoteSyncService {
   private readonly assetProjection: InvestAssetProjection;
+  private readonly marketQuotes: MarketQuoteRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.assetProjection = new InvestAssetProjection(gateway);
+    this.marketQuotes = new MarketQuoteRepository(gateway);
   }
 
   /** Tickers de ações/FIIs com posição ou ativos ativos na custódia. */
@@ -57,12 +61,20 @@ export class InvestQuoteSyncService {
     const missing: string[] = [];
     let updated = 0;
 
+    const marketCtx = authBootstrapContext();
     for (const ticker of tickers) {
       const q = quoteByTicker.get(ticker);
       if (!q) {
         missing.push(ticker);
         continue;
       }
+      await this.marketQuotes.upsertQuote(marketCtx, {
+        ticker: q.ticker,
+        quoteDate: q.asOf,
+        closingPrice: q.price,
+        source: 'brapi',
+        metadata: { kind: q.kind },
+      });
       const ok = await this.writeQuoteToPositionExt(ctx, ticker, q.price, q.asOf);
       if (ok) updated += 1;
     }

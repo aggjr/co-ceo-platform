@@ -24,6 +24,8 @@ import {
 } from '../core/invest/patrimonyLedgerGates';
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
+import { fetchB3Quotes } from '../core/invest/B3QuoteProvider';
+import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import {
   buildCdiBenchmarkForChart,
@@ -159,6 +161,30 @@ export class InvestController {
       ctx,
       equityTickers
     );
+    const missingQuotes = equityTickers.filter((t) => !marketQuoteMap.has(t));
+    if (missingQuotes.length) {
+      try {
+        const quotes = await fetchB3Quotes(missingQuotes, {
+          token: process.env.BRAPI_TOKEN,
+        });
+        const marketCtx = authBootstrapContext();
+        for (const q of quotes) {
+          await this.marketQuoteRepo.upsertQuote(marketCtx, {
+            ticker: q.ticker,
+            quoteDate: q.asOf,
+            closingPrice: q.price,
+            source: 'brapi',
+            metadata: { kind: q.kind },
+          });
+          marketQuoteMap.set(q.ticker.toUpperCase(), {
+            price: q.price,
+            date: q.asOf,
+          });
+        }
+      } catch (err) {
+        console.warn('[listPortfolio] preenchimento brapi de cotações:', err);
+      }
+    }
 
     const items = [];
     for (const raw of rowsMerged) {

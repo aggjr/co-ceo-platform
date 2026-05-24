@@ -295,9 +295,10 @@ export function enrichPortfolioRow(
     updatedQuote =
       metaLast > 0 ? metaLast : custodyUnitMark > 0 ? custodyUnitMark : null;
   } else if (equityLike) {
-    // Cotação de mercado (market_quotes_daily / brapi) — nunca confundir com PM do livro.
-    updatedQuote = marketPx;
-    lastPrice = marketPx ?? 0;
+    // Cotação de mercado (market_quotes_daily); fallback legado em invest_position_ext (metadata).
+    const legacyPx = metaLast > 0 ? metaLast : null;
+    updatedQuote = marketPx ?? legacyPx;
+    lastPrice = updatedQuote ?? 0;
   } else {
     updatedQuote = metaLast > 0 ? metaLast : null;
   }
