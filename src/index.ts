@@ -3,6 +3,7 @@ import path from 'path';
 import pool from './config/database';
 import apiRoutes from './routes/api';
 import { APP_VERSION } from './generated/version';
+import { ensureCoreSchema } from './core/db/ensureCoreSchema';
 import { applyUiCatalog } from './core/ui/UiCatalogApplyService';
 import { startInvestMarketCron } from './jobs/investMarketCron';
 
@@ -42,23 +43,38 @@ app.get('*', (req, res, next) => {
   });
 });
 
-app.listen(port, () => {
-  console.log('==========================================');
-  console.log(`[co-CEO Core] API + Web na porta ${port}`);
-  console.log(`[co-CEO Core] Dev UI: http://localhost:5173 (npm run dev:web)`);
-  console.log('==========================================');
-
-  startInvestMarketCron();
-
-  if (process.env.UI_CATALOG_BOOTSTRAP_ON_START === '1') {
-    applyUiCatalog(pool)
-      .then((r) => {
-        console.log(
-          `[co-CEO Core] Catálogo UI sincronizado (textos=${r.textsUpserted}, menu=${r.menuUpserted}).`
-        );
-      })
-      .catch((err) => {
-        console.error('[co-CEO Core] Falha ao sincronizar catálogo UI no boot:', err);
-      });
+async function startServer() {
+  try {
+    const r = await ensureCoreSchema(pool);
+    if (r.marketMigrationApplied || r.platformJobMigrationApplied) {
+      console.log(
+        `[co-CEO Core] Schema core aplicado (mercado=${r.marketMigrationApplied}, jobs=${r.platformJobMigrationApplied}).`
+      );
+    }
+  } catch (err) {
+    console.error('[co-CEO Core] Falha ao garantir schema core:', err);
   }
-});
+
+  app.listen(port, () => {
+    console.log('==========================================');
+    console.log(`[co-CEO Core] API + Web na porta ${port}`);
+    console.log(`[co-CEO Core] Dev UI: http://localhost:5173 (npm run dev:web)`);
+    console.log('==========================================');
+
+    startInvestMarketCron();
+
+    if (process.env.UI_CATALOG_BOOTSTRAP_ON_START === '1') {
+      applyUiCatalog(pool)
+        .then((r) => {
+          console.log(
+            `[co-CEO Core] Catálogo UI sincronizado (textos=${r.textsUpserted}, menu=${r.menuUpserted}).`
+          );
+        })
+        .catch((err) => {
+          console.error('[co-CEO Core] Falha ao sincronizar catálogo UI no boot:', err);
+        });
+    }
+  });
+}
+
+void startServer();

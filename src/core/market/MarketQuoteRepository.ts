@@ -349,12 +349,18 @@ export class MarketQuoteRepository {
     ctx: UserContext,
     tickers: string[]
   ): Promise<Map<string, { price: number; date: string }>> {
-    const result = new Map<string, { price: number; date: string }>();
-    for (const ticker of tickers) {
-      const row = await this.getQuoteOnOrBefore(ctx, ticker, new Date().toISOString().slice(0, 10));
-      if (row) result.set(ticker.toUpperCase(), { price: row.closing_price, date: row.quote_date });
+    try {
+      const result = new Map<string, { price: number; date: string }>();
+      const asOf = new Date().toISOString().slice(0, 10);
+      for (const ticker of tickers) {
+        const row = await this.getQuoteOnOrBefore(ctx, ticker, asOf);
+        if (row) result.set(ticker.toUpperCase(), { price: row.closing_price, date: row.quote_date });
+      }
+      return result;
+    } catch (err) {
+      if (isMissingSchemaError(err)) return new Map();
+      throw err;
     }
-    return result;
   }
 
   /**

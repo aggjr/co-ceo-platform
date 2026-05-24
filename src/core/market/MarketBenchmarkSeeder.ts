@@ -1,6 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import type { Pool } from 'mysql2/promise';
+import { runSqlFile, tableExists } from '../db/sqlMigrationRunner';
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import { authBootstrapContext } from '../auth/authBootstrapContext';
 import { MarketQuoteRepository } from './MarketQuoteRepository';
@@ -103,23 +102,8 @@ export class MarketBenchmarkSeeder {
   }
 
   async ensureSchema(pool: Pool): Promise<boolean> {
-    const [rows] = await pool.query(
-      `SELECT COUNT(*) AS n FROM information_schema.tables
-       WHERE table_schema = DATABASE() AND table_name = 'market_index_daily'`
-    );
-    const n = Number((rows as { n: number }[])[0]?.n ?? 0);
-    if (n > 0) return true;
-
-    const migrationPath = path.join(
-      __dirname,
-      '..',
-      '..',
-      'database',
-      'migrations',
-      '22_market_quotes_global.sql'
-    );
-    const sql = fs.readFileSync(migrationPath, 'utf8');
-    await pool.query(sql);
+    if (await tableExists(pool, 'market_quotes_daily')) return true;
+    await runSqlFile(pool, '22_market_quotes_global.sql');
     return true;
   }
 

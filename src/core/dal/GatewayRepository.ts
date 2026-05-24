@@ -377,16 +377,21 @@ export class GatewayRepository {
     const start = Date.now();
     try {
       const table = TableRegistry.assertRegistered(tableName);
-      if (table.kind === 'system') {
+      if (table.kind === 'system' && !this.isInstaller()) {
         throw new GatewayError('TABLE_NOT_ALLOWED', 'Tabela de sistema.', 403);
       }
       if (!Object.keys(payload).length) {
         throw new GatewayError('EMPTY_PAYLOAD', 'Payload vazio.', 400);
       }
 
-      const filtered = TableRegistry.filterWritablePayload(table, payload, {
-        isInstaller: this.isInstaller(),
-      }) as SecurePayload;
+      const filtered =
+        table.kind === 'system'
+          ? (TableRegistry.filterWritablePayload(table, payload, {
+              isInstaller: true,
+            }) as SecurePayload)
+          : (TableRegistry.filterWritablePayload(table, payload, {
+              isInstaller: this.isInstaller(),
+            }) as SecurePayload);
 
       if (table.kind === 'tenant') {
         await FieldPolicyService.assertCanWrite(
