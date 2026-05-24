@@ -66,7 +66,6 @@ export class PlatformJobMonitorService {
       id,
       job_key: jobKey,
       status: 'running',
-      started_at: nowSql(),
       host: os.hostname().slice(0, 120),
     };
     await this.gateway.insert(ctx, 'platform_scheduled_job_runs', payload);
@@ -119,7 +118,6 @@ export class PlatformJobMonitorService {
       severity: input.severity,
       title: input.title,
       body: input.body,
-      created_at: nowSql(),
     });
   }
 

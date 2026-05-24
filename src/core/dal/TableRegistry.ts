@@ -174,12 +174,12 @@ const TABLES: TableDefinition[] = [
   def('platform_scheduled_job_runs', 'system', {
     softDelete: false,
     countsTowardStorage: false,
-    blockedWritableColumns: new Set([...DEFAULT_BLOCKED, 'started_at']),
+    blockedWritableColumns: new Set(DEFAULT_BLOCKED),
   }),
   def('platform_admin_alerts', 'system', {
     softDelete: false,
     countsTowardStorage: false,
-    blockedWritableColumns: new Set([...DEFAULT_BLOCKED, 'created_at']),
+    blockedWritableColumns: new Set(DEFAULT_BLOCKED),
   }),
   def('database_usage_telemetry', 'system', {
     softDelete: false,
