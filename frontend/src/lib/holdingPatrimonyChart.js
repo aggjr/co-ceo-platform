@@ -31,6 +31,35 @@ function formatPct(n) {
   return `${sign}${(n * 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
 }
 
+/** Índice 100 no primeiro ponto = 0% de rentabilidade no período. */
+function toIndexedFromFirst(values, baseLevel = 100) {
+  const first = Number(values[0]);
+  if (!Number.isFinite(first) || first <= 0) {
+    return values.map(() => baseLevel);
+  }
+  return values.map((v) =>
+    Math.round((Number(v) / first) * baseLevel * 1_000_000) / 1_000_000
+  );
+}
+
+/** Garante que o primeiro valor não-nulo do array seja exatamente 100. */
+function rebaseIndexedSeries(values) {
+  const firstIdx = values.findIndex((v) => v != null && Number.isFinite(Number(v)));
+  if (firstIdx < 0) return values;
+  const base = Number(values[firstIdx]);
+  if (!base || base <= 0) return values;
+  return values.map((v) =>
+    v == null || !Number.isFinite(Number(v))
+      ? null
+      : Math.round((Number(v) / base) * 100 * 1_000_000) / 1_000_000
+  );
+}
+
+function indexedToPct(indexLevel) {
+  if (indexLevel == null || !Number.isFinite(Number(indexLevel))) return null;
+  return (Number(indexLevel) / 100 - 1) * 100;
+}
+
 function renderCashTransitBlock(cashInTransit) {
   if (!cashInTransit) return '';
   return `<div class="holding-summary-side muted" style="margin-top:8px;text-align:left">
@@ -176,7 +205,8 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
   }
 
   const labels = clipped.map((p) => p.date);
-  const values = clipped.map((p) => Number(p.patrimony));
+  const patrimonyBrl = clipped.map((p) => Number(p.patrimony));
+  const portfolioIndexed = rebaseIndexedSeries(toIndexedFromFirst(patrimonyBrl));
   const tickSet = new Set(sampleLabels(clipped));
 
   const gold = '#DAB177';
@@ -194,16 +224,23 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
   );
   const hasCdi = opts.cdiBenchmark?.available && cdiByDate.size > 0;
   const hasStock = opts.stockBenchmark?.available && stockByDate.size > 0;
-  const hasIndexAxis = hasCdi || hasStock;
-  const cdiValues = labels.map((d) => (cdiByDate.has(d) ? cdiByDate.get(d) : null));
-  const stockValues = labels.map((d) => (stockByDate.has(d) ? stockByDate.get(d) : null));
+  const cdiValues = rebaseIndexedSeries(
+    labels.map((d) => (cdiByDate.has(d) ? cdiByDate.get(d) : null))
+  );
+  const stockValues = rebaseIndexedSeries(
+    labels.map((d) => (stockByDate.has(d) ? stockByDate.get(d) : null))
+  );
   const stockOrange = '#FB923C';
+
+  const portfolioLabel = opts.datasetLabel
+    ? `${opts.datasetLabel} (%)`
+    : 'Carteira (%)';
 
   /** @type {import('chart.js').ChartDataset[]} */
   const datasets = [
     {
-      label: opts.datasetLabel || 'Patrimônio diário',
-      data: values,
+      label: portfolioLabel,
+      data: portfolioIndexed,
       borderColor: gold,
       backgroundColor: goldFill,
       borderWidth: 2.5,
@@ -212,13 +249,13 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
       pointRadius: 0,
       pointHitRadius: 8,
       pointHoverRadius: 4,
-      yAxisID: 'y',
+      yAxisID: 'yIndex',
     },
   ];
 
   if (hasCdi) {
     datasets.push({
-      label: 'CDI (índice 100)',
+      label: 'CDI (%)',
       data: cdiValues,
       borderColor: white,
       borderWidth: 2,
@@ -234,7 +271,7 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
 
   if (hasStock) {
     datasets.push({
-      label: `${stockTicker} buy & hold (índice 100)`,
+      label: `${stockTicker} buy & hold (%)`,
       data: stockValues,
       borderColor: stockOrange,
       borderWidth: 2,
@@ -284,43 +321,37 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
             },
             label(ctx) {
               const y = ctx.parsed.y;
-              if (ctx.dataset.yAxisID === 'yIndex') {
-                const ret = y != null ? ((Number(y) / 100 - 1) * 100).toFixed(2) : '—';
-                return `${ctx.dataset.label}: ${ret}%`;
+              const pct =
+                y != null ? indexedToPct(y)?.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : null;
+              const pctStr = pct != null ? `${pct}%` : '—';
+              if (ctx.datasetIndex === 0) {
+                const i = ctx.dataIndex;
+                const brl = i != null ? patrimonyBrl[i] : null;
+                return [
+                  `${ctx.dataset.label}: ${pctStr}`,
+                  brl != null ? `Patrimônio: ${formatBrl(brl)}` : '',
+                ].filter(Boolean);
               }
-              return `Patrimônio: ${formatBrl(y)}`;
+              return `${ctx.dataset.label}: ${pctStr}`;
             },
           },
         },
       },
       scales: {
-        y: {
+        yIndex: {
           position: 'left',
+          min: 100,
           grid: { color: 'rgba(255,255,255,0.06)' },
           ticks: {
             color: '#94A3B8',
             maxTicksLimit: 8,
-            callback: (v) => formatBrl(Number(v)),
+            callback: (v) => {
+              const pct = indexedToPct(Number(v));
+              if (pct == null) return '';
+              return `${pct.toFixed(1)}%`;
+            },
           },
         },
-        ...(hasIndexAxis
-          ? {
-              yIndex: {
-                position: 'right',
-                grid: { drawOnChartArea: false },
-                ticks: {
-                  color: 'rgba(255,255,255,0.65)',
-                  maxTicksLimit: 6,
-                  callback: (v) => {
-                    const n = Number(v);
-                    if (!Number.isFinite(n)) return '';
-                    const pct = ((n / 100 - 1) * 100).toFixed(1);
-                    return `${pct}%`;
-                  },
-                },
-              },
-            }
-          : {}),
         x: {
           grid: { display: false },
           ticks: {

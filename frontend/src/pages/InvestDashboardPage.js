@@ -248,8 +248,8 @@ export async function InvestDashboardPage(container) {
         <${D}>
           <h2 style="font-size:18px;margin:0">${screenTitle}</h2>
           <p class="muted" style="margin:4px 0 0;font-size:13px">
-            Patrimônio em R$ (esquerda). CDI (branco tracejado) e PRIO3 buy-and-hold (laranja) em índice 100 (direita).
-            Curva calibrada às âncoras mensais BTG (custódia). Padrão: 31/12/2025 até ontem.
+            Todas as curvas em rentabilidade acumulada (%), partindo de 0% no primeiro dia do período.
+            Valores em R$ aparecem no resumo acima e no tooltip da carteira. Padrão: 31/12/2025 até ontem.
           </p>
         </${D}>
         <label>De <input type="date" id="patrimony-from" value="${defaultFrom()}" min="${PERIOD_START}" /></label>
