@@ -4,6 +4,7 @@ import pool from './config/database';
 import apiRoutes from './routes/api';
 import { APP_VERSION } from './generated/version';
 import { applyUiCatalog } from './core/ui/UiCatalogApplyService';
+import { startInvestMarketCron } from './jobs/investMarketCron';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -46,6 +47,8 @@ app.listen(port, () => {
   console.log(`[co-CEO Core] API + Web na porta ${port}`);
   console.log(`[co-CEO Core] Dev UI: http://localhost:5173 (npm run dev:web)`);
   console.log('==========================================');
+
+  startInvestMarketCron(pool);
 
   if (process.env.UI_CATALOG_BOOTSTRAP_ON_START !== '0') {
     applyUiCatalog(pool)
