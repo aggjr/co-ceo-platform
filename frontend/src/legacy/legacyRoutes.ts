@@ -5,6 +5,11 @@ import { PlatformCockpitPage } from '../pages/PlatformCockpitPage.js';
 import { ClientCockpitPage } from '../pages/ClientCockpitPage.js';
 import { InvestDashboardPage } from '../pages/InvestDashboardPage.js';
 import { InvestPortfolioPage } from '../pages/InvestPortfolioPage.js';
+import {
+  InvestEquitiesPage,
+  InvestOptionsPage,
+  InvestFixedIncomePage,
+} from '../pages/InvestPortfolioPage.js';
 import { InvestStockGainPivotPage } from '../pages/InvestStockGainPivotPage.js';
 import { InvestHistoricoOperacoesPage } from '../pages/InvestHistoricoOperacoesPage.js';
 import { InvestExtratosPage } from '../pages/InvestExtratosPage.js';
@@ -26,10 +31,10 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/cockpit/client/roles', loader: ClientCockpitPage },
   { path: '/cockpit/client/storage', loader: ClientCockpitPage },
   { path: '/invest', loader: InvestDashboardPage },
-  { path: '/invest/portfolio', loader: InvestPortfolioPage },
-  { path: '/invest/opcoes', loader: InvestPortfolioPage },
-  { path: '/invest/titulos', loader: InvestPortfolioPage },
-  { path: '/invest/carteira-acoes-fiis', loader: InvestPortfolioPage },
+  { path: '/invest/portfolio', loader: InvestEquitiesPage },
+  { path: '/invest/opcoes', loader: InvestOptionsPage },
+  { path: '/invest/titulos', loader: InvestFixedIncomePage },
+  { path: '/invest/carteira-acoes-fiis', loader: InvestEquitiesPage },
   { path: '/invest/resultado', loader: InvestPortfolioPage },
   { path: '/invest/ganhos-por-acao', loader: InvestStockGainPivotPage },
   { path: '/invest/historico-operacoes', loader: InvestHistoricoOperacoesPage },

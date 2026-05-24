@@ -49,6 +49,7 @@ import {
   collectCallCoverageOptionRows,
 } from '../core/invest/callCoverage';
 import { rebuildCustodyFromLedger } from '../core/invest/CustodyEngine';
+import { isFixedIncomeTicker, isOptionTicker } from '../core/invest/assetClassifier';
 import { resolveCashInvestDisplayBalance } from '../core/invest/cashInvestLedger';
 import { buildCashInTransitSummary } from '../core/invest/cashInTransit';
 import { loadOptionMarketCatalog } from '../core/invest/optionMarketCatalog';
@@ -138,10 +139,27 @@ export class InvestController {
       today
     );
     const { assets: ledgerCustody } = rebuildCustodyFromLedger(ledgerEvents);
-    const rowsMerged = mergeLedgerCustodyIntoAssetRows(
+    let rowsMerged = mergeLedgerCustodyIntoAssetRows(
       rows as Record<string, unknown>[],
       ledgerCustody
     );
+    const assetClassQuery = req.query.assetClass as string | undefined;
+    if (assetClassQuery) {
+      rowsMerged = rowsMerged.filter((r) => {
+        const type = String(r.asset_type ?? '').toLowerCase();
+        const t = String(r.asset_ticker ?? '').trim().toUpperCase();
+        
+        const isOpt = type === 'option_call' || type === 'option_put' || isOptionTicker(t);
+        const isFi = type === 'fixed_income' || type === 'cdb' || isFixedIncomeTicker(t);
+        const isCash = type === 'cash' || t.startsWith('CAIXA-');
+        
+        if (assetClassQuery === 'options') return isOpt;
+        if (assetClassQuery === 'fixedIncome') return isFi || isCash;
+        if (assetClassQuery === 'equities') return !isOpt && !isFi && !isCash;
+        return true;
+      });
+    }
+
     const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
     const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents);
     const ledgerStrikeByTicker = buildOptionStrikeMapFromLedgerEvents(ledgerEvents);
