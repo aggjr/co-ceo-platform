@@ -189,8 +189,7 @@ export function renderHoldingPatrimonySummary(
  *   datasetLabel?: string,
  *   cdiBenchmark?: { available?: boolean, series?: Array<{ date: string, indexedLevel: number }> },
  *   stockBenchmark?: { available?: boolean, ticker?: string, series?: Array<{ date: string, indexedLevel: number }> },
- *   /** TWR diário (índice 100 = 0%) — prioridade sobre patrimônio bruto. */
- *   portfolioChartSeries?: Array<{ date: string, indexedLevel: number, periodReturnToDate?: number }>,
+ *   portfolioChartSeries?: Array<{ date: string, indexedLevel: number, periodReturnToDate?: number }> (TWR diário),
  * }} [opts]
  */
 export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
