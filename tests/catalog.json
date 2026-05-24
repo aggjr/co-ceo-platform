@@ -1,33 +1,33 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-23",
+  "updatedAt": "2026-05-24",
   "description": "Mapa de unidades de código → arquivos de teste. Atualize com npm run test:catalog:sync",
   "units": [
     {
-      "id": "core.dal",
-      "label": "Gateway / DAL",
-      "layer": "unit",
+      "id": "cockpit.api",
+      "label": "API Cockpit",
+      "layer": "module",
       "tags": [
-        "core",
-        "dal",
-        "security"
+        "cockpit"
       ],
       "sourcePaths": [
-        "src/core/dal/**"
+        "src/controllers/CockpitController.ts",
+        "src/core/auth/CockpitReadRepository.ts"
       ],
-      "testFiles": [
-        "tests/unit/core/EventBus.test.ts",
-        "tests/unit/core/GatewayError.test.ts",
-        "tests/unit/core/GatewayJunction.test.ts",
-        "tests/unit/core/GeneticTestUtil.test.ts",
-        "tests/unit/core/SecurityScope.test.ts",
-        "tests/unit/core/StorageMeter.test.ts",
-        "tests/unit/core/TableRegistry.test.ts",
-        "tests/unit/core/financial/SettlementEngine.test.ts",
-        "tests/unit/core/fuzzer-genetic.test.ts",
-        "tests/unit/core/inventory/WeightedAverageValuation.test.ts"
-      ],
-      "testCaseCount": 30
+      "testFiles": [],
+      "testCaseCount": 0,
+      "policyTargets": {
+        "minTestCases": 9,
+        "minTestFiles": 2,
+        "proportional": true
+      },
+      "proportionality": {
+        "sourceFiles": 2,
+        "sourceLines": 307,
+        "functionalities": 3,
+        "computedMinTestCases": 9,
+        "computedMinTestFiles": 2
+      }
     },
     {
       "id": "core.auth",
@@ -49,25 +49,60 @@
         "tests/unit/auth/ClientImpersonation.test.ts",
         "tests/unit/auth/LoginContext.test.ts"
       ],
-      "testCaseCount": 11
+      "testCaseCount": 11,
+      "policyTargets": {
+        "minTestCases": 26,
+        "minTestFiles": 5,
+        "proportional": true
+      },
+      "proportionality": {
+        "sourceFiles": 12,
+        "sourceLines": 742,
+        "functionalities": 4,
+        "computedMinTestCases": 26,
+        "computedMinTestFiles": 5
+      }
     },
     {
-      "id": "core.telemetry",
-      "label": "Telemetria",
+      "id": "core.dal",
+      "label": "Gateway / DAL",
       "layer": "unit",
       "tags": [
         "core",
-        "telemetry"
+        "dal",
+        "security"
       ],
       "sourcePaths": [
-        "src/core/telemetry/**",
-        "src/controllers/TelemetryController.ts"
+        "src/core/dal/**"
       ],
       "testFiles": [
-        "tests/unit/core/DatabaseUsageTelemetry.test.ts",
-        "tests/unit/core/TelemetryService.test.ts"
+        "tests/unit/core/EventBus.test.ts",
+        "tests/unit/core/GatewayError.test.ts",
+        "tests/unit/core/GatewayJunction.test.ts",
+        "tests/unit/core/GeneticTestUtil.test.ts",
+        "tests/unit/core/SecurityScope.test.ts",
+        "tests/unit/core/StorageMeter.test.ts",
+        "tests/unit/core/TableRegistry.test.ts",
+        "tests/unit/core/business-events/BusinessEventReconciler.test.ts",
+        "tests/unit/core/business-events/BusinessEventRegistry.test.ts",
+        "tests/unit/core/financial/SettlementEngine.test.ts",
+        "tests/unit/core/fuzzer-genetic.test.ts",
+        "tests/unit/core/inventory/InventoryLedger.statusTransitions.test.ts",
+        "tests/unit/core/inventory/WeightedAverageValuation.test.ts"
       ],
-      "testCaseCount": 5
+      "testCaseCount": 56,
+      "policyTargets": {
+        "minTestCases": 26,
+        "minTestFiles": 4,
+        "proportional": true
+      },
+      "proportionality": {
+        "sourceFiles": 10,
+        "sourceLines": 1798,
+        "functionalities": 4,
+        "computedMinTestCases": 26,
+        "computedMinTestFiles": 4
+      }
     },
     {
       "id": "core.quality",
@@ -88,21 +123,49 @@
         "tests/unit/quality/QualityRegressionService.test.ts",
         "tests/unit/quality/RegressionInfrastructure.test.ts"
       ],
-      "testCaseCount": 11
+      "testCaseCount": 11,
+      "policyTargets": {
+        "minTestCases": 11,
+        "minTestFiles": 2,
+        "proportional": true
+      },
+      "proportionality": {
+        "sourceFiles": 2,
+        "sourceLines": 113,
+        "functionalities": 4,
+        "computedMinTestCases": 11,
+        "computedMinTestFiles": 2
+      }
     },
     {
-      "id": "cockpit.api",
-      "label": "API Cockpit",
-      "layer": "module",
+      "id": "core.telemetry",
+      "label": "Telemetria",
+      "layer": "unit",
       "tags": [
-        "cockpit"
+        "core",
+        "telemetry"
       ],
       "sourcePaths": [
-        "src/controllers/CockpitController.ts",
-        "src/core/auth/CockpitReadRepository.ts"
+        "src/core/telemetry/**",
+        "src/controllers/TelemetryController.ts"
       ],
-      "testFiles": [],
-      "testCaseCount": 0
+      "testFiles": [
+        "tests/unit/core/DatabaseUsageTelemetry.test.ts",
+        "tests/unit/core/TelemetryService.test.ts"
+      ],
+      "testCaseCount": 5,
+      "policyTargets": {
+        "minTestCases": 6,
+        "minTestFiles": 1,
+        "proportional": true
+      },
+      "proportionality": {
+        "sourceFiles": 3,
+        "sourceLines": 165,
+        "functionalities": 1,
+        "computedMinTestCases": 6,
+        "computedMinTestFiles": 1
+      }
     },
     {
       "id": "invest",
@@ -112,16 +175,116 @@
         "invest"
       ],
       "sourcePaths": [
-        "src/modules/invest/**"
+        "src/modules/invest/**",
+        "src/controllers/InvestController.ts",
+        "src/core/invest/**",
+        "src/jobs/**/invest/**",
+        "src/jobs/**/market/**"
       ],
-      "testFiles": [],
-      "testCaseCount": 0
+      "testFiles": [
+        "tests/unit/api/InvestApiRoutes.test.ts",
+        "tests/unit/controllers/InvestController.errors.test.ts",
+        "tests/unit/invest/AutoPendingSettlementSync.test.ts",
+        "tests/unit/invest/B3QuoteProvider.test.ts",
+        "tests/unit/invest/BtgExtractLineParser.test.ts",
+        "tests/unit/invest/CustodyEngine.test.ts",
+        "tests/unit/invest/LedgerImportService.errors.test.ts",
+        "tests/unit/invest/MyProfitHistoricalParser.test.ts",
+        "tests/unit/invest/PatrimonyDailyEngine.test.ts",
+        "tests/unit/invest/PatrimonyDailyStore.test.ts",
+        "tests/unit/invest/PatrimonyMtmDailyEngine.test.ts",
+        "tests/unit/invest/PatrimonyMtmEconomic.test.ts",
+        "tests/unit/invest/PnLPivotEngine.test.ts",
+        "tests/unit/invest/StockUnderlyingPivotEngine.test.ts",
+        "tests/unit/invest/brokerOrderMapper.test.ts",
+        "tests/unit/invest/brokerageNotesReviewFromLedger.test.ts",
+        "tests/unit/invest/btgBrokerageNoteLedgerTranslator.test.ts",
+        "tests/unit/invest/btgBrokerageNoteParser.test.ts",
+        "tests/unit/invest/btgExtractCashSeries.test.ts",
+        "tests/unit/invest/btgExtractPdfText.test.ts",
+        "tests/unit/invest/btgHomeBrokerImport.test.ts",
+        "tests/unit/invest/btgPerformanceReference.test.ts",
+        "tests/unit/invest/callCoverage.test.ts",
+        "tests/unit/invest/cashInTransit.test.ts",
+        "tests/unit/invest/cashInvestLedger.test.ts",
+        "tests/unit/invest/custodyEngineCash.test.ts",
+        "tests/unit/invest/ledgerOperationDedup.test.ts",
+        "tests/unit/invest/opcoesNetChainParser.test.ts",
+        "tests/unit/invest/optionExpiry.test.ts",
+        "tests/unit/invest/optionStrike.test.ts",
+        "tests/unit/invest/optionStrikeFromLedger.test.ts",
+        "tests/unit/invest/patrimonyLedgerGates.test.ts",
+        "tests/unit/invest/portfolioMapper.test.ts",
+        "tests/unit/invest/portfolioPerformance.test.ts",
+        "tests/unit/invest/portfolioThreePrices.test.ts",
+        "tests/unit/invest/settlementCalendar.test.ts",
+        "tests/unit/invest/sharpeRatio.test.ts",
+        "tests/unit/invest/tesouroDirectLedger.test.ts",
+        "tests/unit/invest/threePricesEngine.test.ts",
+        "tests/unit/invest/threePricesValidation.test.ts",
+        "tests/unit/jobs/cronSchedule.test.ts",
+        "tests/unit/modules/invest/InvestOperations.costAdjustment.test.ts",
+        "tests/unit/modules/invest/InvestOperations.eventGrouping.test.ts",
+        "tests/unit/modules/invest/InvestOperations.voidAmend.test.ts",
+        "tests/unit/modules/invest/LedgerEventProjection.test.ts",
+        "tests/unit/modules/invest/ThreePricesValuation.test.ts"
+      ],
+      "testCaseCount": 202,
+      "policyTargets": {
+        "minTestCases": 123,
+        "minTestFiles": 12,
+        "proportional": true
+      },
+      "proportionality": {
+        "sourceFiles": 57,
+        "sourceLines": 12121,
+        "functionalities": 4,
+        "computedMinTestCases": 123,
+        "computedMinTestFiles": 12
+      }
+    },
+    {
+      "id": "invest.market-parity",
+      "label": "INVEST — paridade mercado (visão usuário)",
+      "layer": "parity",
+      "tags": [
+        "invest",
+        "market",
+        "parity",
+        "user-expectation"
+      ],
+      "sourcePaths": [
+        "src/core/invest/B3QuoteProvider.ts",
+        "src/core/invest/portfolioMapper.ts",
+        "src/core/invest/opcoesNetClient.ts",
+        "src/core/invest/opcoesNetChainParser.ts",
+        "src/core/market/**"
+      ],
+      "testFiles": [
+        "tests/parity/marketQuoteUserExpectation.test.ts",
+        "tests/parity/opcoesNetOptionCatalog.test.ts",
+        "tests/unit/market/indexBenchmark.test.ts"
+      ],
+      "testCaseCount": 10,
+      "policyTargets": {
+        "minTestCases": 28,
+        "minTestFiles": 3,
+        "proportional": true
+      },
+      "proportionality": {
+        "sourceFiles": 7,
+        "sourceLines": 1766,
+        "functionalities": 4,
+        "computedMinTestCases": 28,
+        "computedMinTestFiles": 3
+      }
     }
   ],
   "stats": {
-    "totalTestFiles": 56,
-    "totalUnits": 6,
-    "unitsWithTests": 4,
-    "unitsWithoutTests": 2
+    "totalTestFiles": 72,
+    "totalUnits": 7,
+    "unitsWithTests": 6,
+    "unitsWithoutTests": 1,
+    "unassignedTestFiles": 0
   }
 }

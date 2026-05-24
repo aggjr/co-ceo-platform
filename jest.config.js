@@ -7,7 +7,10 @@ module.exports = {
       displayName: 'unit-core',
       preset: 'ts-jest',
       testEnvironment: 'node',
-      testMatch: ['<rootDir>/tests/unit/**/*.test.ts'],
+      testMatch: [
+        '<rootDir>/tests/unit/**/*.test.ts',
+        '<rootDir>/tests/parity/**/*.test.ts',
+      ],
     },
     {
       displayName: 'unit-middleware',

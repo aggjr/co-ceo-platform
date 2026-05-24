@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
   "model": "risk-by-functionality",
-  "summary": "Cada unidade tem meta própria conforme criticidade e funcionalidades que o código afeta. Não existe meta global única de 80%.",
+  "summary": "Cada unidade tem meta própria conforme criticidade e funcionalidades. Metas proporcionais (proportional: true) sobem com arquivos/linhas de código — sem teto fixo de ~100 casos.",
   "units": {
     "core.dal": {
       "lifecycle": "active",
@@ -14,9 +14,12 @@
         { "id": "soft-delete", "label": "Soft delete transacional" }
       ],
       "targets": {
+        "proportional": true,
         "lineCoveragePct": 85,
-        "minTestCases": 10,
-        "minTestFiles": 4
+        "minTestCasesFloor": 10,
+        "minTestFilesFloor": 4,
+        "testCasesPerSourceFile": 1.2,
+        "testCasesPerFunctionality": 2
       }
     },
     "core.auth": {
@@ -30,9 +33,12 @@
         { "id": "api-security", "label": "Middleware de proteção de rotas" }
       ],
       "targets": {
+        "proportional": true,
         "lineCoveragePct": 80,
-        "minTestCases": 10,
-        "minTestFiles": 5
+        "minTestCasesFloor": 10,
+        "minTestFilesFloor": 5,
+        "testCasesPerSourceFile": 1.2,
+        "testCasesPerFunctionality": 2
       }
     },
     "core.telemetry": {
@@ -43,9 +49,11 @@
         { "id": "usage-tracking", "label": "Rastreio de uso de telas/ações" }
       ],
       "targets": {
+        "proportional": true,
         "lineCoveragePct": 60,
-        "minTestCases": 2,
-        "minTestFiles": 1
+        "minTestCasesFloor": 2,
+        "minTestFilesFloor": 1,
+        "testCasesPerSourceFile": 1
       }
     },
     "cockpit.api": {
@@ -58,9 +66,11 @@
         { "id": "contract-admin", "label": "Gestão de contratos (plataforma)" }
       ],
       "targets": {
+        "proportional": true,
         "lineCoveragePct": 70,
-        "minTestCases": 5,
-        "minTestFiles": 2
+        "minTestCasesFloor": 5,
+        "minTestFilesFloor": 2,
+        "testCasesPerSourceFile": 1
       }
     },
     "core.quality": {
@@ -74,24 +84,64 @@
         { "id": "quality-dashboard", "label": "API / Cockpit Qualidade" }
       ],
       "targets": {
+        "proportional": true,
         "lineCoveragePct": 50,
-        "minTestCases": 6,
-        "minTestFiles": 2
+        "minTestCasesFloor": 6,
+        "minTestFilesFloor": 2,
+        "testCasesPerSourceFile": 1
       }
     },
     "invest": {
-      "lifecycle": "planned",
+      "lifecycle": "active",
       "criticality": "P1",
-      "rationale": "INVEST em construção — metas entram em vigor no go-live do módulo.",
+      "rationale": "INVEST: livro razão, carteira, patrimônio — erro de PM ou custódia afeta decisão do usuário.",
       "functionalities": [
-        { "id": "ledger", "label": "Livro razão / preço médio" },
-        { "id": "custody", "label": "Custódia" },
+        { "id": "ledger", "label": "Livro razão / três preços" },
+        { "id": "custody", "label": "Custódia e posições" },
+        { "id": "portfolio-ui", "label": "Carteira exibida (PM vs cotação)" },
         { "id": "snapshots", "label": "Snapshots diários" }
       ],
+      "sourcePaths": [
+        "src/modules/invest/**",
+        "src/controllers/InvestController.ts",
+        "src/core/invest/**",
+        "src/jobs/**/invest/**",
+        "src/jobs/**/market/**"
+      ],
       "targets": {
-        "lineCoveragePct": 75,
-        "minTestCases": 8,
-        "minTestFiles": 3
+        "proportional": true,
+        "lineCoveragePct": 70,
+        "minTestCasesFloor": 40,
+        "minTestFilesFloor": 8,
+        "testCasesPerSourceFile": 1.5,
+        "testCasesPerFunctionality": 3,
+        "testCasesPer1000Lines": 2
+      }
+    },
+    "invest.market-parity": {
+      "lifecycle": "active",
+      "criticality": "P0",
+      "rationale": "Cotação em branco ou errada é falha visível ao usuário — validar contra brapi e opcoes.net.",
+      "functionalities": [
+        { "id": "equity-quote-brapi", "label": "Ação/FII: cotação = mercado (brapi)" },
+        { "id": "option-chain-opcoes", "label": "Opção: strike/vencimento do catálogo opcoes.net" },
+        { "id": "quote-not-pm", "label": "Cotação atualizada ≠ PM B3/gerencial" },
+        { "id": "market-quotes-daily", "label": "Persistência market_quotes_daily" }
+      ],
+      "sourcePaths": [
+        "src/core/invest/B3QuoteProvider.ts",
+        "src/core/invest/portfolioMapper.ts",
+        "src/core/invest/opcoesNetClient.ts",
+        "src/core/invest/opcoesNetChainParser.ts",
+        "src/core/market/**"
+      ],
+      "targets": {
+        "proportional": true,
+        "lineCoveragePct": 65,
+        "minTestCasesFloor": 12,
+        "minTestFilesFloor": 3,
+        "testCasesPerSourceFile": 2,
+        "testCasesPerFunctionality": 2
       }
     }
   }
