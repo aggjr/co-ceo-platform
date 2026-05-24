@@ -40,16 +40,11 @@ function bindPortfolioView(container, items, cashMeta, pageType) {
   paint();
 }
 
-export async function InvestPortfolioPage(container, currentPath) {
+async function buildInvestPortfolioPage(container, currentPath, pageType) {
   if (!isAuthenticated()) {
     navigate('/login');
     return;
   }
-
-  const path = currentPath || window.location.pathname;
-  let pageType = 'equities';
-  if (path.includes('/invest/opcoes')) pageType = 'options';
-  else if (path.includes('/invest/titulos')) pageType = 'titulos';
 
   const underlyingFilter = getUnderlyingFilter();
 
@@ -90,7 +85,8 @@ export async function InvestPortfolioPage(container, currentPath) {
   }
 
   try {
-    const data = await apiRequest('/api/invest/portfolio');
+    const assetClassQuery = pageType === 'titulos' ? 'fixedIncome' : pageType;
+    const data = await apiRequest(`/api/invest/portfolio?assetClass=${assetClassQuery}`);
     const items = data.items || [];
     const cashMeta = {
       cashStatementBalance: data.cashStatementBalance ?? 0,
@@ -139,3 +135,7 @@ export async function InvestPortfolioPage(container, currentPath) {
     await renderShell(container, { title: `INVEST — ${pageTitle}`, contentHtml: body });
   }
 }
+
+export const InvestEquitiesPage = (container, path) => buildInvestPortfolioPage(container, path, 'equities');
+export const InvestOptionsPage = (container, path) => buildInvestPortfolioPage(container, path, 'options');
+export const InvestFixedIncomePage = (container, path) => buildInvestPortfolioPage(container, path, 'titulos');

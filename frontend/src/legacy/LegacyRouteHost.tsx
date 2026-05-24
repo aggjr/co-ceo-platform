@@ -6,27 +6,47 @@ export type LegacyPageLoader = (container: HTMLElement, currentPath?: string) =>
 
 /** Monta páginas JS legadas (renderShell + portfolioDisplay) dentro do shell Solid. */
 export function LegacyRouteHost(props: { loader: LegacyPageLoader }) {
-  let root: HTMLDivElement | undefined;
+  let containerRef: HTMLDivElement | undefined;
   const location = useLocation();
+  let activeRoot: HTMLDivElement | null = null;
 
   const run = async () => {
-    if (!root) {
-      console.log('[LegacyRouteHost] run aborted: root is null/undefined');
+    if (!containerRef) {
+      console.log('[LegacyRouteHost] run aborted: containerRef is null/undefined');
       return;
     }
+    
+    // Create a fresh detached wrapper for this execution
+    const newRoot = document.createElement('div');
+    newRoot.className = 'legacy-route-active';
+    activeRoot = newRoot;
+    
+    // Clear container and attach the new root
+    containerRef.innerHTML = '';
+    containerRef.appendChild(newRoot);
+
     console.log('[LegacyRouteHost] run starting for loader', props.loader, 'at path', location.pathname);
     const loader = document.getElementById('app-loader');
     if (loader) loader.style.display = 'none';
-    root.innerHTML = '';
+    
     try {
-      await props.loader(root, location.pathname);
-      console.log('[LegacyRouteHost] loader finished successfully');
-      const path = window.location.pathname === '/' ? '/login' : window.location.pathname;
-      trackScreenView(path);
+      await props.loader(newRoot, location.pathname);
+      
+      console.log('[LegacyRouteHost] loader finished for path', location.pathname);
+      
+      // Se este run não for o mais recente, descartamos as ações pós-carregamento.
+      if (activeRoot === newRoot) {
+        const path = window.location.pathname === '/' ? '/login' : window.location.pathname;
+        trackScreenView(path);
+      } else {
+        console.warn(`[LegacyRouteHost] race condition prevented for path ${location.pathname}`);
+      }
     } catch (err) {
       console.error('[LegacyRouteHost] loader threw error:', err);
-      const message = err instanceof Error ? err.message : 'Erro ao carregar página.';
-      root.innerHTML = `<div class="error-banner">${message}</div>`;
+      if (activeRoot === newRoot) {
+        const message = err instanceof Error ? err.message : 'Erro ao carregar página.';
+        newRoot.innerHTML = `<div class="error-banner">${message}</div>`;
+      }
     }
   };
 
@@ -44,10 +64,10 @@ export function LegacyRouteHost(props: { loader: LegacyPageLoader }) {
 
   onCleanup(() => {
     window.removeEventListener('coceo:route-refresh', onRefresh);
-    if (root) root.innerHTML = '';
+    if (containerRef) containerRef.innerHTML = '';
   });
 
-  return <div ref={root!} class="legacy-route-root" />;
+  return <div ref={containerRef!} class="legacy-route-host" />;
 }
 
 export function legacyPage(loader: LegacyPageLoader) {

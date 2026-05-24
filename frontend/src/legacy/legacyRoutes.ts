@@ -2,9 +2,19 @@ import type { LegacyPageLoader } from './LegacyRouteHost';
 import { LoginPage } from '../pages/LoginPage.js';
 import { CockpitWelcomePage } from '../pages/CockpitWelcomePage.js';
 import { PlatformCockpitPage } from '../pages/PlatformCockpitPage.js';
-import { ClientCockpitPage } from '../pages/ClientCockpitPage.js';
+import {
+  CockpitClientDashboardPage,
+  CockpitTeamPage,
+  CockpitRolesPage,
+  CockpitStoragePage,
+} from '../pages/ClientCockpitPage.js';
 import { InvestDashboardPage } from '../pages/InvestDashboardPage.js';
 import { InvestPortfolioPage } from '../pages/InvestPortfolioPage.js';
+import {
+  InvestEquitiesPage,
+  InvestOptionsPage,
+  InvestFixedIncomePage,
+} from '../pages/InvestPortfolioPage.js';
 import { InvestStockGainPivotPage } from '../pages/InvestStockGainPivotPage.js';
 import { InvestHistoricoOperacoesPage } from '../pages/InvestHistoricoOperacoesPage.js';
 import { InvestExtratosPage } from '../pages/InvestExtratosPage.js';
@@ -21,15 +31,15 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/cockpit', loader: CockpitWelcomePage },
   { path: '/cockpit/platform', loader: PlatformCockpitPage },
   { path: '/cockpit/platform/quality', loader: QualityRegressionPage },
-  { path: '/cockpit/client', loader: ClientCockpitPage },
-  { path: '/cockpit/client/team', loader: ClientCockpitPage },
-  { path: '/cockpit/client/roles', loader: ClientCockpitPage },
-  { path: '/cockpit/client/storage', loader: ClientCockpitPage },
+  { path: '/cockpit/client', loader: CockpitClientDashboardPage },
+  { path: '/cockpit/client/team', loader: CockpitTeamPage },
+  { path: '/cockpit/client/roles', loader: CockpitRolesPage },
+  { path: '/cockpit/client/storage', loader: CockpitStoragePage },
   { path: '/invest', loader: InvestDashboardPage },
-  { path: '/invest/portfolio', loader: InvestPortfolioPage },
-  { path: '/invest/opcoes', loader: InvestPortfolioPage },
-  { path: '/invest/titulos', loader: InvestPortfolioPage },
-  { path: '/invest/carteira-acoes-fiis', loader: InvestPortfolioPage },
+  { path: '/invest/portfolio', loader: InvestEquitiesPage },
+  { path: '/invest/opcoes', loader: InvestOptionsPage },
+  { path: '/invest/titulos', loader: InvestFixedIncomePage },
+  { path: '/invest/carteira-acoes-fiis', loader: InvestEquitiesPage },
   { path: '/invest/resultado', loader: InvestPortfolioPage },
   { path: '/invest/ganhos-por-acao', loader: InvestStockGainPivotPage },
   { path: '/invest/historico-operacoes', loader: InvestHistoricoOperacoesPage },
