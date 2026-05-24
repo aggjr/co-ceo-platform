@@ -34,7 +34,7 @@ export const STOCK_PIVOT_COLUMN_LABELS: Record<StockPivotColumnKey, string> = {
   bonus: 'Bonificação',
   outros_ganhos: 'Outros ganhos',
   taxas: 'Taxas (todas)',
-  ganho_aproximado: 'Resultado Total',
+  ganho_aproximado: 'Total',
 };
 
 export type StockPivotRow = Record<StockPivotColumnKey, number> & {

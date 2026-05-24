@@ -638,10 +638,15 @@ export class InvestController {
     }
     pivot = enrichStockPivotWithQuotes(pivot, quotesByTicker);
 
+    const columnOrder = [
+      ...STOCK_PIVOT_COLUMNS.filter((c) => c !== 'ganho_aproximado'),
+      'ganho_aproximado',
+    ];
+
     return res.json({
       success: true,
       columnLabels: STOCK_PIVOT_COLUMN_LABELS,
-      columnOrder: [...STOCK_PIVOT_COLUMNS],
+      columnOrder,
       pivot,
     });
   };
