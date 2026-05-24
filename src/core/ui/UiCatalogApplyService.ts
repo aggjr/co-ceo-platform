@@ -28,7 +28,13 @@ function migrationsDir(): string {
 async function runSqlFile(pool: Pool, fileName: string): Promise<void> {
   const full = path.join(migrationsDir(), fileName);
   const sql = fs.readFileSync(full, 'utf8');
-  await pool.query(sql);
+  const statements = sql
+    .split(';')
+    .map((s) => s.replace(/--[^\n]*/g, '').trim())
+    .filter((s) => s.length > 0);
+  for (const stmt of statements) {
+    await pool.query(stmt);
+  }
 }
 
 export async function applyUiCatalog(pool: Pool): Promise<UiCatalogApplyResult> {
