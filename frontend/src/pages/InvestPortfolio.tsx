@@ -1,4 +1,4 @@
-import { Show, createMemo, createResource, For } from 'solid-js';
+import { Show, createMemo, createResource, For, onCleanup, onMount } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import { apiRequest } from '../api/client.js';
@@ -117,6 +117,12 @@ export function InvestPortfolio() {
   }
 
   const [data, { refetch }] = createResource<PortfolioResponse>(fetchPortfolio);
+
+  onMount(() => {
+    const onRefresh = () => void refetch();
+    window.addEventListener('coceo:route-refresh', onRefresh);
+    onCleanup(() => window.removeEventListener('coceo:route-refresh', onRefresh));
+  });
 
   const equities = createMemo(() =>
     (data()?.items ?? [])

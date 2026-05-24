@@ -15,6 +15,7 @@ import {
 import { SideNav } from './SideNav';
 import { ImpersonationBar } from './ImpersonationBar';
 import { PlatformJobAlertsBanner } from './PlatformJobAlertsBanner';
+import { MarketQuotesSyncButton } from './MarketQuotesSyncButton';
 import '../../styles/app.css';
 import '../../styles/cockpit-shell.css';
 
@@ -102,8 +103,9 @@ export function Shell(props: { children?: JSX.Element }) {
               <ImpersonationBar />
             </div>
 
-            {/* Bloco Direito: Avatar, Email */}
+            {/* Bloco Direito: Cotações, avatar, email */}
             <div class="header-right">
+              <MarketQuotesSyncButton />
               <div class="avatar" title={user()?.fullName || user()?.email || ''}>
                 {initial()}
               </div>
