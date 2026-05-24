@@ -28,18 +28,17 @@ function formatBytes(bytes) {
 
 const apiWithSession = (path) => apiRequest(path);
 
-export async function ClientCockpitPage(container, currentPath) {
-  const path = currentPath || window.location.pathname;
+async function ensureCockpitAccess(container) {
   const token = getImpersonationToken() || getToken();
   if (!token) {
     navigate('/login');
-    return;
+    return false;
   }
 
   const accessMatrix = await fetchAccessMatrix();
   if (!hasCockpitClientScreens(accessMatrix)) {
     navigate(await resolveClientLandingPath());
-    return;
+    return false;
   }
 
   let me;
@@ -52,22 +51,18 @@ export async function ClientCockpitPage(container, currentPath) {
         fullName: me.user.fullName,
       });
     }
+    return me;
   } catch (err) {
     container.innerHTML = `<div class="error-banner">${err.message || 'Não foi possível carregar a sessão emulada.'}</div>`;
-    return;
+    return false;
   }
+}
 
-  const [matrix, team, roles, storage] = await Promise.all([
-    apiWithSession('/api/cockpit/me/access-matrix').catch(() => null),
-    apiWithSession('/api/cockpit/me/team').catch(() => ({ team: [] })),
-    apiWithSession('/api/cockpit/me/roles').catch(() => null),
-    apiWithSession('/api/cockpit/me/storage').catch(() => null),
-  ]);
+export async function CockpitClientDashboardPage(container) {
+  const me = await ensureCockpitAccess(container);
+  if (!me) return;
 
-  const storageUsed = storage?.storage?.bytesUsed ?? me?.storage?.bytesUsed ?? 0;
-  const storageLimit = storage?.storage?.bytesLimit ?? me?.storage?.bytesLimit ?? null;
-  const pct = storageLimit ? Math.min(100, (storageUsed / storageLimit) * 100) : 0;
-
+  const matrix = await apiWithSession('/api/cockpit/me/access-matrix').catch(() => null);
   const screens = (matrix?.resources || []).filter((r) => r.type === 'screen' && r.effect === 'allow');
   const permissions = matrix?.permissions || [];
 
@@ -84,46 +79,38 @@ export async function ClientCockpitPage(container, currentPath) {
 
   const content = `
     ${investCard}
-    <div class="grid-2">
-      <div class="card">
-        <h2 style="font-size:16px;margin-bottom:12px">Uso de dados</h2>
-        <p class="muted">Armazenamento da sua organização</p>
-        <p style="font-size:24px;font-weight:700;margin-top:8px">${formatBytes(storageUsed)}${
-          storageLimit ? ` <span class="muted" style="font-size:14px">/ ${formatBytes(storageLimit)}</span>` : ''
-        }</p>
-        ${storageLimit ? `<div class="storage-bar"><div class="storage-bar-fill" style="width:${pct}%"></div></div>` : ''}
-      </div>
-      <div class="card">
-        <h2 style="font-size:16px;margin-bottom:12px">Seu acesso</h2>
-        <p class="muted">Contrato: ${me?.contractId || '—'}</p>
-        <p class="muted" style="margin-top:6px">Permissões API: ${permissions.length}</p>
-        <div class="chip-list">
-          ${screens.map((s) => `<span class="chip">${s.label}</span>`).join('') || '<span class="muted">Carregando matriz…</span>'}
-        </div>
+    <div class="card">
+      <h2 style="font-size:16px;margin-bottom:12px">Seu acesso</h2>
+      <p class="muted">Contrato: ${me?.contractId || '—'}</p>
+      <p class="muted" style="margin-top:6px">Permissões API: ${permissions.length}</p>
+      <div class="chip-list">
+        ${screens.map((s) => `<span class="chip">${s.label}</span>`).join('') || '<span class="muted">Carregando matriz…</span>'}
       </div>
     </div>
-    <div class="card" style="margin-top:20px">
+  `;
+
+  await renderShell(container, {
+    title: 'Cockpit — Minha organização',
+    contentHtml: content,
+  });
+}
+
+export async function CockpitTeamPage(container) {
+  const me = await ensureCockpitAccess(container);
+  if (!me) return;
+
+  const teamData = await apiWithSession('/api/cockpit/me/team').catch(() => ({ team: [] }));
+
+  const content = `
+    <div class="card">
       <h2 style="font-size:16px;margin-bottom:12px">Sua equipe</h2>
       <p class="muted" style="margin-bottom:12px">Gestão simples — convites e papéis em breve.</p>
       <div id="client-team-grid"></div>
     </div>
-    ${
-      roles?.modules
-        ? `<div class="card" style="margin-top:20px">
-      <h2 style="font-size:16px;margin-bottom:12px">Módulos contratados</h2>
-      <div class="chip-list">${roles.modules.map((m) => `<span class="chip">${m.module_code}</span>`).join('')}</div>
-    </div>`
-        : ''
-    }
   `;
 
-  let pageTitle = 'Cockpit — Minha organização';
-  if (path.endsWith('/team')) pageTitle = 'Cockpit — Equipe';
-  else if (path.endsWith('/roles')) pageTitle = 'Cockpit — Papéis';
-  else if (path.endsWith('/storage')) pageTitle = 'Cockpit — Armazenamento';
-
   await renderShell(container, {
-    title: pageTitle,
+    title: 'Cockpit — Equipe',
     contentHtml: content,
   });
 
@@ -149,11 +136,57 @@ export async function ClientCockpitPage(container, currentPath) {
         { key: 'status', label: 'Status', type: 'text', width: '100px' },
         { key: 'roles', label: 'Papéis', type: 'text', width: '160px' },
       ],
-      rows: (team?.team || []).map((m, i) => ({
+      rows: (teamData?.team || []).map((m, i) => ({
         id: String(m.id ?? m.email ?? i),
         ...m,
       })),
       emptyText: 'Nenhum membro na equipe.',
     });
   }
+}
+
+export async function CockpitRolesPage(container) {
+  const me = await ensureCockpitAccess(container);
+  if (!me) return;
+
+  const roles = await apiWithSession('/api/cockpit/me/roles').catch(() => null);
+
+  const content = roles?.modules
+    ? `<div class="card">
+        <h2 style="font-size:16px;margin-bottom:12px">Módulos contratados</h2>
+        <div class="chip-list">${roles.modules.map((m) => `<span class="chip">${m.module_code}</span>`).join('')}</div>
+      </div>`
+    : `<div class="card"><p class="muted">Nenhum módulo carregado.</p></div>`;
+
+  await renderShell(container, {
+    title: 'Cockpit — Papéis',
+    contentHtml: content,
+  });
+}
+
+export async function CockpitStoragePage(container) {
+  const me = await ensureCockpitAccess(container);
+  if (!me) return;
+
+  const storage = await apiWithSession('/api/cockpit/me/storage').catch(() => null);
+
+  const storageUsed = storage?.storage?.bytesUsed ?? me?.storage?.bytesUsed ?? 0;
+  const storageLimit = storage?.storage?.bytesLimit ?? me?.storage?.bytesLimit ?? null;
+  const pct = storageLimit ? Math.min(100, (storageUsed / storageLimit) * 100) : 0;
+
+  const content = `
+    <div class="card">
+      <h2 style="font-size:16px;margin-bottom:12px">Uso de dados</h2>
+      <p class="muted">Armazenamento da sua organização</p>
+      <p style="font-size:24px;font-weight:700;margin-top:8px">${formatBytes(storageUsed)}${
+        storageLimit ? ` <span class="muted" style="font-size:14px">/ ${formatBytes(storageLimit)}</span>` : ''
+      }</p>
+      ${storageLimit ? `<div class="storage-bar"><div class="storage-bar-fill" style="width:${pct}%"></div></div>` : ''}
+    </div>
+  `;
+
+  await renderShell(container, {
+    title: 'Cockpit — Armazenamento',
+    contentHtml: content,
+  });
 }

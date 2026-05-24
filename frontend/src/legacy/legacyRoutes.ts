@@ -2,7 +2,12 @@ import type { LegacyPageLoader } from './LegacyRouteHost';
 import { LoginPage } from '../pages/LoginPage.js';
 import { CockpitWelcomePage } from '../pages/CockpitWelcomePage.js';
 import { PlatformCockpitPage } from '../pages/PlatformCockpitPage.js';
-import { ClientCockpitPage } from '../pages/ClientCockpitPage.js';
+import {
+  CockpitClientDashboardPage,
+  CockpitTeamPage,
+  CockpitRolesPage,
+  CockpitStoragePage,
+} from '../pages/ClientCockpitPage.js';
 import { InvestDashboardPage } from '../pages/InvestDashboardPage.js';
 import { InvestPortfolioPage } from '../pages/InvestPortfolioPage.js';
 import {
@@ -26,10 +31,10 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/cockpit', loader: CockpitWelcomePage },
   { path: '/cockpit/platform', loader: PlatformCockpitPage },
   { path: '/cockpit/platform/quality', loader: QualityRegressionPage },
-  { path: '/cockpit/client', loader: ClientCockpitPage },
-  { path: '/cockpit/client/team', loader: ClientCockpitPage },
-  { path: '/cockpit/client/roles', loader: ClientCockpitPage },
-  { path: '/cockpit/client/storage', loader: ClientCockpitPage },
+  { path: '/cockpit/client', loader: CockpitClientDashboardPage },
+  { path: '/cockpit/client/team', loader: CockpitTeamPage },
+  { path: '/cockpit/client/roles', loader: CockpitRolesPage },
+  { path: '/cockpit/client/storage', loader: CockpitStoragePage },
   { path: '/invest', loader: InvestDashboardPage },
   { path: '/invest/portfolio', loader: InvestEquitiesPage },
   { path: '/invest/opcoes', loader: InvestOptionsPage },
