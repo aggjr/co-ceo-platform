@@ -11,12 +11,14 @@ import { QualityController } from '../controllers/QualityController';
 import { InvestController } from '../controllers/InvestController';
 import { UiManifestController } from '../controllers/UiManifestController';
 import { PlatformAlertsController } from '../controllers/PlatformAlertsController';
+import { PlatformDeployController } from '../controllers/PlatformDeployController';
 
 const router = Router();
 const gateway = dataGateway;
 const cockpit = new CockpitController(gateway);
 const invest = new InvestController(gateway);
 const platformAlerts = new PlatformAlertsController(gateway);
+const platformDeploy = new PlatformDeployController();
 const telemetry = createTelemetryController(gateway);
 const uiManifest = new UiManifestController(gateway);
 
@@ -36,6 +38,18 @@ router.post(
   AuthMiddleware.protect,
   AuthMiddleware.requireGlobalScope,
   uiManifest.applyCatalog
+);
+router.get(
+  '/platform/deploy/status',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  platformDeploy.getStatus
+);
+router.post(
+  '/platform/deploy/production',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  platformDeploy.triggerProduction
 );
 
 // --- Cockpit plataforma (co-CEO) ---

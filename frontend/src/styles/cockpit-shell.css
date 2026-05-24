@@ -238,6 +238,19 @@
   cursor: not-allowed;
 }
 
+.shell .btn-header-deploy-temp {
+  border-color: rgba(255, 160, 80, 0.7);
+  color: #ffc880;
+}
+
+.shell .btn-header-deploy-temp:hover:not(:disabled) {
+  background: rgba(255, 160, 80, 0.15);
+}
+
+.shell .header-deploy-sync {
+  max-width: 320px;
+}
+
 .shell .header-quotes-sync__flash {
   font-size: 11px;
   line-height: 1.3;
