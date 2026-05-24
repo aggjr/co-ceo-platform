@@ -22,7 +22,17 @@ async function tableExists(pool: Pool, name: string): Promise<boolean> {
 }
 
 function migrationsDir(): string {
-  return path.join(process.cwd(), 'src', 'database', 'migrations');
+  const candidates = [
+    path.join(process.cwd(), 'src', 'database', 'migrations'),
+    path.join(__dirname, '../../database/migrations'),
+    path.join(__dirname, '../../../src/database/migrations'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(path.join(dir, '22_ui_invest_menu_swap_portfolio_options_paths.sql'))) {
+      return dir;
+    }
+  }
+  return candidates[0]!;
 }
 
 async function runSqlFile(pool: Pool, fileName: string): Promise<void> {

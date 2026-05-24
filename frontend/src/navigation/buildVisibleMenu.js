@@ -32,7 +32,7 @@ function ensureInvestFromScreens(licensed, allowed) {
   }
 }
 
-/** Fallback usado quando o manifesto do banco esta vazio (ambiente sem seed). */
+/** Menu embutido (legado) — paths estáveis; não depende do MySQL. */
 export function filterMenuCatalog(catalog, { global, allowed, licensed }) {
   return catalog
     .map((mod) => {
@@ -54,7 +54,7 @@ export function filterMenuCatalog(catalog, { global, allowed, licensed }) {
     .filter(Boolean);
 }
 
-async function loadFallbackMenu() {
+async function loadEmbeddedMenu() {
   const global = isGlobalSession();
   if (global) {
     return filterMenuCatalog(MENU_CATALOG, {
@@ -79,17 +79,45 @@ async function loadFallbackMenu() {
   });
 }
 
+function useDatabaseMenu() {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('coceo_menu_source') === 'database';
+}
+
+function manifestTimeoutMs() {
+  const n = Number(import.meta.env?.VITE_UI_MANIFEST_TIMEOUT_MS);
+  return Number.isFinite(n) && n > 0 ? n : 4000;
+}
+
+async function tryLoadDatabaseMenu() {
+  const manifest = await Promise.race([
+    loadUiManifest(),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('manifest timeout')), manifestTimeoutMs());
+    }),
+  ]);
+  if (manifest?.menu?.length) return manifest.menu;
+  return null;
+}
+
 /**
- * Carrega o menu visivel para o usuario. Fonte de verdade: GET /api/ui/manifest
- * (catalogo no banco + overrides por organizacao). Fallback no MENU_CATALOG embutido
- * apenas quando o manifesto vem vazio (ambiente recem-criado sem seed).
+ * Menu lateral: embutido (menuCatalog.js) por padrão — estável mesmo se o catálogo
+ * no banco estiver desatualizado ou a API estiver lenta. Catálogo BD só com
+ * localStorage coceo_menu_source=database ou VITE_MENU_SOURCE=database no build.
  */
 export async function loadVisibleMenu() {
-  try {
-    const manifest = await loadUiManifest();
-    if (manifest?.menu?.length) return manifest.menu;
-  } catch {
-    // segue para fallback local
+  const preferDb =
+    useDatabaseMenu() || import.meta.env?.VITE_MENU_SOURCE === 'database';
+
+  if (!preferDb) {
+    return loadEmbeddedMenu();
   }
-  return loadFallbackMenu();
+
+  try {
+    const fromDb = await tryLoadDatabaseMenu();
+    if (fromDb?.length) return fromDb;
+  } catch {
+    /* fallback */
+  }
+  return loadEmbeddedMenu();
 }

@@ -1,4 +1,4 @@
-import type { Pool } from 'mysql2/promise';
+import mysql from 'mysql2/promise';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { CoCeoDataGateway } from '../core/dal';
 import {
@@ -9,8 +9,28 @@ import { OptionMarketSyncService } from '../core/invest/OptionMarketSyncService'
 import { scheduleDailyWallClock } from './cronSchedule';
 
 let optionSyncRunning = false;
+let cronPool: mysql.Pool | null = null;
 
-export async function runOptionMarketSyncJob(pool: Pool): Promise<void> {
+/** Pool separado — sync noturno não esgota conexões da API (evita 502). */
+function getCronPool(): mysql.Pool {
+  if (!cronPool) {
+    cronPool = mysql.createPool({
+      host: process.env.DB_HOST || 'localhost',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'co_ceo_platform',
+      charset: 'utf8mb4',
+      waitForConnections: true,
+      connectionLimit: process.env.DB_CRON_POOL_LIMIT
+        ? parseInt(process.env.DB_CRON_POOL_LIMIT, 10)
+        : 3,
+      queueLimit: 0,
+    });
+  }
+  return cronPool;
+}
+
+export async function runOptionMarketSyncJob(pool = getCronPool()): Promise<void> {
   if (optionSyncRunning) {
     console.warn('[cron:options-market] execução anterior ainda em andamento — pulando.');
     return;
@@ -42,7 +62,7 @@ function parseHourMinute(spec: string, fallbackHour: number, fallbackMinute: num
  * Cron embutido na API (EasyPanel / Docker) — não depende de ts-node nem crontab do host.
  * Produção: ativo por padrão. Dev: INVEST_CRON_ENABLED=1 para testar.
  */
-export function startInvestMarketCron(pool: Pool): void {
+export function startInvestMarketCron(): void {
   const enabled =
     process.env.INVEST_CRON_ENABLED === '1' ||
     (process.env.INVEST_CRON_ENABLED !== '0' && process.env.NODE_ENV === 'production');
@@ -64,7 +84,7 @@ export function startInvestMarketCron(pool: Pool): void {
   );
 
   scheduleDailyWallClock(hour, minute, timeZone, 'options-market', () =>
-    runOptionMarketSyncJob(pool)
+    runOptionMarketSyncJob()
   );
 
   if (process.env.INVEST_CRON_RUN_ON_STARTUP === '1') {
@@ -73,7 +93,7 @@ export function startInvestMarketCron(pool: Pool): void {
       `[cron] options-market no startup agendado em ${Math.round(delayMs / 1000)}s (API livre antes).`
     );
     setTimeout(() => {
-      void runOptionMarketSyncJob(pool).catch((err) =>
+      void runOptionMarketSyncJob().catch((err) =>
         console.error('[cron:options-market] falha no startup:', err)
       );
     }, delayMs);

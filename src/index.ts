@@ -48,9 +48,9 @@ app.listen(port, () => {
   console.log(`[co-CEO Core] Dev UI: http://localhost:5173 (npm run dev:web)`);
   console.log('==========================================');
 
-  startInvestMarketCron(pool);
+  startInvestMarketCron();
 
-  if (process.env.UI_CATALOG_BOOTSTRAP_ON_START !== '0') {
+  if (process.env.UI_CATALOG_BOOTSTRAP_ON_START === '1') {
     applyUiCatalog(pool)
       .then((r) => {
         console.log(
