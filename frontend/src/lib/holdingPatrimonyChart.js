@@ -131,7 +131,7 @@ export function renderHoldingPatrimonySummary(
           Ganho ${positive ? '+' : ''}${formatBrl(gain)} · rentab. ${formatPct(twr)} (TWR)
         </span>
         <span class="muted" style="font-size:12px;display:block;margin-top:4px">
-          TWR por fechamentos mensais BTG — ${flowsNote}. Proventos e operações entram no rendimento.
+          TWR diário (TEDs descontados) — ${flowsNote}. Proventos e operações entram no rendimento.
         </span>
         ${
           performance.periodReturnTwrDaily != null &&
@@ -189,6 +189,8 @@ export function renderHoldingPatrimonySummary(
  *   datasetLabel?: string,
  *   cdiBenchmark?: { available?: boolean, series?: Array<{ date: string, indexedLevel: number }> },
  *   stockBenchmark?: { available?: boolean, ticker?: string, series?: Array<{ date: string, indexedLevel: number }> },
+ *   /** TWR diário (índice 100 = 0%) — prioridade sobre patrimônio bruto. */
+ *   portfolioChartSeries?: Array<{ date: string, indexedLevel: number, periodReturnToDate?: number }>,
  * }} [opts]
  */
 export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
@@ -206,7 +208,15 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
 
   const labels = clipped.map((p) => p.date);
   const patrimonyBrl = clipped.map((p) => Number(p.patrimony));
-  const portfolioIndexed = rebaseIndexedSeries(toIndexedFromFirst(patrimonyBrl));
+  const twrByDate = new Map(
+    (opts.portfolioChartSeries || []).map((p) => [
+      String(p.date).slice(0, 10),
+      Number(p.indexedLevel),
+    ])
+  );
+  const portfolioIndexed = twrByDate.size
+    ? rebaseIndexedSeries(labels.map((d) => (twrByDate.has(d) ? twrByDate.get(d) : null)))
+    : rebaseIndexedSeries(toIndexedFromFirst(patrimonyBrl));
   const tickSet = new Set(sampleLabels(clipped));
 
   const gold = '#DAB177';
@@ -233,8 +243,8 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
   const stockOrange = '#FB923C';
 
   const portfolioLabel = opts.datasetLabel
-    ? `${opts.datasetLabel} (%)`
-    : 'Carteira (%)';
+    ? `${opts.datasetLabel} (TWR %)`
+    : 'Carteira (TWR %)';
 
   /** @type {import('chart.js').ChartDataset[]} */
   const datasets = [

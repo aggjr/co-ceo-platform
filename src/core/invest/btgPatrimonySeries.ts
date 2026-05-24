@@ -65,7 +65,8 @@ export function buildBtgAnchorPatrimonyDailyResult(
         periodReturnTwrDaily: performanceDaily.periodReturnTwr,
         monthAnchorTwr: monthLinked?.periodReturnTwr,
         monthAnchorBreakdown: monthLinked?.months,
-        periodReturnTwr: monthLinked?.periodReturnTwr ?? performanceDaily.periodReturnTwr,
+        /** TWR diário com ajuste de TEDs — usado no resumo e no gráfico. */
+        periodReturnTwr: performanceDaily.periodReturnTwr,
         periodGainBrl: monthLinked
           ? Math.round(
               ((monthLinked.months[monthLinked.months.length - 1]?.endPatrimony ??

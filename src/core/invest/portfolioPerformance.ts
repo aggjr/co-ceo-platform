@@ -93,8 +93,9 @@ export function listExternalFlows(
 }
 
 /**
- * Rentabilidade do período com fluxos externos apenas em capital_deposit / capital_withdrawal.
- * Dividendos, JCP, locação, prêmios de opções etc. permanecem no rendimento (sem “quebra”).
+ * TWR diário encadeado: em cada dia t, r_t = (V_t − V_{t−1} − CF_t) / V_{t−1},
+ * com CF_t = capital_deposit/withdrawal (TED) no mesmo dia (fluxo no fim do pregão).
+ * Dividendos, JCP, locação etc. permanecem no rendimento (não são CF externo).
  */
 export function computePortfolioPerformance(
   series: Array<{ date: string; patrimony: number }>,

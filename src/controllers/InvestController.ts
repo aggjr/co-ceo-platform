@@ -29,6 +29,7 @@ import {
   buildCdiBenchmarkForChart,
   buildPatrimonyIndexedSeries,
   buildStockBenchmarkForChart,
+  buildTwrPerformanceChartSeries,
 } from '../core/market/indexBenchmark';
 
 /** Ação principal da holding para curva buy-and-hold no gráfico de Resultado Histórico. */
@@ -409,7 +410,11 @@ export class InvestController {
     const toMonth = to.slice(0, 7);
     const btgReference =
       result.performance != null
-        ? compareToBtgPublished(result.performance.periodReturnTwr, fromMonth, toMonth)
+        ? compareToBtgPublished(
+            result.performance.monthAnchorTwr ?? result.performance.periodReturnTwr,
+            fromMonth,
+            toMonth
+          )
         : null;
 
     const extractReconciliation = buildExtractReconciliationSummary();
@@ -454,11 +459,15 @@ export class InvestController {
       chartDates,
       CHART_BENCHMARK_STOCK
     );
-    const portfolioIndexed = buildPatrimonyIndexedSeries(result.series);
+    const portfolioIndexed =
+      result.performance?.points?.length
+        ? buildTwrPerformanceChartSeries(result.performance.points)
+        : buildPatrimonyIndexedSeries(result.series);
     const portfolioPeriodReturn =
-      portfolioIndexed.length >= 2
+      result.performance?.periodReturnTwr ??
+      (portfolioIndexed.length >= 2
         ? portfolioIndexed[portfolioIndexed.length - 1]!.periodReturnToDate
-        : null;
+        : null);
     const cdiComparison =
       cdiBenchmark.available &&
       cdiBenchmark.periodReturn != null &&
@@ -508,7 +517,10 @@ export class InvestController {
         calibrateToAnchors
           ? 'Série com calibração às âncoras mensais BTG.'
           : 'Série econômica: livro-razão × cotação do dia (ou PM quando sem cotação).',
-        'TWR: fluxos externos apenas capital_deposit/withdrawal (TEDs).',
+        'Gráfico da carteira: TWR diário (rentab. acumulada), descontando aportes e retiradas (TEDs).',
+        result.performance?.externalFlows?.length
+          ? `${result.performance.externalFlows.length} fluxo(s) externo(s) no período (capital_deposit/withdrawal).`
+          : 'Nenhum TED no livro — confira importação do extrato BTG.',
         cdiBenchmark.available
           ? `CDI: ${cdiBenchmark.observationDays} dia(s) em market_index_daily (índice 100 no gráfico).`
           : 'CDI indisponível — rode npm run sync:market:indices e confira migration 22.',

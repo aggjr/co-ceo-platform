@@ -170,6 +170,7 @@ function bindPatrimonyChart(container) {
       if (canvas) {
         const result = mountHoldingPatrimonyChart(canvas, series, {
           datasetLabel: chartLegendLabel(data),
+          portfolioChartSeries: data.portfolioIndexed,
           cdiBenchmark: data.cdiBenchmark,
           stockBenchmark: data.stockBenchmark,
         });
@@ -248,8 +249,8 @@ export async function InvestDashboardPage(container) {
         <${D}>
           <h2 style="font-size:18px;margin:0">${screenTitle}</h2>
           <p class="muted" style="margin:4px 0 0;font-size:13px">
-            Todas as curvas em rentabilidade acumulada (%), partindo de 0% no primeiro dia do período.
-            Valores em R$ aparecem no resumo acima e no tooltip da carteira. Padrão: 31/12/2025 até ontem.
+            Rentabilidade acumulada (TWR): aportes e retiradas (TEDs) não distorcem a curva da carteira.
+            Patrimônio em R$ no resumo e no tooltip. Padrão: 31/12/2025 até ontem.
           </p>
         </${D}>
         <label>De <input type="date" id="patrimony-from" value="${defaultFrom()}" min="${PERIOD_START}" /></label>

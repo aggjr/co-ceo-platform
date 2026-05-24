@@ -311,7 +311,7 @@ export function buildDailyPatrimonyMtmSeries(
         periodReturnTwrDaily: performanceDaily.periodReturnTwr,
         monthAnchorTwr: monthLinked?.periodReturnTwr,
         monthAnchorBreakdown: monthLinked?.months,
-        periodReturnTwr: monthLinked?.periodReturnTwr ?? performanceDaily.periodReturnTwr,
+        periodReturnTwr: performanceDaily.periodReturnTwr,
         periodGainBrl: monthLinked
           ? Math.round(
               ((monthLinked.months[monthLinked.months.length - 1]?.endPatrimony ?? performanceDaily.endPatrimony) -

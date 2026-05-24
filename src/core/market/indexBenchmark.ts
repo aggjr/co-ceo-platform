@@ -224,6 +224,26 @@ export function buildStockBenchmarkForChart(
   };
 }
 
+/**
+ * Curva da carteira para o gráfico: TWR diário (índice 100 = 0%), com saques/aportes
+ * removidos via capital_deposit/withdrawal no motor de performance.
+ */
+export function buildTwrPerformanceChartSeries(
+  performancePoints: Array<{ date: string; cumulativeReturnTwr: number | null }>,
+  baseLevel = 100
+): BenchmarkChartPoint[] {
+  return performancePoints.map((p) => {
+    const twr = Number(p.cumulativeReturnTwr ?? 0);
+    const level = Math.round(baseLevel * (1 + twr) * 1_000_000) / 1_000_000;
+    return {
+      date: String(p.date).slice(0, 10),
+      indexedLevel: level,
+      periodReturnToDate: Math.round(twr * 1_000_000) / 1_000_000,
+      dailyFactor: null,
+    };
+  });
+}
+
 export function buildPatrimonyIndexedSeries(
   patrimonySeries: { date: string; patrimony: number }[],
   baseLevel = 100
