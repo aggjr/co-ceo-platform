@@ -1,6 +1,6 @@
 {
   "name": "co-ceo-core",
-  "version": "0.0.80",
+  "version": "0.0.81",
   "description": "co-CEO Platform Core API",
   "main": "dist/index.js",
   "scripts": {
@@ -29,6 +29,7 @@
     "seed:ui-catalog:raw": "node ./node_modules/ts-node/dist/bin.js scripts/seed-ui-catalog-raw.ts",
     "db:ui-catalog": "node ./node_modules/ts-node/dist/bin.js scripts/apply-ui-catalog-db.ts",
     "db:ui-catalog:remote": "node ./node_modules/ts-node/dist/bin.js scripts/apply-ui-catalog-db.ts --remote",
+    "deploy:production": "node scripts/deploy-production.js",
     "record:patrimony:daily": "node ./node_modules/ts-node/dist/bin.js scripts/record-daily-patrimony.ts",
     "fetch:b3:quotes": "node ./node_modules/ts-node/dist/bin.js scripts/fetch-b3-quotes.ts",
     "invest:daily-close": "node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts",

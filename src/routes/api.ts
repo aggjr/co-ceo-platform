@@ -30,6 +30,12 @@ router.post('/telemetry/events', AuthMiddleware.protect, telemetry.ingest);
 
 // --- UI manifest (menu + textos resolvidos para o tenant) ---
 router.get('/ui/manifest', AuthMiddleware.protect, uiManifest.getManifest);
+router.post(
+  '/platform/ui-catalog/apply',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  uiManifest.applyCatalog
+);
 
 // --- Cockpit plataforma (co-CEO) ---
 router.get(

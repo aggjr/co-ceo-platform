@@ -3,6 +3,7 @@ import path from 'path';
 import pool from './config/database';
 import apiRoutes from './routes/api';
 import { APP_VERSION } from './generated/version';
+import { applyUiCatalog } from './core/ui/UiCatalogApplyService';
 import { startInvestMarketCron } from './jobs/investMarketCron';
 
 const app = express();
@@ -46,5 +47,18 @@ app.listen(port, () => {
   console.log(`[co-CEO Core] API + Web na porta ${port}`);
   console.log(`[co-CEO Core] Dev UI: http://localhost:5173 (npm run dev:web)`);
   console.log('==========================================');
+
   startInvestMarketCron(pool);
+
+  if (process.env.UI_CATALOG_BOOTSTRAP_ON_START !== '0') {
+    applyUiCatalog(pool)
+      .then((r) => {
+        console.log(
+          `[co-CEO Core] Catálogo UI sincronizado (textos=${r.textsUpserted}, menu=${r.menuUpserted}).`
+        );
+      })
+      .catch((err) => {
+        console.error('[co-CEO Core] Falha ao sincronizar catálogo UI no boot:', err);
+      });
+  }
 });

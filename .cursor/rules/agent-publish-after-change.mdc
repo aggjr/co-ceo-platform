@@ -21,6 +21,16 @@ Equivalente: commit na branch do agente → `git-publish-to-main` → merge das 
 
 Se a working tree estiver limpa mas a branch local estiver atras do `origin/main`, rodar `npm run git:ensure-version` e `git push origin <branch-do-agente>` para nao deixar remoto desalinhado.
 
+## Producao (codigo + banco)
+
+Apos `git:ship` com alteracoes que afetam runtime ou catalogo UI, rodar **sem perguntar**:
+
+```bash
+npm run deploy:production
+```
+
+Isso aciona o webhook EasyPanel (`EASYPANEL_DEPLOY_WEBHOOK_URL` no `.env`), aguarda a versao em `https://platform.co-ceo.com.br/api/version` e sincroniza o catalogo UI no MySQL interno (API ou bootstrap no boot do container).
+
 Login e sidebar leem `/api/version` (`frontend/src/lib/appVersion.js`) — ver `agent-version-ui.mdc`.
 
 ## Sem perguntar ao usuario
