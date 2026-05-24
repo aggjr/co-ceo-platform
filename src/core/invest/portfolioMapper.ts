@@ -302,7 +302,7 @@ export function enrichPortfolioRow(
   } else {
     updatedQuote = metaLast > 0 ? metaLast : null;
   }
-  const pmB3 = prices.b3 > 0 ? prices.b3 : displayAvg;
+  const pmB3 = prices.b3 > 0 ? prices.b3 : 0;
   let marketValue = qty * lastPrice;
   let costBasis = qty * displayAvg;
   let pnl = marketValue - costBasis;
@@ -344,14 +344,12 @@ export function enrichPortfolioRow(
 
   if (equityLike) {
     const quote = updatedQuote ?? 0;
-    const b3Cost = pmB3 > 0 ? pmB3 : displayAvg;
-    costBasis = Math.round(qty * b3Cost * 100) / 100;
-    marketValue =
-      quote > 0 ? Math.round(qty * quote * 100) / 100 : Math.round(qty * b3Cost * 100) / 100;
+    costBasis = pmB3 > 0 ? Math.round(qty * pmB3 * 100) / 100 : 0;
+    marketValue = quote > 0 ? Math.round(qty * quote * 100) / 100 : 0;
     if (pmB3 > 0 && quote > 0) {
       pnl = equityResultFromB3Quote(pmB3, quote, qty);
     } else {
-      pnl = Math.round((marketValue - costBasis) * 100) / 100;
+      pnl = 0;
     }
   }
 
@@ -578,8 +576,24 @@ export function applyAllocationPercents(items: PortfolioItemDto[]): PortfolioIte
 
 export function summarizePortfolio(items: PortfolioItemDto[]): PortfolioSummaryDto {
   const totalMarketValue = items.reduce((s, i) => s + i.marketValue, 0);
-  const totalCostBasis = items.reduce((s, i) => s + i.costBasis, 0);
-  const totalPnl = totalMarketValue - totalCostBasis;
+  const totalCostBasis = items.reduce((s, i) => {
+    if (i.assetType === 'stock' || i.assetType === 'fii') {
+      const b3 = i.prices?.b3 ?? 0;
+      return s + (b3 > 0 ? Math.round(i.quantity * b3 * 100) / 100 : 0);
+    }
+    return s + i.costBasis;
+  }, 0);
+  const totalPnl = items.reduce((s, i) => {
+    if (i.assetType === 'stock' || i.assetType === 'fii') {
+      const b3 = i.prices?.b3 ?? 0;
+      const quote = i.updatedQuote ?? 0;
+      if (b3 > 0 && quote > 0) {
+        return s + equityResultFromB3Quote(b3, quote, i.quantity);
+      }
+      return s;
+    }
+    return s + i.pnl;
+  }, 0);
   const totalPnlPct = totalCostBasis > 0 ? (totalPnl / totalCostBasis) * 100 : 0;
   return {
     positionCount: items.length,
