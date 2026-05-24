@@ -1,5 +1,4 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
-import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { inferUnderlyingTicker, isOptionTicker } from './assetClassifier';
 import { fetchOpcoesNetOptionsChainAll } from './opcoesNetClient';
 import { parseOpcoesNetExpirations } from './opcoesNetChainParser';
@@ -23,19 +22,19 @@ function sleep(ms: number): Promise<void> {
  */
 export class OptionMarketSyncService {
   private readonly marketRepo: OptionMarketRepository;
-  private readonly quoteRepo: MarketQuoteRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.marketRepo = new OptionMarketRepository(gateway);
-    this.quoteRepo = new MarketQuoteRepository(gateway);
   }
 
+  /** Custódia real em patrimony_items (não exige invest_position_ext). */
   async listUnderlyingsWithOptionsInUse(ctx: UserContext): Promise<string[]> {
-    const tickers = await this.quoteRepo.listTickersInUse(ctx);
+    const rows = await this.gateway.readQuery(ctx, 'invest_open_option_tickers', []);
     const underlyings = new Set<string>();
-    for (const t of tickers) {
-      if (!isOptionTicker(t)) continue;
-      underlyings.add(inferUnderlyingTicker(t));
+    for (const row of rows) {
+      const ticker = String(row.ticker ?? '').toUpperCase();
+      if (!ticker || !isOptionTicker(ticker)) continue;
+      underlyings.add(inferUnderlyingTicker(ticker));
     }
     return [...underlyings].sort();
   }

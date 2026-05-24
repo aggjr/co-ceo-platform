@@ -22,12 +22,14 @@ async function main() {
     .map((a) => a.trim().toUpperCase())
     .filter((a) => a && !a.startsWith('--'));
 
+  const host = process.env.REMOTE_DB_HOST || process.env.DB_HOST || '127.0.0.1';
   const pool = mysql.createPool({
-    host: process.env.DB_HOST || '127.0.0.1',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME || 'co_ceo_db',
+    host,
+    user: process.env.REMOTE_DB_USER || process.env.DB_USER || 'root',
+    password: process.env.REMOTE_DB_PASSWORD || process.env.DB_PASSWORD,
+    database: process.env.REMOTE_DB_NAME || process.env.DB_NAME || 'co_ceo_platform',
   });
+  console.log(`Banco: ${host}`);
 
   const gateway = new CoCeoDataGateway(pool);
   const ctx = authBootstrapContext();

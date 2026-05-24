@@ -32,6 +32,7 @@ export type GatewayReadQueryKey =
   | 'market_index_daily_range'
   | 'market_index_daily_on_or_before'
   | 'market_distinct_tickers_in_use'
+  | 'invest_open_option_tickers'
   | 'market_quotes_bulk_range'
   | 'ui_menu_nodes_active'
   | 'ui_texts_resolved_for_org'
@@ -323,7 +324,7 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
     requiresGlobalScope: true,
     sql: `SELECT DISTINCT pi.identifier AS ticker, ipe.asset_class
           FROM patrimony_items pi
-          INNER JOIN invest_position_ext ipe ON ipe.patrimony_item_id = pi.id
+          LEFT JOIN invest_position_ext ipe ON ipe.patrimony_item_id = pi.id
           WHERE pi.source_module = 'INVEST'
             AND pi.status = 'active'
             AND pi.deleted_at IS NULL
@@ -332,6 +333,18 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
             AND pi.identifier NOT LIKE 'CDB-%'
             AND pi.identifier NOT LIKE 'LFT-%'
             AND pi.identifier NOT LIKE 'TD-%'
+          ORDER BY pi.identifier`,
+  },
+  invest_open_option_tickers: {
+    requiresGlobalScope: true,
+    sql: `SELECT DISTINCT pi.identifier AS ticker
+          FROM patrimony_items pi
+          WHERE pi.source_module = 'INVEST'
+            AND pi.status = 'active'
+            AND pi.deleted_at IS NULL
+            AND ABS(pi.quantity) > 0.0001
+            AND pi.identifier REGEXP '^[A-Z]{4}[A-X][0-9]'
+            AND pi.identifier NOT LIKE 'CAIXA-%'
           ORDER BY pi.identifier`,
   },
   ui_menu_nodes_active: {
