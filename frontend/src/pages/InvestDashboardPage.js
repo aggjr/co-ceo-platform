@@ -12,7 +12,7 @@ import {
 import { formatDateBr } from '../lib/dateFormat.js';
 
 const D = 'div';
-const PERIOD_START = '2026-01-01';
+const PERIOD_START = '2025-12-31';
 
 function localDateParts(d = new Date()) {
   return {
@@ -58,14 +58,14 @@ function clampToToday(dateStr) {
 }
 
 function chartLegendLabel(data) {
+  if (data?.patrimonySource === 'ledger_plus_btg_anchors') {
+    return 'Holding (patrimônio ajustado BTG)';
+  }
   if (data?.dailyRecording?.storedDaysInRange > 0) {
     return 'Patrimônio diário (fechamentos gravados)';
   }
   if (data?.marketQuotes?.usesHistoricalQuotes) {
     return 'Patrimônio diário (livro × cotações de mercado)';
-  }
-  if (data?.patrimonySource === 'ledger_plus_btg_anchors') {
-    return 'Patrimônio diário (âncoras BTG)';
   }
   return 'Patrimônio diário (livro-razão)';
 }
@@ -148,7 +148,7 @@ function bindPatrimonyChart(container) {
       if (fromInput) fromInput.min = PERIOD_START;
 
       const data = await apiRequest(
-        `/api/invest/patrimony-daily?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&method=mtm_economic`
+        `/api/invest/patrimony-daily?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&method=mtm_btg`
       );
       const today = todayIso();
       const series = (data.series || []).filter((p) => String(p.date).slice(0, 10) <= today);
@@ -249,7 +249,7 @@ export async function InvestDashboardPage(container) {
           <h2 style="font-size:18px;margin:0">${screenTitle}</h2>
           <p class="muted" style="margin:4px 0 0;font-size:13px">
             Patrimônio em R$ (esquerda). CDI (branco tracejado) e PRIO3 buy-and-hold (laranja) em índice 100 (direita).
-            Clique na legenda para ocultar qualquer linha. Padrão: 01/01/2026 até ontem.
+            Curva calibrada às âncoras mensais BTG (custódia). Padrão: 31/12/2025 até ontem.
           </p>
         </${D}>
         <label>De <input type="date" id="patrimony-from" value="${defaultFrom()}" min="${PERIOD_START}" /></label>

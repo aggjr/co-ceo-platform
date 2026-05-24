@@ -144,7 +144,7 @@ export function buildDailyPatrimonyMtmSeries(
   options?: PatrimonyMtmOptions
 ): PatrimonyDailyResult {
   const anchors = options?.anchors ?? loadPatrimonyAnchors();
-  const calibrate = options?.calibrateToAnchors !== false;
+  const calibrate = options?.calibrateToAnchors === true;
   const fixedIncome =
     options?.fixedIncomeTotal ?? Number(anchors.fixed_income_total ?? 0);
   const stockQuotes = options?.stockQuotes ?? {};

@@ -13,15 +13,13 @@ import {
   STOCK_PIVOT_COLUMNS,
 } from '../core/invest/StockUnderlyingPivotEngine';
 import { buildDailyPatrimonySeries } from '../core/invest/PatrimonyDailyEngine';
+import { buildBtgAnchorPatrimonyDailyResult } from '../core/invest/btgPatrimonySeries';
 import { buildDailyPatrimonyMtmSeries } from '../core/invest/PatrimonyMtmDailyEngine';
 import { buildBrokerageNoteReviewRows } from '../core/invest/brokerageNotesReviewFromLedger';
 import { buildExtractReconciliationSummary } from '../core/invest/btgExtractCashSeries';
 import { compareToBtgPublished } from '../core/invest/btgPerformanceReference';
-import { loadPatrimonyAnchors } from '../core/invest/patrimonyAnchors';
-import {
-  fixedIncomeTotalFromLedger,
-  shouldUseBtgAnchorCalibration,
-} from '../core/invest/patrimonyLedgerGates';
+import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
+import { fixedIncomeTotalFromLedger } from '../core/invest/patrimonyLedgerGates';
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import { fetchB3Quotes } from '../core/invest/B3QuoteProvider';
@@ -38,6 +36,7 @@ const CHART_BENCHMARK_STOCK =
   (process.env.INVEST_CHART_BENCHMARK_TICKER || 'PRIO3').trim().toUpperCase();
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import {
+  filterStoredDaysForChartMethod,
   mergeStoredPatrimonySeries,
   trimZeroPatrimonyTailAfterLastStored,
   PatrimonyDailyStore,
@@ -90,6 +89,7 @@ export class InvestController {
   private readonly quoteSync: InvestQuoteSyncService;
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuoteRepo: MarketQuoteRepository;
+  private readonly patrimonyAnchorsRepo: PatrimonyMonthlyAnchorsRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -98,6 +98,7 @@ export class InvestController {
     this.quoteSync = new InvestQuoteSyncService(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuoteRepo = new MarketQuoteRepository(gateway);
+    this.patrimonyAnchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
   }
 
   listPortfolio = async (req: Request, res: Response) => {
@@ -372,30 +373,30 @@ export class InvestController {
         ? this.marketQuoteRepo.buildQuoteForDateFn(quoteMap)
         : undefined;
 
-    const anchors = loadPatrimonyAnchors();
-    const calibrateToAnchors =
-      method === 'mtm_btg' &&
-      shouldUseBtgAnchorCalibration(events) &&
-      anchors.month_ends.length > 0;
+    const anchors = await this.patrimonyAnchorsRepo.loadForOrganization(ctx);
+    const useBtgAnchorCurve = method === 'mtm_btg' && anchors.month_ends.length > 0;
+    const calibrateToAnchors = useBtgAnchorCurve;
     const fixedIncomeTotal = calibrateToAnchors
       ? Number(anchors.fixed_income_total ?? 0)
       : fixedIncomeTotalFromLedger(events);
 
+    const riskFree = Number.isFinite(riskFreeAnnual) ? riskFreeAnnual : 0;
     let result =
       method === 'ledger_replay'
-        ? buildDailyPatrimonySeries(events, from, to, {
-            riskFreeAnnual: Number.isFinite(riskFreeAnnual) ? riskFreeAnnual : 0,
-          })
-        : buildDailyPatrimonyMtmSeries(events, from, to, {
-            riskFreeAnnual: Number.isFinite(riskFreeAnnual) ? riskFreeAnnual : 0,
-            anchors,
-            stockQuotes,
-            fixedIncomeTotal,
-            calibrateToAnchors,
-            quoteForDate,
-          });
+        ? buildDailyPatrimonySeries(events, from, to, { riskFreeAnnual: riskFree })
+        : useBtgAnchorCurve
+          ? buildBtgAnchorPatrimonyDailyResult(events, from, to, anchors, riskFree)
+          : buildDailyPatrimonyMtmSeries(events, from, to, {
+              riskFreeAnnual: riskFree,
+              anchors,
+              stockQuotes,
+              fixedIncomeTotal,
+              calibrateToAnchors: false,
+              quoteForDate,
+            });
 
-    const storedDays = await this.patrimonyStore.loadRange(ctx, from, to);
+    const storedDaysRaw = await this.patrimonyStore.loadRange(ctx, from, to);
+    const storedDays = filterStoredDaysForChartMethod(storedDaysRaw, method);
     let storedDates: string[] = [];
     if (storedDays.length > 0) {
       const merged = mergeStoredPatrimonySeries(result.series, storedDays);

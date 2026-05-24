@@ -83,6 +83,7 @@ const TABLES: TableDefinition[] = [
   // financial_accounts + financial_ledger_entries.
   def('invest_daily_snapshots', 'tenant', { softDelete: false }),
   def('invest_portfolio_daily', 'tenant', { softDelete: false }),
+  def('invest_patrimony_monthly_anchors', 'tenant', { softDelete: false }),
   def('invest_options_chain', 'global', {
     softDelete: false,
     primaryKey: 'ticker',

@@ -4,10 +4,8 @@ export type PatrimonyAnchorFile = {
 };
 
 /**
- * Âncoras de patrimônio não vêm mais de arquivo JSON no repositório
- * (ver .cursor/rules/no-runtime-data-files.mdc). A integração com a fonte
- * canônica (livro razão / tabela de âncoras no banco) ainda será modelada.
- * Por enquanto, retorna vazio: a série de patrimônio fica somente sobre o livro razão.
+ * Legado para scripts sem contexto de organização.
+ * Preferir {@link PatrimonyMonthlyAnchorsRepository.loadForOrganization}.
  */
 export function loadPatrimonyAnchors(): PatrimonyAnchorFile {
   return { month_ends: [], fixed_income_total: 0 };

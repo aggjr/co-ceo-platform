@@ -238,6 +238,21 @@ export class PatrimonyDailyStore {
   }
 }
 
+/**
+ * Fechamentos gravados com source mtm_economic distorcem a curva calibrada BTG.
+ * Só mesclamos snapshots compatíveis com o método do gráfico.
+ */
+export function filterStoredDaysForChartMethod(
+  stored: StoredPortfolioDay[],
+  method: string
+): StoredPortfolioDay[] {
+  const m = method.toLowerCase();
+  if (m === 'mtm_btg') {
+    return stored.filter((s) => s.source === 'mtm_btg_calibrated');
+  }
+  return stored;
+}
+
 /** Substitui dias gravados na série calculada; inclui dias só em invest_portfolio_daily. */
 export function mergeStoredPatrimonySeries(
   computed: DailyPatrimonyPoint[],
