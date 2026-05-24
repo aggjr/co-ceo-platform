@@ -68,8 +68,14 @@ export function startInvestMarketCron(pool: Pool): void {
   );
 
   if (process.env.INVEST_CRON_RUN_ON_STARTUP === '1') {
-    void runOptionMarketSyncJob(pool).catch((err) =>
-      console.error('[cron:options-market] falha no startup:', err)
+    const delayMs = Number(process.env.INVEST_CRON_STARTUP_DELAY_MS) || 120_000;
+    console.log(
+      `[cron] options-market no startup agendado em ${Math.round(delayMs / 1000)}s (API livre antes).`
     );
+    setTimeout(() => {
+      void runOptionMarketSyncJob(pool).catch((err) =>
+        console.error('[cron:options-market] falha no startup:', err)
+      );
+    }, delayMs);
   }
 }
