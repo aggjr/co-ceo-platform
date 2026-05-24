@@ -5,19 +5,32 @@ alwaysApply: true
 
 # Publicar apos alterar codigo (obrigatorio)
 
-**Subir para o Git = commit local + push `origin` (`main` e branch do agente).** Commit so na maquina nao conta como publicado.
+**Subir para o Git = commit local + push `origin` na branch do agente + integrar em `main`.** Commit so na maquina nao conta como publicado.
+
+## Ordem obrigatoria (multi-agente)
+
+Varios agentes trabalham em paralelo em branches diferentes. **Nunca** commitar/push direto em `main` sem passar pela branch do agente primeiro — senao o trabalho dos outros agentes (ainda nao integrado) e **perdido ou sobrescrito** no merge.
+
+Fluxo **sempre** nesta ordem:
+
+1. Commit na **branch do agente** (ex.: `antigravity-gamer`)
+2. **`git push origin <branch-do-agente>`** — publicar o trabalho desta sessao
+3. **`git checkout main`** → `git pull origin main` → merge da branch do agente → bump de versao → **`git push origin main`**
+4. Realinhar a branch do agente com `main` (`git checkout <branch>` → `git merge main` → `git push origin <branch>`)
+
+Proibido: alterar `main` local/remoto com commits proprios antes do passo 2.
 
 Quando o agente executor **terminar** alteracoes de codigo nesta sessao (task, fix, script, regra), **nao perguntar** se deve commitar ou integrar. Fazer sempre:
 
 1. `npm run git:ensure-version` (se ainda nao alinhou no inicio)
 2. `tsc --noEmit` e criterio de aceite da task, se houver
-3. **Commit + integracao + bump** em um fluxo:
+3. **Commit + push branch + integracao + bump** (o script abaixo deve respeitar a ordem acima):
 
 ```bash
 npm run git:ship -- -Message "tipo(escopo): assunto curto"
 ```
 
-Equivalente: commit na branch do agente → `git-publish-to-main` → merge das branches par em `main` → **sempre** incrementa patch + `verify:version-ui` + `build:web` → **push** `origin/main` + **push** `origin/<branch-do-agente>` e realinha a branch local.
+Se `git:ship` falhar no push da branch ou no merge, **nao** contornar commitando so em `main` — corrigir e repetir na branch do agente.
 
 Se a working tree estiver limpa mas a branch local estiver atras do `origin/main`, rodar `npm run git:ensure-version` e `git push origin <branch-do-agente>` para nao deixar remoto desalinhado.
 
@@ -48,4 +61,6 @@ Resposta padrao: **sim, sempre**, exceto se o usuario disser explicitamente para
 
 ## Outros agentes
 
-Apos o push, `main` fica com versao nova; outros agentes/maquinas usam `npm run git:ensure-version` na proxima sessao.
+- Cada agente usa **sua** branch (`antigravity-gamer`, `antigravity-guto`, etc.) — nunca a do colega.
+- Apos integracao em `main`, outros agentes rodam `npm run git:ensure-version` na proxima sessao para trazer `main` antes de novo trabalho.
+- Integrar em `main` sem antes ter feito push da branch do agente = risco de apagar commits de outros agentes ainda so no remoto da branch deles.
