@@ -516,18 +516,18 @@ export function buildInvestOptionsColumns() {
         return span;
       },
     },
-    { key: 'avgPrice', label: 'Preço médio', type: 'currency', align: 'right', width: '104px' },
+    { key: 'avgPrice', label: 'Prêmio', type: 'currency', align: 'right', width: '104px' },
     {
       key: 'updatedQuote',
       label: 'Cotação opção',
       type: 'currency',
       align: 'right',
       width: '100px',
-      render: (row) => renderPriceCell(row.updatedQuote ?? row.lastPrice),
+      render: (row) => renderPriceCell(row.updatedQuote),
     },
     {
       key: 'premiumReceived',
-      label: 'Prêmio recebido',
+      label: 'Prêmio total',
       type: 'currency',
       align: 'right',
       width: '112px',
