@@ -32,6 +32,10 @@ tr.sgp-totals-row td {
   font-weight: 600;
 }
 
+tr.sgp-totals-row td.sgp-total-col {
+  background: rgba(218, 177, 119, 0.18);
+}
+
 .sgp-page .coceo-excel-grid-host .table-wrapper,
 .sgp-page .excel-table {
   min-width: 1400px;
