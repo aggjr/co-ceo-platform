@@ -34,10 +34,36 @@ function priceCell(v) {
   return formatBrl(Number(v));
 }
 
+/** Colunas de resultado somadas na linha (exceto PM, cotação e total). */
+const ROW_TOTAL_COMPONENT_KEYS = new Set([
+  'venda_call',
+  'compra_call',
+  'venda_put',
+  'compra_put',
+  'dividendos',
+  'jcp',
+  'locacao_acao',
+  'trade',
+  'day_trade',
+  'bonus',
+  'outros_ganhos',
+]);
+
+function sumRowOperations(row) {
+  let sum = 0;
+  for (const key of ROW_TOTAL_COMPONENT_KEYS) {
+    sum += Number(row[key] ?? 0);
+  }
+  const taxas = Number(row.taxas ?? 0);
+  return Math.round((sum - taxas) * 100) / 100;
+}
+
 function buildColumns(columnLabels, columnOrder) {
-  const valueCols = (columnOrder || Object.keys(columnLabels)).filter(
-    (k) => k !== 'ganho_aproximado'
+  const ordered = columnOrder?.length ? columnOrder : Object.keys(columnLabels);
+  const valueCols = ordered.filter(
+    (k) => k !== 'ganho_aproximado' && k !== 'preco_estrito' && k !== 'cotacao_atual'
   );
+
   const cols = [
     {
       key: 'underlying',
@@ -45,16 +71,26 @@ function buildColumns(columnLabels, columnOrder) {
       align: 'left',
       sortValue: (r) => r.underlying,
       filterText: (r) => r.underlying,
-      cell: (r) => `<strong>${r.label || r.underlying}</strong>`,
+      cell: (r) =>
+        r.underlying === 'TOTAL'
+          ? '<strong>Total geral</strong>'
+          : `<strong>${r.label || r.underlying}</strong>`,
     },
     {
-      key: 'ganho_aproximado',
-      label: columnLabels.ganho_aproximado || 'Resultado Total',
+      key: 'preco_estrito',
+      label: 'Preço estrito (PM)',
       align: 'right',
-      sortValue: (r) => Number(r.ganho_aproximado ?? 0),
-      filterText: (r) => String(r.ganho_aproximado ?? 0),
-      cell: (r) => numCell(r.ganho_aproximado),
-      cellClass: () => 'sgp-total-col',
+      sortValue: (r) => r.preco_estrito ?? -1,
+      filterText: (r) => String(r.preco_estrito ?? ''),
+      cell: (r) => (r.underlying === 'TOTAL' ? '' : priceCell(r.preco_estrito)),
+    },
+    {
+      key: 'cotacao_atual',
+      label: 'Cotação atual',
+      align: 'right',
+      sortValue: (r) => r.cotacao_atual ?? -1,
+      filterText: (r) => String(r.cotacao_atual ?? ''),
+      cell: (r) => (r.underlying === 'TOTAL' ? '' : priceCell(r.cotacao_atual)),
     },
   ];
 
@@ -68,6 +104,22 @@ function buildColumns(columnLabels, columnOrder) {
       cell: (r) => numCell(r[key]),
     });
   }
+
+  cols.push({
+    key: 'ganho_aproximado',
+    label: columnLabels.ganho_aproximado || 'Total',
+    align: 'right',
+    sortValue: (r) => Number(r.ganho_aproximado ?? sumRowOperations(r)),
+    filterText: (r) => String(r.ganho_aproximado ?? sumRowOperations(r)),
+    cell: (r) => {
+      const v =
+        r.ganho_aproximado != null && Number.isFinite(Number(r.ganho_aproximado))
+          ? Number(r.ganho_aproximado)
+          : sumRowOperations(r);
+      return numCell(v);
+    },
+    cellClass: () => 'sgp-total-col',
+  });
 
   return cols;
 }
@@ -95,7 +147,9 @@ function bindPage(container) {
       const columnOrder = data.columnOrder || [];
 
       if (summaryHost && pivot?.totals) {
-        summaryHost.innerHTML = `<p class="muted">Período <strong>${pivot.from}</strong> a <strong>${pivot.to}</strong> — resultado total: <strong class="sgp-up">${formatBrl(pivot.totals.ganho_aproximado)}</strong> · taxas: <strong>${formatBrl(pivot.totals.taxas)}</strong></p>`;
+        const net = Number(pivot.totals.ganho_aproximado ?? 0);
+        const netCls = net > 0 ? 'sgp-up' : net < 0 ? 'sgp-down' : '';
+        summaryHost.innerHTML = `<p class="muted">Período <strong>${pivot.from}</strong> a <strong>${pivot.to}</strong> — resultado total: <strong class="${netCls}">${formatBrl(net)}</strong> · taxas: <strong>${formatBrl(pivot.totals.taxas)}</strong></p>`;
       }
 
       const rows = [...(pivot?.rows || [])];
