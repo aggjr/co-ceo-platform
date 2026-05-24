@@ -58,14 +58,14 @@ function clampToToday(dateStr) {
 }
 
 function chartLegendLabel(data) {
+  if (data?.patrimonySource === 'ledger_plus_btg_anchors') {
+    return 'Holding (patrimônio ajustado BTG)';
+  }
   if (data?.dailyRecording?.storedDaysInRange > 0) {
     return 'Patrimônio diário (fechamentos gravados)';
   }
   if (data?.marketQuotes?.usesHistoricalQuotes) {
     return 'Patrimônio diário (livro × cotações de mercado)';
-  }
-  if (data?.patrimonySource === 'ledger_plus_btg_anchors') {
-    return 'Patrimônio diário (âncoras BTG)';
   }
   return 'Patrimônio diário (livro-razão)';
 }

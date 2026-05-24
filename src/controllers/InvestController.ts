@@ -13,15 +13,13 @@ import {
   STOCK_PIVOT_COLUMNS,
 } from '../core/invest/StockUnderlyingPivotEngine';
 import { buildDailyPatrimonySeries } from '../core/invest/PatrimonyDailyEngine';
+import { buildBtgAnchorPatrimonyDailyResult } from '../core/invest/btgPatrimonySeries';
 import { buildDailyPatrimonyMtmSeries } from '../core/invest/PatrimonyMtmDailyEngine';
 import { buildBrokerageNoteReviewRows } from '../core/invest/brokerageNotesReviewFromLedger';
 import { buildExtractReconciliationSummary } from '../core/invest/btgExtractCashSeries';
 import { compareToBtgPublished } from '../core/invest/btgPerformanceReference';
 import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
-import {
-  fixedIncomeTotalFromLedger,
-  shouldUseBtgAnchorCalibration,
-} from '../core/invest/patrimonyLedgerGates';
+import { fixedIncomeTotalFromLedger } from '../core/invest/patrimonyLedgerGates';
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
@@ -332,27 +330,26 @@ export class InvestController {
         : undefined;
 
     const anchors = await this.patrimonyAnchorsRepo.loadForOrganization(ctx);
-    const calibrateToAnchors =
-      method === 'mtm_btg' &&
-      shouldUseBtgAnchorCalibration(events) &&
-      anchors.month_ends.length > 0;
+    const useBtgAnchorCurve = method === 'mtm_btg' && anchors.month_ends.length > 0;
+    const calibrateToAnchors = useBtgAnchorCurve;
     const fixedIncomeTotal = calibrateToAnchors
       ? Number(anchors.fixed_income_total ?? 0)
       : fixedIncomeTotalFromLedger(events);
 
+    const riskFree = Number.isFinite(riskFreeAnnual) ? riskFreeAnnual : 0;
     let result =
       method === 'ledger_replay'
-        ? buildDailyPatrimonySeries(events, from, to, {
-            riskFreeAnnual: Number.isFinite(riskFreeAnnual) ? riskFreeAnnual : 0,
-          })
-        : buildDailyPatrimonyMtmSeries(events, from, to, {
-            riskFreeAnnual: Number.isFinite(riskFreeAnnual) ? riskFreeAnnual : 0,
-            anchors,
-            stockQuotes,
-            fixedIncomeTotal,
-            calibrateToAnchors,
-            quoteForDate,
-          });
+        ? buildDailyPatrimonySeries(events, from, to, { riskFreeAnnual: riskFree })
+        : useBtgAnchorCurve
+          ? buildBtgAnchorPatrimonyDailyResult(events, from, to, anchors, riskFree)
+          : buildDailyPatrimonyMtmSeries(events, from, to, {
+              riskFreeAnnual: riskFree,
+              anchors,
+              stockQuotes,
+              fixedIncomeTotal,
+              calibrateToAnchors: false,
+              quoteForDate,
+            });
 
     const storedDaysRaw = await this.patrimonyStore.loadRange(ctx, from, to);
     const storedDays = filterStoredDaysForChartMethod(storedDaysRaw, method);
