@@ -1,0 +1,16 @@
+---
+description: INVEST — cotação atual na UI vem de market_quotes_daily, nunca do PM.
+alwaysApply: false
+---
+
+# Cotação atual vs PM (ações/FIIs)
+
+| Coluna UI | Fonte |
+|-----------|--------|
+| Preço estrito / PM B3 / Meu PM | Livro razão (`buildThreeAvgPricesByUnderlying`) |
+| **Cotação atual** | `market_quotes_daily` via `MarketQuoteRepository.loadLatestQuoteMap` |
+| Resultado / % | `(cotação − PM B3) × qty` |
+
+`listPortfolio` injeta `marketQuote` em `enrichPortfolioRow`. **Não** usar `managerial_avg_price` nem `invest_position_ext.last_price` como fallback de cotação para ações — isso iguala PM e mercado.
+
+Se cotação aparecer `—` ou zerada: rodar `npm run sync:market:quotes:stocks` (e `backfill:market:quotes` se necessário).

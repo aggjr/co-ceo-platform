@@ -126,6 +126,23 @@ export class InvestController {
     const marketCatalog = await loadOptionMarketCatalog(this.gateway);
     const strikeHints = { ledgerStrikeByTicker, marketCatalog };
 
+    const equityTickers = [
+      ...new Set(
+        rowsMerged
+          .map((r) => {
+            const t = String(r.asset_ticker ?? '').trim().toUpperCase();
+            if (!t || t.startsWith('CAIXA-')) return '';
+            const type = String(r.asset_type ?? '').toLowerCase();
+            return type === 'stock' || type === 'fii' ? t : '';
+          })
+          .filter(Boolean)
+      ),
+    ];
+    const marketQuoteMap = await this.marketQuoteRepo.loadLatestQuoteMap(
+      ctx,
+      equityTickers
+    );
+
     const items = [];
     for (const raw of rowsMerged) {
       const row = mergeOptionStrikeIntoAssetRow(
@@ -156,8 +173,12 @@ export class InvestController {
         threeByUnderlying,
         Number(filtered.managerial_avg_price ?? 0)
       );
-      const item = enrichPortfolioRow(filtered, three, strikeHints);
       const ticker = String(filtered.asset_ticker ?? '').toUpperCase();
+      const mq = marketQuoteMap.get(ticker);
+      const marketQuote = mq
+        ? { price: mq.price, asOf: mq.date }
+        : null;
+      const item = enrichPortfolioRow(filtered, three, strikeHints, marketQuote);
       const assetType = String(item.assetType ?? '');
       if (
         (assetType === 'stock' || assetType === 'fii') &&
@@ -550,23 +571,13 @@ export class InvestController {
     const events = await this.ledger.listLedgerEvents(ctx, from, to);
     let pivot = buildStockUnderlyingPivot(events, from, to);
 
-    const assets = await this.assetProjection.listActiveAssets(ctx);
+    const underlyings = [
+      ...new Set(pivot.rows.map((r) => String(r.underlying || '').toUpperCase()).filter(Boolean)),
+    ];
+    const marketMap = await this.marketQuoteRepo.loadLatestQuoteMap(ctx, underlyings);
     const quotesByTicker: Record<string, { lastPrice?: number }> = {};
-    for (const row of assets) {
-      const ticker = String(row.asset_ticker ?? '').toUpperCase();
-      let meta: { last_price?: number } = {};
-      if (row.metadata) {
-        try {
-          meta =
-            typeof row.metadata === 'string'
-              ? JSON.parse(row.metadata)
-              : (row.metadata as { last_price?: number });
-        } catch {
-          meta = {};
-        }
-      }
-      const lp = Number(meta.last_price ?? row.managerial_avg_price ?? 0);
-      if (Number.isFinite(lp) && lp > 0) quotesByTicker[ticker] = { lastPrice: lp };
+    for (const [ticker, mq] of marketMap) {
+      if (mq.price > 0) quotesByTicker[ticker] = { lastPrice: mq.price };
     }
     pivot = enrichStockPivotWithQuotes(pivot, quotesByTicker);
 

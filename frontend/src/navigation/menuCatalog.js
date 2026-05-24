@@ -64,12 +64,12 @@ export const MENU_CATALOG = [
       },
       {
         label: 'AÇÕES/FIIs',
-        path: '/invest/opcoes',
+        path: '/invest/portfolio',
         resourceKey: 'screen.invest.portfolio',
       },
       {
         label: 'Opções',
-        path: '/invest/portfolio',
+        path: '/invest/opcoes',
         resourceKey: 'screen.invest.portfolio',
       },
       {

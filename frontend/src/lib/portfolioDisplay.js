@@ -269,6 +269,40 @@ function sumPortfolioTotals(list) {
   return { totalValue, totalPnl, totalPct };
 }
 
+function sumEquitySheetTotals(list) {
+  let totalValue = 0;
+  let totalPnl = 0;
+  let totalCostB3 = 0;
+  for (const r of list) {
+    totalValue += equityMarketValue(r);
+    totalPnl += equityResultFromB3Quote(r);
+    totalCostB3 += equityCostBasisB3(r);
+  }
+  const totalPct = totalCostB3 > 0 ? (totalPnl / totalCostB3) * 100 : 0;
+  return { totalValue, totalPnl, totalPct };
+}
+
+/** Rodapé ações/FIIs: Valor/Resultado/% sempre na base B3 + cotação de mercado. */
+export function buildEquityTableFooterColumnTotals(rows) {
+  return ({ formatCurrency, currentData, columns }) => {
+    const list = currentData?.length ? currentData : rows || [];
+    const { totalValue, totalPnl, totalPct } = sumEquitySheetTotals(list);
+    const pctSign = totalPct >= 0 ? '+' : '';
+    const pctCls = totalPnl >= 0 ? 'portfolio-pnl--up' : 'portfolio-pnl--down';
+    const cells = emptyFooterCells(columns);
+    if ('marketValue' in cells) {
+      cells.marketValue = `<span class="portfolio-footer-total">${formatCurrency(totalValue)}</span>`;
+    }
+    if ('pnl' in cells) {
+      cells.pnl = `<span class="portfolio-footer-total ${pnlClass(totalPnl)}">${formatCurrency(totalPnl)}</span>`;
+    }
+    if ('pnlPct' in cells) {
+      cells.pnlPct = `<span class="portfolio-footer-total ${pctCls}">${pctSign}${totalPct.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%</span>`;
+    }
+    return cells;
+  };
+}
+
 /** Totais alinhados às colunas (ações/FIIs e planilhas genéricas). */
 export function buildCustodyTableFooterColumnTotals(rows) {
   return ({ formatCurrency, currentData, columns }) => {
@@ -290,15 +324,48 @@ export function buildCustodyTableFooterColumnTotals(rows) {
   };
 }
 
-/** Resultado ações/FIIs: (cotação atual. − PM B3) × quantidade. */
-export function equityResultFromB3Quote(row) {
-  const pmB3 = Number(row.prices?.b3 ?? row.avgPrice);
-  const quote = Number(row.updatedQuote ?? row.lastPrice);
+/** PM B3 do livro (única base para resultado % e custo — não usar PM gerencial). */
+export function equityPmB3(row) {
+  const pm = Number(row.prices?.b3);
+  return Number.isFinite(pm) && pm > 0 ? pm : 0;
+}
+
+export function equityQuote(row) {
+  const q = Number(row.updatedQuote ?? row.lastPrice);
+  return Number.isFinite(q) && q > 0 ? q : 0;
+}
+
+/** Valor de mercado na custódia: cotação × quantidade (fecha patrimônio com caixa). */
+export function equityMarketValue(row) {
+  const quote = equityQuote(row);
   const qty = Number(row.quantity);
-  if (!Number.isFinite(pmB3) || pmB3 <= 0 || !Number.isFinite(quote) || !Number.isFinite(qty)) {
-    return Number(row.pnl ?? 0);
-  }
+  if (quote <= 0 || !Number.isFinite(qty)) return 0;
+  return Math.round(quote * qty * 100) / 100;
+}
+
+/** Custo na base B3: PM B3 × quantidade. */
+export function equityCostBasisB3(row) {
+  const pmB3 = equityPmB3(row);
+  const qty = Number(row.quantity);
+  if (pmB3 <= 0 || !Number.isFinite(qty)) return 0;
+  return Math.round(pmB3 * qty * 100) / 100;
+}
+
+/** Resultado ações/FIIs: (cotação − PM B3) × quantidade. */
+export function equityResultFromB3Quote(row) {
+  const pmB3 = equityPmB3(row);
+  const quote = equityQuote(row);
+  const qty = Number(row.quantity);
+  if (pmB3 <= 0 || quote <= 0 || !Number.isFinite(qty)) return 0;
   return Math.round((quote - pmB3) * qty * 100) / 100;
+}
+
+/** % sobre PM B3: (cotação / PM B3 − 1) × 100. */
+export function equityReturnPctB3(row) {
+  const pmB3 = equityPmB3(row);
+  const quote = equityQuote(row);
+  if (pmB3 <= 0 || quote <= 0) return null;
+  return ((quote - pmB3) / pmB3) * 100;
 }
 
 /** % resultado da opção: (último − preço médio) / preço médio × 100. */
@@ -626,6 +693,7 @@ export function buildOptionsTableFooterColumnTotals(rows) {
 
 function resolveFooterColumnTotals(sheetKey, items) {
   if (sheetKey === 'options') return buildOptionsTableFooterColumnTotals(items);
+  if (sheetKey === 'equities') return buildEquityTableFooterColumnTotals(items);
   return buildCustodyTableFooterColumnTotals(items);
 }
 
@@ -736,33 +804,7 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
             render: (row) =>
               renderPriceCell(row.prices?.managerial ?? row.avgPrice),
           },
-          {
-            key: 'threePricesObservation',
-            label: 'Obs. 3 preços',
-            type: 'text',
-            width: '160px',
-            render: (row) => {
-              const v = row.threePricesValidation;
-              const span = document.createElement('span');
-              if (!v || v.status === 'ok' || !v.observation) {
-                span.className = 'muted';
-                span.textContent = '—';
-                return span;
-              }
-              span.textContent = v.observation;
-              span.style.fontSize = '11px';
-              span.style.lineHeight = '1.3';
-              span.style.display = 'block';
-              span.style.maxWidth = '200px';
-              span.style.overflow = 'hidden';
-              span.style.textOverflow = 'ellipsis';
-              span.style.whiteSpace = 'nowrap';
-              span.className =
-                v.status === 'error' ? 'portfolio-3p-obs--error' : 'portfolio-3p-obs--warn';
-              span.title = v.messages?.join('\n') || v.observation;
-              return span;
-            },
-          },
+
         ]
       : [
           {
@@ -795,15 +837,12 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
       render:
         sheetKey === 'equities'
           ? (row) => {
-              const quote = Number(row.updatedQuote ?? row.lastPrice);
-              const qty = Number(row.quantity);
-              const value =
-                quote > 0 && Number.isFinite(qty)
-                  ? Math.round(quote * qty * 100) / 100
-                  : Number(row.marketValue ?? 0);
               const span = document.createElement('span');
-              span.textContent = formatBrl(value);
-              span.title = 'Cotação atual × quantidade (patrimônio de mercado)';
+              const value = equityMarketValue(row);
+              span.textContent = value > 0 ? formatBrl(value) : '—';
+              if (value <= 0) span.className = 'muted';
+              span.title =
+                'Cotação de mercado × quantidade (patrimônio). Resultado e % usam PM B3 como custo.';
               return span;
             }
           : undefined,
@@ -843,23 +882,22 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
     },
     {
       key: 'pnlPct',
-      label: '% Resultado',
+      label: sheetKey === 'equities' ? '%' : '% Resultado',
       type: 'number',
       align: 'right',
-      width: '96px',
+      width: sheetKey === 'equities' ? '56px' : '96px',
       render: (row) => {
         const span = document.createElement('span');
-        const pmB3 = Number(row.prices?.b3 ?? row.avgPrice);
-        const quote = Number(row.updatedQuote ?? row.lastPrice);
         const pct =
-          sheetKey === 'equities' && pmB3 > 0 && Number.isFinite(quote)
-            ? ((quote - pmB3) / pmB3) * 100
-            : row.pnlPct;
+          sheetKey === 'equities' ? equityReturnPctB3(row) : row.pnlPct;
         const pnlForColor =
           sheetKey === 'equities' ? equityResultFromB3Quote(row) : row.pnl;
         span.className = pnlClass(pnlForColor);
         span.style.fontWeight = '600';
         span.textContent = formatPct(pct);
+        if (sheetKey === 'equities') {
+          span.title = '(Cotação − PM B3) / PM B3';
+        }
         return span;
       },
     },
@@ -881,59 +919,19 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
             return span;
           }
           span.textContent = formatNumber(row.callsSold, 0);
-          const prem = Number(row.callsPremiumPending);
-          if (prem > 0) {
-            span.title = `CALLs vendidas (soma das posições curtas CALL, incl. PRIOF). Prêmio em trânsito (D+1): ${formatBrl(prem)}`;
-          } else {
-            span.title =
-              'CALLs vendidas — soma das posições curtas CALL (planilha Opções + livro-razão)';
-          }
-          return span;
-        },
-      },
-      {
-        key: 'callsPremiumPending',
-        label: 'Prêmio CALL (D+1)',
-        type: 'currency',
-        align: 'right',
-        width: '120px',
-        render: (row) => {
-          const span = document.createElement('span');
-          const prem = Number(row.callsPremiumPending);
-          if (!Number.isFinite(prem) || prem <= 0) {
-            span.className = 'muted';
-            span.textContent = '—';
-            return span;
-          }
-          span.textContent = formatBrl(prem);
-          span.style.fontWeight = '600';
-          span.className = 'portfolio-call-premium-pending';
-          span.title = 'Prêmio das CALLs vendidas — crédito previsto na conta investimento (D+1 útil)';
-          return span;
-        },
-      },
-      {
-        key: 'callsRemaining',
-        label: 'CALLs sobrando',
-        type: 'number',
-        align: 'right',
-        width: '112px',
-        render: (row) => {
-          const span = document.createElement('span');
-          if (row.callsRemaining == null) {
-            span.className = 'muted';
-            span.textContent = '—';
-            return span;
-          }
-          const n = Number(row.callsRemaining);
-          span.textContent = formatNumber(n, 0);
-          span.style.fontWeight = '600';
-          if (n < 0) {
+          
+          const rem = Number(row.callsRemaining);
+          if (rem < 0) {
+            span.style.fontWeight = '600';
             span.className = 'portfolio-calls-uncovered';
-            span.title =
-              'Vendido mais CALLs do que ações em custódia — risco de posição descoberta';
+            span.title = `Venda a descoberto: há ${formatNumber(Math.abs(rem), 0)} CALLs vendidas a mais do que a quantidade de ações em custódia. Alto risco de exercício descoberto!`;
           } else {
-            span.title = 'Ações em custódia − CALLs vendidas (mesma unidade da corretora)';
+            const prem = Number(row.callsPremiumPending);
+            if (prem > 0) {
+              span.title = `CALLs vendidas (soma das posições curtas CALL, incl. PRIOF). Prêmio em trânsito (D+1): ${formatBrl(prem)}`;
+            } else {
+              span.title = 'CALLs vendidas — soma das posições curtas CALL (planilha Opções + livro-razão)';
+            }
           }
           return span;
         },
@@ -1058,7 +1056,7 @@ export function computePortfolioPatrimonyFromTables(
   const { equities } = splitPortfolioBySheet(filtered);
   const options = filterOptionsVencimentoAfterToday(filtered);
   const cashLike = collectCashLikeCustodyItems(openItems);
-  const equitiesMv = equities.reduce((s, i) => s + (Number(i.marketValue) || 0), 0);
+  const equitiesMv = equities.reduce((s, i) => s + equityMarketValue(i), 0);
   const optionsMv = options.reduce((s, i) => s + (Number(i.marketValue) || 0), 0);
   const cashPositionsMv = cashLike.reduce((s, i) => s + (Number(i.marketValue) || 0), 0);
   const inTransitNet = Number(cashInTransit?.inTransitNet) || 0;

@@ -230,13 +230,16 @@ export function mergeOptionStrikeIntoAssetRow(
   return { ...row, metadata: JSON.stringify(meta) };
 }
 
+export type MarketQuoteHint = { price: number; asOf?: string };
+
 export function enrichPortfolioRow(
   row: Record<string, unknown>,
   threePrices?: ThreeAvgPrices,
   strikeHints?: {
     ledgerStrikeByTicker?: Map<string, number>;
     marketCatalog?: Map<string, OptionMarketRow>;
-  }
+  },
+  marketQuote?: MarketQuoteHint | null
 ): PortfolioItemDto {
   const meta = parseMetadata(row.metadata);
   const qty = Number(row.current_quantity ?? 0);
@@ -275,14 +278,31 @@ export function enrichPortfolioRow(
     displayAvg = prices.managerial > 0 ? prices.managerial : avg;
   }
 
+  const marketPx =
+    marketQuote != null &&
+    Number.isFinite(marketQuote.price) &&
+    marketQuote.price > 0
+      ? marketQuote.price
+      : null;
+  const equityLike = isEquityPortfolioItem(assetType, optionLike);
+
   let lastPrice = metaLast > 0 ? metaLast : displayAvg;
+  let updatedQuote: number | null = null;
+
   if (optionLike) {
     if (metaLast > 0) lastPrice = metaLast;
     else if (custodyUnitMark > 0) lastPrice = custodyUnitMark;
     else if (displayAvg > 0) lastPrice = displayAvg;
+    updatedQuote =
+      metaLast > 0 ? metaLast : custodyUnitMark > 0 ? custodyUnitMark : null;
+  } else if (equityLike) {
+    // Cotação de mercado (market_quotes_daily / brapi) — nunca confundir com PM do livro.
+    updatedQuote = marketPx;
+    lastPrice = marketPx ?? 0;
+  } else {
+    updatedQuote = metaLast > 0 ? metaLast : null;
   }
-  const updatedQuote = metaLast > 0 ? metaLast : optionLike && custodyUnitMark > 0 ? custodyUnitMark : null;
-  const pmB3 = prices.b3 > 0 ? prices.b3 : displayAvg;
+  const pmB3 = prices.b3 > 0 ? prices.b3 : 0;
   let marketValue = qty * lastPrice;
   let costBasis = qty * displayAvg;
   let pnl = marketValue - costBasis;
@@ -322,22 +342,21 @@ export function enrichPortfolioRow(
     }
   }
 
-  if (isEquityPortfolioItem(assetType, optionLike)) {
-    const quote = updatedQuote ?? lastPrice;
-    const b3Cost = pmB3 > 0 ? pmB3 : displayAvg;
-    costBasis = Math.round(qty * b3Cost * 100) / 100;
-    marketValue = Math.round(qty * quote * 100) / 100;
-    if (pmB3 > 0) {
+  if (equityLike) {
+    const quote = updatedQuote ?? 0;
+    costBasis = pmB3 > 0 ? Math.round(qty * pmB3 * 100) / 100 : 0;
+    marketValue = quote > 0 ? Math.round(qty * quote * 100) / 100 : 0;
+    if (pmB3 > 0 && quote > 0) {
       pnl = equityResultFromB3Quote(pmB3, quote, qty);
     } else {
-      pnl = Math.round((marketValue - costBasis) * 100) / 100;
+      pnl = 0;
     }
   }
 
   const pnlPct = optionLike
     ? optionPriceReturnPct(lastPrice, displayAvg)
-    : isEquityPortfolioItem(assetType, optionLike) && pmB3 > 0
-      ? optionPriceReturnPct(updatedQuote ?? lastPrice, pmB3)
+    : equityLike && pmB3 > 0 && updatedQuote != null && updatedQuote > 0
+      ? optionPriceReturnPct(updatedQuote, pmB3)
       : costBasis > 0
         ? (pnl / costBasis) * 100
         : 0;
@@ -557,8 +576,24 @@ export function applyAllocationPercents(items: PortfolioItemDto[]): PortfolioIte
 
 export function summarizePortfolio(items: PortfolioItemDto[]): PortfolioSummaryDto {
   const totalMarketValue = items.reduce((s, i) => s + i.marketValue, 0);
-  const totalCostBasis = items.reduce((s, i) => s + i.costBasis, 0);
-  const totalPnl = totalMarketValue - totalCostBasis;
+  const totalCostBasis = items.reduce((s, i) => {
+    if (i.assetType === 'stock' || i.assetType === 'fii') {
+      const b3 = i.prices?.b3 ?? 0;
+      return s + (b3 > 0 ? Math.round(i.quantity * b3 * 100) / 100 : 0);
+    }
+    return s + i.costBasis;
+  }, 0);
+  const totalPnl = items.reduce((s, i) => {
+    if (i.assetType === 'stock' || i.assetType === 'fii') {
+      const b3 = i.prices?.b3 ?? 0;
+      const quote = i.updatedQuote ?? 0;
+      if (b3 > 0 && quote > 0) {
+        return s + equityResultFromB3Quote(b3, quote, i.quantity);
+      }
+      return s;
+    }
+    return s + i.pnl;
+  }, 0);
   const totalPnlPct = totalCostBasis > 0 ? (totalPnl / totalCostBasis) * 100 : 0;
   return {
     positionCount: items.length,
