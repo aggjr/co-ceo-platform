@@ -5,6 +5,8 @@ alwaysApply: true
 
 # Publicar apos alterar codigo (obrigatorio)
 
+**Subir para o Git = commit local + push `origin` (`main` e branch do agente).** Commit so na maquina nao conta como publicado.
+
 Quando o agente executor **terminar** alteracoes de codigo nesta sessao (task, fix, script, regra), **nao perguntar** se deve commitar ou integrar. Fazer sempre:
 
 1. `npm run git:ensure-version` (se ainda nao alinhou no inicio)
@@ -15,7 +17,9 @@ Quando o agente executor **terminar** alteracoes de codigo nesta sessao (task, f
 npm run git:ship -- -Message "tipo(escopo): assunto curto"
 ```
 
-Equivalente: commit na branch do agente → `git-publish-to-main` → merge das branches par em `main` → **sempre** incrementa patch + `verify:version-ui` + `build:web` → push `main` e realinha a branch local.
+Equivalente: commit na branch do agente → `git-publish-to-main` → merge das branches par em `main` → **sempre** incrementa patch + `verify:version-ui` + `build:web` → **push** `origin/main` + **push** `origin/<branch-do-agente>` e realinha a branch local.
+
+Se a working tree estiver limpa mas a branch local estiver atras do `origin/main`, rodar `npm run git:ensure-version` e `git push origin <branch-do-agente>` para nao deixar remoto desalinhado.
 
 Login e sidebar leem `/api/version` (`frontend/src/lib/appVersion.js`) — ver `agent-version-ui.mdc`.
 
