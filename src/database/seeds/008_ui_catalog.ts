@@ -381,7 +381,7 @@ const TEXTS: TextSeed[] = [
     module_code: 'INVEST',
     kind: 'value_label',
     default_text: 'PUT',
-    metadata: typeMeta('notes-type--put', '#eab308', '--invest-type-put'),
+    metadata: typeMeta('notes-type--put', '#f97316', '--invest-type-put'),
   },
   {
     id: '00000000-0000-4003-8000-000000000303',
