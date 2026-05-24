@@ -63,6 +63,7 @@ describe('PatrimonyMtmDailyEngine', () => {
       anchors,
       stockQuotes: { PRIO3: 50 },
       fixedIncomeTotal: 100_000,
+      calibrateToAnchors: true,
     });
     const last = r.series[r.series.length - 1]!;
     expect(last.patrimony).toBeCloseTo(1_100_000, 0);
@@ -77,6 +78,7 @@ describe('PatrimonyMtmDailyEngine', () => {
       anchors,
       stockQuotes: { PRIO3: 40 },
       fixedIncomeTotal: 0,
+      calibrateToAnchors: true,
     });
     expect(r.meta.method).toBe('mtm_btg_calibrated');
     expect(r.series.length).toBeGreaterThan(0);

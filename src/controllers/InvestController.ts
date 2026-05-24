@@ -17,7 +17,7 @@ import { buildDailyPatrimonyMtmSeries } from '../core/invest/PatrimonyMtmDailyEn
 import { buildBrokerageNoteReviewRows } from '../core/invest/brokerageNotesReviewFromLedger';
 import { buildExtractReconciliationSummary } from '../core/invest/btgExtractCashSeries';
 import { compareToBtgPublished } from '../core/invest/btgPerformanceReference';
-import { loadPatrimonyAnchors } from '../core/invest/patrimonyAnchors';
+import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
 import {
   fixedIncomeTotalFromLedger,
   shouldUseBtgAnchorCalibration,
@@ -36,6 +36,7 @@ const CHART_BENCHMARK_STOCK =
   (process.env.INVEST_CHART_BENCHMARK_TICKER || 'PRIO3').trim().toUpperCase();
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import {
+  filterStoredDaysForChartMethod,
   mergeStoredPatrimonySeries,
   trimZeroPatrimonyTailAfterLastStored,
   PatrimonyDailyStore,
@@ -87,6 +88,7 @@ export class InvestController {
   private readonly quoteSync: InvestQuoteSyncService;
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuoteRepo: MarketQuoteRepository;
+  private readonly patrimonyAnchorsRepo: PatrimonyMonthlyAnchorsRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -95,6 +97,7 @@ export class InvestController {
     this.quoteSync = new InvestQuoteSyncService(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuoteRepo = new MarketQuoteRepository(gateway);
+    this.patrimonyAnchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
   }
 
   listPortfolio = async (req: Request, res: Response) => {
@@ -328,7 +331,7 @@ export class InvestController {
         ? this.marketQuoteRepo.buildQuoteForDateFn(quoteMap)
         : undefined;
 
-    const anchors = loadPatrimonyAnchors();
+    const anchors = await this.patrimonyAnchorsRepo.loadForOrganization(ctx);
     const calibrateToAnchors =
       method === 'mtm_btg' &&
       shouldUseBtgAnchorCalibration(events) &&
@@ -351,7 +354,8 @@ export class InvestController {
             quoteForDate,
           });
 
-    const storedDays = await this.patrimonyStore.loadRange(ctx, from, to);
+    const storedDaysRaw = await this.patrimonyStore.loadRange(ctx, from, to);
+    const storedDays = filterStoredDaysForChartMethod(storedDaysRaw, method);
     let storedDates: string[] = [];
     if (storedDays.length > 0) {
       const merged = mergeStoredPatrimonySeries(result.series, storedDays);

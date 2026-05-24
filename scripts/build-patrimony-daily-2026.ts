@@ -13,7 +13,8 @@ import { CoCeoDataGateway } from '../src/core/dal';
 import { installerContext } from '../src/database/seeds/lib/installerContext';
 import { LedgerImportService } from '../src/core/invest/LedgerImportService';
 import { buildDailyPatrimonyMtmSeries } from '../src/core/invest/PatrimonyMtmDailyEngine';
-import { loadPatrimonyAnchors } from '../src/core/invest/patrimonyAnchors';
+import { HOLDING_BTG_PATRIMONY_ANCHORS } from '../src/core/invest/btgPatrimonyAnchorReference';
+import { PatrimonyMonthlyAnchorsRepository } from '../src/core/invest/PatrimonyMonthlyAnchorsRepository';
 import { PatrimonyDailyStore } from '../src/core/invest/PatrimonyDailyStore';
 import { aggregateExternalFlowsByDate } from '../src/core/invest/portfolioPerformance';
 
@@ -59,12 +60,17 @@ async function main() {
     if (Number.isFinite(lp) && lp >= 0) stockQuotes[ticker] = lp;
   }
 
-  const anchors = loadPatrimonyAnchors();
+  const anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
+  const anchors = await anchorsRepo.loadForOrganization(ctx);
   const events = await ledger.listLedgerEvents(ctx, '2025-12-01', '2026-12-31');
+  const calibrate =
+    anchors.month_ends.length > 0 &&
+    events.some((e) => String(e.transaction_type) === 'opening_balance');
   const result = buildDailyPatrimonyMtmSeries(events, '2026-01-01', '2026-12-31', {
-    anchors,
+    anchors: anchors.month_ends.length ? anchors : HOLDING_BTG_PATRIMONY_ANCHORS,
     stockQuotes,
-    fixedIncomeTotal: Number(anchors.fixed_income_total ?? 0),
+    fixedIncomeTotal: Number(anchors.fixed_income_total ?? HOLDING_BTG_PATRIMONY_ANCHORS.fixed_income_total ?? 0),
+    calibrateToAnchors: calibrate,
   });
 
   const outPath = path.join(__dirname, '..', 'data', 'invest', 'patrimony-daily-2026.json');
