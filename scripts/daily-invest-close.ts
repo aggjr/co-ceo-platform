@@ -1,91 +1,71 @@
 /**
- * Rotina diária (rodar na manhã do dia seguinte ao pregão):
- *   1) Cotações ações/FIIs → brapi.dev (fechamento D-1)
- *   2) Opções → snapshot BTG opcional (--snapshot)
- *   3) Grava patrimônio econômico do dia
+ * Fechamento INVEST manual (mesma rotina do cron 23h em produção).
  *
  * Uso:
- *   node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts
- *   node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts --date=2026-05-19
- *   node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts --snapshot=data/invest/snapshot-btg-quotes-current.json
+ *   npm run invest:daily-close
+ *   npm run invest:daily-close -- --date=2026-05-22
+ *   npm run invest:daily-close -- org-holding-001
  */
-import fs from 'fs';
-import path from 'path';
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import { CoCeoDataGateway } from '../src/core/dal';
-import { installerContext } from '../src/database/seeds/lib/installerContext';
-import { InvestQuoteSyncService } from '../src/core/invest/InvestQuoteSyncService';
-import { PatrimonyDailyRecorder } from '../src/core/invest/PatrimonyDailyRecorder';
+import {
+  brazilClosingDateIso,
+  resolveInvestCronOrganizationIds,
+  runInvestDailyCloseForOrg,
+} from '../src/core/invest/investDailyCloseService';
 
 dotenv.config();
 
-const ORG = process.env.PORTFOLIO_ORG_ID || 'org-holding-001';
-
-function defaultClosingDate(): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-
-function parseArgs(): { date: string; snapshot?: string; skipFetch: boolean } {
-  let date = defaultClosingDate();
-  let snapshot: string | undefined;
-  let skipFetch = false;
+function parseArgs(): { date: string; orgIds: string[] } {
+  let date = brazilClosingDateIso();
+  const orgIds = [...resolveInvestCronOrganizationIds()];
   for (const arg of process.argv.slice(2)) {
     if (arg.startsWith('--date=')) date = arg.slice(7).slice(0, 10);
-    else if (arg === '--skip-fetch') skipFetch = true;
-    else if (arg.startsWith('--snapshot=')) snapshot = arg.slice(11);
     else if (/^\d{4}-\d{2}-\d{2}$/.test(arg)) date = arg.slice(0, 10);
+    else if (arg.startsWith('org-')) orgIds.push(arg);
   }
-  return { date, snapshot, skipFetch };
+  return { date, orgIds: [...new Set(orgIds)] };
 }
 
 async function main() {
-  const { date, snapshot, skipFetch } = parseArgs();
-
+  const { date, orgIds } = parseArgs();
   const pool = mysql.createPool({
     host: process.env.DB_HOST || '127.0.0.1',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'co_ceo_db',
   });
-
   const gateway = new CoCeoDataGateway(pool);
-  const ctx = { ...installerContext(), organizationId: ORG, scope: 'node' as const };
-  const quoteSync = new InvestQuoteSyncService(gateway);
-  const recorder = new PatrimonyDailyRecorder(gateway);
 
   console.log('=== Fechamento INVEST', date, '===\n');
 
-  if (!skipFetch) {
-    console.log('1) Cotações B3 (brapi)…');
-    const q = await quoteSync.syncFromBrapi(ctx, date);
-    console.log('   Atualizados:', q.updated, '/', q.requested);
-    if (q.missing.length) console.log('   Faltando:', q.missing.join(', '));
-  } else {
-    console.log('1) Cotações: pulado (--skip-fetch)');
+  for (const orgId of orgIds) {
+    console.log('Organização:', orgId);
+    const r = await runInvestDailyCloseForOrg(gateway, orgId, date);
+    console.log('  Ações atualizadas:', r.stockQuotes.updated, '/', r.stockQuotes.requested);
+    if (r.stockQuotes.missing.length) {
+      console.log('  Faltando cotação:', r.stockQuotes.missing.join(', '));
+    }
+    if (r.options) {
+      console.log('  Opções opcoes.net:', r.options.rowsParsed, 'linhas');
+    }
+    console.log('  Patrimônio:', r.patrimony.recorded.patrimony.toLocaleString('pt-BR'));
+    console.log(
+      '  TWR dia:',
+      r.patrimony.recorded.daily_return_twr != null
+        ? `${(r.patrimony.recorded.daily_return_twr * 100).toFixed(4)}%`
+        : '—'
+    );
+    console.log(
+      '  TWR acum. gravado:',
+      r.patrimony.recorded.cumulative_twr != null
+        ? `${(r.patrimony.recorded.cumulative_twr * 100).toFixed(4)}%`
+        : '—'
+    );
+    console.log('  Snapshots ativos:', r.patrimony.positionsSaved);
+    console.log('');
   }
-
-  const snapPath =
-    snapshot || path.join(__dirname, '..', 'data', 'invest', 'snapshot-btg-quotes-current.json');
-  if (fs.existsSync(snapPath)) {
-    console.log('\n2) Opções do snapshot BTG:', snapPath);
-    const snap = JSON.parse(fs.readFileSync(snapPath, 'utf8')) as {
-      renda_variavel?: { opcoes?: { items?: Array<{ ticker: string; last_price?: number }> } };
-    };
-    const items = snap.renda_variavel?.opcoes?.items || [];
-    const n = await quoteSync.applySnapshotOptions(ctx, items, date);
-    console.log('   Opções atualizadas:', n);
-  } else {
-    console.log('\n2) Snapshot BTG não encontrado — opções mantêm última cotação gravada.');
-  }
-
-  console.log('\n3) Gravando patrimônio diário…');
-  const saved = await recorder.recordDay(ctx, date);
-  console.log('   Patrimônio:', saved.recorded.patrimony.toLocaleString('pt-BR'));
-  console.log('   TWR dia:', saved.recorded.daily_return_twr != null ? `${(saved.recorded.daily_return_twr * 100).toFixed(4)}%` : '—');
-  console.log('   Posições:', saved.positionsSaved);
 
   await pool.end();
 }

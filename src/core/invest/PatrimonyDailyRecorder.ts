@@ -88,7 +88,9 @@ export class PatrimonyDailyRecorder {
   }
 
   /**
-   * Grava fechamento econômico do dia (sem calibração BTG) + snapshot por ativo.
+   * Grava fechamento econômico do dia em invest_portfolio_daily (patrimônio, TWR dia/acum.)
+   * e invest_daily_snapshots por ativo. Sem calibração BTG — curva real para histórico futuro.
+   * Ajuste de caixa semanal: lançar TEDs no livro antes do fechamento da noite.
    * @param snapshotDate YYYY-MM-DD (padrão: hoje UTC)
    */
   async recordDay(ctx: UserContext, snapshotDate?: string): Promise<RecordDailyPatrimonyResult> {

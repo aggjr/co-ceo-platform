@@ -78,6 +78,8 @@ O container **não usa crontab do host** — o agendamento roda **dentro do proc
 | `INVEST_CRON_ENABLED` | `1` em `NODE_ENV=production` | `0` desliga; `1` força em dev |
 | `INVEST_CRON_TZ` | `America/Sao_Paulo` | Fuso do horário |
 | `INVEST_CRON_OPTIONS_AT` | `03:15` | Strike/vencimento via opcoes.net → `invest_options_market` |
+| `INVEST_CRON_PATRIMONY_AT` | `23:00` | Fechamento diário: brapi + opções + `invest_portfolio_daily` |
+| `INVEST_CRON_ORG_IDS` | `PORTFOLIO_ORG_ID` | Orgs separadas por vírgula para o fechamento |
 | `INVEST_CRON_RUN_ON_STARTUP` | — | `1` roda uma vez ao subir o container (útil após deploy) |
 
 Logs no painel do app: `[cron] options-market — iniciando/concluído`.
