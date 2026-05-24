@@ -210,7 +210,8 @@ function bindPatrimonyChart(container) {
         banner.textContent =
           'API de patrimônio não encontrada. Reinicie com npm run dev (porta 5173 + API 3001).';
       } else {
-        banner.textContent = err.message || 'Erro ao carregar patrimônio diário.';
+        banner.textContent =
+          err.body?.error || err.message || 'Erro ao carregar patrimônio diário.';
       }
       chartHost.replaceChildren(banner);
     }

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import pool from '../../config/database';
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
+import { isMissingSchemaError } from '../dal/mysqlErrors';
 import type { DailyPatrimonyPoint } from './PatrimonyDailyEngine';
 import type { PositionDailySnapshot } from './PatrimonyMtmDailyEngine';
 
@@ -84,12 +85,17 @@ export class PatrimonyDailyStore {
 
   async loadRange(ctx: UserContext, from: string, to: string): Promise<StoredPortfolioDay[]> {
     if (!ctx.organizationId) return [];
-    const rows = await this.gateway.readQuery(ctx, 'invest_portfolio_daily_range', [
-      ctx.organizationId,
-      from,
-      to,
-    ]);
-    return rows.map(rowToStored);
+    try {
+      const rows = await this.gateway.readQuery(ctx, 'invest_portfolio_daily_range', [
+        ctx.organizationId,
+        from,
+        to,
+      ]);
+      return rows.map(rowToStored);
+    } catch (err) {
+      if (isMissingSchemaError(err)) return [];
+      throw err;
+    }
   }
 
   async loadDayBefore(ctx: UserContext, beforeDate: string): Promise<StoredPortfolioDay | null> {
