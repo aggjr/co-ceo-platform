@@ -48,22 +48,6 @@ function buildColumns(columnLabels, columnOrder) {
       cell: (r) => `<strong>${r.label || r.underlying}</strong>`,
     },
     {
-      key: 'preco_estrito',
-      label: 'Preço estrito (PM)',
-      align: 'right',
-      sortValue: (r) => r.preco_estrito ?? -1,
-      filterText: (r) => String(r.preco_estrito ?? ''),
-      cell: (r) => priceCell(r.preco_estrito),
-    },
-    {
-      key: 'cotacao_atual',
-      label: 'Cotação atual',
-      align: 'right',
-      sortValue: (r) => r.cotacao_atual ?? -1,
-      filterText: (r) => String(r.cotacao_atual ?? ''),
-      cell: (r) => priceCell(r.cotacao_atual),
-    },
-    {
       key: 'ganho_aproximado',
       label: columnLabels.ganho_aproximado || 'Resultado Total',
       align: 'right',
@@ -120,8 +104,6 @@ function bindPage(container) {
           ...pivot.totals,
           underlying: 'TOTAL',
           label: 'Total geral',
-          preco_estrito: null,
-          cotacao_atual: null,
         });
       }
 
