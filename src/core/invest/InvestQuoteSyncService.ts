@@ -90,6 +90,25 @@ export class InvestQuoteSyncService {
     };
   }
 
+  /** Atualiza last_price em invest_position_ext (ações, opções, FIIs). */
+  async applyLastPrices(
+    ctx: UserContext,
+    items: Array<{ ticker: string; last_price: number }>,
+    asOf: string
+  ): Promise<number> {
+    if (!ctx.organizationId) return 0;
+    let n = 0;
+    const asOfDay = asOf.slice(0, 10);
+    for (const item of items) {
+      const ticker = item.ticker?.trim().toUpperCase();
+      const lastPrice = Number(item.last_price);
+      if (!ticker || !Number.isFinite(lastPrice) || lastPrice < 0) continue;
+      const ok = await this.writeQuoteToPositionExt(ctx, ticker, lastPrice, asOfDay);
+      if (ok) n += 1;
+    }
+    return n;
+  }
+
   /** Opções e totais BTG: merge opcional do snapshot manual (sem API pública). */
   async applySnapshotOptions(
     ctx: UserContext,

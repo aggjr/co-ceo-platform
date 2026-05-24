@@ -142,7 +142,7 @@
 }
 
 .portfolio-pnl--down {
-  color: #ef4444;
+  color: #e23d52;
 }
 
 .portfolio-table th.num,
@@ -280,7 +280,7 @@
   color: #b91c1c !important;
 }
 
-.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-cv--v {
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-qty--short {
   color: #c7364a !important;
 }
 
@@ -365,13 +365,15 @@
   color: #f97316;
 }
 
-/* Venda (V): vermelho entre o antigo PUT (#be185d) e o vermelho forte (#ef4444). */
-.portfolio-excel-section .portfolio-cv--v {
+/* Qtd negativa — mesmo tom do histórico de operações (.notes-cv--sell) */
+.portfolio-qty--short,
+.portfolio-excel-section .portfolio-qty--short {
   color: #e23d52;
+  font-weight: 600;
 }
 
-.portfolio-excel-section .portfolio-cv--c {
-  color: #10b981;
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-qty--short {
+  color: #c7364a !important;
 }
 
 .portfolio-excel-section .portfolio-options-call-total strong {

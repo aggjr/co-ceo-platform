@@ -36,6 +36,8 @@ export type RecordPortfolioDayInput = {
   quotesAsOf: string | null;
   positionSnapshots: PositionDailySnapshot[];
   stockQuotes: Record<string, number>;
+  source?: string;
+  metadataExtra?: Record<string, unknown>;
 };
 
 function toIsoDate(value: unknown): string {
@@ -143,6 +145,7 @@ export class PatrimonyDailyStore {
     const metadata = {
       stock_quotes: input.stockQuotes,
       positions_count: input.positionSnapshots.length,
+      ...(input.metadataExtra ?? {}),
     };
 
     const payload = {
@@ -159,7 +162,7 @@ export class PatrimonyDailyStore {
       daily_return_twr: input.dailyReturnTwr,
       cumulative_twr: input.cumulativeTwr,
       quotes_as_of: input.quotesAsOf,
-      source: 'mtm_economic',
+      source: input.source ?? 'mtm_economic',
       metadata: JSON.stringify(metadata),
     };
 
@@ -189,7 +192,7 @@ export class PatrimonyDailyStore {
       daily_return_twr: input.dailyReturnTwr,
       cumulative_twr: input.cumulativeTwr,
       quotes_as_of: input.quotesAsOf,
-      source: 'mtm_economic',
+      source: input.source ?? 'mtm_economic',
       metadata,
     };
   }
@@ -259,6 +262,9 @@ export function filterStoredDaysForChartMethod(
   const m = method.toLowerCase();
   if (m === 'mtm_btg' || m === 'mtm_recorded') {
     return stored.filter((s) => s.source === 'mtm_btg_calibrated');
+  }
+  if (m === 'mtm_economic') {
+    return stored.filter((s) => s.source === 'mtm_economic');
   }
   return stored;
 }

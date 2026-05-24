@@ -294,6 +294,12 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
     });
   }
 
+  const wrap = canvas.parentElement;
+  if (wrap) {
+    wrap.style.width = '100%';
+    wrap.style.maxWidth = '100%';
+  }
+
   activeChart = new Chart(canvas, {
     type: 'line',
     data: {
@@ -377,6 +383,15 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
       },
     },
   });
+
+  const syncChartLayout = () => {
+    if (!activeChart || !wrap) return;
+    activeChart.resize();
+    wrap.style.height = `${Math.max(460, activeChart.height)}px`;
+  };
+
+  syncChartLayout();
+  requestAnimationFrame(syncChartLayout);
 
   return { empty: false };
 }

@@ -2,8 +2,9 @@ import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
 import { LedgerImportService } from './LedgerImportService';
 import { buildDailyPatrimonyMtmSeries } from './PatrimonyMtmDailyEngine';
-import { loadPatrimonyAnchors } from './patrimonyAnchors';
-import { fixedIncomeTotalFromLedger } from './patrimonyLedgerGates';
+import { interpolatePatrimonyTarget } from './patrimonyAnchors';
+import { PatrimonyMonthlyAnchorsRepository } from './PatrimonyMonthlyAnchorsRepository';
+import { fixedIncomeTotalFromLedger, shouldUseBtgAnchorCalibration } from './patrimonyLedgerGates';
 import { PatrimonyDailyStore, type StoredPortfolioDay } from './PatrimonyDailyStore';
 import { aggregateExternalFlowsByDate } from './portfolioPerformance';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
@@ -14,6 +15,8 @@ export type RecordDailyPatrimonyResult = {
   recorded: StoredPortfolioDay;
   positionsSaved: number;
   quotesAsOf: string | null;
+  economicPatrimony: number;
+  btgPatrimony: number | null;
 };
 
 export class PatrimonyDailyRecorder {
@@ -21,12 +24,14 @@ export class PatrimonyDailyRecorder {
   private readonly store: PatrimonyDailyStore;
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuotes: MarketQuoteRepository;
+  private readonly anchorsRepo: PatrimonyMonthlyAnchorsRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
     this.store = new PatrimonyDailyStore(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuotes = new MarketQuoteRepository(gateway);
+    this.anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
   }
 
   async loadStockQuotes(ctx: UserContext, asOf?: string): Promise<{
@@ -37,7 +42,6 @@ export class PatrimonyDailyRecorder {
     const targetDate = (asOf || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const assets = await this.assetProjection.listActiveAssets(ctx);
 
-    // Tickers relevantes (excluindo caixa e renda fixa)
     const tickers: string[] = [];
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
@@ -48,7 +52,6 @@ export class PatrimonyDailyRecorder {
       tickers.push(ticker);
     }
 
-    // Prefere market_quotes_daily; fallback para invest_position_ext
     const quotes: Record<string, number> = {};
     let quotesAsOf: string | null = null;
 
@@ -58,7 +61,6 @@ export class PatrimonyDailyRecorder {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
       if (!ticker) continue;
 
-      // Tenta market_quotes_daily primeiro
       const mq = marketMap.get(ticker);
       if (mq && Number.isFinite(mq.price) && mq.price > 0) {
         quotes[ticker] = mq.price;
@@ -66,7 +68,6 @@ export class PatrimonyDailyRecorder {
         continue;
       }
 
-      // Fallback: invest_position_ext via metadata
       let meta: { last_price?: number; quote_as_of?: string } = {};
       if (row.metadata) {
         try {
@@ -83,22 +84,20 @@ export class PatrimonyDailyRecorder {
       }
     }
 
-    void targetDate; // reservado para futura query por data específica
+    void targetDate;
     return { quotes, quotesAsOf };
   }
 
   /**
-   * Grava fechamento econômico do dia em invest_portfolio_daily (patrimônio, TWR dia/acum.)
-   * e invest_daily_snapshots por ativo. Sem calibração BTG — curva real para histórico futuro.
-   * Ajuste de caixa semanal: lançar TEDs no livro antes do fechamento da noite.
-   * @param snapshotDate YYYY-MM-DD (padrão: hoje UTC)
+   * Grava fechamento diário: patrimônio principal alinhado à custódia BTG quando há âncoras;
+   * mantém série econômica em metadata para auditoria e evolução futura.
    */
   async recordDay(ctx: UserContext, snapshotDate?: string): Promise<RecordDailyPatrimonyResult> {
     const date = (snapshotDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
-    const anchors = loadPatrimonyAnchors();
+    const anchors = await this.anchorsRepo.loadForOrganization(ctx);
+    const hasAnchors = anchors.month_ends.length > 0;
     const { quotes: stockQuotes, quotesAsOf } = await this.loadStockQuotes(ctx, date);
 
-    // Cotações históricas de market_quotes_daily para o dia — prefere o dado real de mercado
     const quoteMap = await this.marketQuotes.loadQuoteMapForRange(ctx, date, date);
     const quoteForDate = this.marketQuotes.buildQuoteForDateFn(quoteMap);
 
@@ -107,20 +106,41 @@ export class PatrimonyDailyRecorder {
       events.length > 0
         ? String(events[0]!.transaction_date).slice(0, 10)
         : date;
-    const mtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
+
+    const rfLedger = fixedIncomeTotalFromLedger(events);
+    const rfAnchor = Number(anchors.fixed_income_total ?? 0);
+    const rfForEconomic = hasAnchors && rfAnchor > 0 ? rfAnchor : rfLedger;
+
+    const economicMtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
       anchors,
       stockQuotes,
-      fixedIncomeTotal: fixedIncomeTotalFromLedger(events),
+      fixedIncomeTotal: rfForEconomic,
       calibrateToAnchors: false,
       quoteForDate,
     });
 
-    const point = mtm.series[mtm.series.length - 1];
-    if (!point || point.date !== date) {
-      throw new Error(`Sem patrimônio calculado para ${date}.`);
+    const economicPoint = economicMtm.series[economicMtm.series.length - 1];
+    if (!economicPoint || economicPoint.date !== date) {
+      throw new Error(`Sem patrimônio econômico calculado para ${date}.`);
     }
 
-    const patrimonyGross = point.patrimonyGross;
+    let recordPoint = economicPoint;
+    let source = 'mtm_economic';
+    let btgPatrimony: number | null = null;
+
+    if (hasAnchors && shouldUseBtgAnchorCalibration(events)) {
+      btgPatrimony = Math.round(interpolatePatrimonyTarget(date, anchors) * 100) / 100;
+      const pending = economicPoint.pendingSettlements;
+      recordPoint = {
+        ...economicPoint,
+        patrimony: btgPatrimony,
+        patrimonyGross: Math.round((btgPatrimony - pending) * 100) / 100,
+        positionsValue: economicPoint.positionsValue,
+      };
+      source = 'mtm_btg_calibrated';
+    }
+
+    const patrimonyGross = recordPoint.patrimonyGross;
 
     const flowsByDate = aggregateExternalFlowsByDate(events, date, date);
     const externalFlow = flowsByDate.get(date) ?? 0;
@@ -131,7 +151,7 @@ export class PatrimonyDailyRecorder {
 
     if (prev && prev.patrimony > 0) {
       dailyReturnTwr =
-        Math.round(((point.patrimony - prev.patrimony - externalFlow) / prev.patrimony) * 10000) /
+        Math.round(((recordPoint.patrimony - prev.patrimony - externalFlow) / prev.patrimony) * 10000) /
         10000;
       const prevCum = prev.cumulative_twr ?? 0;
       cumulativeTwr =
@@ -143,18 +163,29 @@ export class PatrimonyDailyRecorder {
       cumulativeTwr = 0;
     }
 
-    const positions = mtm.positionSnapshots ?? [];
+    const positions = economicMtm.positionSnapshots ?? [];
     const recorded = await this.store.upsertPortfolioDay(ctx, {
       snapshotDate: date,
-      point,
+      point: recordPoint,
       patrimonyGross,
-      fixedIncomeTotal: fixedIncomeTotalFromLedger(events),
+      fixedIncomeTotal: rfForEconomic,
       externalFlow,
       dailyReturnTwr,
       cumulativeTwr,
       quotesAsOf,
       positionSnapshots: positions,
       stockQuotes,
+      source,
+      metadataExtra: {
+        economic_patrimony: economicPoint.patrimony,
+        economic_patrimony_gross: economicPoint.patrimonyGross,
+        btg_interpolated_patrimony: btgPatrimony,
+        cash: economicPoint.cash,
+        positions_value: economicPoint.positionsValue,
+        pending_settlements: economicPoint.pendingSettlements,
+        rf_ledger: rfLedger,
+        rf_anchor: rfAnchor,
+      },
     });
 
     return {
@@ -162,6 +193,8 @@ export class PatrimonyDailyRecorder {
       recorded,
       positionsSaved: positions.length,
       quotesAsOf,
+      economicPatrimony: economicPoint.patrimony,
+      btgPatrimony,
     };
   }
 }

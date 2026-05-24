@@ -50,7 +50,11 @@ async function main() {
     if (r.options) {
       console.log('  Opções opcoes.net:', r.options.rowsParsed, 'linhas');
     }
-    console.log('  Patrimônio:', r.patrimony.recorded.patrimony.toLocaleString('pt-BR'));
+    console.log('  Patrimônio (gravado):', r.patrimony.recorded.patrimony.toLocaleString('pt-BR'));
+    console.log('  Econômico (auditoria):', r.patrimony.economicPatrimony.toLocaleString('pt-BR'));
+    if (r.patrimony.btgPatrimony != null) {
+      console.log('  BTG interpolado:   ', r.patrimony.btgPatrimony.toLocaleString('pt-BR'));
+    }
     console.log(
       '  TWR dia:',
       r.patrimony.recorded.daily_return_twr != null

@@ -242,6 +242,23 @@ function formatOptionExpiryLabel(item) {
   return year ? `${item.optionMonthName}/${year.slice(2)}${letter}` : `${item.optionMonthName}${letter}`;
 }
 
+/** Qtd com sinal; posição vendida/líquida negativa em vermelho suave (histórico de operações). */
+function renderQuantityCell(row, digits = 0) {
+  const span = document.createElement('span');
+  const q = Number(row.quantity);
+  if (!Number.isFinite(q)) {
+    span.textContent = '—';
+    span.className = 'muted';
+    return span;
+  }
+  span.textContent = formatNumber(q, digits);
+  if (q < 0) {
+    span.className = 'portfolio-qty--short';
+    span.title = 'Posição líquida vendida (quantidade negativa)';
+  }
+  return span;
+}
+
 function renderPriceCell(value) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) {
@@ -426,7 +443,7 @@ function formatStrikeDistance(row) {
   return { brl, pct };
 }
 
-/** Planilha de opções — colunas dedicadas. */
+/** Planilha de opções — colunas dedicadas (sem C/V; qtd negativa = venda líquida). */
 export function buildInvestOptionsColumns() {
   return [
     {
@@ -440,6 +457,14 @@ export function buildInvestOptionsColumns() {
         span.textContent = row.ticker || '—';
         return span;
       },
+    },
+    {
+      key: 'quantity',
+      label: 'Qtd',
+      type: 'number',
+      align: 'right',
+      width: '88px',
+      render: (row) => renderQuantityCell(row, 0),
     },
     {
       key: 'underlying',
@@ -478,22 +503,6 @@ export function buildInvestOptionsColumns() {
       },
     },
     {
-      key: 'cv',
-      label: 'C/V',
-      type: 'text',
-      width: '48px',
-      align: 'center',
-      render: (row) => {
-        const span = document.createElement('span');
-        const q = Number(row.quantity);
-        span.textContent = q > 0 ? 'C' : q < 0 ? 'V' : '—';
-        span.style.fontWeight = '600';
-        span.className =
-          q > 0 ? 'portfolio-cv--c' : q < 0 ? 'portfolio-cv--v' : 'muted';
-        return span;
-      },
-    },
-    {
       key: 'optionExpiryDate',
       label: 'Data Strike',
       type: 'date',
@@ -502,18 +511,6 @@ export function buildInvestOptionsColumns() {
       render: (row) => {
         const span = document.createElement('span');
         span.textContent = formatDateBr(row.optionExpiryDate);
-        return span;
-      },
-    },
-    {
-      key: 'quantity',
-      label: 'Qtde',
-      type: 'number',
-      align: 'right',
-      width: '88px',
-      render: (row) => {
-        const span = document.createElement('span');
-        span.textContent = formatNumber(row.quantity, 0);
         return span;
       },
     },
@@ -725,20 +722,12 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
       },
     },
     {
-      key: 'cv',
-      label: 'C/V',
-      type: 'text',
-      width: '48px',
-      align: 'center',
-      render: (row) => {
-        const span = document.createElement('span');
-        const q = Number(row.quantity);
-        span.textContent = q > 0 ? 'C' : q < 0 ? 'V' : '—';
-        span.style.fontWeight = '600';
-        span.className =
-          q > 0 ? 'portfolio-cv--c' : q < 0 ? 'portfolio-cv--v' : 'muted';
-        return span;
-      },
+      key: 'quantity',
+      label: 'Qtd',
+      type: 'number',
+      align: 'right',
+      width: '88px',
+      render: (row) => renderQuantityCell(row, qtyDigits(row.assetType)),
     },
     {
       key: 'assetType',
@@ -767,18 +756,6 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
     });
   }
   cols.push(
-    {
-      key: 'quantity',
-      label: 'Qtd',
-      type: 'number',
-      align: 'right',
-      width: '88px',
-      render: (row) => {
-        const span = document.createElement('span');
-        span.textContent = formatNumber(row.quantity, qtyDigits(row.assetType));
-        return span;
-      },
-    },
     ...(sheetKey === 'equities'
       ? [
           {
