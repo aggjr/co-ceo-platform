@@ -60,7 +60,7 @@ interface MenuSeed {
 
 const LOCALE = 'pt-BR';
 
-const TEXTS: TextSeed[] = [
+export const TEXTS: TextSeed[] = [
   {
     id: '00000000-0000-4003-8000-000000000001',
     text_key: 'menu.cockpit',
@@ -465,7 +465,7 @@ const TEXTS: TextSeed[] = [
   },
 ];
 
-const MENU: MenuSeed[] = [
+export const MENU: MenuSeed[] = [
   // Raizes (sem path, sem access_resource_key).
   {
     id: '00000000-0000-4004-8000-000000000001',
@@ -759,7 +759,13 @@ async function run() {
   await pool.end();
 }
 
-run().catch((err) => {
-  console.error('Falha no seed UI catalog:', err);
-  process.exit(1);
-});
+export { LOCALE };
+
+const isDirectRun = (process.argv[1] || '').replace(/\\/g, '/').includes('008_ui_catalog');
+
+if (isDirectRun) {
+  run().catch((err) => {
+    console.error('Falha no seed UI catalog:', err);
+    process.exit(1);
+  });
+}
