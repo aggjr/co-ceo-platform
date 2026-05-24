@@ -28,7 +28,8 @@ function formatBytes(bytes) {
 
 const apiWithSession = (path) => apiRequest(path);
 
-export async function ClientCockpitPage(container) {
+export async function ClientCockpitPage(container, currentPath) {
+  const path = currentPath || window.location.pathname;
   const token = getImpersonationToken() || getToken();
   if (!token) {
     navigate('/login');
@@ -116,7 +117,6 @@ export async function ClientCockpitPage(container) {
     }
   `;
 
-  const path = window.location.pathname;
   let pageTitle = 'Cockpit — Minha organização';
   if (path.endsWith('/team')) pageTitle = 'Cockpit — Equipe';
   else if (path.endsWith('/roles')) pageTitle = 'Cockpit — Papéis';

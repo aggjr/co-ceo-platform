@@ -40,13 +40,13 @@ function bindPortfolioView(container, items, cashMeta, pageType) {
   paint();
 }
 
-export async function InvestPortfolioPage(container) {
+export async function InvestPortfolioPage(container, currentPath) {
   if (!isAuthenticated()) {
     navigate('/login');
     return;
   }
 
-  const path = window.location.pathname;
+  const path = currentPath || window.location.pathname;
   let pageType = 'equities';
   if (path.includes('/invest/opcoes')) pageType = 'options';
   else if (path.includes('/invest/titulos')) pageType = 'titulos';
