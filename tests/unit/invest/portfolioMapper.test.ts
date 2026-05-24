@@ -238,6 +238,36 @@ describe('portfolioMapper', () => {
     expect(row.pnl).toBeGreaterThan(0);
   });
 
+  it('catálogo de mercado prevalece sobre strike gravado na operação', () => {
+    const marketCatalog = new Map([
+      [
+        'PRIOR407',
+        {
+          ticker: 'PRIOR407',
+          underlyingTicker: 'PRIO3',
+          optionType: 'PUT' as const,
+          strikePrice: 40.75,
+          expirationDate: '2026-06-19',
+        },
+      ],
+    ]);
+    const opt = enrichPortfolioRow(
+      {
+        id: 'o1',
+        asset_ticker: 'PRIOR407',
+        asset_type: 'option_put',
+        current_quantity: -6500,
+        managerial_avg_price: 0.91,
+        metadata: { option_strike: 40.7, underlying_ticker: 'PRIO3' },
+        status: 'active',
+      },
+      undefined,
+      { ledgerStrikeByTicker: new Map(), marketCatalog }
+    );
+    expect(opt.optionStrike).toBe(40.75);
+    expect(opt.optionStrikeSource).toBe('market_catalog');
+  });
+
   it('opção vendida: prêmio, resultado e notional a partir da custódia', () => {
     const stock = enrichPortfolioRow(
       {

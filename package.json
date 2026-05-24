@@ -30,6 +30,7 @@
     "fetch:b3:quotes": "node ./node_modules/ts-node/dist/bin.js scripts/fetch-b3-quotes.ts",
     "invest:daily-close": "node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts",
     "sync:market:quotes:stocks": "node ./node_modules/ts-node/dist/bin.js scripts/sync-market-quotes-stocks.ts",
+    "sync:options:market": "node ./node_modules/ts-node/dist/bin.js scripts/sync-option-market-opcoes-net.ts",
     "sync:market:indices": "node ./node_modules/ts-node/dist/bin.js scripts/sync-market-indices.ts",
     "report:cdi": "node ./node_modules/ts-node/dist/bin.js scripts/report-cdi-coverage.ts",
     "seed:market:benchmarks": "node ./node_modules/ts-node/dist/bin.js scripts/seed-market-benchmarks.ts",

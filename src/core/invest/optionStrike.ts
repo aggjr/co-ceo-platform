@@ -17,8 +17,8 @@ export function strikeFromMetadata(meta: PortfolioStrikeMeta | null | undefined)
 }
 
 /**
- * Strike vem da operação da opção no livro razão (gravada em metadata do ativo).
- * Nunca é inferido do ticker B3 nem lido de catálogo — sem operação, sem strike.
+ * Strike efetivo: catálogo opcoes.net (ajustado pós-dividendos) prevalece sobre
+ * metadata da operação. Fallback: exercício no livro, depois metadata legada.
  */
 export function resolveOptionStrike(input: {
   meta?: PortfolioStrikeMeta | null;
@@ -26,11 +26,11 @@ export function resolveOptionStrike(input: {
   marketStrike?: number | null;
   ledgerExerciseStrike?: number | null;
 }): { strike: number | null; source: OptionStrikeSource } {
-  const fromMeta = strikeFromMetadata(input.meta);
-  if (fromMeta != null) return { strike: fromMeta, source: 'metadata' };
-  const fromLedger = parseStrikeValue(input.ledgerExerciseStrike);
-  if (fromLedger != null) return { strike: fromLedger, source: 'ledger_exercise' };
   const fromMarket = parseStrikeValue(input.marketStrike);
   if (fromMarket != null) return { strike: fromMarket, source: 'market_catalog' };
+  const fromLedger = parseStrikeValue(input.ledgerExerciseStrike);
+  if (fromLedger != null) return { strike: fromLedger, source: 'ledger_exercise' };
+  const fromMeta = strikeFromMetadata(input.meta);
+  if (fromMeta != null) return { strike: fromMeta, source: 'metadata' };
   return { strike: null, source: null };
 }

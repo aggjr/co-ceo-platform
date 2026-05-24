@@ -202,16 +202,15 @@ export function mergeOptionStrikeIntoAssetRow(
   if (!isOptionTicker(ticker)) return row;
   const meta = parseMetadata(row.metadata);
   let changed = false;
-  if (meta.option_strike == null) {
-    const ledger = ledgerStrikeByTicker.get(ticker);
-    const market = marketCatalog.get(ticker);
-    if (ledger != null && ledger > 0) {
-      meta.option_strike = ledger;
-      changed = true;
-    } else if (market?.strikePrice != null && market.strikePrice > 0) {
-      meta.option_strike = market.strikePrice;
-      changed = true;
-    }
+  const market = marketCatalog.get(ticker);
+  const ledger = ledgerStrikeByTicker.get(ticker);
+  const marketStrike =
+    market?.strikePrice != null && market.strikePrice > 0 ? market.strikePrice : null;
+  const ledgerStrike = ledger != null && ledger > 0 ? ledger : null;
+  const resolvedStrike = marketStrike ?? ledgerStrike ?? null;
+  if (resolvedStrike != null && meta.option_strike !== resolvedStrike) {
+    meta.option_strike = resolvedStrike;
+    changed = true;
   }
   if (!meta.underlying_ticker) {
     const und =
