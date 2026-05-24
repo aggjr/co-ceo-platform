@@ -142,7 +142,7 @@
 }
 
 .portfolio-pnl--down {
-  color: #ef4444;
+  color: #e23d52;
 }
 
 .portfolio-table th.num,
@@ -277,7 +277,7 @@
 }
 
 .portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-pnl--down {
-  color: #b91c1c !important;
+  color: #c7364a !important;
 }
 
 .portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-cv--v {
@@ -324,7 +324,7 @@
 }
 
 .portfolio-excel-section .excel-footer-aggregate .portfolio-pnl--down {
-  color: #f87171;
+  color: #e23d52;
 }
 
 .portfolio-excel-section .coceo-excel-grid-host tr.excel-column-totals-row td {
@@ -344,7 +344,7 @@
 }
 
 .portfolio-excel-section .coceo-excel-grid-host tr.excel-column-totals-row td .portfolio-pnl--down {
-  color: #f87171 !important;
+  color: #e23d52 !important;
 }
 
 .portfolio-excel-section .portfolio-option-itm {

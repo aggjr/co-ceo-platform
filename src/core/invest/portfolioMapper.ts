@@ -525,16 +525,19 @@ export function consolidateTesouroPortfolioItems(
   return rest;
 }
 
-/** Ajusta linha CAIXA-BTG para saldo em R$ (extrato / livro-razão). */
 export function applyCashInvestBalanceToItems(
   items: PortfolioItemDto[],
   balance: number
 ): PortfolioItemDto[] {
   const b = Math.round(balance * 100) / 100;
-  return items.map((item) => {
-    if (!isCashInvestTicker(item.ticker) && item.assetType !== 'cash') return item;
-    return {
-      ...item,
+  const filtered = items.filter(
+    (item) => !isCashInvestTicker(item.ticker) && item.assetType !== 'cash'
+  );
+  if (Math.abs(b) > 0.01) {
+    filtered.push({
+      ticker: 'CAIXA-BTG',
+      name: 'Conta Corrente BTG',
+      assetType: 'cash',
       quantity: b,
       avgPrice: 1,
       prices: { strict: 1, b3: 1, managerial: 1 },
@@ -544,8 +547,9 @@ export function applyCashInvestBalanceToItems(
       costBasis: b,
       pnl: 0,
       pnlPct: 0,
-    };
-  });
+    } as any);
+  }
+  return filtered;
 }
 
 export function applyAllocationPercents(items: PortfolioItemDto[]): PortfolioItemDto[] {
