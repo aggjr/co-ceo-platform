@@ -229,7 +229,7 @@ export async function InvestDashboardPage(container) {
 
   const t = await getPageTexts(
     ['screen.invest.dashboard.title'],
-    { 'screen.invest.dashboard.title': 'Resultado Histórico' }
+    { 'screen.invest.dashboard.title': 'Resultado histórico' }
   );
   const screenTitle = t['screen.invest.dashboard.title'];
 

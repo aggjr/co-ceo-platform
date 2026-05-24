@@ -64,7 +64,7 @@ export function Shell(props: { children?: JSX.Element }) {
         <div class="sidebar-footer">
           <div
             data-app-version
-            style={{ "margin-bottom": "8px", "font-size": "11px", color: "rgba(255, 255, 255, 0.4)", "text-align": "center" }}
+            style={{ "margin-bottom": "12px", "font-size": "11px", color: "var(--color-accent)", opacity: 0.7, "text-align": "center", "font-weight": 500, "letter-spacing": "1px" }}
           >
             {appVersion()}
           </div>

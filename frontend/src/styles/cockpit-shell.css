@@ -126,21 +126,28 @@
 }
 
 .shell .btn-logout {
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  color: var(--color-text-muted);
-  padding: 10px 16px;
-  border-radius: 6px;
+  width: 100%;
+  background: linear-gradient(90deg, var(--color-primary) 0%, #005a80 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(218, 177, 119, 0.4);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 600;
   font-size: 13px;
   text-align: center;
-  margin-top: 10px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 66, 95, 0.4);
+  letter-spacing: 1px;
 }
 
 .shell .btn-logout:hover {
-  background: #1e293b;
-  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 66, 95, 0.6);
+  background: linear-gradient(90deg, #005a80 0%, var(--color-primary) 100%);
+  border-color: rgba(218, 177, 119, 0.8);
 }
 
 .shell .main {

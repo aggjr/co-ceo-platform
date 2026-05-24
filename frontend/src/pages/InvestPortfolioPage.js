@@ -60,7 +60,7 @@ export async function InvestPortfolioPage(container) {
       'screen.invest.fixed_income.title',
     ],
     {
-      'screen.invest.portfolio.title': 'AÇÕES/FIIs',
+      'screen.invest.portfolio.title': 'Ações/FIIs',
       'screen.invest.options.title': 'Opções',
       'screen.invest.fixed_income.title': 'Títulos, RF e CDB',
     }
