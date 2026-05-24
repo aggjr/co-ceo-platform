@@ -488,7 +488,8 @@ export function buildInvestOptionsColumns() {
         const q = Number(row.quantity);
         span.textContent = q > 0 ? 'C' : q < 0 ? 'V' : '—';
         span.style.fontWeight = '600';
-        span.className = q > 0 ? 'portfolio-pnl--up' : q < 0 ? 'portfolio-pnl--down' : 'muted';
+        span.className =
+          q > 0 ? 'portfolio-cv--c' : q < 0 ? 'portfolio-cv--v' : 'muted';
         return span;
       },
     },
@@ -516,18 +517,18 @@ export function buildInvestOptionsColumns() {
         return span;
       },
     },
-    { key: 'avgPrice', label: 'Preço médio', type: 'currency', align: 'right', width: '104px' },
+    { key: 'avgPrice', label: 'Prêmio', type: 'currency', align: 'right', width: '104px' },
     {
       key: 'updatedQuote',
       label: 'Cotação opção',
       type: 'currency',
       align: 'right',
       width: '100px',
-      render: (row) => renderPriceCell(row.updatedQuote ?? row.lastPrice),
+      render: (row) => renderPriceCell(row.updatedQuote),
     },
     {
       key: 'premiumReceived',
-      label: 'Prêmio recebido',
+      label: 'Prêmio total',
       type: 'currency',
       align: 'right',
       width: '112px',
@@ -734,7 +735,8 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
         const q = Number(row.quantity);
         span.textContent = q > 0 ? 'C' : q < 0 ? 'V' : '—';
         span.style.fontWeight = '600';
-        span.className = q > 0 ? 'portfolio-pnl--up' : q < 0 ? 'portfolio-pnl--down' : 'muted';
+        span.className =
+          q > 0 ? 'portfolio-cv--c' : q < 0 ? 'portfolio-cv--v' : 'muted';
         return span;
       },
     },
