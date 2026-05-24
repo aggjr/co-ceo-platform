@@ -1,4 +1,5 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
+import { asyncHandler } from '../middlewares/asyncHandler';
 import { AuthController } from '../controllers/AuthController';
 import { CockpitController } from '../controllers/CockpitController';
 import { createTelemetryController } from '../controllers/TelemetryController';
@@ -243,5 +244,18 @@ router.get('/core/storage', AuthMiddleware.protect, requirePermission('cockpit:s
   const storage = await gateway.getOrganizationStorage(ctx, ctx.organizationId);
   return res.json({ success: true, storage });
 });
+
+/** Evita uncaughtException quando um handler async rejeita sem try/catch. */
+function wrapAsyncRoutes(router: Router): void {
+  for (const layer of router.stack) {
+    if (!layer.route) continue;
+    for (const stackLayer of layer.route.stack) {
+      const original = stackLayer.handle as RequestHandler;
+      stackLayer.handle = asyncHandler(original as never) as RequestHandler;
+    }
+  }
+}
+
+wrapAsyncRoutes(router);
 
 export default router;

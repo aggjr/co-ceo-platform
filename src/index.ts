@@ -1,7 +1,8 @@
-import express from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
 import path from 'path';
 import pool from './config/database';
 import apiRoutes from './routes/api';
+import { GatewayError } from './core/dal';
 import { APP_VERSION } from './generated/version';
 import { ensureCoreSchema } from './core/db/ensureCoreSchema';
 import { applyUiCatalog } from './core/ui/UiCatalogApplyService';
@@ -13,6 +14,16 @@ const webDist = path.join(__dirname, '../frontend/dist');
 
 app.use(express.json());
 app.use('/api', apiRoutes);
+
+app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) return next(err);
+  console.error('[co-CEO Core] Erro na API:', err);
+  if (err instanceof GatewayError) {
+    return res.status(err.httpStatus).json({ success: false, error: err.message });
+  }
+  const message = err instanceof Error ? err.message : 'Erro interno do servidor.';
+  return res.status(500).json({ success: false, error: message });
+});
 
 app.get('/api/version', (_req, res) => {
   res.json({ success: true, version: APP_VERSION });

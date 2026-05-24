@@ -32,18 +32,30 @@ function ensureInvestFromScreens(licensed, allowed) {
   }
 }
 
+/** Quando IAM/contrato não responde (502), exibe menu cliente do catálogo embutido. */
+function degradedTenantMenuFilter() {
+  const licensed = new Set(MENU_CATALOG.map((m) => m.moduleCode));
+  const allowed = new Set();
+  for (const mod of MENU_CATALOG) {
+    for (const item of mod.items) {
+      if (item.resourceKey) allowed.add(item.resourceKey);
+    }
+  }
+  return { licensed, allowed, degraded: true };
+}
+
 /** Menu embutido (legado) — paths estáveis; não depende do MySQL. */
-export function filterMenuCatalog(catalog, { global, allowed, licensed }) {
+export function filterMenuCatalog(catalog, { global, allowed, licensed, degraded }) {
   return catalog
     .map((mod) => {
-      if (!global && licensed && !licensed.has(mod.moduleCode)) {
+      if (!global && !degraded && licensed && !licensed.has(mod.moduleCode)) {
         return null;
       }
 
       const items = mod.items.filter((item) => {
         if (item.platformOnly && !global) return false;
         if (item.clientOnly && global) return false;
-        if (global) return true;
+        if (global || degraded) return true;
         if (!item.resourceKey) return true;
         return allowed.has(item.resourceKey);
       });
@@ -63,13 +75,28 @@ async function loadEmbeddedMenu() {
       licensed: null,
     });
   }
-  const matrix = await apiRequest('/api/cockpit/me/access-matrix').catch(() => ({
-    resources: [],
-  }));
+  let matrixOk = true;
+  let modulesOk = true;
+  const matrix = await apiRequest('/api/cockpit/me/access-matrix').catch(() => {
+    matrixOk = false;
+    return { resources: [] };
+  });
+  const modulesPayload = await apiRequest('/api/cockpit/me/contract-modules').catch(() => {
+    modulesOk = false;
+    return null;
+  });
+
+  if (!matrixOk || !modulesOk) {
+    const { licensed, allowed, degraded } = degradedTenantMenuFilter();
+    return filterMenuCatalog(MENU_CATALOG, {
+      global: false,
+      allowed,
+      licensed,
+      degraded,
+    });
+  }
+
   const allowed = allowedResourceKeys(matrix);
-  const modulesPayload = await apiRequest('/api/cockpit/me/contract-modules').catch(
-    () => null
-  );
   const licensed = licensedModuleCodesFromApi(modulesPayload);
   ensureInvestFromScreens(licensed, allowed);
   return filterMenuCatalog(MENU_CATALOG, {

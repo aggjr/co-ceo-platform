@@ -98,6 +98,23 @@ export class InvestController {
   }
 
   listPortfolio = async (req: Request, res: Response) => {
+    try {
+      return await this.listPortfolioImpl(req, res);
+    } catch (err) {
+      console.error('[listPortfolio]', err);
+      if (isMissingSchemaError(err)) {
+        return res.status(503).json({
+          success: false,
+          error:
+            'Banco desatualizado: aplique a migration 22 (market_quotes_daily) ou reinicie a API em V0.0.87+.',
+        });
+      }
+      const message = err instanceof Error ? err.message : 'Falha ao carregar portfólio.';
+      return res.status(500).json({ success: false, error: message });
+    }
+  };
+
+  private listPortfolioImpl = async (req: Request, res: Response) => {
     const ctx = req.userContext!;
     if (!ctx.organizationId) {
       return res.status(400).json({
