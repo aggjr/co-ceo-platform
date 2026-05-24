@@ -77,6 +77,7 @@ import {
 } from '../core/invest/extractLedgerEnrichment';
 import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
 import pool from '../config/database';
+import { isMissingSchemaError } from '../core/dal/mysqlErrors';
 import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
 
 export class InvestController {
@@ -237,6 +238,24 @@ export class InvestController {
   };
 
   getPatrimonyDaily = async (req: Request, res: Response) => {
+    try {
+      return await this.getPatrimonyDailyImpl(req, res);
+    } catch (err) {
+      console.error('[getPatrimonyDaily]', err);
+      if (isMissingSchemaError(err)) {
+        return res.status(503).json({
+          success: false,
+          error:
+            'Banco desatualizado: aplique as migrations 09 (invest_portfolio_daily) e 22 (market_quotes_daily) no servidor.',
+        });
+      }
+      const message =
+        err instanceof Error ? err.message : 'Falha ao calcular patrimônio diário.';
+      return res.status(500).json({ success: false, error: message });
+    }
+  };
+
+  private getPatrimonyDailyImpl = async (req: Request, res: Response) => {
     const ctx = req.userContext!;
     if (!ctx.organizationId) {
       return res.status(400).json({

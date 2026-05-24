@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { CoCeoDataGateway, UserContext, SecurePayload } from '../dal';
+import { isMissingSchemaError } from '../dal/mysqlErrors';
 
 export type QuoteSource =
   | 'brapi'
@@ -193,12 +194,17 @@ export class MarketQuoteRepository {
     from: string,
     to: string
   ): Promise<MarketQuoteRow[]> {
-    const rows = await this.gateway.readQuery(ctx, 'market_quotes_daily_range', [
-      ticker.toUpperCase(),
-      from.slice(0, 10),
-      to.slice(0, 10),
-    ]);
-    return rows.map(rowToQuote);
+    try {
+      const rows = await this.gateway.readQuery(ctx, 'market_quotes_daily_range', [
+        ticker.toUpperCase(),
+        from.slice(0, 10),
+        to.slice(0, 10),
+      ]);
+      return rows.map(rowToQuote);
+    } catch (err) {
+      if (isMissingSchemaError(err)) return [];
+      throw err;
+    }
   }
 
   async upsertIndex(ctx: UserContext, input: UpsertIndexInput): Promise<MarketIndexRow> {
@@ -260,12 +266,17 @@ export class MarketQuoteRepository {
     from: string,
     to: string
   ): Promise<MarketIndexRow[]> {
-    const rows = await this.gateway.readQuery(ctx, 'market_index_daily_range', [
-      indexCode.toUpperCase(),
-      from.slice(0, 10),
-      to.slice(0, 10),
-    ]);
-    return rows.map(rowToIndex);
+    try {
+      const rows = await this.gateway.readQuery(ctx, 'market_index_daily_range', [
+        indexCode.toUpperCase(),
+        from.slice(0, 10),
+        to.slice(0, 10),
+      ]);
+      return rows.map(rowToIndex);
+    } catch (err) {
+      if (isMissingSchemaError(err)) return [];
+      throw err;
+    }
   }
 
   /**
@@ -282,20 +293,25 @@ export class MarketQuoteRepository {
     from: string,
     to: string
   ): Promise<Map<string, Map<string, number>>> {
-    const rows = await this.gateway.readQuery(ctx, 'market_quotes_bulk_range', [
-      from.slice(0, 10),
-      to.slice(0, 10),
-    ]);
-    const map = new Map<string, Map<string, number>>();
-    for (const r of rows) {
-      const ticker = String(r.ticker ?? '').toUpperCase();
-      const date = toIsoDate(r.quote_date);
-      const price = Number(r.closing_price);
-      if (!ticker || !date || !Number.isFinite(price) || price <= 0) continue;
-      if (!map.has(ticker)) map.set(ticker, new Map());
-      map.get(ticker)!.set(date, price);
+    try {
+      const rows = await this.gateway.readQuery(ctx, 'market_quotes_bulk_range', [
+        from.slice(0, 10),
+        to.slice(0, 10),
+      ]);
+      const map = new Map<string, Map<string, number>>();
+      for (const r of rows) {
+        const ticker = String(r.ticker ?? '').toUpperCase();
+        const date = toIsoDate(r.quote_date);
+        const price = Number(r.closing_price);
+        if (!ticker || !date || !Number.isFinite(price) || price <= 0) continue;
+        if (!map.has(ticker)) map.set(ticker, new Map());
+        map.get(ticker)!.set(date, price);
+      }
+      return map;
+    } catch (err) {
+      if (isMissingSchemaError(err)) return new Map();
+      throw err;
     }
-    return map;
   }
 
   /**
