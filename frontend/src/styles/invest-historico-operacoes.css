@@ -25,7 +25,7 @@
 }
 
 .notes-cv--sell {
-  color: #ef4444;
+  color: #e23d52;
   font-weight: 700;
 }
 
@@ -37,7 +37,7 @@
 }
 
 .notes-type--put {
-  color: var(--invest-type-put, #eab308);
+  color: var(--invest-type-put, #f97316);
   font-weight: 700;
   letter-spacing: 0.04em;
 }
