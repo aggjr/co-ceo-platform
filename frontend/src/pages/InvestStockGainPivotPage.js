@@ -63,6 +63,15 @@ function buildColumns(columnLabels, columnOrder) {
       filterText: (r) => String(r.cotacao_atual ?? ''),
       cell: (r) => priceCell(r.cotacao_atual),
     },
+    {
+      key: 'ganho_aproximado',
+      label: columnLabels.ganho_aproximado || 'Resultado Total',
+      align: 'right',
+      sortValue: (r) => Number(r.ganho_aproximado ?? 0),
+      filterText: (r) => String(r.ganho_aproximado ?? 0),
+      cell: (r) => numCell(r.ganho_aproximado),
+      cellClass: () => 'sgp-total-col',
+    },
   ];
 
   for (const key of valueCols) {
@@ -75,16 +84,6 @@ function buildColumns(columnLabels, columnOrder) {
       cell: (r) => numCell(r[key]),
     });
   }
-
-  cols.push({
-    key: 'ganho_aproximado',
-    label: columnLabels.ganho_aproximado || 'Ganho aproximado',
-    align: 'right',
-    sortValue: (r) => Number(r.ganho_aproximado ?? 0),
-    filterText: (r) => String(r.ganho_aproximado ?? 0),
-    cell: (r) => numCell(r.ganho_aproximado),
-    cellClass: () => 'sgp-total-col',
-  });
 
   return cols;
 }
@@ -112,7 +111,7 @@ function bindPage(container) {
       const columnOrder = data.columnOrder || [];
 
       if (summaryHost && pivot?.totals) {
-        summaryHost.innerHTML = `<p class="muted">Período <strong>${pivot.from}</strong> a <strong>${pivot.to}</strong> — ganho aproximado total: <strong class="sgp-up">${formatBrl(pivot.totals.ganho_aproximado)}</strong> · taxas: <strong>${formatBrl(pivot.totals.taxas)}</strong></p>`;
+        summaryHost.innerHTML = `<p class="muted">Período <strong>${pivot.from}</strong> a <strong>${pivot.to}</strong> — resultado total: <strong class="sgp-up">${formatBrl(pivot.totals.ganho_aproximado)}</strong> · taxas: <strong>${formatBrl(pivot.totals.taxas)}</strong></p>`;
       }
 
       const rows = [...(pivot?.rows || [])];
@@ -179,7 +178,7 @@ export async function InvestStockGainPivotPage(container) {
       <div class="sgp-toolbar">
         <div>
           <h2 style="font-size:16px;margin:0">${screenTitle}</h2>
-          <p class="muted" style="margin:4px 0 0">Preço estrito (PM), opções, proventos, trade, day trade, taxas e ganho aproximado por papel.</p>
+          <p class="muted" style="margin:4px 0 0">Preço estrito (PM), opções, proventos, trade, day trade, taxas e resultado total por papel.</p>
         </div>
         <label>De <input type="date" id="sgp-from" value="${defaultFrom()}" /></label>
         <label>Até <input type="date" id="sgp-to" value="${defaultTo()}" /></label>

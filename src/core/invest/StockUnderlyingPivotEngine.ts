@@ -4,6 +4,7 @@ import { inferAssetType, inferUnderlyingTicker } from './assetClassifier';
 
 /** Colunas do pivot por ação (underlying). */
 export const STOCK_PIVOT_COLUMNS = [
+  'ganho_aproximado',
   'venda_call',
   'compra_call',
   'venda_put',
@@ -14,10 +15,8 @@ export const STOCK_PIVOT_COLUMNS = [
   'trade',
   'day_trade',
   'bonus',
-  'exercicio_opcao',
   'outros_ganhos',
   'taxas',
-  'ganho_aproximado',
 ] as const;
 
 export type StockPivotColumnKey = (typeof STOCK_PIVOT_COLUMNS)[number];
@@ -30,13 +29,12 @@ export const STOCK_PIVOT_COLUMN_LABELS: Record<StockPivotColumnKey, string> = {
   dividendos: 'Dividendos',
   jcp: 'JCP',
   locacao_acao: 'Locação ação',
-  trade: 'Trade (swing)',
+  trade: 'Trade',
   day_trade: 'Day trade',
   bonus: 'Bonificação',
-  exercicio_opcao: 'Exercício opção',
   outros_ganhos: 'Outros ganhos',
   taxas: 'Taxas (todas)',
-  ganho_aproximado: 'Ganho aproximado',
+  ganho_aproximado: 'Resultado Total',
 };
 
 export type StockPivotRow = Record<StockPivotColumnKey, number> & {
@@ -127,8 +125,14 @@ export function buildStockUnderlyingPivot(
     return s.totalCost / s.qty;
   };
 
-  const applyCustody = (e: LedgerEvent) => {
-    if (e.impacts_managerial_price === false || e.impacts_managerial_price === 0) return;
+  const applyCustody = (e: LedgerEvent): { closedQty: number; costBasisClosed: number; wasLong: boolean } => {
+    let closedQty = 0;
+    let costBasisClosed = 0;
+    let wasLong = true;
+
+    if (e.impacts_managerial_price === false || e.impacts_managerial_price === 0) {
+      return { closedQty, costBasisClosed, wasLong };
+    }
     const type = String(e.transaction_type);
     let s = custodyStates.get(e.asset_id);
     if (!s) {
@@ -136,15 +140,51 @@ export function buildStockUnderlyingPivot(
       custodyStates.set(e.asset_id, s);
     }
     const qty = Math.abs(Number(e.quantity));
-    if (['buy', 'put_buy', 'call_buy', 'opening_balance', 'bonus'].includes(type)) {
-      s.totalCost += qty * Number(e.unit_price);
-      s.qty += qty;
-    } else if (['sell', 'put_sell', 'call_sell', 'option_exercise'].includes(type)) {
-      const avg = s.qty > 0 ? s.totalCost / s.qty : 0;
-      const used = Math.min(qty, s.qty);
-      s.totalCost -= used * avg;
-      s.qty -= used;
+    const price = Number(e.unit_price);
+
+    const isBuy = ['buy', 'put_buy', 'call_buy', 'opening_balance', 'bonus'].includes(type);
+    const isSell = ['sell', 'put_sell', 'call_sell', 'option_exercise'].includes(type);
+
+    if (isBuy) {
+      if (s.qty < 0) {
+        wasLong = false;
+        const used = Math.min(qty, Math.abs(s.qty));
+        const avg = s.totalCost / Math.abs(s.qty);
+        s.totalCost -= used * avg;
+        s.qty += used;
+        closedQty = used;
+        costBasisClosed = used * avg;
+        const remainder = qty - used;
+        if (remainder > 0) {
+          s.qty += remainder;
+          s.totalCost += remainder * price;
+        }
+        if (s.qty === 0) s.totalCost = 0;
+      } else {
+        s.qty += qty;
+        s.totalCost += qty * price;
+      }
+    } else if (isSell) {
+      if (s.qty > 0) {
+        wasLong = true;
+        const used = Math.min(qty, s.qty);
+        const avg = s.totalCost / s.qty;
+        s.totalCost -= used * avg;
+        s.qty -= used;
+        closedQty = used;
+        costBasisClosed = used * avg;
+        const remainder = qty - used;
+        if (remainder > 0) {
+          s.qty -= remainder;
+          s.totalCost += remainder * price;
+        }
+        if (s.qty === 0) s.totalCost = 0;
+      } else {
+        s.qty -= qty;
+        s.totalCost += qty * price;
+      }
     }
+    return { closedQty, costBasisClosed, wasLong };
   };
 
   const recordSameDayBuy = (underlying: string, date: string, qty: number) => {
@@ -164,8 +204,6 @@ export function buildStockUnderlyingPivot(
 
   for (const e of entries) {
     const day = String(e.transaction_date || '').slice(0, 10);
-    if (!day || day < from || day > to) continue;
-
     const und = underlyingOf(e);
     if (!isStockUnderlying(und)) continue;
 
@@ -174,7 +212,10 @@ export function buildStockUnderlyingPivot(
     const assetType = String(e.asset_type || inferAssetType(String(e.asset_ticker)));
     const net = netCash(e);
     const qty = Math.abs(Number(e.quantity));
-    const avgBefore = getAvg(e.asset_id);
+    
+    const { closedQty, costBasisClosed, wasLong } = applyCustody(e);
+
+    if (!day || day < from || day > to) continue;
 
     switch (type) {
       case 'dividend':
@@ -189,68 +230,62 @@ export function buildStockUnderlyingPivot(
       case 'bonus':
         addToRow(row, 'bonus', net);
         break;
-      case 'put_sell':
-        addToRow(row, 'venda_put', net);
-        break;
-      case 'put_buy':
-        addToRow(row, 'compra_put', net);
-        break;
-      case 'call_sell':
-        addToRow(row, 'venda_call', net);
-        break;
-      case 'call_buy':
-        addToRow(row, 'compra_call', net);
-        break;
       case 'fee':
-        addToRow(row, 'taxas', Math.abs(net));
-        break;
       case 'penalty_b3':
         addToRow(row, 'taxas', Math.abs(net));
         break;
       case 'revaluation':
         addToRow(row, 'outros_ganhos', net);
         break;
+      case 'put_sell':
+      case 'put_buy':
+      case 'call_sell':
+      case 'call_buy':
       case 'sell':
+      case 'buy':
       case 'option_exercise': {
-        if (assetType === 'option_put') {
-          addToRow(row, 'venda_put', net);
-          break;
-        }
-        if (assetType === 'option_call') {
-          addToRow(row, 'venda_call', net);
-          break;
-        }
         if (assetType === 'stock' || assetType === 'fii') {
-          const dtQty = consumeSameDayBuy(und, day, qty);
-          const swingQty = Math.max(0, qty - dtQty);
-          const totalCost = qty * avgBefore;
-          if (dtQty > 0) {
-            const netDt = qty > 0 ? (net * dtQty) / qty : 0;
-            const costDt = dtQty * avgBefore;
-            addToRow(row, 'day_trade', netDt - costDt);
+          if (type === 'buy') {
+            if (closedQty > 0 && !wasLong) {
+               const netOfClosed = qty > 0 ? net * (closedQty / qty) : net;
+               const pnl = netOfClosed + costBasisClosed; 
+               addToRow(row, 'trade', pnl);
+            }
+            recordSameDayBuy(und, day, qty);
+          } else if (type === 'sell' || type === 'option_exercise') {
+            const dtQty = consumeSameDayBuy(und, day, qty);
+            const swingQty = Math.max(0, qty - dtQty);
+            const netPerShare = qty > 0 ? net / qty : 0;
+            const costPerShare = closedQty > 0 ? costBasisClosed / closedQty : 0;
+
+            if (dtQty > 0) {
+              const pnlDt = (netPerShare * dtQty) - (costPerShare * dtQty);
+              addToRow(row, 'day_trade', pnlDt);
+            }
+            if (swingQty > 0) {
+              const pnlSw = (netPerShare * swingQty) - (costPerShare * swingQty);
+              addToRow(row, 'trade', pnlSw);
+            }
+            if (dtQty === 0 && swingQty === 0 && qty > 0) {
+              addToRow(row, 'trade', net - costBasisClosed);
+            }
           }
-          if (swingQty > 0) {
-            const netSw = qty > 0 ? (net * swingQty) / qty : net;
-            const costSw = swingQty * avgBefore;
-            addToRow(row, 'trade', netSw - costSw);
+        } else if (assetType === 'option_put' || assetType === 'option_call') {
+          if (closedQty > 0) {
+            const netOfClosed = qty > 0 ? net * (closedQty / qty) : net;
+            const pnl = wasLong ? netOfClosed - costBasisClosed : netOfClosed + costBasisClosed;
+            
+            if (assetType === 'option_put') {
+              if (wasLong) addToRow(row, 'compra_put', pnl);
+              else addToRow(row, 'venda_put', pnl);
+            } else {
+              if (wasLong) addToRow(row, 'compra_call', pnl);
+              else addToRow(row, 'venda_call', pnl);
+            }
           }
-          if (dtQty === 0 && swingQty === 0 && qty > 0) {
-            addToRow(row, 'trade', net - totalCost);
-          }
-          break;
         }
-        addToRow(row, 'exercicio_opcao', net);
         break;
       }
-      case 'buy':
-        if (assetType === 'option_put') {
-          addToRow(row, 'compra_put', net);
-        } else if (assetType === 'option_call') {
-          addToRow(row, 'compra_call', net);
-        } else if (assetType === 'stock' || assetType === 'fii') {
-          recordSameDayBuy(und, day, qty);
-        }
-        break;
       default:
         if (net !== 0 && !['capital_deposit', 'capital_withdrawal', 'cash_yield', 'pending_settlement', 'opening_balance'].includes(type)) {
           addToRow(row, 'outros_ganhos', net);
@@ -262,8 +297,6 @@ export function buildStockUnderlyingPivot(
     if (exp > 0 && type !== 'fee') {
       addToRow(row, 'taxas', exp);
     }
-
-    applyCustody(e);
   }
 
   const custody = rebuildCustodyFromLedger(entries);
@@ -287,7 +320,6 @@ export function buildStockUnderlyingPivot(
     'trade',
     'day_trade',
     'bonus',
-    'exercicio_opcao',
     'outros_ganhos',
   ];
 
