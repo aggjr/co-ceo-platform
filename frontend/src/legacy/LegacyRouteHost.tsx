@@ -2,7 +2,7 @@ import { onMount, onCleanup, createEffect } from 'solid-js';
 import { useLocation } from '@solidjs/router';
 import { trackScreenView } from '../telemetry/index.js';
 
-export type LegacyPageLoader = (container: HTMLElement) => void | Promise<void>;
+export type LegacyPageLoader = (container: HTMLElement, currentPath?: string) => void | Promise<void>;
 
 /** Monta páginas JS legadas (renderShell + portfolioDisplay) dentro do shell Solid. */
 export function LegacyRouteHost(props: { loader: LegacyPageLoader }) {
@@ -19,7 +19,7 @@ export function LegacyRouteHost(props: { loader: LegacyPageLoader }) {
     if (loader) loader.style.display = 'none';
     root.innerHTML = '';
     try {
-      await props.loader(root);
+      await props.loader(root, location.pathname);
       console.log('[LegacyRouteHost] loader finished successfully');
       const path = window.location.pathname === '/' ? '/login' : window.location.pathname;
       trackScreenView(path);
