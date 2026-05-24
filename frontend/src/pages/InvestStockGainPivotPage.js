@@ -158,8 +158,6 @@ function bindPage(container) {
           ...pivot.totals,
           underlying: 'TOTAL',
           label: 'Total geral',
-          preco_estrito: null,
-          cotacao_atual: null,
         });
       }
 

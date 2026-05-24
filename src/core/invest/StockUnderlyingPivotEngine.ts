@@ -9,6 +9,7 @@ export const STOCK_PIVOT_COLUMNS = [
   'compra_call',
   'venda_put',
   'compra_put',
+  'resultado_custodia',
   'dividendos',
   'jcp',
   'locacao_acao',
@@ -26,6 +27,7 @@ export const STOCK_PIVOT_COLUMN_LABELS: Record<StockPivotColumnKey, string> = {
   compra_call: 'Compra call',
   venda_put: 'Venda put',
   compra_put: 'Compra put',
+  resultado_custodia: 'Resultado Custódia',
   dividendos: 'Dividendos',
   jcp: 'JCP',
   locacao_acao: 'Locação ação',
@@ -40,18 +42,12 @@ export const STOCK_PIVOT_COLUMN_LABELS: Record<StockPivotColumnKey, string> = {
 export type StockPivotRow = Record<StockPivotColumnKey, number> & {
   underlying: string;
   label: string;
-  /** Preço médio estrito (custo gerencial) da ação no fim do período. */
-  preco_estrito: number | null;
-  /** Cotação de mercado atual (metadata), se disponível. */
-  cotacao_atual: number | null;
 };
 
 function emptyRow(underlying: string): StockPivotRow {
   const row = {
     underlying,
     label: underlying,
-    preco_estrito: null,
-    cotacao_atual: null,
   } as StockPivotRow;
   for (const col of STOCK_PIVOT_COLUMNS) row[col] = 0;
   return row;
@@ -271,13 +267,21 @@ export function buildStockUnderlyingPivot(
             }
           }
         } else if (assetType === 'option_put' || assetType === 'option_call') {
-          const isVenda = ['put_sell', 'call_sell', 'sell'].includes(type) && !['option_exercise'].includes(type);
-          if (assetType === 'option_put') {
-            if (isVenda) addToRow(row, 'venda_put', net);
-            else addToRow(row, 'compra_put', net);
-          } else {
-            if (isVenda) addToRow(row, 'venda_call', net);
-            else addToRow(row, 'compra_call', net);
+          if (['sell', 'call_sell', 'put_sell', 'option_exercise'].includes(type)) {
+             if (closedQty > 0 && wasLong) {
+                const netOfClosed = qty > 0 ? net * (closedQty / qty) : net;
+                const pnl = netOfClosed - costBasisClosed;
+                if (assetType === 'option_call') addToRow(row, 'compra_call', pnl);
+                else if (assetType === 'option_put') addToRow(row, 'compra_put', pnl);
+             }
+          } 
+          else if (['buy', 'call_buy', 'put_buy'].includes(type)) {
+             if (closedQty > 0 && !wasLong) {
+                const netOfClosed = qty > 0 ? net * (closedQty / qty) : net;
+                const pnl = netOfClosed + costBasisClosed;
+                if (assetType === 'option_call') addToRow(row, 'venda_call', pnl);
+                else if (assetType === 'option_put') addToRow(row, 'venda_put', pnl);
+             }
           }
         }
         break;
@@ -300,8 +304,11 @@ export function buildStockUnderlyingPivot(
     const ticker = String(pos.underlying || pos.ticker || '').toUpperCase();
     if (!isStockUnderlying(ticker)) continue;
     const row = getRow(ticker);
+    
+    // Calcula o "resultado_custodia" = caixa travado ou recebido pela posição aberta
     if (Math.abs(pos.quantity) > 0 && pos.avgPrice > 0) {
-      row.preco_estrito = Math.round(pos.avgPrice * 10000) / 10000;
+       const openCashFlow = pos.quantity > 0 ? -(pos.quantity * pos.avgPrice) : (Math.abs(pos.quantity) * pos.avgPrice);
+       addToRow(row, 'resultado_custodia', openCashFlow);
     }
   }
 
@@ -310,6 +317,7 @@ export function buildStockUnderlyingPivot(
     'compra_call',
     'venda_put',
     'compra_put',
+    'resultado_custodia',
     'dividendos',
     'jcp',
     'locacao_acao',
@@ -349,13 +357,5 @@ export function enrichStockPivotWithQuotes(
   pivot: StockUnderlyingPivotResult,
   quotesByTicker: Record<string, { lastPrice?: number }>
 ): StockUnderlyingPivotResult {
-  const rows = pivot.rows.map((row) => {
-    const q = quotesByTicker[row.underlying];
-    const lp = q?.lastPrice;
-    return {
-      ...row,
-      cotacao_atual: lp != null && Number.isFinite(lp) ? Math.round(lp * 10000) / 10000 : row.cotacao_atual,
-    };
-  });
-  return { ...pivot, rows };
+  return pivot;
 }

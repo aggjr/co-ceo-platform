@@ -31,6 +31,7 @@ import {
   buildStockBenchmarkForChart,
   buildTwrPerformanceChartSeries,
 } from '../core/market/indexBenchmark';
+import { buildStoredTwrChartSeries } from '../core/invest/storedPatrimonyChart';
 
 /** Ação principal da holding para curva buy-and-hold no gráfico de Resultado Histórico. */
 const CHART_BENCHMARK_STOCK =
@@ -477,15 +478,23 @@ export class InvestController {
       chartDates,
       CHART_BENCHMARK_STOCK
     );
+    const storedTwrChart =
+      storedDays.filter((s) => s.cumulative_twr != null).length >= 2
+        ? buildStoredTwrChartSeries(storedDays, chartDates, from)
+        : [];
     const portfolioIndexed =
-      result.performance?.points?.length
-        ? buildTwrPerformanceChartSeries(result.performance.points)
-        : buildPatrimonyIndexedSeries(result.series);
+      storedTwrChart.length >= 2
+        ? storedTwrChart
+        : result.performance?.points?.length
+          ? buildTwrPerformanceChartSeries(result.performance.points)
+          : buildPatrimonyIndexedSeries(result.series);
     const portfolioPeriodReturn =
-      result.performance?.periodReturnTwr ??
-      (portfolioIndexed.length >= 2
-        ? portfolioIndexed[portfolioIndexed.length - 1]!.periodReturnToDate
-        : null);
+      storedTwrChart.length >= 2
+        ? storedTwrChart[storedTwrChart.length - 1]!.periodReturnToDate
+        : result.performance?.periodReturnTwr ??
+          (portfolioIndexed.length >= 2
+            ? portfolioIndexed[portfolioIndexed.length - 1]!.periodReturnToDate
+            : null);
     const cdiComparison =
       cdiBenchmark.available &&
       cdiBenchmark.periodReturn != null &&
@@ -527,8 +536,8 @@ export class InvestController {
       },
       performanceNotes: [
         storedDates.length > 0
-          ? `${storedDates.length} dia(s) com fechamento gravado em invest_portfolio_daily.`
-          : 'Sem fechamentos gravados: rode npm run record:patrimony:daily após sync de cotações.',
+          ? `${storedDates.length} dia(s) com fechamento gravado em invest_portfolio_daily (cron 23h ou npm run invest:daily-close).`
+          : 'Sem fechamentos gravados ainda — o cron patrimony-daily (23h) passará a preencher dia a dia.',
         quoteForDate
           ? `Cotações históricas: ${quoteMap.size} ticker(s), ${marketQuoteRows} preço/dia em market_quotes_daily.`
           : 'Sem cotações em market_quotes_daily no período — rode sync:market:quotes:stocks e backfill:market:quotes.',

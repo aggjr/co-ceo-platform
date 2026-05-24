@@ -52,7 +52,7 @@ describe('buildStockUnderlyingPivot', () => {
     expect(row!.ganho_aproximado).toBeCloseTo(190, 0);
   });
 
-  it('agrega prêmio de put vendida na coluna venda_put', () => {
+  it('mantém prêmio de put vendida em resultado_custodia até ser fechada', () => {
     const entries: LedgerEvent[] = [
       ev({
         asset_id: 'o1',
@@ -68,6 +68,6 @@ describe('buildStockUnderlyingPivot', () => {
     ];
     const r = buildStockUnderlyingPivot(entries, '2026-01-01', '2026-12-31');
     const row = r.rows.find((x) => x.underlying === 'PRIO3');
-    expect(row?.venda_put).toBeCloseTo(150, 0);
+    expect(row?.resultado_custodia).toBeCloseTo(150, 0);
   });
 });

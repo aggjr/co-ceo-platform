@@ -36,6 +36,8 @@ export type RecordPortfolioDayInput = {
   quotesAsOf: string | null;
   positionSnapshots: PositionDailySnapshot[];
   stockQuotes: Record<string, number>;
+  source?: string;
+  metadataExtra?: Record<string, unknown>;
 };
 
 function toIsoDate(value: unknown): string {
@@ -143,6 +145,7 @@ export class PatrimonyDailyStore {
     const metadata = {
       stock_quotes: input.stockQuotes,
       positions_count: input.positionSnapshots.length,
+      ...(input.metadataExtra ?? {}),
     };
 
     const payload = {
@@ -159,7 +162,7 @@ export class PatrimonyDailyStore {
       daily_return_twr: input.dailyReturnTwr,
       cumulative_twr: input.cumulativeTwr,
       quotes_as_of: input.quotesAsOf,
-      source: 'mtm_economic',
+      source: input.source ?? 'mtm_economic',
       metadata: JSON.stringify(metadata),
     };
 
@@ -172,7 +175,7 @@ export class PatrimonyDailyStore {
       await this.gateway.insert(ctx, 'invest_portfolio_daily', { id: recordId, ...payload });
     }
 
-    await this.upsertAssetSnapshots(ctx, input.snapshotDate, input.positionSnapshots);
+    await this.upsertAssetSnapshotsBestEffort(ctx, input.snapshotDate, input.positionSnapshots);
 
     return {
       id: recordId,
@@ -189,12 +192,16 @@ export class PatrimonyDailyStore {
       daily_return_twr: input.dailyReturnTwr,
       cumulative_twr: input.cumulativeTwr,
       quotes_as_of: input.quotesAsOf,
-      source: 'mtm_economic',
+      source: input.source ?? 'mtm_economic',
       metadata,
     };
   }
 
-  private async upsertAssetSnapshots(
+  /**
+   * Snapshots por ativo — best-effort (FK legada invest_assets pode falhar até migração).
+   * O fechamento em invest_portfolio_daily sempre é gravado.
+   */
+  private async upsertAssetSnapshotsBestEffort(
     ctx: UserContext,
     snapshotDate: string,
     positions: PositionDailySnapshot[]
@@ -202,53 +209,62 @@ export class PatrimonyDailyStore {
     if (!ctx.organizationId) return;
 
     for (const p of positions) {
-      const existing = await this.gateway.findWhere(
-        ctx,
-        'invest_daily_snapshots',
-        {
+      try {
+        const existing = await this.gateway.findWhere(
+          ctx,
+          'invest_daily_snapshots',
+          {
+            organization_id: ctx.organizationId,
+            asset_id: p.assetId,
+            snapshot_date: snapshotDate,
+          },
+          { limit: 1, columns: ['id'] }
+        );
+
+        const unrealized = Math.round((p.marketValue - p.managerialValue) * 100) / 100;
+        const payload = {
           organization_id: ctx.organizationId,
           asset_id: p.assetId,
           snapshot_date: snapshotDate,
-        },
-        { limit: 1, columns: ['id'] }
-      );
+          closing_price: p.closingPrice,
+          quantity_held: p.quantity,
+          managerial_avg_price: p.unitCost,
+          total_market_value: p.marketValue,
+          total_managerial_value: p.managerialValue,
+          unrealized_pnl: unrealized,
+        };
 
-      const unrealized = Math.round((p.marketValue - p.managerialValue) * 100) / 100;
-      const payload = {
-        organization_id: ctx.organizationId,
-        asset_id: p.assetId,
-        snapshot_date: snapshotDate,
-        closing_price: p.closingPrice,
-        quantity_held: p.quantity,
-        managerial_avg_price: p.unitCost,
-        total_market_value: p.marketValue,
-        total_managerial_value: p.managerialValue,
-        unrealized_pnl: unrealized,
-      };
-
-      if (existing[0]?.id) {
-        await this.gateway.update(ctx, 'invest_daily_snapshots', String(existing[0].id), payload);
-      } else {
-        await this.gateway.insert(ctx, 'invest_daily_snapshots', {
-          id: randomUUID(),
-          ...payload,
-        });
+        if (existing[0]?.id) {
+          await this.gateway.update(ctx, 'invest_daily_snapshots', String(existing[0].id), payload);
+        } else {
+          await this.gateway.insert(ctx, 'invest_daily_snapshots', {
+            id: randomUUID(),
+            ...payload,
+          });
+        }
+      } catch (err) {
+        const code = (err as { code?: string })?.code;
+        if (code === 'ER_NO_REFERENCED_ROW_2') continue;
+        throw err;
       }
     }
   }
 }
 
 /**
- * Fechamentos gravados com source mtm_economic distorcem a curva calibrada BTG.
- * Só mesclamos snapshots compatíveis com o método do gráfico.
+ * Fechamentos gravados (mtm_economic) substituem o dia na curva quando existem —
+ * patrimônio e TWR vêm de invest_portfolio_daily (fechamento das 23h).
  */
 export function filterStoredDaysForChartMethod(
   stored: StoredPortfolioDay[],
   method: string
 ): StoredPortfolioDay[] {
   const m = method.toLowerCase();
-  if (m === 'mtm_btg') {
+  if (m === 'mtm_btg' || m === 'mtm_recorded') {
     return stored.filter((s) => s.source === 'mtm_btg_calibrated');
+  }
+  if (m === 'mtm_economic') {
+    return stored.filter((s) => s.source === 'mtm_economic');
   }
   return stored;
 }

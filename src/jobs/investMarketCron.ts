@@ -4,13 +4,20 @@ import { CoCeoDataGateway } from '../core/dal';
 import {
   evaluateOptionsMarketSyncReport,
   runMonitoredPlatformJob,
+  type PlatformJobOutcome,
 } from '../core/platform/PlatformJobMonitorService';
 import { OptionMarketSyncService } from '../core/invest/OptionMarketSyncService';
 import { StockMarketSyncService } from '../core/market/StockMarketSyncService';
 import { scheduleDailyWallClock } from './cronSchedule';
+import {
+  evaluateInvestDailyCloseResult,
+  resolveInvestCronOrganizationIds,
+  runInvestDailyCloseForOrg,
+} from '../core/invest/investDailyCloseService';
 
 let optionSyncRunning = false;
 let stockSyncRunning = false;
+let patrimonyCloseRunning = false;
 let cronPool: mysql.Pool | null = null;
 
 /** Pool separado — sync noturno não esgota conexões da API (evita 502). */
@@ -46,6 +53,41 @@ export async function runStockMarketSyncJob(pool = getCronPool()): Promise<void>
     console.log('[cron:stocks-market] relatório:', JSON.stringify(report));
   } finally {
     stockSyncRunning = false;
+  }
+}
+
+export async function runPatrimonyDailyCloseJob(pool = getCronPool()): Promise<void> {
+  if (patrimonyCloseRunning) {
+    console.warn('[cron:patrimony-daily] execução anterior ainda em andamento — pulando.');
+    return;
+  }
+  patrimonyCloseRunning = true;
+  try {
+    const gateway = new CoCeoDataGateway(pool);
+    const orgIds = resolveInvestCronOrganizationIds();
+    await runMonitoredPlatformJob(
+      gateway,
+      'patrimony-daily',
+      async () => {
+        const results = [];
+        for (const orgId of orgIds) {
+          results.push(await runInvestDailyCloseForOrg(gateway, orgId));
+        }
+        return results;
+      },
+      (results): PlatformJobOutcome => {
+        const ev = evaluateInvestDailyCloseResult(results);
+        return {
+          status: ev.status,
+          title: ev.title,
+          body: ev.body,
+          summary: ev.summary,
+        };
+      }
+    );
+    console.log('[cron:patrimony-daily] concluído para', orgIds.join(', '));
+  } finally {
+    patrimonyCloseRunning = false;
   }
 }
 
@@ -94,9 +136,10 @@ export function startInvestMarketCron(): void {
   const timeZone = process.env.INVEST_CRON_TZ || 'America/Sao_Paulo';
   const optionsAt = parseHourMinute(process.env.INVEST_CRON_OPTIONS_AT || '03:15', 3, 15);
   const stocksAt = parseHourMinute(process.env.INVEST_CRON_STOCKS_AT || '19:05', 19, 5);
+  const patrimonyAt = parseHourMinute(process.env.INVEST_CRON_PATRIMONY_AT || '23:00', 23, 0);
 
   console.log(
-    `[cron] invest ativo — opções.net ${String(optionsAt.hour).padStart(2, '0')}:${String(optionsAt.minute).padStart(2, '0')}, ações brapi ${String(stocksAt.hour).padStart(2, '0')}:${String(stocksAt.minute).padStart(2, '0')} (${timeZone})`
+    `[cron] invest ativo — opções.net ${String(optionsAt.hour).padStart(2, '0')}:${String(optionsAt.minute).padStart(2, '0')}, ações brapi ${String(stocksAt.hour).padStart(2, '0')}:${String(stocksAt.minute).padStart(2, '0')}, fechamento patrimônio ${String(patrimonyAt.hour).padStart(2, '0')}:${String(patrimonyAt.minute).padStart(2, '0')} (${timeZone})`
   );
 
   scheduleDailyWallClock(optionsAt.hour, optionsAt.minute, timeZone, 'options-market', () =>
@@ -105,6 +148,10 @@ export function startInvestMarketCron(): void {
 
   scheduleDailyWallClock(stocksAt.hour, stocksAt.minute, timeZone, 'stocks-market', () =>
     runStockMarketSyncJob()
+  );
+
+  scheduleDailyWallClock(patrimonyAt.hour, patrimonyAt.minute, timeZone, 'patrimony-daily', () =>
+    runPatrimonyDailyCloseJob()
   );
 
   if (process.env.INVEST_CRON_RUN_ON_STARTUP === '1') {

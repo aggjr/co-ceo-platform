@@ -31,7 +31,11 @@ async function main() {
 
   const result = await recorder.recordDay(ctx, dateArg);
   console.log('Gravado:', result.snapshotDate);
-  console.log('Patrimônio:', result.recorded.patrimony.toLocaleString('pt-BR'));
+  console.log('Patrimônio (gravado):', result.recorded.patrimony.toLocaleString('pt-BR'));
+  console.log('Econômico (auditoria):', result.economicPatrimony.toLocaleString('pt-BR'));
+  if (result.btgPatrimony != null) {
+    console.log('BTG interpolado:', result.btgPatrimony.toLocaleString('pt-BR'));
+  }
   console.log('TWR dia:', result.recorded.daily_return_twr != null ? `${(result.recorded.daily_return_twr * 100).toFixed(4)}%` : '—');
   console.log('TWR acum. (série gravada):', result.recorded.cumulative_twr != null ? `${(result.recorded.cumulative_twr * 100).toFixed(4)}%` : '—');
   console.log('Posições snapshot:', result.positionsSaved);

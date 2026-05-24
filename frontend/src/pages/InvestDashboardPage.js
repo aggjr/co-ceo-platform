@@ -259,10 +259,12 @@ export async function InvestDashboardPage(container) {
       </${D}>
       <${D} id="patrimony-status" class="patrimony-status-host"></${D}>
       <${D} id="patrimony-summary" class="patrimony-summary-host"></${D}>
-      <${D} id="patrimony-chart-host" class="patrimony-chart-panel">
-        <p class="muted">Carregando...</p>
+      <${D} class="patrimony-chart-section">
+        <${D} id="patrimony-chart-host" class="patrimony-chart-panel">
+          <p class="muted">Carregando...</p>
+        </${D}>
+        <p id="patrimony-meta" class="patrimony-meta muted"></p>
       </${D}>
-      <p id="patrimony-meta" class="patrimony-meta muted"></p>
       <nav class="invest-patrimony-links" aria-label="Atalhos INVEST">
         <a href="/invest/portfolio" data-link>Portfólio →</a>
         · <a href="/invest/extratos" data-link>Extratos →</a>

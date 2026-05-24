@@ -1,7 +1,7 @@
 {
   "version": 2,
   "model": "risk-by-functionality",
-  "summary": "Cada unidade tem meta própria conforme criticidade e funcionalidades. Metas proporcionais (proportional: true) sobem com arquivos/linhas de código — sem teto fixo de ~100 casos.",
+  "summary": "Não existe meta global 80%. Cada unidade tem meta própria conforme criticidade e funcionalidades. Metas proporcionais (proportional: true) sobem com arquivos/linhas de código — sem teto fixo de ~100 casos.",
   "units": {
     "core.dal": {
       "lifecycle": "active",

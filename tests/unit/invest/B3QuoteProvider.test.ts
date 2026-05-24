@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from '@jest/globals';
 import { fetchB3Quotes } from '../../../src/core/invest/B3QuoteProvider';
 
 describe('fetchB3Quotes', () => {

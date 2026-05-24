@@ -23,7 +23,7 @@ describe('Regression infrastructure artifacts', () => {
     );
     expect(policy.summary).toMatch(/não existe meta global/i);
     expect(policy.units['core.dal']?.targets?.lineCoveragePct).toBe(85);
-    expect(policy.units.invest?.lifecycle).toBe('planned');
+    expect(policy.units.invest?.lifecycle).toBe('active');
   });
 
   it('impact-map.json define gatilhos de reteste completo', () => {
