@@ -1,6 +1,10 @@
 import type { Pool } from 'mysql2/promise';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { CoCeoDataGateway } from '../core/dal';
+import {
+  evaluateOptionsMarketSyncReport,
+  runMonitoredPlatformJob,
+} from '../core/platform/PlatformJobMonitorService';
 import { OptionMarketSyncService } from '../core/invest/OptionMarketSyncService';
 import { scheduleDailyWallClock } from './cronSchedule';
 
@@ -16,7 +20,12 @@ export async function runOptionMarketSyncJob(pool: Pool): Promise<void> {
     const gateway = new CoCeoDataGateway(pool);
     const ctx = authBootstrapContext();
     const service = new OptionMarketSyncService(gateway);
-    const report = await service.syncFromOpcoesNet(ctx);
+    const report = await runMonitoredPlatformJob(
+      gateway,
+      'options-market',
+      () => service.syncFromOpcoesNet(ctx),
+      evaluateOptionsMarketSyncReport
+    );
     console.log('[cron:options-market] relatório:', JSON.stringify(report));
   } finally {
     optionSyncRunning = false;

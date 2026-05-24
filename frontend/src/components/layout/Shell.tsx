@@ -14,6 +14,7 @@ import {
 } from '../../shell/shellState';
 import { SideNav } from './SideNav';
 import { ImpersonationBar } from './ImpersonationBar';
+import { PlatformJobAlertsBanner } from './PlatformJobAlertsBanner';
 import '../../styles/app.css';
 import '../../styles/cockpit-shell.css';
 
@@ -113,6 +114,9 @@ export function Shell(props: { children?: JSX.Element }) {
 
           {/* Conteúdo principal (painel IVA desativado — ver bloco comentado no git history / Shell.tsx) */}
           <div class="content" style="flex: 1; min-height: 0; overflow-y: auto;">
+            <div style={{ padding: '12px 16px 0' }}>
+              <PlatformJobAlertsBanner />
+            </div>
             {props.children}
           </div>
 

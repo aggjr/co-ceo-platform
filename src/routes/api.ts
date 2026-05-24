@@ -9,11 +9,13 @@ import { dataGateway } from '../config/gateway';
 import { QualityController } from '../controllers/QualityController';
 import { InvestController } from '../controllers/InvestController';
 import { UiManifestController } from '../controllers/UiManifestController';
+import { PlatformAlertsController } from '../controllers/PlatformAlertsController';
 
 const router = Router();
 const gateway = dataGateway;
 const cockpit = new CockpitController(gateway);
 const invest = new InvestController(gateway);
+const platformAlerts = new PlatformAlertsController(gateway);
 const telemetry = createTelemetryController(gateway);
 const uiManifest = new UiManifestController(gateway);
 
@@ -107,6 +109,20 @@ router.get(
     const storage = await gateway.getOrganizationStorage(ctx, ctx.organizationId);
     return res.json({ success: true, storage });
   }
+);
+
+// --- Alertas de jobs agendados (equipe co-CEO) ---
+router.get(
+  '/platform/job-alerts',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  platformAlerts.listUnread.bind(platformAlerts)
+);
+router.post(
+  '/platform/job-alerts/:alertId/acknowledge',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  platformAlerts.acknowledge.bind(platformAlerts)
 );
 
 // --- Qualidade / regressão (plataforma) ---

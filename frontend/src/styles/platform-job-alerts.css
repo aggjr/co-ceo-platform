@@ -1,0 +1,81 @@
+.platform-job-alerts {
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(218, 177, 119, 0.45);
+  background: rgba(218, 177, 119, 0.08);
+}
+
+.platform-job-alerts__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.platform-job-alerts__hint {
+  opacity: 0.75;
+  font-size: 12px;
+}
+
+.platform-job-alerts__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.platform-job-alerts__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.platform-job-alerts__item--error {
+  border-left: 3px solid #e85d5d;
+}
+
+.platform-job-alerts__item--warning {
+  border-left: 3px solid #d4a84b;
+}
+
+.platform-job-alerts__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.platform-job-alerts__title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.platform-job-alerts__body {
+  font-size: 12px;
+  opacity: 0.9;
+  line-height: 1.4;
+}
+
+.platform-job-alerts__ack {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.platform-job-alerts__ack:hover {
+  background: rgba(255, 255, 255, 0.08);
+}

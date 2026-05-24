@@ -82,6 +82,13 @@ O container **não usa crontab do host** — o agendamento roda **dentro do proc
 
 Logs no painel do app: `[cron] options-market — iniciando/concluído`.
 
+**Alertas na UI (sem olhar log):** usuário com escopo **global** (equipe co-CEO) vê faixa no topo quando um job falha ou gera aviso. Requer migration `25_platform_job_monitoring.sql`.
+
+```bash
+# aplicar migration no MySQL de produção (uma vez)
+mysql -h ... -u ... -p co_ceo_platform < src/database/migrations/25_platform_job_monitoring.sql
+```
+
 Manual (máquina com repo + `REMOTE_DB_*` ou túnel):
 
 ```bash

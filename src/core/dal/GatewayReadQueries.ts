@@ -36,7 +36,9 @@ export type GatewayReadQueryKey =
   | 'market_quotes_bulk_range'
   | 'ui_menu_nodes_active'
   | 'ui_texts_resolved_for_org'
-  | 'ui_catalog_version';
+  | 'ui_catalog_version'
+  | 'platform_admin_alerts_unread'
+  | 'platform_admin_alerts_recent';
 
 export interface GatewayReadQueryDef {
   sql: string;
@@ -346,6 +348,21 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
             AND pi.identifier REGEXP '^[A-Z]{4}[A-X][0-9]'
             AND pi.identifier NOT LIKE 'CAIXA-%'
           ORDER BY pi.identifier`,
+  },
+  platform_admin_alerts_unread: {
+    requiresGlobalScope: true,
+    sql: `SELECT id, job_run_id, job_key, severity, title, body, created_at
+          FROM platform_admin_alerts
+          WHERE acknowledged_at IS NULL
+          ORDER BY created_at DESC
+          LIMIT ?`,
+  },
+  platform_admin_alerts_recent: {
+    requiresGlobalScope: true,
+    sql: `SELECT id, job_run_id, job_key, severity, title, body, created_at, acknowledged_at
+          FROM platform_admin_alerts
+          ORDER BY created_at DESC
+          LIMIT ?`,
   },
   ui_menu_nodes_active: {
     sql: `SELECT id, code, parent_id, module_code, path, icon, order_index,
