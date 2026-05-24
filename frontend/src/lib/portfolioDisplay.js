@@ -935,27 +935,6 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
           }
           return span;
         },
-      },
-      {
-        key: 'callsPremiumPending',
-        label: 'Prêmio CALL (D+1)',
-        type: 'currency',
-        align: 'right',
-        width: '120px',
-        render: (row) => {
-          const span = document.createElement('span');
-          const prem = Number(row.callsPremiumPending);
-          if (!Number.isFinite(prem) || prem <= 0) {
-            span.className = 'muted';
-            span.textContent = '—';
-            return span;
-          }
-          span.textContent = formatBrl(prem);
-          span.style.fontWeight = '600';
-          span.className = 'portfolio-call-premium-pending';
-          span.title = 'Prêmio das CALLs vendidas — crédito previsto na conta investimento (D+1 útil)';
-          return span;
-        },
       }
     );
   }
