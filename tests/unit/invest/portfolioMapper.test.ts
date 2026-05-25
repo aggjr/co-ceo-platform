@@ -320,6 +320,40 @@ describe('portfolioMapper', () => {
     expect(enriched.strikeDistanceBrl).not.toBeNull();
   });
 
+  it('opções sem ação na lista: usa cotação externa (market_quotes_daily)', () => {
+    const marketCatalog = new Map([
+      [
+        'PRIOR580',
+        {
+          ticker: 'PRIOR580',
+          underlyingTicker: 'PRIO3',
+          optionType: 'PUT' as const,
+          strikePrice: 58,
+          expirationDate: '2026-06-19',
+        },
+      ],
+    ]);
+    const opt = enrichPortfolioRow(
+      {
+        id: 'o-only',
+        asset_ticker: 'PRIOR580',
+        asset_type: 'option_put',
+        current_quantity: -1000,
+        managerial_avg_price: 1.5,
+        metadata: { underlying_ticker: 'PRIO3' },
+        status: 'active',
+      },
+      undefined,
+      { ledgerStrikeByTicker: new Map(), marketCatalog }
+    );
+    const external = new Map([['PRIO3', 65.4]]);
+    const items = attachUnderlyingMarketData([opt], external);
+    const enriched = items[0]!;
+    expect(enriched.underlyingLastPrice).toBe(65.4);
+    expect(enriched.strikeDistanceBrl).toBeCloseTo(7.4, 1);
+    expect(enriched.strikeDistancePct).toBeCloseTo(12.76, 1);
+  });
+
   it('ação: cotação de mercado não replica PM B3 (metadata com PM errado)', () => {
     const row = enrichPortfolioRow(
       {

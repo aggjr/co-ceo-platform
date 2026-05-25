@@ -1,6 +1,10 @@
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
-import { inferAssetType, inferUnderlyingTicker } from './assetClassifier';
+import {
+  inferAssetType,
+  inferUnderlyingTicker,
+  isOptionTicker,
+} from './assetClassifier';
 import { inferOptionExpiryDate, inferOptionMonthFromTicker } from './optionExpiry';
 import { authBootstrapContext } from '../auth/authBootstrapContext';
 import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
@@ -32,7 +36,7 @@ export class InvestQuoteSyncService {
     this.marketQuotes = new MarketQuoteRepository(gateway);
   }
 
-  /** Tickers de ações/FIIs com posição ou ativos ativos na custódia. */
+  /** Ações/FIIs em custódia + subjacentes das opções abertas (para cotação na grade de opções). */
   async listB3QuoteTickers(ctx: UserContext): Promise<string[]> {
     if (!ctx.organizationId) return [];
     const assets = await this.assetProjection.listActiveAssets(ctx);
@@ -43,6 +47,15 @@ export class InvestQuoteSyncService {
       const type = String(row.asset_type || inferAssetType(ticker));
       if (type === 'stock' || type === 'fii') {
         tickers.push(ticker);
+        continue;
+      }
+      if (
+        type === 'option_call' ||
+        type === 'option_put' ||
+        isOptionTicker(ticker)
+      ) {
+        const und = inferUnderlyingTicker(ticker);
+        if (und) tickers.push(und);
       }
     }
     return [...new Set(tickers)];

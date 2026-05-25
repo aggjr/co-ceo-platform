@@ -296,7 +296,12 @@ export class InvestController {
       items.push(item);
     }
 
-    const withUnderlyingQuotes = attachUnderlyingMarketData(items);
+    const underlyingSpots = new Map<string, number>();
+    for (const [ticker, mq] of marketQuoteMap) {
+      const price = Number(mq.price);
+      if (price > 0) underlyingSpots.set(ticker.toUpperCase(), price);
+    }
+    const withUnderlyingQuotes = attachUnderlyingMarketData(items, underlyingSpots);
     withUnderlyingQuotes.sort((a, b) => b.marketValue - a.marketValue);
     const { open, closedOptions } = partitionPortfolioPositions(withUnderlyingQuotes);
     const consolidated = consolidateTesouroPortfolioItems(open);

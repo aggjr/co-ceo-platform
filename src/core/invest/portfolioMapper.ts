@@ -394,14 +394,39 @@ export function enrichPortfolioRow(
   };
 }
 
-/** Notional = |qty| × strike; cotação e distância ao strike para risco de exercício. */
-export function attachUnderlyingMarketData(items: PortfolioItemDto[]): PortfolioItemDto[] {
+export type UnderlyingSpotMap = Map<string, number>;
+
+/** Cotações de subjacentes vindas de market_quotes_daily / brapi (quando a resposta não traz a ação). */
+export function buildUnderlyingSpotMap(
+  items: PortfolioItemDto[],
+  externalSpots?: UnderlyingSpotMap
+): UnderlyingSpotMap {
   const spotByTicker = new Map<string, number>();
+  if (externalSpots) {
+    for (const [ticker, price] of externalSpots) {
+      const p = Number(price);
+      if (p > 0) spotByTicker.set(ticker.toUpperCase(), p);
+    }
+  }
   for (const item of items) {
     if (isPortfolioOptionItem(item)) continue;
     const lp = Number(item.lastPrice);
     if (lp > 0) spotByTicker.set(item.ticker.toUpperCase(), lp);
+    const uq = item.updatedQuote;
+    if (uq != null && uq > 0) {
+      const key = String(item.ticker).toUpperCase();
+      if (!spotByTicker.has(key)) spotByTicker.set(key, uq);
+    }
   }
+  return spotByTicker;
+}
+
+/** Notional = |qty| × strike; cotação e distância ao strike para risco de exercício. */
+export function attachUnderlyingMarketData(
+  items: PortfolioItemDto[],
+  externalSpots?: UnderlyingSpotMap
+): PortfolioItemDto[] {
+  const spotByTicker = buildUnderlyingSpotMap(items, externalSpots);
 
   return items.map((item) => {
     if (!isPortfolioOptionItem(item)) return item;
