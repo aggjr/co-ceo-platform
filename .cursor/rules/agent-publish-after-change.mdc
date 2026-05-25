@@ -11,12 +11,16 @@ alwaysApply: true
 
 Varios agentes trabalham em paralelo em branches diferentes. **Nunca** commitar/push direto em `main` sem passar pela branch do agente primeiro — senao o trabalho dos outros agentes (ainda nao integrado) e **perdido ou sobrescrito** no merge.
 
-Fluxo **sempre** nesta ordem:
+Fluxo **sempre** nesta ordem (**subir, depois integrate**):
 
-1. Commit na **branch do agente** (ex.: `antigravity-gamer`)
-2. **`git push origin <branch-do-agente>`** — publicar o trabalho desta sessao
-3. **`git checkout main`** → merge da branch do agente → **`bump-version.js --integrate`** (patch +1 obrigatorio) → commit `chore(release): Vx.y.z` → **`git push origin main`**
-4. Realinhar a branch do agente com `main` (`git checkout <branch>` → `git merge main` → `git push origin <branch>`)
+1. Commit na **branch do agente** (ex.: `antigravity-guto`)
+2. **`git push origin <branch-do-agente>`** — **subir** o trabalho desta sessao (obrigatorio antes do integrate)
+3. **`npm run git:integrate`** — merge em `main`, bump patch, push `main`, realinhar branch do agente
+4. Confirmar: `git log -1 --oneline` em `main` = `chore(release): V0.0.N`
+
+Equivalente manual ao passo 3: `git checkout main` → merge da branch → `bump-version.js --integrate` → push `main` → checkout branch → merge `main` → push branch.
+
+**Nunca** rodar `git:integrate` com alteracoes nao commitadas na working tree (stash ou commit antes).
 
 O passo de versao e **automatico** dentro de `git-publish-to-main.ps1` (passo 6/8). Nao incrementar `version.json`/`package.json` manualmente no commit de feature.
 
