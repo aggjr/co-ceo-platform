@@ -130,13 +130,10 @@ export function computePortfolioPerformance(
     let cumulativeReturnTwr: number | null = null;
 
     if (prevPatrimony != null && prevPatrimony !== 0) {
-      dailyReturnSimple =
-        Math.round(((p.patrimony - prevPatrimony) / prevPatrimony) * 10000) / 10000;
-      dailyReturnAdjusted =
-        Math.round(((p.patrimony - prevPatrimony - externalFlow) / prevPatrimony) * 10000) /
-        10000;
+      dailyReturnSimple = (p.patrimony - prevPatrimony) / prevPatrimony;
+      dailyReturnAdjusted = (p.patrimony - prevPatrimony - externalFlow) / prevPatrimony;
       cumulativeFactor *= 1 + dailyReturnAdjusted;
-      cumulativeReturnTwr = Math.round((cumulativeFactor - 1) * 10000) / 10000;
+      cumulativeReturnTwr = cumulativeFactor - 1;
     } else {
       cumulativeReturnTwr = 0;
     }
@@ -211,8 +208,7 @@ export function computeTwrFromMonthEndAnchors(
     const endPatrimony = cur.patrimony;
     const periodReturn =
       startPatrimony > 0
-        ? Math.round(((endPatrimony - startPatrimony - externalFlows) / startPatrimony) * 10000) /
-          10000
+        ? (endPatrimony - startPatrimony - externalFlows) / startPatrimony
         : 0;
     factor *= 1 + periodReturn;
     months.push({
@@ -225,7 +221,7 @@ export function computeTwrFromMonthEndAnchors(
   }
 
   return {
-    periodReturnTwr: Math.round((factor - 1) * 10000) / 10000,
+    periodReturnTwr: factor - 1,
     months,
   };
 }

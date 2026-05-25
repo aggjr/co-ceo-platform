@@ -97,7 +97,6 @@ export async function InvestResultadoPage(container) {
     'screen.invest.resultado.import_help',
     'label.common.period_from',
     'label.common.period_to',
-    'action.common.update',
     'action.common.load_template',
     'action.common.import_recalc',
   ]);
@@ -131,7 +130,7 @@ export async function InvestResultadoPage(container) {
       <div class="table-period-toolbar">
         <label>${t['label.common.period_from']} <input type="date" id="pivot-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
         <label>${t['label.common.period_to']} <input type="date" id="pivot-to" value="${bounds.today}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
-        <button type="button" id="pivot-reload" class="btn-entrar">${t['action.common.update']}</button>
+        <button type="button" id="pivot-reload" class="btn-entrar">Atualizar Rentabilidade</button>
       </div>
       <div id="pivot-summary" class="table-period-summary"></div>
       <div id="pivot-host"><p class="muted">Carregando...</p></div>
