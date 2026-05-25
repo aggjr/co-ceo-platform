@@ -122,13 +122,13 @@
 }
 
 .opt-card-badge--call {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
+  background: var(--invest-option-call-bg, rgba(34, 197, 94, 0.2));
+  color: var(--invest-option-call-color, #86efac);
 }
 
 .opt-card-badge--put {
-  background: rgba(168, 85, 247, 0.2);
-  color: #d8b4fe;
+  background: var(--invest-option-put-bg, rgba(168, 85, 247, 0.2));
+  color: var(--invest-option-put-color, #d8b4fe);
 }
 
 .opt-card-table {

@@ -30,8 +30,8 @@ const RF_FALLBACK = {
 };
 
 const FALLBACK_BY_CODE = {
-  CALL: { cssClass: 'notes-type--call', color: '#60a5fa', cssVar: '--invest-type-call' },
-  PUT: { cssClass: 'notes-type--put', color: '#f97316', cssVar: '--invest-type-put' },
+  CALL: { cssClass: 'notes-type--call', color: '#86efac', cssVar: '--invest-type-call' },
+  PUT: { cssClass: 'notes-type--put', color: '#d8b4fe', cssVar: '--invest-type-put' },
   EXEC: { cssClass: 'notes-type--exec', color: '#fbbf24', cssVar: '--invest-type-exec' },
   BTC: { cssClass: 'notes-type--btc', color: '#94a3b8', cssVar: '--invest-type-btc' },
   LFT: RF_FALLBACK,
