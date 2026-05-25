@@ -89,6 +89,23 @@ import { isMissingSchemaError } from '../core/dal/mysqlErrors';
 import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
 import { StockMarketSyncService } from '../core/market/StockMarketSyncService';
 
+function portfolioRowMatchesAssetClass(
+  row: Record<string, unknown>,
+  assetClass: string
+): boolean {
+  const type = String(row.asset_type ?? '').toLowerCase();
+  const t = String(row.asset_ticker ?? '').trim().toUpperCase();
+  const isOpt =
+    type === 'option_call' || type === 'option_put' || isOptionTicker(t);
+  const isFi =
+    type === 'fixed_income' || type === 'cdb' || isFixedIncomeTicker(t);
+  const isCash = type === 'cash' || t.startsWith('CAIXA-');
+  if (assetClass === 'options') return isOpt;
+  if (assetClass === 'fixedIncome') return isFi || isCash;
+  if (assetClass === 'equities') return !isOpt && !isFi && !isCash;
+  return true;
+}
+
 export class InvestController {
   private readonly ledger: LedgerImportService;
   private readonly patrimonyStore: PatrimonyDailyStore;
@@ -153,7 +170,16 @@ export class InvestController {
       });
     }
 
+    const assetClassQuery = req.query.assetClass as string | undefined;
+    const optionsOnly = assetClassQuery === 'options';
+
     const rows = await this.assetProjection.listActiveAssets(ctx);
+    let assetRows = rows as Record<string, unknown>[];
+    if (assetClassQuery) {
+      assetRows = assetRows.filter((r) =>
+        portfolioRowMatchesAssetClass(r, assetClassQuery)
+      );
+    }
 
     const today = new Date().toISOString().slice(0, 10);
     const ledgerEvents = await this.ledger.listLedgerEvents(
@@ -162,29 +188,14 @@ export class InvestController {
       today
     );
     const { assets: ledgerCustody } = rebuildCustodyFromLedger(ledgerEvents);
-    let rowsMerged = mergeLedgerCustodyIntoAssetRows(
-      rows as Record<string, unknown>[],
-      ledgerCustody
-    );
-    const assetClassQuery = req.query.assetClass as string | undefined;
-    if (assetClassQuery) {
-      rowsMerged = rowsMerged.filter((r) => {
-        const type = String(r.asset_type ?? '').toLowerCase();
-        const t = String(r.asset_ticker ?? '').trim().toUpperCase();
-        
-        const isOpt = type === 'option_call' || type === 'option_put' || isOptionTicker(t);
-        const isFi = type === 'fixed_income' || type === 'cdb' || isFixedIncomeTicker(t);
-        const isCash = type === 'cash' || t.startsWith('CAIXA-');
-        
-        if (assetClassQuery === 'options') return isOpt;
-        if (assetClassQuery === 'fixedIncome') return isFi || isCash;
-        if (assetClassQuery === 'equities') return !isOpt && !isFi && !isCash;
-        return true;
-      });
-    }
+    const rowsMerged = mergeLedgerCustodyIntoAssetRows(assetRows, ledgerCustody);
 
-    const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
-    const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents);
+    const threeByUnderlying = optionsOnly
+      ? new Map<string, { strict: number; b3: number; managerial: number }>()
+      : buildThreeAvgPricesByUnderlying(ledgerEvents);
+    const engineSnapshots = optionsOnly
+      ? new Map()
+      : computeThreePricesByUnderlying(ledgerEvents);
     const ledgerStrikeByTicker = buildOptionStrikeMapFromLedgerEvents(ledgerEvents);
     const marketCatalog = await loadOptionMarketCatalog(
       this.gateway,
@@ -240,7 +251,8 @@ export class InvestController {
       }
     }
 
-    if (missingOptions.length) {
+    // Tela de opções: só cotações já no banco (sync manual/cron). Evita grade opcoes.net no request.
+    if (missingOptions.length && !optionsOnly) {
       try {
         const optQuotes = await fetchOpcoesNetOptionQuotes(missingOptions);
         const marketCtx = authBootstrapContext();
@@ -331,51 +343,71 @@ export class InvestController {
     const withUnderlyingQuotes = attachUnderlyingMarketData(items, underlyingSpots);
     withUnderlyingQuotes.sort((a, b) => b.marketValue - a.marketValue);
     const { open, closedOptions } = partitionPortfolioPositions(withUnderlyingQuotes);
-    const consolidated = consolidateTesouroPortfolioItems(open);
+    const consolidated = optionsOnly
+      ? open
+      : consolidateTesouroPortfolioItems(open);
     const withAllocation = applyAllocationPercents(consolidated);
 
-    const coverageOptions = collectCallCoverageOptionRows(
-      withAllocation,
-      ledgerCustody
-    );
-    const premiumByUnderlying = buildShortCallPremiumPendingByUnderlying(ledgerEvents);
-    const withCallCoverage = attachCallCoverageToEquities(
-      withAllocation,
-      coverageOptions,
-      premiumByUnderlying
-    );
-    const cashInTransit = buildCashInTransitSummary(ledgerEvents, today);
-    const withCash = applyCashInvestBalanceToItems(
-      withCallCoverage,
-      cashInTransit.settledCashBalance
-    );
+    let responseItems = withAllocation;
+    let cashInTransit: ReturnType<typeof buildCashInTransitSummary> | null = null;
+
+    if (optionsOnly) {
+      cashInTransit = {
+        asOfDate: today,
+        settledCashBalance: 0,
+        inTransitNet: 0,
+        receivables: 0,
+        payables: 0,
+        cashIncludingTransit: 0,
+        lines: [],
+      };
+    } else {
+      const coverageOptions = collectCallCoverageOptionRows(
+        withAllocation,
+        ledgerCustody
+      );
+      const premiumByUnderlying =
+        buildShortCallPremiumPendingByUnderlying(ledgerEvents);
+      responseItems = attachCallCoverageToEquities(
+        withAllocation,
+        coverageOptions,
+        premiumByUnderlying
+      );
+      cashInTransit = buildCashInTransitSummary(ledgerEvents, today);
+      responseItems = applyCashInvestBalanceToItems(
+        responseItems,
+        cashInTransit.settledCashBalance
+      );
+    }
 
     const threePricesAudit = { ok: 0, warn: 0, error: 0, pending: [] as Array<{
       ticker: string;
       status: string;
       observation: string;
     }> };
-    for (const it of withCash) {
-      const v = it.threePricesValidation;
-      if (!v) continue;
-      if (v.status === 'ok') threePricesAudit.ok += 1;
-      else if (v.status === 'warn') threePricesAudit.warn += 1;
-      else threePricesAudit.error += 1;
-      if (v.status !== 'ok') {
-        threePricesAudit.pending.push({
-          ticker: it.ticker,
-          status: v.status,
-          observation: v.observation,
-        });
+    if (!optionsOnly) {
+      for (const it of responseItems) {
+        const v = it.threePricesValidation;
+        if (!v) continue;
+        if (v.status === 'ok') threePricesAudit.ok += 1;
+        else if (v.status === 'warn') threePricesAudit.warn += 1;
+        else threePricesAudit.error += 1;
+        if (v.status !== 'ok') {
+          threePricesAudit.pending.push({
+            ticker: it.ticker,
+            status: v.status,
+            observation: v.observation,
+          });
+        }
       }
     }
 
     return res.json({
       success: true,
-      items: withCash,
+      items: responseItems,
       closedOptions,
-      summary: summarizePortfolio(withCash),
-      cashStatementBalance: cashInTransit.settledCashBalance,
+      summary: summarizePortfolio(responseItems),
+      cashStatementBalance: cashInTransit!.settledCashBalance,
       cashInTransit,
       threePricesAudit,
       source: 'custody',

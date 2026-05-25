@@ -71,32 +71,32 @@ function renderCard(row, labels) {
   const distRowClass = `opt-card-dist--${f.distanceBand}`;
 
   const rows = [
-    [labels['field.invest.options.underlying'], escapeHtml(f.underlying || '—')],
-    [labels['field.invest.options.type'], escapeHtml(f.typeLabel)],
+    [labels['field.invest.options.underlying'] || 'Ação ref.', escapeHtml(f.underlying || '—')],
+    [labels['field.invest.options.type'] || 'Tipo', escapeHtml(f.typeLabel)],
     [
-      labels['field.invest.options.quantity'],
+      labels['field.invest.options.quantity'] || 'Quantidade',
       escapeHtml(formatNumber(f.quantity, 0)),
       qtyClass,
     ],
-    [labels['field.invest.options.strike'], escapeHtml(f.strike != null ? formatBrl(f.strike) : '—')],
-    [labels['field.invest.options.premium'], escapeHtml(formatBrl(f.premium))],
+    [labels['field.invest.options.strike'] || 'Strike', escapeHtml(f.strike != null ? formatBrl(f.strike) : '—')],
+    [labels['field.invest.options.premium'] || 'Prêmio', escapeHtml(formatBrl(f.premium))],
     [
-      labels['field.invest.options.premium_total'],
+      labels['field.invest.options.premium_total'] || 'Prêmio Total',
       escapeHtml(formatBrl(f.premiumTotal)),
     ],
-    [labels['field.invest.options.quote'], escapeHtml(formatBrl(f.quote))],
+    [labels['field.invest.options.quote'] || 'Cotação', escapeHtml(formatBrl(f.quote))],
     [
-      labels['field.invest.options.notional'],
+      labels['field.invest.options.notional'] || 'Nocional',
       escapeHtml(f.notional != null ? formatBrl(f.notional) : '—'),
     ],
     [
-      labels['field.invest.options.underlying_quote'],
+      labels['field.invest.options.underlying_quote'] || 'Cotação ref.',
       escapeHtml(formatBrl(f.underlyingQuote)),
     ],
-    [labels['field.invest.options.strike_distance'], escapeHtml(f.distanceText), distRowClass],
-    [labels['field.invest.options.expiry'], escapeHtml(formatDateBr(f.expiry))],
-    [labels['field.invest.options.result_pct'], escapeHtml(f.pnlPctFormatted)],
-    [labels['field.invest.options.result'], escapeHtml(f.pnlFormatted), pnlClass],
+    [labels['field.invest.options.strike_distance'] || 'Distância strike', escapeHtml(f.distanceText), distRowClass],
+    [labels['field.invest.options.expiry'] || 'Data strike', escapeHtml(formatDateBr(f.expiry))],
+    [labels['field.invest.options.result_pct'] || 'Resultado %', escapeHtml(f.pnlPctFormatted)],
+    [labels['field.invest.options.result'] || 'Resultado', escapeHtml(f.pnlFormatted), pnlClass],
   ];
 
   const body = rows
