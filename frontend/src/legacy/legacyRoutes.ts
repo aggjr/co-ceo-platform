@@ -11,9 +11,12 @@ import {
 import { InvestDashboardPage } from '../pages/InvestDashboardPage.js';
 import {
   InvestEquitiesPage,
-  InvestOptionsPage,
+  InvestOptionsTablePage,
   InvestFixedIncomePage,
 } from '../pages/InvestPortfolioPage.js';
+import { InvestOptionsRedirectPage } from '../pages/InvestOptionsRedirectPage.js';
+import { InvestOptionsCardsPage } from '../pages/InvestOptionsCardsPage.js';
+import { InvestOptionsByExpiryPage } from '../pages/InvestOptionsByExpiryPage.js';
 import { InvestResultadoPage } from '../pages/InvestResultadoPage.js';
 import { InvestClosedTradesPage } from '../pages/InvestClosedTradesPage.js';
 import { InvestStockGainPivotPage } from '../pages/InvestStockGainPivotPage.js';
@@ -38,7 +41,10 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/cockpit/client/storage', loader: CockpitStoragePage },
   { path: '/invest', loader: InvestDashboardPage },
   { path: '/invest/portfolio', loader: InvestEquitiesPage },
-  { path: '/invest/opcoes', loader: InvestOptionsPage },
+  { path: '/invest/opcoes', loader: InvestOptionsRedirectPage },
+  { path: '/invest/opcoes/tabela', loader: InvestOptionsTablePage },
+  { path: '/invest/opcoes/cards', loader: InvestOptionsCardsPage },
+  { path: '/invest/opcoes/vencimentos', loader: InvestOptionsByExpiryPage },
   { path: '/invest/titulos', loader: InvestFixedIncomePage },
   { path: '/invest/carteira-acoes-fiis', loader: InvestEquitiesPage },
   { path: '/invest/resultado', loader: InvestResultadoPage },

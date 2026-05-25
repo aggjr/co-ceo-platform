@@ -5,12 +5,46 @@ import { loadVisibleMenu } from '../../navigation/buildVisibleMenu.js';
 interface MenuItem {
   label: string;
   path: string;
+  children?: MenuItem[];
 }
 
 interface MenuModule {
   id: string;
   label: string;
   items: MenuItem[];
+}
+
+function collectPaths(items: MenuItem[]): string[] {
+  const paths: string[] = [];
+  for (const item of items) {
+    paths.push(item.path);
+    if (item.children?.length) {
+      for (const child of item.children) paths.push(child.path);
+    }
+  }
+  return paths;
+}
+
+function itemOrChildActive(item: MenuItem, currentPath: string, allPaths: string[]) {
+  if (isPathActive(currentPath, item.path, allPaths)) return true;
+  if (!item.children?.length) return false;
+  return item.children.some((c) => isPathActive(currentPath, c.path, allPaths));
+}
+
+function pathMatches(currentPath: string, itemPath: string) {
+  if (currentPath === itemPath) return true;
+  if (itemPath !== '/' && currentPath.startsWith(`${itemPath}/`)) return true;
+  return false;
+}
+
+function isPathActive(currentPath: string, itemPath: string, allPaths: string[]) {
+  if (!pathMatches(currentPath, itemPath)) return false;
+  return !allPaths.some(
+    (other) =>
+      other !== itemPath &&
+      other.startsWith(`${itemPath}/`) &&
+      pathMatches(currentPath, other),
+  );
 }
 
 export function SideNav() {
@@ -24,12 +58,14 @@ export function SideNav() {
       const menu = await loadVisibleMenu();
       setModules(menu);
 
-      // Autoexpandir o módulo que contém a rota atual
       const current = location.pathname;
       const initialExpanded: Record<string, boolean> = {};
 
       menu.forEach((mod: MenuModule) => {
-        const hasActive = mod.items.some((item) => pathMatches(current, item.path));
+        const allPaths = collectPaths(mod.items);
+        const hasActive = mod.items.some((item) =>
+          itemOrChildActive(item, current, allPaths),
+        );
         initialExpanded[mod.id] = hasActive;
       });
       setExpanded(initialExpanded);
@@ -37,22 +73,6 @@ export function SideNav() {
       console.error('Erro ao carregar menu lateral:', err);
     }
   });
-
-  const pathMatches = (currentPath: string, itemPath: string) => {
-    if (currentPath === itemPath) return true;
-    if (itemPath !== '/' && currentPath.startsWith(`${itemPath}/`)) return true;
-    return false;
-  };
-
-  const isPathActive = (currentPath: string, itemPath: string, allPaths: string[]) => {
-    if (!pathMatches(currentPath, itemPath)) return false;
-    return !allPaths.some(
-      (other) =>
-        other !== itemPath &&
-        other.startsWith(`${itemPath}/`) &&
-        pathMatches(currentPath, other)
-    );
-  };
 
   const toggleModule = (moduleId: string) => {
     setExpanded((prev) => ({
@@ -69,7 +89,7 @@ export function SideNav() {
       >
         <For each={modules()}>
           {(mod) => {
-            const allPaths = mod.items.map((i) => i.path);
+            const allPaths = collectPaths(mod.items);
             const isOpen = () => !!expanded()[mod.id];
 
             return (
@@ -85,22 +105,51 @@ export function SideNav() {
                 </button>
                 <div class="nav-module-items" hidden={!isOpen()}>
                   <For each={mod.items}>
-                    {(item) => {
-                      const isActive = () => isPathActive(location.pathname, item.path, allPaths);
-                      return (
-                        <a
-                          href={item.path}
-                          class="nav-link"
-                          classList={{ active: isActive() }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            navigate(item.path);
-                          }}
-                        >
-                          {item.label}
-                        </a>
-                      );
-                    }}
+                    {(item) => (
+                      <Show
+                        when={item.children?.length}
+                        fallback={
+                          <a
+                            href={item.path}
+                            class="nav-link"
+                            classList={{
+                              active: isPathActive(location.pathname, item.path, allPaths),
+                            }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              navigate(item.path);
+                            }}
+                          >
+                            {item.label}
+                          </a>
+                        }
+                      >
+                        <div class="nav-subgroup">
+                          <span class="nav-subgroup-label">{item.label}</span>
+                          <For each={item.children!}>
+                            {(child) => (
+                              <a
+                                href={child.path}
+                                class="nav-link nav-link--child"
+                                classList={{
+                                  active: isPathActive(
+                                    location.pathname,
+                                    child.path,
+                                    allPaths,
+                                  ),
+                                }}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  navigate(child.path);
+                                }}
+                              >
+                                {child.label}
+                              </a>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                    )}
                   </For>
                 </div>
               </div>

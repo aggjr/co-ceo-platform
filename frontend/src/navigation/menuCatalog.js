@@ -71,6 +71,23 @@ export const MENU_CATALOG = [
         label: 'Opções',
         path: '/invest/opcoes',
         resourceKey: 'screen.invest.portfolio',
+        children: [
+          {
+            label: 'Tabela Excel',
+            path: '/invest/opcoes/tabela',
+            resourceKey: 'screen.invest.portfolio',
+          },
+          {
+            label: 'Cards',
+            path: '/invest/opcoes/cards',
+            resourceKey: 'screen.invest.portfolio',
+          },
+          {
+            label: 'Por vencimento',
+            path: '/invest/opcoes/vencimentos',
+            resourceKey: 'screen.invest.portfolio',
+          },
+        ],
       },
       {
         label: 'Títulos, RF e CDB',

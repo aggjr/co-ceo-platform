@@ -83,6 +83,25 @@
   color: var(--color-accent);
 }
 
+.shell .nav-subgroup {
+  margin: 4px 0 8px;
+}
+
+.shell .nav-subgroup-label {
+  display: block;
+  padding: 6px 25px 4px 48px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.75);
+}
+
+.shell .nav-module-items .nav-link--child {
+  padding-left: 58px;
+  font-size: 12px;
+}
+
 .shell .nav-module-items .nav-link {
   display: block;
   padding: 10px 25px 10px 48px;

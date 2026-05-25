@@ -34,13 +34,13 @@ async function buildInvestPortfolioPage(container, currentPath, pageType) {
 
   const t = await getPageTexts([
     'screen.invest.portfolio.title',
-    'screen.invest.options.title',
+    'screen.invest.options.table.title',
     'screen.invest.fixed_income.title',
   ]);
 
   let pageTitle = t['screen.invest.portfolio.title'];
   if (pageType === 'options') {
-    pageTitle = t['screen.invest.options.title'];
+    pageTitle = t['screen.invest.options.table.title'];
   } else if (pageType === 'titulos') {
     pageTitle = t['screen.invest.fixed_income.title'];
   }
@@ -100,5 +100,7 @@ async function buildInvestPortfolioPage(container, currentPath, pageType) {
 }
 
 export const InvestEquitiesPage = (container, path) => buildInvestPortfolioPage(container, path, 'equities');
-export const InvestOptionsPage = (container, path) => buildInvestPortfolioPage(container, path, 'options');
+export const InvestOptionsTablePage = (container, path) => buildInvestPortfolioPage(container, path, 'options');
+/** @deprecated rota legada — redireciona para Tabela Excel */
+export const InvestOptionsPage = InvestOptionsTablePage;
 export const InvestFixedIncomePage = (container, path) => buildInvestPortfolioPage(container, path, 'titulos');

@@ -39,6 +39,11 @@ function degradedTenantMenuFilter() {
   for (const mod of MENU_CATALOG) {
     for (const item of mod.items) {
       if (item.resourceKey) allowed.add(item.resourceKey);
+      if (item.children) {
+        for (const child of item.children) {
+          if (child.resourceKey) allowed.add(child.resourceKey);
+        }
+      }
     }
   }
   return { licensed, allowed, degraded: true };
@@ -52,13 +57,32 @@ export function filterMenuCatalog(catalog, { global, allowed, licensed, degraded
         return null;
       }
 
-      const items = mod.items.filter((item) => {
-        if (item.platformOnly && !global) return false;
-        if (item.clientOnly && global) return false;
-        if (global || degraded) return true;
-        if (!item.resourceKey) return true;
-        return allowed.has(item.resourceKey);
-      });
+      const items = mod.items
+        .map((item) => {
+          if (item.children?.length) {
+            const children = item.children.filter((child) => {
+              if (child.platformOnly && !global) return false;
+              if (child.clientOnly && global) return false;
+              if (global || degraded) return true;
+              if (!child.resourceKey) return true;
+              return allowed.has(child.resourceKey);
+            });
+            if (!children.length) return null;
+            const parentOk =
+              global ||
+              degraded ||
+              !item.resourceKey ||
+              allowed.has(item.resourceKey);
+            if (!parentOk && !children.length) return null;
+            return { ...item, children };
+          }
+          if (item.platformOnly && !global) return null;
+          if (item.clientOnly && global) return null;
+          if (global || degraded) return item;
+          if (!item.resourceKey) return item;
+          return allowed.has(item.resourceKey) ? item : null;
+        })
+        .filter(Boolean);
 
       if (!items.length) return null;
       return { ...mod, items };
