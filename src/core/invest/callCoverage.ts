@@ -1,4 +1,8 @@
-import { inferAssetType, inferUnderlyingTicker, isOptionTicker } from './assetClassifier';
+import {
+  inferAssetType,
+  inferUnderlyingTicker,
+  isOptionTicker,
+} from './assetClassifier';
 import type { AssetCustodyState } from './CustodyEngine';
 import type { LedgerEvent } from './CustodyEngine';
 import { inferOptionMonthFromTicker } from './optionExpiry';
@@ -47,6 +51,17 @@ function isShortCallPosition(opt: CallCoverageOptionRow): boolean {
   return resolveOptionSide(opt) === 'call';
 }
 
+/** Ação-mãe canônica (livro às vezes grava o ticker da opção em underlying_ticker). */
+export function resolveCoverageUnderlying(
+  ticker: string,
+  underlying?: string | null
+): string {
+  const t = String(ticker || '').trim().toUpperCase();
+  const u = String(underlying || '').trim().toUpperCase();
+  if (u && u !== t && !isOptionTicker(u)) return u;
+  return inferUnderlyingTicker(t);
+}
+
 /** Soma CALLs vendidas (unidades) por ação objeto. */
 export function buildShortCallsSoldByUnderlying(
   options: CallCoverageOptionRow[] | null | undefined
@@ -54,7 +69,7 @@ export function buildShortCallsSoldByUnderlying(
   const map = new Map<string, number>();
   for (const opt of options || []) {
     if (!isShortCallPosition(opt)) continue;
-    const u = String(opt.underlying || opt.ticker || '').toUpperCase();
+    const u = resolveCoverageUnderlying(opt.ticker || '', opt.underlying);
     if (!u) continue;
     const units = optionQtyAbs(opt.quantity);
     map.set(u, (map.get(u) || 0) + units);
@@ -125,7 +140,7 @@ export function collectCallCoverageOptionRows(
     if (!isPortfolioOptionRow(item)) continue;
     add({
       ticker: item.ticker,
-      underlying: item.underlying,
+      underlying: resolveCoverageUnderlying(item.ticker || '', item.underlying),
       quantity: item.quantity,
       assetType: item.assetType,
       optionSide: item.optionSide ?? null,
@@ -141,7 +156,7 @@ export function collectCallCoverageOptionRows(
     if (side !== 'call') continue;
     add({
       ticker: la.ticker,
-      underlying: la.underlying || inferUnderlyingTicker(la.ticker),
+      underlying: resolveCoverageUnderlying(la.ticker, la.underlying),
       quantity: la.quantity,
       assetType: la.assetType || inferAssetType(la.ticker),
       optionSide: 'call',
@@ -163,9 +178,10 @@ export function buildShortCallPremiumPendingByUnderlying(
       assetType: e.asset_type,
     });
     if (side !== 'call') continue;
-    const u = String(
-      e.underlying_ticker || inferUnderlyingTicker(e.asset_ticker)
-    ).toUpperCase();
+    const u = resolveCoverageUnderlying(
+      e.asset_ticker,
+      e.underlying_ticker
+    );
     const net = Math.abs(Number(e.total_net_value ?? 0));
     const gross =
       net > 0 ? net : Math.abs(Number(e.quantity)) * Math.abs(Number(e.unit_price));

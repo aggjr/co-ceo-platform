@@ -50,6 +50,18 @@ Import de notas (idempotente — não duplica caixa)
   npx ts-node scripts/build-btg-brokerage-notes-review.ts local-import/btg-sources/notas-corretagem
   npx ts-node scripts/import-btg-brokerage-notes-ledger.ts local-import/btg-sources/auditoria/notas-review.json
 
+Snapshot de custódia (telas Ações / Opções / composição)
+------------------------------------------------------
+
+  1. Monte um JSON conforme docs/invest/broker-custody-snapshot.template.json
+     (pode copiar tests/fixtures/broker-custody-snapshot-btg-2026-05-23.json como base).
+  2. Salve em: local-import/btg-sources/custody-snapshot.json
+
+  npm run import:broker:snapshot -- local-import/btg-sources/custody-snapshot.json
+  npm run apply:broker:snapshot -- YYYY-MM-DD
+  npm run apply:broker:options-ledger -- YYYY-MM-DD   # se houver linhas pending_*
+  npm run sync:options:market -- PRIO3 ITUB4 BBAS3 WEGE3
+
 Importação para o livro (após conferência)
 ------------------------------------------
 

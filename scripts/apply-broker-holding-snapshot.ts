@@ -1,19 +1,14 @@
 /**
- * Aplica snapshot do homebroker BTG (ações, opções, caixa, RF, patrimônio total).
+ * Aplica snapshot do homebroker BTG já importado no banco.
  *
+ *   npm run import:broker:snapshot -- local-import/btg-sources/custody-snapshot.json
  *   npm run apply:broker:snapshot
- *   npm run apply:broker:snapshot -- 2026-05-24
+ *   npm run apply:broker:snapshot -- 2026-05-23
  */
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import { CoCeoDataGateway } from '../src/core/dal';
 import { applyBrokerHoldingSnapshot } from '../src/core/invest/applyBrokerHoldingSnapshot';
-import {
-  BROKER_OPTION_MARKS,
-  BROKER_PATRIMONY_COMPOSITION,
-  BROKER_STOCK_MARKS,
-  sumBrokerMarks,
-} from '../src/core/invest/brokerHoldingSnapshot';
 import { PatrimonyDailyRecorder } from '../src/core/invest/PatrimonyDailyRecorder';
 import { installerContext } from '../src/database/seeds/lib/installerContext';
 
@@ -31,34 +26,23 @@ async function main() {
   });
   const gateway = new CoCeoDataGateway(pool);
 
-  console.log('=== Snapshot homebroker BTG ===\n');
-  console.log('Composição alvo:');
-  console.log('  RV:        ', BROKER_PATRIMONY_COMPOSITION.variableIncome.toLocaleString('pt-BR'));
-  console.log('  RF:        ', BROKER_PATRIMONY_COMPOSITION.fixedIncome.toLocaleString('pt-BR'));
-  console.log('  Caixa:     ', BROKER_PATRIMONY_COMPOSITION.cash.toLocaleString('pt-BR'));
-  console.log('  Trânsito:  ', BROKER_PATRIMONY_COMPOSITION.inTransit.toLocaleString('pt-BR'));
-  console.log('  Derivativos:', BROKER_PATRIMONY_COMPOSITION.derivatives.toLocaleString('pt-BR'));
-  console.log('  Total:     ', BROKER_PATRIMONY_COMPOSITION.totalPatrimony.toLocaleString('pt-BR'));
-  console.log(
-    '  Soma marks (ações+opções):',
-    (sumBrokerMarks(BROKER_STOCK_MARKS) + sumBrokerMarks(BROKER_OPTION_MARKS)).toLocaleString('pt-BR')
-  );
-  console.log('');
+  console.log('=== Aplicar snapshot homebroker (banco) ===\n');
 
   const result = await applyBrokerHoldingSnapshot(gateway, ORG, dateArg);
-  console.log('Data:', result.asOf);
-  console.log('Posições atualizadas:', result.positionsTouched);
-  console.log('Cotações gravadas:', result.quotesUpdated);
-  console.log('Caixa atualizada:', result.cashAccountUpdated ? 'sim' : 'não');
-  console.log('Âncora patrimônio:', result.anchorPatrimony.toLocaleString('pt-BR'));
+  console.log('Snapshot id:   ', result.snapshotId);
+  console.log('Data:          ', result.asOf);
+  console.log('Posições:      ', result.positionsTouched);
+  console.log('Cotações:      ', result.quotesUpdated);
+  console.log('Caixa:         ', result.cashAccountUpdated ? 'sim' : 'não');
+  console.log('Âncora:        ', result.anchorPatrimony.toLocaleString('pt-BR'));
   console.log(
-    'Marks — ações:',
+    'Marks ações:   ',
     result.impliedFromMarks.stocks.toLocaleString('pt-BR'),
     '| opções:',
     result.impliedFromMarks.options.toLocaleString('pt-BR')
   );
   if (result.positionsMissing.length) {
-    console.log('Tickers não encontrados no livro:', result.positionsMissing.join(', '));
+    console.log('Faltantes:     ', result.positionsMissing.join(', '));
   }
 
   const ctx = { ...installerContext(), organizationId: ORG, scope: 'node' as const };
@@ -66,10 +50,6 @@ async function main() {
   console.log('\nGravando fechamento do dia…');
   const saved = await recorder.recordDay(ctx, result.asOf);
   console.log('  Patrimônio gravado:', saved.recorded.patrimony.toLocaleString('pt-BR'));
-  console.log('  Econômico (auditoria):', saved.economicPatrimony.toLocaleString('pt-BR'));
-  if (saved.btgPatrimony != null) {
-    console.log('  BTG interpolado:', saved.btgPatrimony.toLocaleString('pt-BR'));
-  }
 
   await pool.end();
 }

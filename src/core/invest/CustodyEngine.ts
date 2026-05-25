@@ -1,4 +1,8 @@
-import { isFixedIncomeTicker, isOptionTicker } from './assetClassifier';
+import {
+  inferUnderlyingTicker,
+  isFixedIncomeTicker,
+  isOptionTicker,
+} from './assetClassifier';
 import type { LedgerTransactionType } from './ledgerTypes';
 import {
   isTesouroDiretoTicker,
@@ -121,7 +125,10 @@ export function rebuildCustodyFromLedger(entries: LedgerEvent[]): CustodyRebuild
   const getState = (e: LedgerEvent): InternalState => {
     let s = states.get(e.asset_id);
     if (!s) {
-      const underlying = (e.underlying_ticker || e.asset_ticker || '').toUpperCase();
+      const ticker = String(e.asset_ticker || '').toUpperCase();
+      const underlying = isOptionTicker(ticker)
+        ? inferUnderlyingTicker(ticker, e.underlying_ticker ?? undefined)
+        : String(e.underlying_ticker || ticker || '').toUpperCase();
       s = {
         assetId: e.asset_id,
         ticker: e.asset_ticker,

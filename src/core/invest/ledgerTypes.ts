@@ -33,6 +33,9 @@ export const LEDGER_TRANSACTION_TYPES = [
 /** Ticker sintético por corretora para lançamentos de extrato (caixa). */
 export const CASH_TICKER_PREFIX = 'CAIXA-';
 
+/** Conta corrente BTG no livro razão INVEST (único identificador canônico). */
+export const MAIN_CASH_TICKER = 'CAIXA-BTG';
+
 export type LedgerTransactionType = (typeof LEDGER_TRANSACTION_TYPES)[number];
 
 /** Colunas do relatório tipo pivot (Excel). */

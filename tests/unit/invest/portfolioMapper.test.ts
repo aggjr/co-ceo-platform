@@ -283,6 +283,18 @@ describe('portfolioMapper', () => {
       undefined,
       { price: 65.4 }
     );
+    const marketCatalog = new Map([
+      [
+        'PRIOR407',
+        {
+          ticker: 'PRIOR407',
+          underlyingTicker: 'PRIO3',
+          optionType: 'PUT' as const,
+          strikePrice: 40.75,
+          expirationDate: '2026-06-19',
+        },
+      ],
+    ]);
     const opt = enrichPortfolioRow(
       {
         id: 'o1',
@@ -296,14 +308,14 @@ describe('portfolioMapper', () => {
         status: 'active',
       },
       undefined,
-      { ledgerStrikeByTicker: new Map(), marketCatalog: new Map() }
+      { ledgerStrikeByTicker: new Map(), marketCatalog }
     );
     expect(opt.premiumReceived).toBeCloseTo(5930, 0);
-    expect(opt.optionStrike).toBe(40.7);
+    expect(opt.optionStrike).toBe(40.75);
     expect(opt.lastPrice).toBeGreaterThan(0);
     const items = attachUnderlyingMarketData([stock, opt]);
     const enriched = items.find((i) => i.ticker === 'PRIOR407')!;
-    expect(enriched.notional).toBeCloseTo(6500 * 40.7, 0);
+    expect(enriched.notional).toBeCloseTo(6500 * 40.75, 0);
     expect(enriched.underlyingLastPrice).toBe(65.4);
     expect(enriched.strikeDistanceBrl).not.toBeNull();
   });

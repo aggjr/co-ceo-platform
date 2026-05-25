@@ -2,6 +2,8 @@
  * Parser de linhas do extrato BTG (texto extraído do PDF).
  * Ignora liquidações agregadas de bolsa — o detalhe vem do myProfit / notas.
  */
+import { MAIN_CASH_TICKER } from './ledgerTypes';
+
 const LFT_TICKER_RE = /LFT\s+(\d{2})\/(\d{2})\/(\d{4})/i;
 
 export type BtgParsedLine = {
@@ -65,7 +67,7 @@ export type BtgLedgerMapping = {
   notes?: string;
 };
 
-const CASH_TICKER = 'CAIXA-BTG';
+const CASH_TICKER = MAIN_CASH_TICKER;
 
 function parseLftTicker(description: string): string {
   const match = description.match(LFT_TICKER_RE);
