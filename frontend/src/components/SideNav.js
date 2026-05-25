@@ -93,12 +93,25 @@ export function mountSideNav(container, modules, currentPath) {
       if (item.children?.length) {
         const group = document.createElement('div');
         group.className = 'nav-subgroup';
-        const label = document.createElement('span');
-        label.className = 'nav-subgroup-label';
-        label.textContent = item.label;
-        group.appendChild(label);
+        group.dataset.itemPath = item.path;
+
+        const childActive = item.children.some((c) =>
+          isPathActive(currentPath, c.path, allPaths),
+        );
+        const subOpen = childActive;
+
+        const subToggle = document.createElement('button');
+        subToggle.type = 'button';
+        subToggle.className = 'nav-subgroup-toggle';
+        subToggle.setAttribute('aria-expanded', subOpen ? 'true' : 'false');
+        subToggle.innerHTML = `<span class="nav-chevron">${subOpen ? '▼' : '▶'}</span><span class="nav-subgroup-label">${item.label}</span>`;
+
+        const subItems = document.createElement('div');
+        subItems.className = 'nav-subgroup-items';
+        subItems.hidden = !subOpen;
+
         for (const child of item.children) {
-          appendNavLink(group, {
+          appendNavLink(subItems, {
             path: child.path,
             label: child.label,
             currentPath,
@@ -106,6 +119,16 @@ export function mountSideNav(container, modules, currentPath) {
             indent: true,
           });
         }
+
+        subToggle.addEventListener('click', () => {
+          const open = subItems.hidden;
+          subItems.hidden = !open;
+          subToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+          subToggle.querySelector('.nav-chevron').textContent = open ? '▼' : '▶';
+          subToggle.blur();
+        });
+
+        group.append(subToggle, subItems);
         sub.appendChild(group);
       } else {
         appendNavLink(sub, {
