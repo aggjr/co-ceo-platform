@@ -1,9 +1,14 @@
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
-import { inferAssetType, inferUnderlyingTicker } from './assetClassifier';
+import {
+  inferAssetType,
+  inferUnderlyingTicker,
+  isOptionTicker,
+} from './assetClassifier';
 import { inferOptionExpiryDate, inferOptionMonthFromTicker } from './optionExpiry';
 import { authBootstrapContext } from '../auth/authBootstrapContext';
 import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
+import { fetchOpcoesNetOptionQuotes } from './opcoesNetQuotes';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
@@ -32,7 +37,7 @@ export class InvestQuoteSyncService {
     this.marketQuotes = new MarketQuoteRepository(gateway);
   }
 
-  /** Tickers de ações/FIIs com posição ou ativos ativos na custódia. */
+  /** Ações/FIIs em custódia + subjacentes das opções abertas (para cotação na grade de opções). */
   async listB3QuoteTickers(ctx: UserContext): Promise<string[]> {
     if (!ctx.organizationId) return [];
     const assets = await this.assetProjection.listActiveAssets(ctx);
@@ -43,6 +48,15 @@ export class InvestQuoteSyncService {
       const type = String(row.asset_type || inferAssetType(ticker));
       if (type === 'stock' || type === 'fii') {
         tickers.push(ticker);
+        continue;
+      }
+      if (
+        type === 'option_call' ||
+        type === 'option_put' ||
+        isOptionTicker(ticker)
+      ) {
+        const und = inferUnderlyingTicker(ticker);
+        if (und) tickers.push(und);
       }
     }
     return [...new Set(tickers)];
@@ -79,10 +93,43 @@ export class InvestQuoteSyncService {
       if (ok) updated += 1;
     }
 
+    const optionTickers: string[] = [];
+    for (const row of await this.assetProjection.listActiveAssets(ctx)) {
+      const ticker = String(row.asset_ticker ?? '').toUpperCase();
+      if (!ticker || !isOptionTicker(ticker)) continue;
+      const type = String(row.asset_type || inferAssetType(ticker));
+      if (
+        type === 'option_call' ||
+        type === 'option_put' ||
+        isOptionTicker(ticker)
+      ) {
+        optionTickers.push(ticker);
+      }
+    }
+    const uniqueOptions = [...new Set(optionTickers)];
+    if (uniqueOptions.length) {
+      try {
+        const optQuotes = await fetchOpcoesNetOptionQuotes(uniqueOptions, { asOfDate });
+        for (const q of optQuotes) {
+          await this.marketQuotes.upsertQuote(marketCtx, {
+            ticker: q.ticker,
+            quoteDate: q.asOf,
+            closingPrice: q.price,
+            source: 'opcoes_net',
+            metadata: { kind: 'option_last' },
+          });
+          const ok = await this.writeQuoteToPositionExt(ctx, q.ticker, q.price, q.asOf);
+          if (ok) updated += 1;
+        }
+      } catch (err) {
+        console.warn('[syncFromBrapi] opcoes.net opções:', err);
+      }
+    }
+
     const asOf = asOfDate?.slice(0, 10) || quotes[0]?.asOf || new Date().toISOString().slice(0, 10);
     return {
       asOf,
-      requested: tickers.length,
+      requested: tickers.length + uniqueOptions.length,
       updated,
       skipped: tickers.length - updated - missing.length,
       missing,

@@ -23,6 +23,7 @@ import { fixedIncomeTotalFromLedger } from '../core/invest/patrimonyLedgerGates'
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import { fetchB3Quotes } from '../core/invest/B3QuoteProvider';
+import { fetchOpcoesNetOptionQuotes } from '../core/invest/opcoesNetQuotes';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import {
@@ -48,7 +49,11 @@ import {
   collectCallCoverageOptionRows,
 } from '../core/invest/callCoverage';
 import { rebuildCustodyFromLedger } from '../core/invest/CustodyEngine';
-import { isFixedIncomeTicker, isOptionTicker } from '../core/invest/assetClassifier';
+import {
+  inferUnderlyingTicker,
+  isFixedIncomeTicker,
+  isOptionTicker,
+} from '../core/invest/assetClassifier';
 import { resolveCashInvestDisplayBalance } from '../core/invest/cashInvestLedger';
 import { buildCashInTransitSummary } from '../core/invest/cashInTransit';
 import { loadOptionMarketCatalog } from '../core/invest/optionMarketCatalog';
@@ -181,29 +186,39 @@ export class InvestController {
     const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
     const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents);
     const ledgerStrikeByTicker = buildOptionStrikeMapFromLedgerEvents(ledgerEvents);
-    const marketCatalog = await loadOptionMarketCatalog(this.gateway);
+    const marketCatalog = await loadOptionMarketCatalog(
+      this.gateway,
+      ctx.organizationId!
+    );
     const strikeHints = { ledgerStrikeByTicker, marketCatalog };
 
-    const equityTickers = [
-      ...new Set(
-        rowsMerged
-          .map((r) => {
-            const t = String(r.asset_ticker ?? '').trim().toUpperCase();
-            if (!t || t.startsWith('CAIXA-')) return '';
-            const type = String(r.asset_type ?? '').toLowerCase();
-            return type === 'stock' || type === 'fii' ? t : '';
-          })
-          .filter(Boolean)
-      ),
-    ];
+    const quoteTickers = new Set<string>();
+    for (const r of rowsMerged) {
+      const t = String(r.asset_ticker ?? '').trim().toUpperCase();
+      if (!t || t.startsWith('CAIXA-')) continue;
+      const type = String(r.asset_type ?? '').toLowerCase();
+      if (type === 'stock' || type === 'fii') {
+        quoteTickers.add(t);
+        continue;
+      }
+      if (type === 'option_call' || type === 'option_put' || isOptionTicker(t)) {
+        quoteTickers.add(t);
+        const und = inferUnderlyingTicker(t);
+        if (und) quoteTickers.add(und);
+      }
+    }
+    const allQuoteTickers = [...quoteTickers];
     const marketQuoteMap = await this.marketQuoteRepo.loadLatestQuoteMap(
       ctx,
-      equityTickers
+      allQuoteTickers
     );
-    const missingQuotes = equityTickers.filter((t) => !marketQuoteMap.has(t));
-    if (missingQuotes.length) {
+    const missingQuotes = allQuoteTickers.filter((t) => !marketQuoteMap.has(t));
+    const missingEquity = missingQuotes.filter((t) => !isOptionTicker(t));
+    const missingOptions = missingQuotes.filter((t) => isOptionTicker(t));
+
+    if (missingEquity.length) {
       try {
-        const quotes = await fetchB3Quotes(missingQuotes, {
+        const quotes = await fetchB3Quotes(missingEquity, {
           token: process.env.BRAPI_TOKEN,
         });
         const marketCtx = authBootstrapContext();
@@ -222,6 +237,28 @@ export class InvestController {
         }
       } catch (err) {
         console.warn('[listPortfolio] preenchimento brapi de cotações:', err);
+      }
+    }
+
+    if (missingOptions.length) {
+      try {
+        const optQuotes = await fetchOpcoesNetOptionQuotes(missingOptions);
+        const marketCtx = authBootstrapContext();
+        for (const q of optQuotes) {
+          await this.marketQuoteRepo.upsertQuote(marketCtx, {
+            ticker: q.ticker,
+            quoteDate: q.asOf,
+            closingPrice: q.price,
+            source: 'opcoes_net',
+            metadata: { kind: 'option_last' },
+          });
+          marketQuoteMap.set(q.ticker.toUpperCase(), {
+            price: q.price,
+            date: q.asOf,
+          });
+        }
+      } catch (err) {
+        console.warn('[listPortfolio] preenchimento opcoes.net de opções:', err);
       }
     }
 
@@ -286,7 +323,12 @@ export class InvestController {
       items.push(item);
     }
 
-    const withUnderlyingQuotes = attachUnderlyingMarketData(items);
+    const underlyingSpots = new Map<string, number>();
+    for (const [ticker, mq] of marketQuoteMap) {
+      const price = Number(mq.price);
+      if (price > 0) underlyingSpots.set(ticker.toUpperCase(), price);
+    }
+    const withUnderlyingQuotes = attachUnderlyingMarketData(items, underlyingSpots);
     withUnderlyingQuotes.sort((a, b) => b.marketValue - a.marketValue);
     const { open, closedOptions } = partitionPortfolioPositions(withUnderlyingQuotes);
     const consolidated = consolidateTesouroPortfolioItems(open);

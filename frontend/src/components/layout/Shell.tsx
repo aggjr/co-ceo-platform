@@ -16,7 +16,6 @@ import { SideNav } from './SideNav';
 import { ImpersonationBar } from './ImpersonationBar';
 import { PlatformJobAlertsBanner } from './PlatformJobAlertsBanner';
 import { MarketQuotesSyncButton } from './MarketQuotesSyncButton';
-import { ProductionDeployButton } from './ProductionDeployButton';
 import '../../styles/app.css';
 import '../../styles/cockpit-shell.css';
 
@@ -37,7 +36,16 @@ export function Shell(props: { children?: JSX.Element }) {
 
   const initial = () => {
     const u = user();
-    return (u?.email || u?.fullName || '?').charAt(0).toUpperCase();
+    return (u?.fullName || u?.email || '?').charAt(0).toUpperCase();
+  };
+
+  const userTooltip = () => {
+    const u = user();
+    if (!u) return 'Usuário';
+    const name = u.fullName?.trim();
+    const email = u.email?.trim();
+    if (name && email) return `${name} (${email})`;
+    return name || email || 'Usuário';
   };
 
   const roleHint = () => {
@@ -104,21 +112,23 @@ export function Shell(props: { children?: JSX.Element }) {
               <ImpersonationBar />
             </div>
 
-            {/* Bloco Direito: Cotações, avatar, email */}
+            {/* Bloco Direito: sync cotações, usuário logado */}
             <div class="header-right">
-              <ProductionDeployButton />
               <MarketQuotesSyncButton />
-              <div class="avatar" title={user()?.fullName || user()?.email || ''}>
+              <div
+                class="avatar"
+                title={userTooltip()}
+                aria-label={userTooltip()}
+              >
                 {initial()}
               </div>
-              <span class="header-email">{user()?.email || ''}</span>
             </div>
 
           </header>
 
           {/* Conteúdo principal (painel IVA desativado — ver bloco comentado no git history / Shell.tsx) */}
-          <div class="content" style="flex: 1; min-height: 0; overflow-y: auto;">
-            <div style={{ padding: '12px 16px 0' }}>
+          <div class="content shell-content">
+            <div class="shell-content-alerts">
               <PlatformJobAlertsBanner />
             </div>
             {props.children}

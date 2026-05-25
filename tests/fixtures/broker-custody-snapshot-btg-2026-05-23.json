@@ -1,0 +1,374 @@
+{
+  "schemaVersion": 1,
+  "broker": "btg",
+  "referenceDate": "2026-05-23",
+  "sourceLabel": "homebroker_screens_mai_2026",
+  "notes": "Fixture de teste — mesma custódia das capturas BTG",
+  "composition": {
+    "variableIncome": 1298057.99,
+    "fixedIncome": 208762.91,
+    "cash": 8828.25,
+    "inTransit": 2157.44,
+    "derivatives": -13197.78,
+    "totalPatrimony": 1504608.81
+  },
+  "positions": [
+    {
+      "ticker": "BBAS3",
+      "lineKind": "mark",
+      "quantity": 6000,
+      "lastPrice": 20.91,
+      "marketValue": 125460
+    },
+    {
+      "ticker": "ITUB4",
+      "lineKind": "mark",
+      "quantity": 5100,
+      "lastPrice": 39.41,
+      "marketValue": 200991
+    },
+    {
+      "ticker": "PRIO3",
+      "lineKind": "mark",
+      "quantity": 12700,
+      "lastPrice": 68.41,
+      "marketValue": 868807
+    },
+    {
+      "ticker": "WEGE3",
+      "lineKind": "mark",
+      "quantity": 2500,
+      "lastPrice": 42.99,
+      "marketValue": 107475
+    },
+    {
+      "ticker": "BBASF224",
+      "lineKind": "mark",
+      "quantity": -500,
+      "lastPrice": 0.22,
+      "marketValue": -110
+    },
+    {
+      "ticker": "BBASF231",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 0.1,
+      "marketValue": -70
+    },
+    {
+      "ticker": "ITUBF422",
+      "lineKind": "mark",
+      "quantity": -300,
+      "lastPrice": 0.35,
+      "marketValue": -105
+    },
+    {
+      "ticker": "ITUBF427",
+      "lineKind": "mark",
+      "quantity": 100,
+      "lastPrice": 0.27,
+      "marketValue": 27
+    },
+    {
+      "ticker": "ITUBF432",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 0.2,
+      "marketValue": -140
+    },
+    {
+      "ticker": "ITUBF435",
+      "lineKind": "mark",
+      "quantity": -500,
+      "lastPrice": 0.18,
+      "marketValue": -90
+    },
+    {
+      "ticker": "ITUBF437",
+      "lineKind": "mark",
+      "quantity": -900,
+      "lastPrice": 0.18,
+      "marketValue": -162
+    },
+    {
+      "ticker": "ITUBF445",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 0.11,
+      "marketValue": -77
+    },
+    {
+      "ticker": "ITUBR416",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 0.4,
+      "marketValue": -280
+    },
+    {
+      "ticker": "ITUBR424",
+      "lineKind": "mark",
+      "quantity": -900,
+      "lastPrice": 0.6,
+      "marketValue": -540
+    },
+    {
+      "ticker": "ITUBR431",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 0.87,
+      "marketValue": -609
+    },
+    {
+      "ticker": "ITUBR436",
+      "lineKind": "mark",
+      "quantity": -300,
+      "lastPrice": 1.1,
+      "marketValue": -330
+    },
+    {
+      "ticker": "PRIOF740",
+      "lineKind": "mark",
+      "quantity": -600,
+      "lastPrice": 1.44,
+      "marketValue": -864
+    },
+    {
+      "ticker": "PRIOF750",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 1.18,
+      "marketValue": -826
+    },
+    {
+      "ticker": "PRIOF755",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 1.06,
+      "marketValue": -742
+    },
+    {
+      "ticker": "PRIOF760",
+      "lineKind": "mark",
+      "quantity": -1200,
+      "lastPrice": 1,
+      "marketValue": -1200
+    },
+    {
+      "ticker": "PRIOF770",
+      "lineKind": "mark",
+      "quantity": -900,
+      "lastPrice": 0.81,
+      "marketValue": -729
+    },
+    {
+      "ticker": "PRIOF775",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 0.7,
+      "marketValue": -490
+    },
+    {
+      "ticker": "PRIOF780",
+      "lineKind": "mark",
+      "quantity": -500,
+      "lastPrice": 0.67,
+      "marketValue": -335
+    },
+    {
+      "ticker": "PRIOF785",
+      "lineKind": "mark",
+      "quantity": -500,
+      "lastPrice": 0.62,
+      "marketValue": -310
+    },
+    {
+      "ticker": "PRIOF800",
+      "lineKind": "mark",
+      "quantity": -900,
+      "lastPrice": 0.48,
+      "marketValue": -432
+    },
+    {
+      "ticker": "PRIOF820",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 0.33,
+      "marketValue": -231
+    },
+    {
+      "ticker": "PRIOR407",
+      "lineKind": "mark",
+      "quantity": -6500,
+      "lastPrice": 0.03,
+      "marketValue": -195
+    },
+    {
+      "ticker": "PRIOR560",
+      "lineKind": "mark",
+      "quantity": -500,
+      "lastPrice": 0.25,
+      "marketValue": -125
+    },
+    {
+      "ticker": "PRIOR580",
+      "lineKind": "mark",
+      "quantity": -900,
+      "lastPrice": 0.4,
+      "marketValue": -360
+    },
+    {
+      "ticker": "PRIOR590",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 0.44,
+      "marketValue": -308
+    },
+    {
+      "ticker": "PRIOR605",
+      "lineKind": "mark",
+      "quantity": -300,
+      "lastPrice": 0.62,
+      "marketValue": -186
+    },
+    {
+      "ticker": "WEGEF476",
+      "lineKind": "mark",
+      "quantity": -1000,
+      "lastPrice": 0.29,
+      "marketValue": -290
+    },
+    {
+      "ticker": "WEGER441",
+      "lineKind": "mark",
+      "quantity": -500,
+      "lastPrice": 0.58,
+      "marketValue": -290
+    },
+    {
+      "ticker": "WEGER417",
+      "lineKind": "mark",
+      "quantity": -900,
+      "lastPrice": 0.81,
+      "marketValue": -729
+    },
+    {
+      "ticker": "WEGER435",
+      "lineKind": "mark",
+      "quantity": -300,
+      "lastPrice": 1.44,
+      "marketValue": -432
+    },
+    {
+      "ticker": "WEGER448",
+      "lineKind": "mark",
+      "quantity": -700,
+      "lastPrice": 1.2,
+      "marketValue": -840
+    },
+    {
+      "ticker": "ITUBF422",
+      "lineKind": "pending_open",
+      "quantity": -300,
+      "avgPrice": 0.47,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "ITUBF427",
+      "lineKind": "pending_open",
+      "quantity": 100,
+      "avgPrice": 0.37,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "ITUBF432",
+      "lineKind": "pending_open",
+      "quantity": -700,
+      "avgPrice": 0.28,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "ITUBF437",
+      "lineKind": "pending_open",
+      "quantity": -900,
+      "avgPrice": 0.21,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "ITUBF445",
+      "lineKind": "pending_open",
+      "quantity": -700,
+      "avgPrice": 0.14,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "PRIOF755",
+      "lineKind": "pending_open",
+      "quantity": -700,
+      "avgPrice": 1.04,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "PRIOF770",
+      "lineKind": "pending_open",
+      "quantity": -900,
+      "avgPrice": 0.79,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "PRIOF775",
+      "lineKind": "pending_open",
+      "quantity": -700,
+      "avgPrice": 0.95,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "PRIOF785",
+      "lineKind": "pending_open",
+      "quantity": -500,
+      "avgPrice": 0.61,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "PRIOF800",
+      "lineKind": "pending_open",
+      "quantity": -900,
+      "avgPrice": 0.6,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "PRIOF820",
+      "lineKind": "pending_open",
+      "quantity": -700,
+      "avgPrice": 0.41,
+      "legTag": "pending_open"
+    },
+    {
+      "ticker": "PRIOF740",
+      "lineKind": "pending_topup",
+      "quantity": -300,
+      "avgPrice": 1.54,
+      "legTag": "topup"
+    },
+    {
+      "ticker": "PRIOF760",
+      "lineKind": "pending_topup",
+      "quantity": -300,
+      "avgPrice": 1.23,
+      "legTag": "topup"
+    },
+    {
+      "ticker": "WEGER41",
+      "lineKind": "pending_migrate",
+      "quantity": 500,
+      "avgPrice": 0.38,
+      "legTag": "wege-migrate"
+    },
+    {
+      "ticker": "WEGER441",
+      "lineKind": "pending_migrate",
+      "quantity": -500,
+      "avgPrice": 0.38,
+      "legTag": "wege-migrate"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "name": "co-ceo-core",
-  "version": "0.0.102",
+  "version": "0.0.109",
   "description": "co-CEO Platform Core API",
   "main": "dist/index.js",
   "scripts": {
@@ -36,12 +36,15 @@
     "fetch:b3:quotes": "node ./node_modules/ts-node/dist/bin.js scripts/fetch-b3-quotes.ts",
     "invest:daily-close": "node ./node_modules/ts-node/dist/bin.js scripts/daily-invest-close.ts",
     "diagnose:patrimony": "node ./node_modules/ts-node/dist/bin.js scripts/diagnose-patrimony-components.ts",
+    "import:broker:snapshot": "node ./node_modules/ts-node/dist/bin.js scripts/import-broker-custody-snapshot.ts",
     "apply:broker:snapshot": "node ./node_modules/ts-node/dist/bin.js scripts/apply-broker-holding-snapshot.ts",
     "reconcile:broker:options": "node ./node_modules/ts-node/dist/bin.js scripts/reconcile-broker-options.ts",
     "apply:broker:options-ledger": "node ./node_modules/ts-node/dist/bin.js scripts/apply-broker-options-pending-ledger.ts",
     "sync:market:quotes:stocks": "node ./node_modules/ts-node/dist/bin.js scripts/sync-market-quotes-stocks.ts",
     "sync:market:quotes:remote": "node scripts/run-remote-stock-quotes.js",
     "sync:options:market": "node ./node_modules/ts-node/dist/bin.js scripts/sync-option-market-opcoes-net.ts",
+    "sync:options:custody": "node ./node_modules/ts-node/dist/bin.js scripts/sync-custody-option-quotes.ts",
+    "sync:options:custody:remote": "node scripts/run-remote-custody-option-quotes.js",
     "sync:market:indices": "node ./node_modules/ts-node/dist/bin.js scripts/sync-market-indices.ts",
     "report:cdi": "node ./node_modules/ts-node/dist/bin.js scripts/report-cdi-coverage.ts",
     "seed:market:benchmarks": "node ./node_modules/ts-node/dist/bin.js scripts/seed-market-benchmarks.ts",

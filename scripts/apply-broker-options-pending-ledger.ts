@@ -1,26 +1,27 @@
 /**
- * Lança no livro razão as opções da custódia BTG ainda sem nota de corretagem.
+ * Lança no livro razão opções pendentes do snapshot importado (aguardando notas).
  *
+ *   npm run import:broker:snapshot -- local-import/btg-sources/custody-snapshot.json
  *   npm run apply:broker:options-ledger
+ *   npm run apply:broker:options-ledger -- 2026-05-23
  */
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import { CoCeoDataGateway } from '../src/core/dal';
 import { installerContext } from '../src/database/seeds/lib/installerContext';
 import { LedgerImportService } from '../src/core/invest/LedgerImportService';
+import { BrokerCustodySnapshotRepository } from '../src/core/invest/BrokerCustodySnapshotRepository';
 import {
-  BROKER_SNAPSHOT_PENDING_DATE,
-  BROKER_SNAPSHOT_PENDING_EVENT_REF,
-  buildBrokerOptionsPendingLedgerLines,
-} from '../src/core/invest/brokerOptionsPendingLedger';
+  buildPendingLedgerLinesFromSnapshot,
+  pendingEventRefForDate,
+} from '../src/core/invest/buildPendingLedgerFromSnapshot';
 import { applyBrokerHoldingSnapshot } from '../src/core/invest/applyBrokerHoldingSnapshot';
 import { PatrimonyDailyRecorder } from '../src/core/invest/PatrimonyDailyRecorder';
-import { InvestAssetProjection } from '../src/modules/invest/sync/InvestAssetProjection';
-import { inferAssetType } from '../src/core/invest/assetClassifier';
 
 dotenv.config();
 
 const ORG = process.env.PORTFOLIO_ORG_ID || 'org-holding-001';
+const dateArg = process.argv.find((a) => /^\d{4}-\d{2}-\d{2}$/.test(a));
 
 async function main() {
   const pool = mysql.createPool({
@@ -31,13 +32,24 @@ async function main() {
   });
   const gateway = new CoCeoDataGateway(pool);
   const ctx = { ...installerContext(), organizationId: ORG, scope: 'node' as const };
+  const repo = new BrokerCustodySnapshotRepository(gateway);
   const ledger = new LedgerImportService(gateway);
-  const projection = new InvestAssetProjection(gateway);
 
-  const entries = buildBrokerOptionsPendingLedgerLines();
-  console.log('=== Lançamentos provisórios (custódia BTG) ===\n');
-  console.log('Data:', BROKER_SNAPSHOT_PENDING_DATE);
-  console.log('Header:', BROKER_SNAPSHOT_PENDING_EVENT_REF);
+  const snapshot =
+    (dateArg ? await repo.loadByReferenceDate(ctx, dateArg) : null) ??
+    (await repo.loadLatest(ctx));
+  if (!snapshot) {
+    throw new Error(
+      'Nenhum snapshot no banco. Rode: npm run import:broker:snapshot -- <arquivo.json>'
+    );
+  }
+
+  const entries = buildPendingLedgerLinesFromSnapshot(snapshot);
+  const ref = pendingEventRefForDate(snapshot.referenceDate);
+
+  console.log('=== Lançamentos provisórios (snapshot banco) ===\n');
+  console.log('Data:', snapshot.referenceDate);
+  console.log('Header:', ref);
   console.log('Linhas:', entries.length);
   for (const e of entries) {
     console.log(
@@ -51,31 +63,13 @@ async function main() {
   });
   console.log('Import:', result);
 
-  const assets = await projection.listActiveAssets(ctx);
-  const brokerTickers = new Set(
-    [
-      'ITUBF422', 'ITUBF427', 'ITUBF432', 'ITUBF437', 'ITUBF445',
-      'PRIOF740', 'PRIOF755', 'PRIOF760', 'PRIOF770', 'PRIOF775', 'PRIOF785', 'PRIOF800', 'PRIOF820',
-      'WEGER441',
-    ]
-  );
-  console.log('\n--- Custódia após import (amostra) ---');
-  for (const a of assets) {
-    const t = String(a.asset_ticker).toUpperCase();
-    if (!brokerTickers.has(t)) continue;
-    const type = inferAssetType(t);
-    if (type !== 'option_call' && type !== 'option_put') continue;
-    console.log(`  ${t} qty=${a.current_quantity} value=${a.current_value}`);
-  }
-
   console.log('\n--- Marcas de mercado (snapshot) ---');
-  const snap = await applyBrokerHoldingSnapshot(gateway, ORG, BROKER_SNAPSHOT_PENDING_DATE);
+  const snap = await applyBrokerHoldingSnapshot(gateway, ORG, snapshot.referenceDate);
   console.log('Posições tocadas:', snap.positionsTouched, '| faltantes:', snap.positionsMissing.join(', ') || '(nenhum)');
 
   const recorder = new PatrimonyDailyRecorder(gateway);
-  const saved = await recorder.recordDay(ctx, BROKER_SNAPSHOT_PENDING_DATE);
+  const saved = await recorder.recordDay(ctx, snapshot.referenceDate);
   console.log('\nPatrimônio gravado:', saved.recorded.patrimony.toLocaleString('pt-BR'));
-  console.log('Econômico (auditoria):', saved.economicPatrimony.toLocaleString('pt-BR'));
 
   await pool.end();
 }

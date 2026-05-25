@@ -3,17 +3,18 @@ import { authBootstrapContext } from '../auth/authBootstrapContext';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestQuoteSyncService } from './InvestQuoteSyncService';
 import { inferAssetType } from './assetClassifier';
+import { BrokerCustodySnapshotRepository } from './BrokerCustodySnapshotRepository';
 import { MAIN_CASH_TICKER } from './ledgerTypes';
 import {
-  BROKER_OPTION_MARKS,
-  BROKER_PATRIMONY_COMPOSITION,
-  BROKER_STOCK_MARKS,
+  marksFromSnapshotLines,
   sumBrokerMarks,
+  type BrokerCustodySnapshotRecord,
   type BrokerPositionMark,
-} from './brokerHoldingSnapshot';
+} from './brokerCustodySnapshotTypes';
 
 export type ApplyBrokerSnapshotResult = {
   asOf: string;
+  snapshotId: string;
   quotesUpdated: number;
   positionsTouched: number;
   positionsMissing: string[];
@@ -70,7 +71,7 @@ async function applyMark(
     quoteDate: asOf,
     closingPrice: mark.lastPrice,
     source: 'user_manual',
-    metadata: { broker_snapshot: true },
+    metadata: { broker_custody_snapshot: true },
   });
 
   const type = inferAssetType(ticker);
@@ -158,8 +159,24 @@ async function updateCashDisplay(
   return true;
 }
 
+function splitStockOptionMarks(snapshot: BrokerCustodySnapshotRecord): {
+  stocks: BrokerPositionMark[];
+  options: BrokerPositionMark[];
+} {
+  const marks = marksFromSnapshotLines(snapshot.positions);
+  const stocks: BrokerPositionMark[] = [];
+  const options: BrokerPositionMark[] = [];
+  for (const m of marks) {
+    const t = inferAssetType(m.ticker);
+    if (t === 'option_call' || t === 'option_put') options.push(m);
+    else stocks.push(m);
+  }
+  return { stocks, options };
+}
+
 /**
- * Aplica marcas de mercado e composição patrimonial do homebroker BTG na custódia canônica.
+ * Aplica snapshot importado no banco (cotações, patrimony_items, âncoras).
+ * Pré-requisito: `import-broker-custody-snapshot.ts` com JSON do homebroker.
  */
 export async function applyBrokerHoldingSnapshot(
   gateway: CoCeoDataGateway,
@@ -168,14 +185,26 @@ export async function applyBrokerHoldingSnapshot(
 ): Promise<ApplyBrokerSnapshotResult> {
   const date = (asOf ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
   const ctx: UserContext = { ...authBootstrapContext(), organizationId, scope: 'node' as const };
+  const repo = new BrokerCustodySnapshotRepository(gateway);
+  const snapshot =
+    (await repo.loadByReferenceDate(ctx, date)) ?? (await repo.loadLatest(ctx));
+  if (!snapshot) {
+    throw new Error(
+      `Nenhum snapshot de custódia BTG em invest_broker_custody_snapshots para ${date}. ` +
+        'Importe antes: npm run import:broker:snapshot -- local-import/btg-sources/custody-snapshot.json'
+    );
+  }
+
   const marketQuotes = new MarketQuoteRepository(gateway);
   const quoteSync = new InvestQuoteSyncService(gateway);
+  const { stocks, options } = splitStockOptionMarks(snapshot);
+  const comp = snapshot.composition;
 
   const missing: string[] = [];
   let touched = 0;
   let quotes = 0;
 
-  for (const mark of [...BROKER_STOCK_MARKS, ...BROKER_OPTION_MARKS]) {
+  for (const mark of [...stocks, ...options]) {
     const ok = await applyMark(gateway, ctx, marketQuotes, quoteSync, mark, date);
     if (ok) {
       touched += 1;
@@ -185,24 +214,23 @@ export async function applyBrokerHoldingSnapshot(
     }
   }
 
-  const cashOk = await updateCashDisplay(gateway, ctx, BROKER_PATRIMONY_COMPOSITION.cash);
-  await upsertFixedIncomeAnchor(gateway, ctx, BROKER_PATRIMONY_COMPOSITION.fixedIncome);
-  await upsertPatrimonyAnchor(gateway, ctx, date, BROKER_PATRIMONY_COMPOSITION.totalPatrimony);
-
-  const stocks = sumBrokerMarks(BROKER_STOCK_MARKS);
-  const options = sumBrokerMarks(BROKER_OPTION_MARKS);
+  const cashOk = await updateCashDisplay(gateway, ctx, comp.cash);
+  await upsertFixedIncomeAnchor(gateway, ctx, comp.fixedIncome);
+  await upsertPatrimonyAnchor(gateway, ctx, date, comp.totalPatrimony);
+  await repo.markApplied(ctx, snapshot.id);
 
   return {
     asOf: date,
+    snapshotId: snapshot.id,
     quotesUpdated: quotes,
     positionsTouched: touched,
     positionsMissing: missing,
     cashAccountUpdated: cashOk,
-    anchorPatrimony: BROKER_PATRIMONY_COMPOSITION.totalPatrimony,
+    anchorPatrimony: comp.totalPatrimony,
     impliedFromMarks: {
-      stocks,
-      options,
-      sum: Math.round((stocks + options) * 100) / 100,
+      stocks: sumBrokerMarks(stocks),
+      options: sumBrokerMarks(options),
+      sum: Math.round((sumBrokerMarks(stocks) + sumBrokerMarks(options)) * 100) / 100,
     },
   };
 }

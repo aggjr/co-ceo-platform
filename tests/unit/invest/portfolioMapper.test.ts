@@ -283,6 +283,18 @@ describe('portfolioMapper', () => {
       undefined,
       { price: 65.4 }
     );
+    const marketCatalog = new Map([
+      [
+        'PRIOR407',
+        {
+          ticker: 'PRIOR407',
+          underlyingTicker: 'PRIO3',
+          optionType: 'PUT' as const,
+          strikePrice: 40.75,
+          expirationDate: '2026-06-19',
+        },
+      ],
+    ]);
     const opt = enrichPortfolioRow(
       {
         id: 'o1',
@@ -296,16 +308,86 @@ describe('portfolioMapper', () => {
         status: 'active',
       },
       undefined,
-      { ledgerStrikeByTicker: new Map(), marketCatalog: new Map() }
+      { ledgerStrikeByTicker: new Map(), marketCatalog }
     );
     expect(opt.premiumReceived).toBeCloseTo(5930, 0);
-    expect(opt.optionStrike).toBe(40.7);
+    expect(opt.optionStrike).toBe(40.75);
     expect(opt.lastPrice).toBeGreaterThan(0);
     const items = attachUnderlyingMarketData([stock, opt]);
     const enriched = items.find((i) => i.ticker === 'PRIOR407')!;
-    expect(enriched.notional).toBeCloseTo(6500 * 40.7, 0);
+    expect(enriched.notional).toBeCloseTo(6500 * 40.75, 0);
     expect(enriched.underlyingLastPrice).toBe(65.4);
     expect(enriched.strikeDistanceBrl).not.toBeNull();
+  });
+
+  it('opção: prêmio (PM) distinto da cotação de mercado (opcoes.net)', () => {
+    const opt = enrichPortfolioRow(
+      {
+        id: 'o-quote',
+        asset_ticker: 'PRIOR580',
+        asset_type: 'option_put',
+        current_quantity: -900,
+        managerial_avg_price: 1.09,
+        acquisition_value: -981,
+        current_value: -981,
+        metadata: { underlying_ticker: 'PRIO3' },
+        status: 'active',
+      },
+      undefined,
+      {
+        ledgerStrikeByTicker: new Map(),
+        marketCatalog: new Map([
+          [
+            'PRIOR580',
+            {
+              ticker: 'PRIOR580',
+              underlyingTicker: 'PRIO3',
+              optionType: 'PUT' as const,
+              strikePrice: 58,
+              expirationDate: '2026-06-19',
+            },
+          ],
+        ]),
+      },
+      { price: 0.75, asOf: '2026-05-22' }
+    );
+    expect(opt.avgPrice).toBeCloseTo(1.09, 2);
+    expect(opt.updatedQuote).toBe(0.75);
+    expect(opt.pnlPct).toBeCloseTo(-31.19, 0);
+  });
+
+  it('opções sem ação na lista: usa cotação externa (market_quotes_daily)', () => {
+    const marketCatalog = new Map([
+      [
+        'PRIOR580',
+        {
+          ticker: 'PRIOR580',
+          underlyingTicker: 'PRIO3',
+          optionType: 'PUT' as const,
+          strikePrice: 58,
+          expirationDate: '2026-06-19',
+        },
+      ],
+    ]);
+    const opt = enrichPortfolioRow(
+      {
+        id: 'o-only',
+        asset_ticker: 'PRIOR580',
+        asset_type: 'option_put',
+        current_quantity: -1000,
+        managerial_avg_price: 1.5,
+        metadata: { underlying_ticker: 'PRIO3' },
+        status: 'active',
+      },
+      undefined,
+      { ledgerStrikeByTicker: new Map(), marketCatalog }
+    );
+    const external = new Map([['PRIO3', 65.4]]);
+    const items = attachUnderlyingMarketData([opt], external);
+    const enriched = items[0]!;
+    expect(enriched.underlyingLastPrice).toBe(65.4);
+    expect(enriched.strikeDistanceBrl).toBeCloseTo(7.4, 1);
+    expect(enriched.strikeDistancePct).toBeCloseTo(12.76, 1);
   });
 
   it('ação: cotação de mercado não replica PM B3 (metadata com PM errado)', () => {

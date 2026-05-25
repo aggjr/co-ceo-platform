@@ -6,6 +6,7 @@ import {
   equityCallCoverageCapacity,
   formatOptionTypeLabel,
   optionQtyAbs,
+  resolveCoverageUnderlying,
   resolveOptionSide,
   sumShortCallQtyAbs,
 } from '../../../src/core/invest/callCoverage';
@@ -79,6 +80,32 @@ describe('call coverage (ações × CALL vendida)', () => {
     expect(equityCallCoverageCapacity(12700)).toBe(12700);
     expect(row.callsSold).toBe(900);
     expect(row.callsRemaining).toBe(11800);
+  });
+
+  it('resolveCoverageUnderlying ignora underlying errado (ticker da opção)', () => {
+    expect(resolveCoverageUnderlying('PRIOF760', 'PRIOF760')).toBe('PRIO3');
+    expect(resolveCoverageUnderlying('PRIOR407', 'PRIOR407')).toBe('PRIO3');
+    expect(resolveCoverageUnderlying('PRIO3', 'PRIO3')).toBe('PRIO3');
+  });
+
+  it('CALLs vendidas agregam por ação-mãe quando livro grava underlying = ticker opção', () => {
+    const options = [
+      {
+        ticker: 'PRIOF760',
+        underlying: 'PRIOF760',
+        quantity: -900,
+        optionSide: 'call',
+        assetType: 'option_call',
+      },
+      {
+        ticker: 'PRIOF780',
+        underlying: 'PRIOF780',
+        quantity: -500,
+        optionSide: 'call',
+        assetType: 'option_call',
+      },
+    ];
+    expect(buildShortCallsSoldByUnderlying(options).get('PRIO3')).toBe(1400);
   });
 
   it('PRIOF do livro-razão alimenta CALLs vendidas e prêmio D+1 em PRIO3', () => {

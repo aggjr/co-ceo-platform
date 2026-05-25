@@ -9,7 +9,11 @@ import { CoCeoDataGateway } from '../src/core/dal';
 import { installerContext } from '../src/database/seeds/lib/installerContext';
 import { InvestAssetProjection } from '../src/modules/invest/sync/InvestAssetProjection';
 import { LedgerImportService } from '../src/core/invest/LedgerImportService';
-import { BROKER_OPTION_MARKS } from '../src/core/invest/brokerHoldingSnapshot';
+import { BrokerCustodySnapshotRepository } from '../src/core/invest/BrokerCustodySnapshotRepository';
+import {
+  marksFromSnapshotLines,
+  type BrokerPositionMark,
+} from '../src/core/invest/brokerCustodySnapshotTypes';
 import { inferAssetType } from '../src/core/invest/assetClassifier';
 import { fetchOpcoesNetOptionsChainAll } from '../src/core/invest/opcoesNetClient';
 import { b3OptionTickerFromOpcoesNetSuffix } from '../src/core/invest/opcoesNetChainParser';
@@ -69,9 +73,19 @@ async function main() {
     });
   }
 
-  const brokerMap = new Map(BROKER_OPTION_MARKS.map((m) => [m.ticker.toUpperCase(), m]));
+  const snapRepo = new BrokerCustodySnapshotRepository(gateway);
+  const snapshot =
+    (await snapRepo.loadByReferenceDate(ctx, TO)) ?? (await snapRepo.loadLatest(ctx));
+  if (!snapshot) {
+    console.error(
+      'Nenhum snapshot BTG no banco. Importe: npm run import:broker:snapshot -- <json>'
+    );
+    process.exit(1);
+  }
+  const brokerMarks = marksFromSnapshotLines(snapshot.positions);
+  const brokerMap = new Map(brokerMarks.map((m) => [m.ticker.toUpperCase(), m]));
 
-  const missingInBook: typeof BROKER_OPTION_MARKS = [];
+  const missingInBook: BrokerPositionMark[] = [];
   const qtyMismatch: Array<{
     ticker: string;
     brokerQty: number;
@@ -81,7 +95,7 @@ async function main() {
   }> = [];
   const matched: string[] = [];
 
-  for (const m of BROKER_OPTION_MARKS) {
+  for (const m of brokerMarks) {
     const t = m.ticker.toUpperCase();
     const book = bookByTicker.get(t);
     if (!book) {
@@ -125,7 +139,7 @@ async function main() {
 
   console.log('=== Reconciliação opções BTG vs livro ===\n');
   console.log('Org:', ORG, '| Até:', TO);
-  console.log('Corretora (imagens):', BROKER_OPTION_MARKS.length, 'linhas');
+  console.log('Corretora (snapshot banco):', brokerMarks.length, 'linhas | data', snapshot.referenceDate);
   console.log('Livro (posição ≠ 0):', assets.filter((a) => isOptionTicker(String(a.asset_ticker))).length);
   console.log('');
 
@@ -189,7 +203,7 @@ async function main() {
   console.log('');
 
   console.log('--- Vendas no livro para tickers que ESTÃO na corretora (conferência) ---');
-  for (const m of BROKER_OPTION_MARKS) {
+  for (const m of brokerMarks) {
     const t = m.ticker.toUpperCase();
     const evs = sellsByTicker.get(t);
     if (!evs?.length) continue;
@@ -205,7 +219,7 @@ async function main() {
   const webTickers = await loadOpcoesNetTickers(underlyings);
   const notOnWeb: string[] = [];
   const onWebMissingBook: string[] = [];
-  for (const m of BROKER_OPTION_MARKS) {
+  for (const m of brokerMarks) {
     const t = m.ticker.toUpperCase();
     const aliases = t === 'WEGER441' ? ['WEGER441', 'WEGER41'] : [t];
     const onWeb = aliases.some((a) => webTickers.has(a));
@@ -232,10 +246,10 @@ async function main() {
   console.log('  Qty divergente:', qtyMismatch.length);
   console.log('  Só no livro:', extraInBook.length);
   console.log(
-    '  Derivativos BTG (imagem):',
-    (-13_197.78).toLocaleString('pt-BR'),
+    '  Derivativos BTG (snapshot):',
+    snapshot.composition.derivatives.toLocaleString('pt-BR'),
     '| marks aplicados:',
-    BROKER_OPTION_MARKS.reduce((s, m) => s + m.marketValue, 0).toLocaleString('pt-BR')
+    brokerMarks.reduce((s, m) => s + m.marketValue, 0).toLocaleString('pt-BR')
   );
 
   await pool.end();

@@ -188,7 +188,6 @@ export async function InvestStockGainPivotPage(container) {
     'screen.invest.stock_gain.title',
     'label.common.period_from',
     'label.common.period_to',
-    'action.common.update',
     'column.invest.stock_gain.underlying',
     'column.invest.stock_gain.preco_estrito',
     'column.invest.stock_gain.cotacao_atual',
@@ -215,7 +214,7 @@ export async function InvestStockGainPivotPage(container) {
       <div class="table-period-toolbar">
         <label>${t['label.common.period_from']} <input type="date" id="sgp-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
         <label>${t['label.common.period_to']} <input type="date" id="sgp-to" value="${bounds.today}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
-        <button type="button" id="sgp-reload" class="btn-entrar">${t['action.common.update']}</button>
+        <button type="button" id="sgp-reload" class="btn-entrar">Atualizar Rentabilidade</button>
       </div>
       <div id="sgp-summary" class="table-period-summary"></div>
       <div id="sgp-table-host"><p class="muted">Carregando…</p></div>

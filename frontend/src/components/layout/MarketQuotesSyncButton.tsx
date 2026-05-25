@@ -4,6 +4,27 @@ import { getActiveContext } from '../../auth/session.js';
 
 type SyncStatus = 'idle' | 'loading';
 
+const QUOTES_TITLE =
+  'Atualizar cotações diárias presentes no sistema (ações e FIIs via brapi).';
+
+function RefreshIcon() {
+  return (
+    <svg
+      class="header-sync-icon__svg"
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="currentColor"
+        d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4.13 5.99 5.99 0 0 1-5.65-4.13H4v2h7.99c4.42 0 7.99-3.58 7.99-8 0-1.74-.56-3.35-1.51-4.65l1.42-1.42L20 4v6h-6l2.65-2.65z"
+      />
+    </svg>
+  );
+}
+
 /**
  * Atualiza cotações do dia (brapi → market_quotes_daily).
  * Plataforma: todos os tickers em uso; holding: ações/FIIs da organização.
@@ -21,14 +42,14 @@ export function MarketQuotesSyncButton() {
 
   const hint = () => {
     const ctx = getActiveContext();
-    if (!ctx) return '';
+    if (!ctx) return QUOTES_TITLE;
     if (ctx.scope === 'global') {
-      return 'Sincroniza cotações de todas as ações/FIIs em uso (brapi).';
+      return `${QUOTES_TITLE} Escopo: todas as organizações.`;
     }
     if (ctx.organizationId) {
-      return 'Atualiza cotações das ações/FIIs desta organização.';
+      return `${QUOTES_TITLE} Escopo: organização personificada.`;
     }
-    return 'Personifique a holding para sincronizar cotações.';
+    return `${QUOTES_TITLE} Personifique a holding para sincronizar.`;
   };
 
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
@@ -81,13 +102,15 @@ export function MarketQuotesSyncButton() {
     <div class="header-quotes-sync">
       <button
         type="button"
-        class="btn-header-quotes"
+        class="btn-header-icon-sync"
+        classList={{ 'btn-header-icon-sync--loading': status() === 'loading' }}
         disabled={!canSync() || status() === 'loading'}
         title={hint()}
+        aria-label={hint()}
         aria-busy={status() === 'loading'}
         onClick={() => void runSync()}
       >
-        {status() === 'loading' ? 'Atualizando…' : 'Cotações do dia'}
+        <RefreshIcon />
       </button>
       <Show when={flash()}>
         <span class="header-quotes-sync__flash" role="status">

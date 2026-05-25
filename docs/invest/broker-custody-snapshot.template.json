@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "broker": "btg",
+  "referenceDate": "YYYY-MM-DD",
+  "composition": {
+    "variableIncome": 1298057.99,
+    "fixedIncome": 208762.91,
+    "cash": 8828.25,
+    "inTransit": 2157.44,
+    "derivatives": -13197.78,
+    "totalPatrimony": 1504608.81
+  },
+  "positions": [
+    {
+      "ticker": "BBAS3",
+      "lineKind": "mark",
+      "quantity": 6000,
+      "lastPrice": 20.91,
+      "marketValue": 125460
+    },
+    {
+      "ticker": "ITUB4",
+      "lineKind": "mark",
+      "quantity": 5100,
+      "lastPrice": 39.41,
+      "marketValue": 200991
+    },
+    {
+      "ticker": "PRIO3",
+      "lineKind": "mark",
+      "quantity": 12700,
+      "lastPrice": 68.41,
+      "marketValue": 868807
+    }
+  ]
+}

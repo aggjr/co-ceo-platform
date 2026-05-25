@@ -33,6 +33,8 @@ export type GatewayReadQueryKey =
   | 'market_index_daily_on_or_before'
   | 'market_distinct_tickers_in_use'
   | 'invest_open_option_tickers'
+  | 'invest_open_option_tickers_for_org'
+  | 'invest_options_market_for_org'
   | 'market_quotes_bulk_range'
   | 'ui_menu_nodes_active'
   | 'ui_texts_resolved_for_org'
@@ -348,6 +350,32 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
             AND pi.identifier REGEXP '^[A-Z]{4}[A-X][0-9]'
             AND pi.identifier NOT LIKE 'CAIXA-%'
           ORDER BY pi.identifier`,
+  },
+  invest_open_option_tickers_for_org: {
+    requiresGlobalScope: true,
+    sql: `SELECT DISTINCT pi.identifier AS ticker
+          FROM patrimony_items pi
+          WHERE pi.organization_id = ?
+            AND pi.source_module = 'INVEST'
+            AND pi.status = 'active'
+            AND pi.deleted_at IS NULL
+            AND ABS(pi.quantity) > 0.0001
+            AND pi.identifier REGEXP '^[A-Z]{4}[A-X][0-9]'
+            AND pi.identifier NOT LIKE 'CAIXA-%'
+          ORDER BY pi.identifier`,
+  },
+  invest_options_market_for_org: {
+    requiresGlobalScope: true,
+    sql: `SELECT m.ticker, m.underlying_ticker, m.option_type, m.strike_price, m.expiration_date
+          FROM invest_options_market m
+          INNER JOIN patrimony_items pi
+            ON pi.identifier = m.ticker
+           AND pi.organization_id = ?
+           AND pi.source_module = 'INVEST'
+           AND pi.status = 'active'
+           AND pi.deleted_at IS NULL
+           AND ABS(pi.quantity) > 0.0001
+          WHERE m.strike_price > 0`,
   },
   platform_admin_alerts_unread: {
     requiresGlobalScope: true,

@@ -16,7 +16,20 @@ export function b3OptionTickerFromOpcoesNetSuffix(
 
 export type ParsedOptionMarketRow = OptionMarketRow & {
   europeanAmerican: 'E' | 'A';
+  /** Último negócio (coluna "p" da grade opcoes.net). */
+  lastPrice: number | null;
+  quoteDate: string | null;
 };
+
+/** Índices do array OptionsChain (colunas id: suffix, fm, m, s, aio, distancia_do_strike, p, …). */
+const CHAIN_LAST_PRICE_IDX = 6;
+const CHAIN_QUOTE_DATE_IDX = 8;
+
+function parseQuoteDate(raw: unknown): string | null {
+  const s = String(raw ?? '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  return null;
+}
 
 function parseChainRow(
   row: OpcoesNetChainRow,
@@ -33,6 +46,11 @@ function parseChainRow(
   if (!ticker) return null;
 
   const style = String(row[2] ?? 'E').toUpperCase() === 'A' ? 'A' : 'E';
+  const lastRaw = row.length > CHAIN_LAST_PRICE_IDX ? Number(row[CHAIN_LAST_PRICE_IDX]) : Number.NaN;
+  const lastPrice =
+    Number.isFinite(lastRaw) && lastRaw >= 0 ? Math.round(lastRaw * 10000) / 10000 : null;
+  const quoteDate =
+    row.length > CHAIN_QUOTE_DATE_IDX ? parseQuoteDate(row[CHAIN_QUOTE_DATE_IDX]) : null;
 
   return {
     ticker,
@@ -41,6 +59,8 @@ function parseChainRow(
     strikePrice: Math.round(strike * 10000) / 10000,
     expirationDate: expirationDate.slice(0, 10),
     europeanAmerican: style,
+    lastPrice,
+    quoteDate,
   };
 }
 
