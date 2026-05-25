@@ -65,7 +65,7 @@ export type BtgLedgerMapping = {
   notes?: string;
 };
 
-const CASH_TICKER = 'CAIXA-BTG';
+const CASH_TICKER = MAIN_CASH_TICKER;
 
 function parseLftTicker(description: string): string {
   const match = description.match(LFT_TICKER_RE);
@@ -415,7 +415,7 @@ export function btgLinesToImportEntries(
       // Fallback: agrupa por mes em BTG-IRRF-OPCAO-MENSAL:{ym} como header de cash_movement em CAIXA.
       out.push({
         date: parsed.date,
-        ticker: map.ticker, // CAIXA-BTG
+        ticker: map.ticker, // MAIN_CASH_TICKER
         operation: 'fee',
         quantity: 0,
         unit_price: 0,

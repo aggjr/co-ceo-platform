@@ -20,6 +20,7 @@ import {
   isTesouroDiretoTicker,
   TESOURO_SELIC_2031_TICKER,
 } from './tesouroDirectLedger';
+import { MAIN_CASH_TICKER, MAIN_CASH_NAME } from './ledgerTypes';
 
 const OPTION_ASSET_TYPES = new Set(['option_call', 'option_put']);
 
@@ -535,8 +536,8 @@ export function applyCashInvestBalanceToItems(
   );
   if (Math.abs(b) > 0.01) {
     filtered.push({
-      ticker: 'CAIXA-BTG',
-      name: 'Conta Corrente BTG',
+      ticker: MAIN_CASH_TICKER,
+      name: MAIN_CASH_NAME,
       assetType: 'cash',
       quantity: b,
       avgPrice: 1,

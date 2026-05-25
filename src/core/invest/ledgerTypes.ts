@@ -32,6 +32,8 @@ export const LEDGER_TRANSACTION_TYPES = [
 
 /** Ticker sintético por corretora para lançamentos de extrato (caixa). */
 export const CASH_TICKER_PREFIX = 'CAIXA-';
+export const MAIN_CASH_TICKER = 'CAIXA-BTG';
+export const MAIN_CASH_NAME = 'Conta Corrente BTG';
 
 export type LedgerTransactionType = (typeof LEDGER_TRANSACTION_TYPES)[number];
 

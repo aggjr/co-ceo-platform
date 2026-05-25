@@ -8,6 +8,7 @@ import {
   defersCashSettlement,
   resolveAssetTypeForSettlement,
 } from './settlementCalendar';
+import { MAIN_CASH_TICKER } from './ledgerTypes';
 
 export const AUTO_D2_REF_PREFIX = 'AUTO-D2:';
 
@@ -78,7 +79,7 @@ export async function syncAutoPendingSettlements(
       if (Math.abs(open) < 0.01) {
         const result = await options.operations.recordOperation(ctx, {
           date: tradeDate,
-          ticker: 'CAIXA-BTG',
+          ticker: MAIN_CASH_TICKER,
           operation: 'pending_settlement',
           quantity: 0,
           unit_price: 0,
@@ -103,7 +104,7 @@ export async function syncAutoPendingSettlements(
     if (Math.abs(open) >= 0.01) {
       const result = await options.operations.recordOperation(ctx, {
         date: settleOn,
-        ticker: 'CAIXA-BTG',
+        ticker: MAIN_CASH_TICKER,
         operation: 'pending_settlement',
         quantity: 0,
         unit_price: 0,
