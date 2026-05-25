@@ -67,63 +67,12 @@ function chartLegendLabel(data) {
   return 'Patrimônio diário (livro-razão)';
 }
 
-function renderDataStatus(data) {
-  const mq = data?.marketQuotes;
-  const rec = data?.dailyRecording;
-  const lines = [];
-  if (mq?.usesHistoricalQuotes) {
-    lines.push(
-      `<span class="patrimony-status-chip is-ok">Cotações: ${mq.tickersWithHistory} ativo(s), ${mq.quoteRowsInRange} dia(s) em market_quotes_daily</span>`
-    );
-  } else {
-    lines.push(
-      '<span class="patrimony-status-chip is-warn">Sem cotações históricas — rode sync/backfill de mercado</span>'
-    );
-  }
-  if (rec?.storedDaysInRange > 0) {
-    lines.push(
-      `<span class="patrimony-status-chip is-ok">Fechamentos gravados: ${rec.storedDaysInRange} dia(s)</span>`
-    );
-  }
-  if (data?.cdiBenchmark?.available) {
-    lines.push(
-      `<span class="patrimony-status-chip is-ok">CDI: ${data.cdiBenchmark.observationDays} dia(s)</span>`
-    );
-  } else {
-    lines.push(
-      '<span class="patrimony-status-chip is-warn">CDI ausente — npm run seed:market:benchmarks</span>'
-    );
-  }
-  const stk = data?.stockBenchmark;
-  if (stk?.available) {
-    lines.push(
-      `<span class="patrimony-status-chip is-ok">${stk.ticker}: ${stk.observationDays} fechamento(s)</span>`
-    );
-  } else {
-    const t = data?.chartBenchmarkTicker || '';
-    lines.push(
-      `<span class="patrimony-status-chip is-warn">${t} sem histórico — npm run seed:market:benchmarks</span>`
-    );
-  }
-  if (data?.extractReconciliation) {
-    const ext = data.extractReconciliation;
-    lines.push(
-      `<span class="patrimony-status-chip">${ext.tedsMatchedWithLedger ? 'Extrato BTG alinhado ao livro' : 'Conferir TEDs extrato × livro'}</span>`
-    );
-  }
-  return lines.length
-    ? `<${D} class="patrimony-status-row">${lines.join('')}</${D}>`
-    : '';
-}
-
 function bindPatrimonyChart(container, initialBounds) {
   const fromInput = container.querySelector('#patrimony-from');
   const toInput = container.querySelector('#patrimony-to');
-  const reloadBtn = container.querySelector('#patrimony-reload');
   const summaryHost = container.querySelector('#patrimony-summary');
   const chartHost = container.querySelector('#patrimony-chart-host');
   const metaHost = container.querySelector('#patrimony-meta');
-  const statusHost = container.querySelector('#patrimony-status');
   let bounds = initialBounds;
 
   const load = async () => {
@@ -132,8 +81,6 @@ function bindPatrimonyChart(container, initialBounds) {
     chartHost.innerHTML =
       '<div class="holding-chart-canvas-wrap"><canvas id="holding-patrimony-canvas"></canvas></div>';
     if (summaryHost) summaryHost.innerHTML = '<p class="muted">Calculando série diária...</p>';
-    if (statusHost) statusHost.innerHTML = '';
-
     try {
       const from = clampToToday(fromInput?.value || bounds.defaultFrom, bounds);
       const to = clampToToday(toInput?.value || defaultTo(bounds), bounds);
@@ -151,8 +98,6 @@ function bindPatrimonyChart(container, initialBounds) {
       if (data?.periodBounds) bounds = periodDefaults(data.periodBounds);
       const today = todayIso();
       const series = (data.series || []).filter((p) => String(p.date).slice(0, 10) <= today);
-
-      if (statusHost) statusHost.innerHTML = renderDataStatus(data);
 
       if (summaryHost) {
         summaryHost.innerHTML = renderHoldingPatrimonySummary(
@@ -190,20 +135,10 @@ function bindPatrimonyChart(container, initialBounds) {
         const displayTo = series.length
           ? String(series[series.length - 1].date).slice(0, 10)
           : to;
-        const parts = [
-          `Período: ${formatDateBr(from)} → ${formatDateBr(displayTo)} · ${series.length} dia(s) na curva.`,
-          ...(data.performanceNotes || []),
-        ].filter(Boolean);
-        if (lastStored && lastStored < to) {
-          parts.push(
-            `Último fechamento gravado: ${formatDateBr(lastStored)} — rode record:patrimony:daily após importar livro e cotações para estender até ontem.`
-          );
-        }
-        metaHost.textContent = parts.join(' ');
+        metaHost.textContent = `Período: ${formatDateBr(from)} → ${formatDateBr(displayTo)} · ${series.length} dia(s).`;
       }
     } catch (err) {
       if (summaryHost) summaryHost.innerHTML = '';
-      if (statusHost) statusHost.innerHTML = '';
       const banner = document.createElement(D);
       banner.className = 'error-banner';
       if (err.status === 404) {
@@ -217,7 +152,8 @@ function bindPatrimonyChart(container, initialBounds) {
     }
   };
 
-  reloadBtn?.addEventListener('click', load);
+  fromInput?.addEventListener('change', load);
+  toInput?.addEventListener('change', load);
   load();
 }
 
@@ -227,12 +163,13 @@ export async function InvestDashboardPage(container) {
     return;
   }
 
-  const t = await getPageTexts([
-    'screen.invest.dashboard.title',
-    'label.common.period_from',
-    'label.common.period_to',
-    'action.common.update',
-  ]);
+  const t = await getPageTexts(
+    ['screen.invest.dashboard.title', 'label.common.period_from', 'label.common.period_to'],
+    {
+      'label.common.period_from': 'De',
+      'label.common.period_to': 'Até',
+    }
+  );
   const screenTitle = t['screen.invest.dashboard.title'];
 
   if (isGlobalSession()) {
@@ -251,9 +188,7 @@ export async function InvestDashboardPage(container) {
       <${D} class="table-period-toolbar patrimony-toolbar">
         <label>${t['label.common.period_from']} <input type="date" id="patrimony-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
         <label>${t['label.common.period_to']} <input type="date" id="patrimony-to" value="${toDefault}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
-        <button type="button" id="patrimony-reload" class="btn-entrar">${t['action.common.update']}</button>
       </${D}>
-      <${D} id="patrimony-status" class="patrimony-status-host"></${D}>
       <${D} id="patrimony-summary" class="patrimony-summary-host"></${D}>
       <${D} class="patrimony-chart-section">
         <${D} id="patrimony-chart-host" class="patrimony-chart-panel">
