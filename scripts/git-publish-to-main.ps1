@@ -1,5 +1,5 @@
 # Depois de commitar na branch da maquina: integra em main, unifica versao e realinha a branch local.
-# Passo 6/8: bump-version.js --integrate SEMPRE incrementa patch + commit chore(release) — agentes nao devem bump manual.
+# Passo 6/8: bump-version.js --integrate SEMPRE incrementa patch + commit chore(release) - agentes nao devem bump manual.
 # Uso (na raiz, com working tree limpa apos o commit):
 #   .\scripts\git-publish-to-main.ps1
 #
@@ -128,7 +128,7 @@ if ($peerRefs.Count -eq 0) {
   }
 }
 
-Write-Host "=== 6/8 bump versao unificada (OBRIGATORIO — incrementa patch) ===" -ForegroundColor Cyan
+Write-Host "=== 6/8 bump versao unificada (OBRIGATORIO - incrementa patch) ===" -ForegroundColor Cyan
 if ($env:BUMP_VERSION -eq "0") {
   Write-Error "BUMP_VERSION=0 proibido no integrate. A versao do sistema deve sempre subir neste passo."
 }
@@ -145,7 +145,7 @@ if ($LASTEXITCODE -ne 0) {
 
 node (Join-Path $PSScriptRoot "verify-integrate-version.js") "--previous-patch=$patchBefore"
 if ($LASTEXITCODE -ne 0) {
-  Write-Error "Verificacao de versao apos bump falhou — integrate abortado"
+  Write-Error "Verificacao de versao apos bump falhou - integrate abortado"
 }
 
 $versionJson = Get-Content -Raw version.json | ConvertFrom-Json
@@ -159,9 +159,9 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "=== 7/8 verificar superficies de versao (login + sidebar) ===" -ForegroundColor Cyan
 npm run verify:version-ui
 if ($LASTEXITCODE -ne 0) {
-  Write-Error "verify:version-ui falhou apos bump — corrija antes do push"
+  Write-Error "verify:version-ui falhou apos bump - corrija antes do push"
 }
-Write-Host "Versao publicada: $appVersion (patch $($patchBefore) -> $($versionJson.patch))" -ForegroundColor Green
+Write-Host "Versao publicada: $appVersion (patch $($patchBefore) para $($versionJson.patch))" -ForegroundColor Green
 
 Write-Host "=== 8/8 push $integration e realinhar $machine ===" -ForegroundColor Cyan
 git push origin $integration
@@ -180,4 +180,4 @@ $versionJson = Get-Content -Raw version.json | ConvertFrom-Json
 $appVersion = "V$($versionJson.major).$($versionJson.minor).$($versionJson.patch)"
 Write-Host ""
 Write-Host "OK. main e $machine em $sha | versao $appVersion (sem conflitos pendentes)." -ForegroundColor Green
-Write-Host "Tip: git log -1 --oneline" -ForegroundColor DarkGray
+Write-Host 'Tip: git log -1 --oneline' -ForegroundColor DarkGray
