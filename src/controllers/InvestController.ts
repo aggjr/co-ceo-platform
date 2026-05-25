@@ -491,7 +491,7 @@ export class InvestController {
     const btgReference =
       result.performance != null
         ? compareToBtgPublished(
-            result.performance.monthAnchorTwr ?? result.performance.periodReturnTwr,
+            result.performance.periodReturnTwr,
             fromMonth,
             toMonth
           )
