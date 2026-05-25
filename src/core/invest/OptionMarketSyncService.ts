@@ -1,6 +1,4 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
-import { authBootstrapContext } from '../auth/authBootstrapContext';
-import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { inferUnderlyingTicker, isOptionTicker } from './assetClassifier';
 import { fetchOpcoesNetOptionsChainAll } from './opcoesNetClient';
 import { parseOpcoesNetExpirations } from './opcoesNetChainParser';
@@ -24,11 +22,9 @@ function sleep(ms: number): Promise<void> {
  */
 export class OptionMarketSyncService {
   private readonly marketRepo: OptionMarketRepository;
-  private readonly marketQuotes: MarketQuoteRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.marketRepo = new OptionMarketRepository(gateway);
-    this.marketQuotes = new MarketQuoteRepository(gateway);
   }
 
   /** Custódia real em patrimony_items (não exige invest_position_ext). */
@@ -68,17 +64,6 @@ export class OptionMarketSyncService {
         const result = await this.marketRepo.upsertMany(ctx, parsed);
         inserted += result.inserted;
         updated += result.updated;
-        const marketCtx = authBootstrapContext();
-        for (const row of parsed) {
-          if (row.lastPrice == null || row.lastPrice < 0) continue;
-          await this.marketQuotes.upsertQuote(marketCtx, {
-            ticker: row.ticker,
-            quoteDate: row.quoteDate ?? asOfDate,
-            closingPrice: row.lastPrice,
-            source: 'opcoes_net',
-            metadata: { underlying: row.underlyingTicker, optionType: row.optionType },
-          });
-        }
       } catch (err) {
         errors.push({
           underlying,
