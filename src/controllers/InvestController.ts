@@ -48,7 +48,11 @@ import {
   collectCallCoverageOptionRows,
 } from '../core/invest/callCoverage';
 import { rebuildCustodyFromLedger } from '../core/invest/CustodyEngine';
-import { isFixedIncomeTicker, isOptionTicker } from '../core/invest/assetClassifier';
+import {
+  inferUnderlyingTicker,
+  isFixedIncomeTicker,
+  isOptionTicker,
+} from '../core/invest/assetClassifier';
 import { resolveCashInvestDisplayBalance } from '../core/invest/cashInvestLedger';
 import { buildCashInTransitSummary } from '../core/invest/cashInTransit';
 import { loadOptionMarketCatalog } from '../core/invest/optionMarketCatalog';
@@ -181,21 +185,27 @@ export class InvestController {
     const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
     const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents);
     const ledgerStrikeByTicker = buildOptionStrikeMapFromLedgerEvents(ledgerEvents);
-    const marketCatalog = await loadOptionMarketCatalog(this.gateway);
+    const marketCatalog = await loadOptionMarketCatalog(
+      this.gateway,
+      ctx.organizationId!
+    );
     const strikeHints = { ledgerStrikeByTicker, marketCatalog };
 
-    const equityTickers = [
-      ...new Set(
-        rowsMerged
-          .map((r) => {
-            const t = String(r.asset_ticker ?? '').trim().toUpperCase();
-            if (!t || t.startsWith('CAIXA-')) return '';
-            const type = String(r.asset_type ?? '').toLowerCase();
-            return type === 'stock' || type === 'fii' ? t : '';
-          })
-          .filter(Boolean)
-      ),
-    ];
+    const quoteTickers = new Set<string>();
+    for (const r of rowsMerged) {
+      const t = String(r.asset_ticker ?? '').trim().toUpperCase();
+      if (!t || t.startsWith('CAIXA-')) continue;
+      const type = String(r.asset_type ?? '').toLowerCase();
+      if (type === 'stock' || type === 'fii') {
+        quoteTickers.add(t);
+        continue;
+      }
+      if (type === 'option_call' || type === 'option_put' || isOptionTicker(t)) {
+        const und = inferUnderlyingTicker(t);
+        if (und) quoteTickers.add(und);
+      }
+    }
+    const equityTickers = [...quoteTickers];
     const marketQuoteMap = await this.marketQuoteRepo.loadLatestQuoteMap(
       ctx,
       equityTickers
