@@ -483,6 +483,7 @@ export function buildInvestOptionsColumns() {
       type: 'text',
       align: 'center',
       width: '64px',
+      filterText: (row) => formatOptionTypeLabel(resolveOptionSide(row)),
       render: (row) => {
         const side = resolveOptionSide(row);
         const span = document.createElement('span');
@@ -752,6 +753,7 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
       label: 'Tipo',
       type: 'text',
       width: '100px',
+      filterText: (row) => assetTypeLabel(row.assetType),
       render: (row) => {
         const span = document.createElement('span');
         span.textContent = assetTypeLabel(row.assetType);
@@ -949,6 +951,15 @@ function buildSheetCaption(title, items, sheetKey) {
   return `${title} <span class="muted">(${n})</span>`;
 }
 
+/** Preserva cobertura já calculada na API; só recalcula se callsSold não veio do servidor. */
+function applyEquityCallCoverageFromApi(items, coverageOptions, premiumByUnderlying) {
+  const hasServerCoverage = (items || []).some((row) =>
+    Number.isFinite(Number(row.callsSold))
+  );
+  if (hasServerCoverage) return items;
+  return attachCallCoverageToEquities(items, coverageOptions, premiumByUnderlying);
+}
+
 function renderTableSection(
   title,
   items,
@@ -965,7 +976,7 @@ function renderTableSection(
   const optsForCoverage = coverageOptions.length ? coverageOptions : allOptions;
   const rows =
     sheetKey === 'equities'
-      ? attachCallCoverageToEquities(items, optsForCoverage, premiumByUnderlying)
+      ? applyEquityCallCoverageFromApi(items, optsForCoverage, premiumByUnderlying)
       : items;
   const mountId = `pft-${++portfolioTableSeq}`;
   registerCoCeoExcelMount(mountId, {
