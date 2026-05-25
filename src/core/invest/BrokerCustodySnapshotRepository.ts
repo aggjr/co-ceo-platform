@@ -14,6 +14,17 @@ function lineId(snapshotId: string, ticker: string, kind: string, leg: string): 
   return `${snapshotId}-${ticker}-${kind}-${leg}`.slice(0, 96);
 }
 
+/** MySQL DATE pode voltar como Date; evita "Sat May 23" no livro. */
+function toReferenceDateIso(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  const s = String(value ?? '').trim();
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1]!;
+  throw new Error(`reference_date inválida no snapshot: ${s}`);
+}
+
 function rowToRecord(
   header: Record<string, unknown>,
   lines: BrokerCustodySnapshotLineInput[]
@@ -23,7 +34,7 @@ function rowToRecord(
     organizationId: String(header.organization_id),
     schemaVersion: 1,
     broker: String(header.broker_code),
-    referenceDate: String(header.reference_date).slice(0, 10),
+    referenceDate: toReferenceDateIso(header.reference_date),
     status: String(header.status) as BrokerCustodySnapshotRecord['status'],
     sourceLabel: header.source_label != null ? String(header.source_label) : null,
     notes: header.notes != null ? String(header.notes) : null,
@@ -82,9 +93,17 @@ export class BrokerCustodySnapshotRepository {
         ...headerPayload,
         id: String(existing[0].id),
       });
-      await this.gateway.deleteMatching(ctx, 'invest_broker_custody_snapshot_lines', {
-        snapshot_id: String(existing[0].id),
-      });
+      const oldLines = await this.gateway.findWhere(
+        ctx,
+        'invest_broker_custody_snapshot_lines',
+        { snapshot_id: String(existing[0].id) },
+        { columns: ['id'] }
+      );
+      for (const row of oldLines) {
+        await this.gateway.deleteMatching(ctx, 'invest_broker_custody_snapshot_lines', {
+          id: String(row.id),
+        });
+      }
     } else {
       await this.gateway.insert(ctx, 'invest_broker_custody_snapshots', {
         id,
