@@ -210,17 +210,13 @@ export async function InvestStockGainPivotPage(container) {
   }
 
   const content = `
-    <div class="card sgp-page">
-      <div class="sgp-toolbar">
-        <div>
-          <h2 style="font-size:16px;margin:0">${screenTitle}</h2>
-          <p class="muted" style="margin:4px 0 0">Preço estrito (PM), opções, proventos, trade, day trade, taxas e resultado total por papel.</p>
-        </div>
+    <div class="card sgp-page invest-table-card">
+      <div class="table-period-toolbar">
         <label>De <input type="date" id="sgp-from" value="${defaultFrom()}" /></label>
         <label>Até <input type="date" id="sgp-to" value="${defaultTo()}" /></label>
         <button type="button" id="sgp-reload" class="btn-entrar">Atualizar</button>
       </div>
-      <div id="sgp-summary" style="margin:12px 0"></div>
+      <div id="sgp-summary" class="table-period-summary"></div>
       <div id="sgp-table-host"><p class="muted">Carregando…</p></div>
     </div>
   `;

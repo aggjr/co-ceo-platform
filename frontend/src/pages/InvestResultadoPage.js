@@ -125,17 +125,13 @@ export async function InvestResultadoPage(container) {
       <p id="import-status" class="import-status muted"></p>
     </div>
 
-    <div class="card" style="margin-top:20px">
-      <div class="pivot-toolbar">
-        <div>
-          <h2 style="font-size:16px;margin:0">Pivot de resultado</h2>
-          <p class="muted" style="margin:4px 0 0">Como planilha dinâmica: ganhos por ação, dividendos, opções, locação e despesas.</p>
-        </div>
+    <div class="card invest-table-card" style="margin-top:20px">
+      <div class="table-period-toolbar">
         <label>De <input type="date" id="pivot-from" value="${defaultFrom()}" /></label>
         <label>Até <input type="date" id="pivot-to" value="${defaultTo()}" /></label>
         <button type="button" id="pivot-reload" class="btn-entrar">Atualizar</button>
       </div>
-      <div id="pivot-summary" style="margin:12px 0"></div>
+      <div id="pivot-summary" class="table-period-summary"></div>
       <div id="pivot-host"><p class="muted">Carregando...</p></div>
     </div>
   `;

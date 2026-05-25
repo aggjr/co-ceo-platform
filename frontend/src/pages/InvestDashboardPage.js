@@ -245,14 +245,7 @@ export async function InvestDashboardPage(container) {
   const toDefault = defaultTo();
   const contentHtml = `<${D} class="invest-patrimony-page">
     <${D} class="card invest-patrimony-card">
-      <${D} class="patrimony-toolbar">
-        <${D}>
-          <h2 style="font-size:18px;margin:0">${screenTitle}</h2>
-          <p class="muted" style="margin:4px 0 0;font-size:13px">
-            Rentabilidade acumulada (TWR): aportes e retiradas (TEDs) não distorcem a curva da carteira.
-            Patrimônio em R$ no resumo e no tooltip. Padrão: 31/12/2025 até ontem.
-          </p>
-        </${D}>
+      <${D} class="table-period-toolbar patrimony-toolbar">
         <label>De <input type="date" id="patrimony-from" value="${defaultFrom()}" min="${PERIOD_START}" /></label>
         <label>Até <input type="date" id="patrimony-to" value="${toDefault}" min="${PERIOD_START}" max="${todayIso()}" /></label>
         <button type="button" id="patrimony-reload" class="btn-entrar">Atualizar</button>
