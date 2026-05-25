@@ -123,6 +123,7 @@ export async function applyUiCatalog(pool: Pool): Promise<UiCatalogApplyResult> 
   await runSqlFile(pool, '24_ui_menu_text_pt_br.sql');
   await runSqlFile(pool, '27_ui_invest_period_labels.sql');
   await runSqlFile(pool, '29_ui_invest_options_cards_depara.sql');
+  await runSqlFile(pool, '30_ui_catalog_apply_button_labels.sql');
 
   const keys = [
     'menu.invest.portfolio',

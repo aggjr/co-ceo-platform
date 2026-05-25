@@ -530,6 +530,30 @@ export const TEXTS: TextSeed[] = [
     default_text: 'Resultado',
   },
   {
+    id: '00000000-0000-4003-8000-000000000180',
+    text_key: 'action.platform.ui_catalog_apply',
+    module_code: 'CORE',
+    kind: 'button_label',
+    default_text: 'Sincronizar DE-PARA UI',
+    description: 'Botão temporário no header — sincronizar catálogo de textos',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000181',
+    text_key: 'action.platform.ui_catalog_apply.hint',
+    module_code: 'CORE',
+    kind: 'description',
+    default_text:
+      'Grava textos curtos do catálogo (Opções Cards, filtros, menu) no MySQL deste ambiente.',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000182',
+    text_key: 'action.platform.ui_catalog_apply.done',
+    module_code: 'CORE',
+    kind: 'field_label',
+    default_text:
+      'Catálogo UI sincronizado ({texts} textos, {menu} itens de menu). Recarregue a tela se os rótulos não mudarem.',
+  },
+  {
     id: '00000000-0000-4003-8000-000000000104',
     text_key: 'screen.invest.fixed_income.title',
     module_code: 'INVEST',
