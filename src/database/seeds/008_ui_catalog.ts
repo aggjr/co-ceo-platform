@@ -541,9 +541,10 @@ export const TEXTS: TextSeed[] = [
     id: '00000000-0000-4003-8000-000000000181',
     text_key: 'action.platform.ui_catalog_apply.hint',
     module_code: 'CORE',
-    kind: 'description',
+    kind: 'field_label',
     default_text:
       'Grava textos curtos do catálogo (Opções Cards, filtros, menu) no MySQL deste ambiente.',
+    description: 'Tooltip do botão Sincronizar DE-PARA UI',
   },
   {
     id: '00000000-0000-4003-8000-000000000182',
