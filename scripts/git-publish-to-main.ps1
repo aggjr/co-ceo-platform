@@ -136,7 +136,7 @@ if ($LASTEXITCODE -ne 0) {
 
 $versionJson = Get-Content -Raw version.json | ConvertFrom-Json
 $appVersion = "V$($versionJson.major).$($versionJson.minor).$($versionJson.patch)"
-git add version.json package.json src/generated/version.ts frontend/src/generated/version.js
+git add version.json package.json src/generated/version.ts frontend/src/generated/version.js src/frontend/login_preview.html
 git commit -m "chore(release): $appVersion - integracao main"
 if ($LASTEXITCODE -ne 0) {
   Write-Error "Falha ao commitar bump de versao"
