@@ -13,10 +13,7 @@ export async function InvestClosedTradesPage(container) {
     return;
   }
 
-  const t = await getPageTexts(
-    ['screen.invest.closed_trades.title'],
-    { 'screen.invest.closed_trades.title': 'Opções finalizadas' }
-  );
+  const t = await getPageTexts(['screen.invest.closed_trades.title']);
   const screenTitle = t['screen.invest.closed_trades.title'];
 
   if (isGlobalSession()) {
@@ -33,13 +30,7 @@ export async function InvestClosedTradesPage(container) {
     const data = await apiRequest('/api/invest/portfolio');
     const closed = data.closedOptions || [];
     body = `
-      <div class="card">
-        <h2 style="font-size:16px;margin:0 0 8px">${screenTitle}</h2>
-        <p class="muted" style="margin:0 0 16px">
-          Posições com quantidade zerada (exercício, vencimento ou encerramento).
-          Não aparecem em <a href="/invest/portfolio" data-link>Portfólio</a>.
-          A 5ª letra do ticker indica o mês de vencimento (padrão B3).
-        </p>
+      <div class="card invest-table-card">
         <div id="closed-options-table-host">${renderClosedOptionsTable(closed)}</div>
       </div>
     `;

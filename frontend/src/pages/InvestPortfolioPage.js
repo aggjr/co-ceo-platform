@@ -6,38 +6,24 @@ import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import { getPageTexts } from '../navigation/pageTexts.js';
 import {
-  getUnderlyingFilter,
   mountPortfolioExcelTables,
   renderInvestPortfolioPage,
   renderInvestOpcoesPage,
   renderInvestTitulosPage,
-  renderUnderlyingFilterSelect,
-  setUnderlyingFilter,
 } from '../lib/portfolioDisplay.js';
 
 function bindPortfolioView(container, items, cashMeta, pageType) {
   const host = container.querySelector('#portfolio-positions');
-  const filterEl = container.querySelector('#portfolio-underlying-filter');
   if (!host) return;
 
-  const paint = () => {
-    const underlying = getUnderlyingFilter();
-    if (pageType === 'options') {
-      host.innerHTML = renderInvestOpcoesPage(items, underlying);
-    } else if (pageType === 'titulos') {
-      host.innerHTML = renderInvestTitulosPage(items, cashMeta);
-    } else {
-      host.innerHTML = renderInvestPortfolioPage(items, underlying, cashMeta);
-    }
-    mountPortfolioExcelTables(host);
-  };
-
-  filterEl?.addEventListener('change', () => {
-    setUnderlyingFilter(filterEl.value);
-    paint();
-  });
-
-  paint();
+  if (pageType === 'options') {
+    host.innerHTML = renderInvestOpcoesPage(items, '');
+  } else if (pageType === 'titulos') {
+    host.innerHTML = renderInvestTitulosPage(items, cashMeta);
+  } else {
+    host.innerHTML = renderInvestPortfolioPage(items, '', cashMeta);
+  }
+  mountPortfolioExcelTables(host);
 }
 
 async function buildInvestPortfolioPage(container, currentPath, pageType) {
@@ -46,29 +32,17 @@ async function buildInvestPortfolioPage(container, currentPath, pageType) {
     return;
   }
 
-  const underlyingFilter = getUnderlyingFilter();
-
-  const t = await getPageTexts(
-    [
-      'screen.invest.portfolio.title',
-      'screen.invest.options.title',
-      'screen.invest.fixed_income.title',
-    ],
-    {
-      'screen.invest.portfolio.title': 'Ações/FIIs',
-      'screen.invest.options.title': 'Opções',
-      'screen.invest.fixed_income.title': 'Títulos, RF e CDB',
-    }
-  );
+  const t = await getPageTexts([
+    'screen.invest.portfolio.title',
+    'screen.invest.options.title',
+    'screen.invest.fixed_income.title',
+  ]);
 
   let pageTitle = t['screen.invest.portfolio.title'];
-  let pageSubtitle = 'Ações e FIIs em custódia aberta.';
   if (pageType === 'options') {
     pageTitle = t['screen.invest.options.title'];
-    pageSubtitle = 'Opções vigentes com vencimento futuro.';
   } else if (pageType === 'titulos') {
     pageTitle = t['screen.invest.fixed_income.title'];
-    pageSubtitle = 'Conta corrente, ativos de baixo risco e trânsito.';
   }
 
   let body = `<p class="muted">Carregando ${pageTitle.toLowerCase()}...</p>`;
@@ -109,18 +83,7 @@ async function buildInvestPortfolioPage(container, currentPath, pageType) {
 
     body = `
       ${auditBanner}
-      <div class="card">
-        <div class="portfolio-toolbar">
-          <div>
-            <h2>${pageTitle}</h2>
-            <p class="muted" style="margin:4px 0 0">
-              ${pageSubtitle}
-            </p>
-          </div>
-          <div class="portfolio-toolbar-actions">
-            ${renderUnderlyingFilterSelect(items, underlyingFilter)}
-          </div>
-        </div>
+      <div class="card invest-table-card">
         <div id="portfolio-positions"></div>
       </div>
     `;

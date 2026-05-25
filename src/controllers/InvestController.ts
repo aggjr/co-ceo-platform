@@ -33,9 +33,7 @@ import {
 } from '../core/market/indexBenchmark';
 import { buildStoredTwrChartSeries } from '../core/invest/storedPatrimonyChart';
 
-/** Ação principal da holding para curva buy-and-hold no gráfico de Resultado Histórico. */
-const CHART_BENCHMARK_STOCK =
-  (process.env.INVEST_CHART_BENCHMARK_TICKER || 'PRIO3').trim().toUpperCase();
+import { resolveInvestPeriodBounds } from '../core/invest/investPeriodBounds';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import {
   filterStoredDaysForChartMethod,
@@ -80,6 +78,7 @@ import {
   normalizeBrokerNoteRef,
 } from '../core/invest/extractLedgerEnrichment';
 import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
+import type { UserContext } from '../core/dal';
 import pool from '../config/database';
 import { isMissingSchemaError } from '../core/dal/mysqlErrors';
 import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
@@ -103,6 +102,24 @@ export class InvestController {
     this.marketQuoteRepo = new MarketQuoteRepository(gateway);
     this.patrimonyAnchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
   }
+
+  private async periodBoundsFor(ctx: UserContext) {
+    const today = new Date().toISOString().slice(0, 10);
+    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+    return resolveInvestPeriodBounds(events);
+  }
+
+  getInvestUiContext = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selecione uma organização (personifique a holding).',
+      });
+    }
+    const context = await this.periodBoundsFor(ctx);
+    return res.json({ success: true, context });
+  };
 
   listPortfolio = async (req: Request, res: Response) => {
     try {
@@ -350,8 +367,10 @@ export class InvestController {
       });
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const from = String(req.query.from || '2026-01-01').slice(0, 10);
+    const bounds = await this.periodBoundsFor(ctx);
+    const today = bounds.today;
+    const fromQ = String(req.query.from || bounds.defaultFrom).slice(0, 10);
+    const from = fromQ < bounds.periodMin ? bounds.periodMin : fromQ;
     const toRaw = String(req.query.to || today).slice(0, 10);
     const to = toRaw > today ? today : toRaw;
     const riskFreeAnnual = Number(req.query.risk_free ?? 0);
@@ -448,36 +467,32 @@ export class InvestController {
 
     const chartDates = result.series.map((p) => String(p.date).slice(0, 10));
     let cdiRows = await this.marketQuoteRepo.loadIndexRange(ctx, 'CDI', from, to);
-    let prioQuotes = await this.marketQuoteRepo.loadQuoteRange(
-      ctx,
-      CHART_BENCHMARK_STOCK,
-      from,
-      to
-    );
-    if (!cdiRows.length || !prioQuotes.length) {
-      try {
-        await seedMarketBenchmarks(this.gateway, pool, {
-          from,
-          to,
-          stockTicker: CHART_BENCHMARK_STOCK,
-        });
-        cdiRows = await this.marketQuoteRepo.loadIndexRange(ctx, 'CDI', from, to);
-        prioQuotes = await this.marketQuoteRepo.loadQuoteRange(
-          ctx,
-          CHART_BENCHMARK_STOCK,
-          from,
-          to
-        );
-      } catch {
-        /* seed best-effort */
+    const chartStock = bounds.chartBenchmarkTicker;
+    let prioQuotes: Awaited<ReturnType<MarketQuoteRepository['loadQuoteRange']>> = [];
+    if (chartStock) {
+      prioQuotes = await this.marketQuoteRepo.loadQuoteRange(ctx, chartStock, from, to);
+      if (!cdiRows.length || !prioQuotes.length) {
+        try {
+          await seedMarketBenchmarks(this.gateway, pool, {
+            from,
+            to,
+            stockTicker: chartStock,
+          });
+          cdiRows = await this.marketQuoteRepo.loadIndexRange(ctx, 'CDI', from, to);
+          prioQuotes = await this.marketQuoteRepo.loadQuoteRange(ctx, chartStock, from, to);
+        } catch {
+          /* seed best-effort */
+        }
       }
     }
     const cdiBenchmark = buildCdiBenchmarkForChart(cdiRows, from, to, chartDates);
-    const stockBenchmark = buildStockBenchmarkForChart(
-      prioQuotes.map((q) => ({ quote_date: q.quote_date, closing_price: q.closing_price })),
-      chartDates,
-      CHART_BENCHMARK_STOCK
-    );
+    const stockBenchmark = chartStock
+      ? buildStockBenchmarkForChart(
+          prioQuotes.map((q) => ({ quote_date: q.quote_date, closing_price: q.closing_price })),
+          chartDates,
+          chartStock
+        )
+      : buildStockBenchmarkForChart([], chartDates, '');
     const storedTwrChart =
       storedDays.filter((s) => s.cumulative_twr != null).length >= 2
         ? buildStoredTwrChartSeries(storedDays, chartDates, from)
@@ -513,7 +528,8 @@ export class InvestController {
       ...result,
       cdiBenchmark,
       stockBenchmark,
-      chartBenchmarkTicker: CHART_BENCHMARK_STOCK,
+      chartBenchmarkTicker: chartStock,
+      periodBounds: bounds,
       portfolioIndexed,
       cdiComparison,
       cashInTransit,
@@ -551,9 +567,11 @@ export class InvestController {
         cdiBenchmark.available
           ? `CDI: ${cdiBenchmark.observationDays} dia(s) em market_index_daily (índice 100 no gráfico).`
           : 'CDI indisponível — rode npm run sync:market:indices e confira migration 22.',
-        stockBenchmark.available
-          ? `${CHART_BENCHMARK_STOCK}: ${stockBenchmark.observationDays} fechamento(s) em market_quotes_daily (buy-and-hold índice 100).`
-          : `${CHART_BENCHMARK_STOCK} sem histórico — rode npm run seed:market:benchmarks.`,
+        chartStock && stockBenchmark.available
+          ? `${chartStock}: ${stockBenchmark.observationDays} fechamento(s) em market_quotes_daily (buy-and-hold índice 100).`
+          : chartStock
+            ? `${chartStock} sem histórico — rode npm run seed:market:benchmarks.`
+            : 'Benchmark de ação não definido (sem posição em ações/FIIs no livro).',
       ],
       patrimonySource: calibrateToAnchors
         ? 'ledger_plus_btg_anchors'
@@ -648,9 +666,11 @@ export class InvestController {
       });
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const from = String(req.query.from || '2026-01-01').slice(0, 10);
-    const to = String(req.query.to || today).slice(0, 10);
+    const bounds = await this.periodBoundsFor(ctx);
+    const fromQ = String(req.query.from || bounds.defaultFrom).slice(0, 10);
+    const from = fromQ < bounds.periodMin ? bounds.periodMin : fromQ;
+    const toRaw = String(req.query.to || bounds.today).slice(0, 10);
+    const to = toRaw > bounds.today ? bounds.today : toRaw;
 
     const events = await this.ledger.listLedgerEvents(ctx, from, to);
     let pivot = buildStockUnderlyingPivot(events, from, to);
@@ -675,6 +695,7 @@ export class InvestController {
       columnLabels: STOCK_PIVOT_COLUMN_LABELS,
       columnOrder,
       pivot,
+      periodBounds: bounds,
     });
   };
 
@@ -687,9 +708,11 @@ export class InvestController {
       });
     }
 
-    const today = new Date().toISOString().slice(0, 10);
-    const from = String(req.query.from || '2026-01-01').slice(0, 10);
-    const to = String(req.query.to || today).slice(0, 10);
+    const bounds = await this.periodBoundsFor(ctx);
+    const fromQ = String(req.query.from || bounds.defaultFrom).slice(0, 10);
+    const from = fromQ < bounds.periodMin ? bounds.periodMin : fromQ;
+    const toRaw = String(req.query.to || bounds.today).slice(0, 10);
+    const to = toRaw > bounds.today ? bounds.today : toRaw;
 
     const events = await this.ledger.listLedgerEvents(ctx, from, to);
     const pivot = buildPnLPivot(events, from, to);
@@ -698,6 +721,7 @@ export class InvestController {
       success: true,
       columnLabels: PIVOT_COLUMN_LABELS,
       pivot,
+      periodBounds: bounds,
     });
   };
 
@@ -906,7 +930,7 @@ export class InvestController {
     });
   };
 
-  /** Popula CDI + ação benchmark (PRIO3) em tabelas globais — escopo plataforma. */
+  /** Popula CDI + ação benchmark em tabelas globais — escopo plataforma. */
   seedMarketBenchmarks = async (req: Request, res: Response) => {
     if (req.userContext?.scope !== 'global') {
       return res.status(403).json({
@@ -914,13 +938,25 @@ export class InvestController {
         error: 'Somente sessão plataforma (escopo global) pode popular benchmarks de mercado.',
       });
     }
-    const from = String(req.body?.from || req.query.from || '2025-12-01').slice(0, 10);
+    const from = String(req.body?.from || req.query.from || '').slice(0, 10);
     const to = String(req.body?.to || req.query.to || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const stockTicker = String(
-      req.body?.stockTicker || req.query.stockTicker || process.env.INVEST_CHART_BENCHMARK_TICKER || 'PRIO3'
+      req.body?.stockTicker || req.query.stockTicker || process.env.INVEST_CHART_BENCHMARK_TICKER || ''
     )
       .trim()
       .toUpperCase();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Informe from (YYYY-MM-DD) no corpo ou query.',
+      });
+    }
+    if (!stockTicker) {
+      return res.status(400).json({
+        success: false,
+        error: 'Informe stockTicker ou configure INVEST_CHART_BENCHMARK_TICKER.',
+      });
+    }
     try {
       const result = await seedMarketBenchmarks(this.gateway, pool, { from, to, stockTicker });
       return res.json({ success: true, ...result });

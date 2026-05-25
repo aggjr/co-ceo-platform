@@ -171,6 +171,12 @@ router.post(
 
 // --- INVEST ---
 router.get(
+  '/invest/ui-context',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.getInvestUiContext.bind(invest)
+);
+router.get(
   '/invest/portfolio',
   AuthMiddleware.protect,
   requirePermission('invest:custody:read'),

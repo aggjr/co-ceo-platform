@@ -88,10 +88,7 @@ export async function InvestExtratosPage(container) {
     return;
   }
 
-  const t = await getPageTexts(
-    ['screen.invest.extratos.title'],
-    { 'screen.invest.extratos.title': 'Extratos de conta' }
-  );
+  const t = await getPageTexts(['screen.invest.extratos.title']);
   const screenTitle = t['screen.invest.extratos.title'];
 
   if (isGlobalSession()) {
@@ -110,13 +107,7 @@ export async function InvestExtratosPage(container) {
     allRows = data.rows || [];
     
     body = `
-      <div class="card notes-meta" style="margin-bottom:16px">
-        <h2 style="font-size:16px;margin:0 0 8px">${screenTitle}</h2>
-        <p class="muted" style="margin:0 0 12px">
-          Verificação da liquidação de notas de corretagem (D+1, D+2) e saldo financeiro.
-        </p>
-      </div>
-      <div class="card notes-grid-card" style="margin-bottom:16px">
+      <div class="card invest-table-card">
         <div id="cash-extract-grid-host"></div>
       </div>
     `;

@@ -10,9 +10,9 @@ import {
   destroyHoldingPatrimonyChart,
 } from '../lib/holdingPatrimonyChart.js';
 import { formatDateBr } from '../lib/dateFormat.js';
+import { loadInvestUiContext, periodDefaults } from '../lib/investUiContext.js';
 
 const D = 'div';
-const PERIOD_START = '2025-12-31';
 
 function localDateParts(d = new Date()) {
   return {
@@ -39,22 +39,19 @@ function yesterdayIso() {
   return toIsoDate(d);
 }
 
-function defaultFrom() {
-  return PERIOD_START;
-}
-
-function defaultTo() {
-  const y = yesterdayIso();
-  const t = todayIso();
-  return y < PERIOD_START ? t : y;
-}
-
-function clampToToday(dateStr) {
-  const d = String(dateStr || todayIso()).slice(0, 10);
-  const max = todayIso();
+function clampToToday(dateStr, bounds) {
+  const d = String(dateStr || bounds.defaultFrom).slice(0, 10);
+  const max = bounds.today;
+  const min = bounds.periodMin;
   if (d > max) return max;
-  if (d < PERIOD_START) return PERIOD_START;
+  if (d < min) return min;
   return d;
+}
+
+function defaultTo(bounds) {
+  const y = yesterdayIso();
+  const t = bounds.today;
+  return y < bounds.periodMin ? t : y;
 }
 
 function chartLegendLabel(data) {
@@ -103,7 +100,7 @@ function renderDataStatus(data) {
       `<span class="patrimony-status-chip is-ok">${stk.ticker}: ${stk.observationDays} fechamento(s)</span>`
     );
   } else {
-    const t = data?.chartBenchmarkTicker || 'PRIO3';
+    const t = data?.chartBenchmarkTicker || '';
     lines.push(
       `<span class="patrimony-status-chip is-warn">${t} sem histórico — npm run seed:market:benchmarks</span>`
     );
@@ -119,7 +116,7 @@ function renderDataStatus(data) {
     : '';
 }
 
-function bindPatrimonyChart(container) {
+function bindPatrimonyChart(container, initialBounds) {
   const fromInput = container.querySelector('#patrimony-from');
   const toInput = container.querySelector('#patrimony-to');
   const reloadBtn = container.querySelector('#patrimony-reload');
@@ -127,6 +124,7 @@ function bindPatrimonyChart(container) {
   const chartHost = container.querySelector('#patrimony-chart-host');
   const metaHost = container.querySelector('#patrimony-meta');
   const statusHost = container.querySelector('#patrimony-status');
+  let bounds = initialBounds;
 
   const load = async () => {
     if (!chartHost) return;
@@ -137,19 +135,20 @@ function bindPatrimonyChart(container) {
     if (statusHost) statusHost.innerHTML = '';
 
     try {
-      const from = clampToToday(fromInput?.value || defaultFrom());
-      const to = clampToToday(toInput?.value || defaultTo());
+      const from = clampToToday(fromInput?.value || bounds.defaultFrom, bounds);
+      const to = clampToToday(toInput?.value || defaultTo(bounds), bounds);
       if (fromInput) fromInput.value = from;
       if (toInput) {
         toInput.value = to;
-        toInput.max = todayIso();
-        toInput.min = PERIOD_START;
+        toInput.max = bounds.today;
+        toInput.min = bounds.periodMin;
       }
-      if (fromInput) fromInput.min = PERIOD_START;
+      if (fromInput) fromInput.min = bounds.periodMin;
 
       const data = await apiRequest(
         `/api/invest/patrimony-daily?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&method=mtm_btg`
       );
+      if (data?.periodBounds) bounds = periodDefaults(data.periodBounds);
       const today = todayIso();
       const series = (data.series || []).filter((p) => String(p.date).slice(0, 10) <= today);
 
@@ -228,10 +227,12 @@ export async function InvestDashboardPage(container) {
     return;
   }
 
-  const t = await getPageTexts(
-    ['screen.invest.dashboard.title'],
-    { 'screen.invest.dashboard.title': 'Resultado histórico' }
-  );
+  const t = await getPageTexts([
+    'screen.invest.dashboard.title',
+    'label.common.period_from',
+    'label.common.period_to',
+    'action.common.update',
+  ]);
   const screenTitle = t['screen.invest.dashboard.title'];
 
   if (isGlobalSession()) {
@@ -242,20 +243,15 @@ export async function InvestDashboardPage(container) {
     return;
   }
 
-  const toDefault = defaultTo();
+  const uiCtx = await loadInvestUiContext();
+  const bounds = periodDefaults(uiCtx);
+  const toDefault = defaultTo(bounds);
   const contentHtml = `<${D} class="invest-patrimony-page">
     <${D} class="card invest-patrimony-card">
-      <${D} class="patrimony-toolbar">
-        <${D}>
-          <h2 style="font-size:18px;margin:0">${screenTitle}</h2>
-          <p class="muted" style="margin:4px 0 0;font-size:13px">
-            Rentabilidade acumulada (TWR): aportes e retiradas (TEDs) não distorcem a curva da carteira.
-            Patrimônio em R$ no resumo e no tooltip. Padrão: 31/12/2025 até ontem.
-          </p>
-        </${D}>
-        <label>De <input type="date" id="patrimony-from" value="${defaultFrom()}" min="${PERIOD_START}" /></label>
-        <label>Até <input type="date" id="patrimony-to" value="${toDefault}" min="${PERIOD_START}" max="${todayIso()}" /></label>
-        <button type="button" id="patrimony-reload" class="btn-entrar">Atualizar</button>
+      <${D} class="table-period-toolbar patrimony-toolbar">
+        <label>${t['label.common.period_from']} <input type="date" id="patrimony-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
+        <label>${t['label.common.period_to']} <input type="date" id="patrimony-to" value="${toDefault}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
+        <button type="button" id="patrimony-reload" class="btn-entrar">${t['action.common.update']}</button>
       </${D}>
       <${D} id="patrimony-status" class="patrimony-status-host"></${D}>
       <${D} id="patrimony-summary" class="patrimony-summary-host"></${D}>
@@ -278,5 +274,5 @@ export async function InvestDashboardPage(container) {
     title: `INVEST — ${screenTitle}`,
     contentHtml,
   });
-  bindPatrimonyChart(container);
+  bindPatrimonyChart(container, bounds);
 }

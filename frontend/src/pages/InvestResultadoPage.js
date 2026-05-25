@@ -7,31 +7,26 @@ import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import { getPageTexts } from '../navigation/pageTexts.js';
 import { mountPivotExcelTable, renderPivotTable } from '../lib/pivotDisplay.js';
 import { formatBrl } from '../lib/portfolioDisplay.js';
+import { loadInvestUiContext, periodDefaults } from '../lib/investUiContext.js';
 
-function defaultFrom() {
-  return '2026-01-01';
-}
-
-function defaultTo() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function bindPivotPage(container) {
+function bindPivotPage(container, initialBounds) {
   const fromInput = container.querySelector('#pivot-from');
   const toInput = container.querySelector('#pivot-to');
   const reloadBtn = container.querySelector('#pivot-reload');
   const host = container.querySelector('#pivot-host');
   const summaryHost = container.querySelector('#pivot-summary');
+  let bounds = initialBounds;
 
   const load = async () => {
     if (!host) return;
     host.innerHTML = '<p class="muted">Calculando...</p>';
     try {
-      const from = fromInput?.value || defaultFrom();
-      const to = toInput?.value || defaultTo();
+      const from = (fromInput?.value || bounds.defaultFrom).slice(0, 10);
+      const to = (toInput?.value || bounds.today).slice(0, 10);
       const data = await apiRequest(
         `/api/invest/pnl-pivot?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
       );
+      if (data?.periodBounds) bounds = periodDefaults(data.periodBounds);
       const pivot = data.pivot;
       if (summaryHost && pivot?.totals) {
         summaryHost.innerHTML = `<p class="muted">Período <strong>${pivot.from}</strong> a <strong>${pivot.to}</strong> — resultado líquido agregado: <strong class="portfolio-pnl--up">${formatBrl(pivot.totals.total)}</strong> · custódia recalculada: <strong>${pivot.custody?.positions ?? 0}</strong> posições</p>`;
@@ -81,7 +76,7 @@ function bindImportPanel(container) {
       if (status) {
         status.textContent = `Importado: ${result.inserted} lançamentos (lote ${result.batchId}). Custódia: ${result.reconcile?.positions ?? 0} posições.`;
       }
-      bindPivotPage(container);
+      container.querySelector('#pivot-reload')?.click();
     } catch (err) {
       if (status) status.textContent = err.message || 'Importação falhou.';
     } finally {
@@ -96,11 +91,18 @@ export async function InvestResultadoPage(container) {
     return;
   }
 
-  const t = await getPageTexts(
-    ['screen.invest.resultado.title'],
-    { 'screen.invest.resultado.title': 'Resultado (pivot)' }
-  );
+  const t = await getPageTexts([
+    'screen.invest.resultado.title',
+    'screen.invest.resultado.import_title',
+    'screen.invest.resultado.import_help',
+    'label.common.period_from',
+    'label.common.period_to',
+    'action.common.update',
+    'action.common.load_template',
+    'action.common.import_recalc',
+  ]);
   const screenTitle = t['screen.invest.resultado.title'];
+  const bounds = periodDefaults(await loadInvestUiContext());
 
   if (isGlobalSession()) {
     const body = `
@@ -115,32 +117,28 @@ export async function InvestResultadoPage(container) {
 
   const content = `
     <div class="card import-panel">
-      <h2 style="font-size:16px;margin-bottom:8px">Importar carteira e notas</h2>
-      <p class="muted">Cole JSON com saldo em <strong>01/01/2026</strong>, <strong>notas de corretagem</strong> (<code>entries</code>) e, se quiser, <strong>extratos mensais</strong> (<code>monthly_statements</code>) para aportes, retiradas, rendimento de caixa e multas B3. O sistema recalcula custódia e o pivot.</p>
-      <textarea id="import-json" placeholder='{"opening_date":"2026-01-01",...}'></textarea>
+      <h2 style="font-size:16px;margin-bottom:8px">${t['screen.invest.resultado.import_title']}</h2>
+      <p class="muted">${t['screen.invest.resultado.import_help']}</p>
+      <textarea id="import-json" placeholder='{"opening_date":"","opening_positions":[],"entries":[]}'></textarea>
       <div class="import-actions">
-        <button type="button" id="import-template" class="secondary">Carregar modelo</button>
-        <button type="button" id="import-run">Importar e recalcular</button>
+        <button type="button" id="import-template" class="secondary">${t['action.common.load_template']}</button>
+        <button type="button" id="import-run">${t['action.common.import_recalc']}</button>
       </div>
       <p id="import-status" class="import-status muted"></p>
     </div>
 
-    <div class="card" style="margin-top:20px">
-      <div class="pivot-toolbar">
-        <div>
-          <h2 style="font-size:16px;margin:0">Pivot de resultado</h2>
-          <p class="muted" style="margin:4px 0 0">Como planilha dinâmica: ganhos por ação, dividendos, opções, locação e despesas.</p>
-        </div>
-        <label>De <input type="date" id="pivot-from" value="${defaultFrom()}" /></label>
-        <label>Até <input type="date" id="pivot-to" value="${defaultTo()}" /></label>
-        <button type="button" id="pivot-reload" class="btn-entrar">Atualizar</button>
+    <div class="card invest-table-card" style="margin-top:20px">
+      <div class="table-period-toolbar">
+        <label>${t['label.common.period_from']} <input type="date" id="pivot-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
+        <label>${t['label.common.period_to']} <input type="date" id="pivot-to" value="${bounds.today}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
+        <button type="button" id="pivot-reload" class="btn-entrar">${t['action.common.update']}</button>
       </div>
-      <div id="pivot-summary" style="margin:12px 0"></div>
+      <div id="pivot-summary" class="table-period-summary"></div>
       <div id="pivot-host"><p class="muted">Carregando...</p></div>
     </div>
   `;
 
   await renderShell(container, { title: `INVEST — ${screenTitle}`, contentHtml: content });
   bindImportPanel(container);
-  bindPivotPage(container);
+  bindPivotPage(container, bounds);
 }

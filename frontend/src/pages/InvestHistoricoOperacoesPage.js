@@ -153,30 +153,6 @@ function formatRow(r) {
   };
 }
 
-function bindFilters(container, allRows, remount) {
-  const catSel = container.querySelector('#notes-filter-category');
-  const search = container.querySelector('#notes-filter-search');
-  const apply = () => {
-    let rows = allRows;
-    const cat = catSel?.value;
-    if (cat && cat !== 'ALL') rows = rows.filter((r) => r.category === cat);
-    const q = (search?.value || '').trim().toUpperCase();
-    if (q) {
-      rows = rows.filter(
-        (r) =>
-          String(r.ticker || '').toUpperCase().includes(q) ||
-          String(r.underlyingStock || '').toUpperCase().includes(q) ||
-          String(r.noteNumber || '').includes(q) ||
-          String(r.tradeType || '').toUpperCase().includes(q) ||
-          String(r.side || '').toUpperCase() === q
-      );
-    }
-    remount(rows);
-  };
-  catSel?.addEventListener('change', apply);
-  search?.addEventListener('input', apply);
-}
-
 export async function InvestHistoricoOperacoesPage(container) {
   if (!isAuthenticated()) {
     navigate('/login');
@@ -236,46 +212,22 @@ export async function InvestHistoricoOperacoesPage(container) {
     allRows = (data.rows || []).map(formatRow).filter(isDisplayableRow);
     const lineCount = allRows.length;
 
-    body = `
-      <div class="card notes-filters" style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-        <label>Mercado
-          <select id="notes-filter-category" style="margin-left:6px">
-            <option value="ALL">Todos</option>
-            <option value="OPTIONS">Opções</option>
-            <option value="SPOT">Vista / exercício</option>
-            <option value="LOAN">Aluguel (BTC)</option>
-          </select>
-        </label>
-        <label>Busca (ticker, ação, nota, CALL/PUT/EXEC)
-          <input id="notes-filter-search" type="search" placeholder="PRIO, 27421483, PUT..." style="margin-left:6px;min-width:220px" />
-        </label>
-      </div>
-      <div class="card notes-grid-card" style="margin-bottom:16px">
-        <div id="brokerage-notes-grid-host"></div>
-      </div>
-      <div class="card notes-meta" style="margin-bottom:16px">
-        <h2 style="font-size:16px;margin:0 0 8px">${screenTitle}</h2>
-        <p class="muted" style="margin:0 0 12px">
-          Operações de compra, venda, aluguel e exercícios registradas na base de dados (livro razão).
-        </p>
-        <p class="muted notes-legend" style="margin:0 0 12px">
-          <strong class="notes-contract-value">Valor contrato</strong> — quantidade × preço (nominal, sem taxas).
-          Taxas/emolumentos vêm da perna de caixa da mesma nota; se vazias, reimporte notas BTG completas.
-          <strong class="notes-note-net">Líq. nota (caixa)</strong> — soma líquida da nota no livro.
-        </p>
-        ${
-          noFees > 0
-            ? `<p class="muted" style="margin:0 0 12px;color:#f59e0b">
-          <strong>${noFees}</strong> linha(s) sem taxas identificadas
-          (${withFees} com taxas). Compare valor contrato × líquido ou rode o script
-          <code>audit-brokerage-note-fees.ts</code> nos PDFs/txt.
+    const feeWarn =
+      noFees > 0
+        ? `<p class="invest-table-footnote invest-table-footnote--warn">
+          <strong>${noFees}</strong> linha(s) sem taxas identificadas (${withFees} com taxas).
         </p>`
-            : ''
-        }
-        <p class="muted" style="margin:0">
-          Notas/Operações: <strong>${stats.notesKept ?? 0}</strong> · Transações: <strong>${lineCount}</strong>
-          · Atualizado em: ${formatDateTimeBr(data.generatedAt)}
-        </p>
+        : '';
+    const metaFoot = `<p class="invest-table-footnote muted">
+      Notas: <strong>${stats.notesKept ?? 0}</strong> · Linhas: <strong>${lineCount}</strong>
+      · Atualizado: ${formatDateTimeBr(data.generatedAt)}
+    </p>`;
+
+    body = `
+      <div class="card invest-table-card">
+        <div id="brokerage-notes-grid-host"></div>
+        ${feeWarn}
+        ${metaFoot}
       </div>
       ${
         dup.length
@@ -318,5 +270,4 @@ export async function InvestHistoricoOperacoesPage(container) {
   };
 
   mountGrid(allRows);
-  bindFilters(container, allRows, mountGrid);
 }

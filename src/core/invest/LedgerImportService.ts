@@ -20,7 +20,6 @@ import { syncAutoPendingSettlements } from './AutoPendingSettlementSync';
 import { PatrimonyDailyStore } from './PatrimonyDailyStore';
 
 /** Abertura de custódia — referência única usada para idempotência. */
-const OPENING_BATCH_REF = 'OPENING-BTG-2026-01-01';
 
 function parseDate(value: string): string {
   const d = value.trim().slice(0, 10);
@@ -193,7 +192,7 @@ export class LedgerImportService {
         asset_type: assetType,
         notes: pos.notes ? `${notePrefix} — ${pos.notes}` : notePrefix,
         option_strike: pos.option_strike,
-        broker_note_ref: `${OPENING_BATCH_REF}:${ticker}`,
+        broker_note_ref: `${openingEventRef}:${ticker}`,
         event_source_ref: openingEventRef,
         source_system: 'invest.opening_import',
       });
@@ -222,7 +221,7 @@ export class LedgerImportService {
         asset_type: assetType,
         option_strike: line.option_strike,
         notes: line.notes ? `${notePrefix} — ${line.notes}` : `${notePrefix} (short herdado)`,
-        broker_note_ref: `${OPENING_BATCH_REF}:${ticker}`,
+        broker_note_ref: `${openingEventRef}:${ticker}`,
         event_source_ref: openingEventRef,
         source_system: 'invest.opening_import',
       });

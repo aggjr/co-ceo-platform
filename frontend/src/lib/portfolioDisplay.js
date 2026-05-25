@@ -722,6 +722,24 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
         return el;
       },
     },
+    ...(sheetKey === 'options' ? [
+      {
+        key: 'cv',
+        label: 'C/V',
+        type: 'text',
+        width: '48px',
+        align: 'center',
+        render: (row) => {
+          const span = document.createElement('span');
+          const q = Number(row.quantity);
+          span.textContent = q > 0 ? 'C' : q < 0 ? 'V' : '—';
+          span.style.fontWeight = '600';
+          span.className =
+            q > 0 ? 'portfolio-cv--c' : q < 0 ? 'portfolio-cv--v' : 'muted';
+          return span;
+        },
+      }
+    ] : []),
     {
       key: 'quantity',
       label: 'Qtd',

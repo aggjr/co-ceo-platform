@@ -4,6 +4,7 @@ import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestQuoteSyncService } from './InvestQuoteSyncService';
 import { inferAssetType } from './assetClassifier';
 import { BrokerCustodySnapshotRepository } from './BrokerCustodySnapshotRepository';
+import { MAIN_CASH_TICKER } from './ledgerTypes';
 import {
   marksFromSnapshotLines,
   sumBrokerMarks,
@@ -151,7 +152,7 @@ async function updateCashDisplay(
   ctx: UserContext,
   balance: number
 ): Promise<boolean> {
-  const itemId = await findPatrimonyItemId(gateway, ctx, 'CAIXA-BTG');
+  const itemId = await findPatrimonyItemId(gateway, ctx, MAIN_CASH_TICKER);
   if (!itemId) return false;
   const rounded = Math.round(balance * 100) / 100;
   await gateway.update(ctx, 'patrimony_items', itemId, { current_value: rounded });
