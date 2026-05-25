@@ -66,6 +66,7 @@
     "git:check-version": "node scripts/ensure-code-version.js --check",
     "git:ensure-version": "node scripts/ensure-code-version.js",
     "verify:version-ui": "node scripts/verify-version-ui.js",
+    "verify:integrate-version": "node scripts/verify-integrate-version.js",
     "git:ship": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-ship-changes.ps1",
     "git:sync": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-sync-before-commit.ps1",
     "git:integrate": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/git-publish-to-main.ps1",

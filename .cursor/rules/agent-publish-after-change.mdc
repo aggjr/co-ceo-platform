@@ -15,8 +15,10 @@ Fluxo **sempre** nesta ordem:
 
 1. Commit na **branch do agente** (ex.: `antigravity-gamer`)
 2. **`git push origin <branch-do-agente>`** — publicar o trabalho desta sessao
-3. **`git checkout main`** → `git pull origin main` → merge da branch do agente → bump de versao → **`git push origin main`**
+3. **`git checkout main`** → merge da branch do agente → **`bump-version.js --integrate`** (patch +1 obrigatorio) → commit `chore(release): Vx.y.z` → **`git push origin main`**
 4. Realinhar a branch do agente com `main` (`git checkout <branch>` → `git merge main` → `git push origin <branch>`)
+
+O passo de versao e **automatico** dentro de `git-publish-to-main.ps1` (passo 6/8). Nao incrementar `version.json`/`package.json` manualmente no commit de feature.
 
 Proibido: alterar `main` local/remoto com commits proprios antes do passo 2.
 
@@ -46,13 +48,19 @@ Isso aciona o webhook EasyPanel (`EASYPANEL_DEPLOY_WEBHOOK_URL` no `.env`), agua
 
 Login e sidebar leem `/api/version` (`frontend/src/lib/appVersion.js`) — ver `agent-version-ui.mdc`.
 
+## Versao do sistema (integrate)
+
+- **`npm run git:ship`** e **`npm run git:integrate`** sempre executam `bump-version.js --integrate` em `main` e gravam commit `chore(release): V0.0.N`.
+- Scripts `verify-integrate-version.js` e `verify:version-ui` falham o fluxo se o patch nao subiu ou superficies ficaram desalinhadas.
+- Proibido: commit de feature que altera `version.json` / `package.json` / `src/generated/version.ts` / `frontend/src/generated/version.js` — isso e so no integrate.
+
 ## Sem perguntar ao usuario
 
 - "Quer que eu faca commit?"
 - "Devo integrar em main?"
 - "Incremento a versao?"
 
-Resposta padrao: **sim, sempre**, exceto se o usuario disser explicitamente para **nao** publicar nesta rodada.
+Resposta padrao: **sim, sempre** (integrate ja incrementa versao), exceto se o usuario disser explicitamente para **nao** publicar nesta rodada.
 
 ## Branch
 

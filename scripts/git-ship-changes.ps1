@@ -46,8 +46,14 @@ Write-Host "=== 3/4 Verificar superficies de versao (login + sidebar) ===" -Fore
 npm run verify:version-ui
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "=== 4/5 Integrar em main + bump + build web ===" -ForegroundColor Cyan
+Write-Host "=== 4/6 Integrar em main + bump obrigatorio de versao + build web ===" -ForegroundColor Cyan
 & (Join-Path $PSScriptRoot "git-publish-to-main.ps1")
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "=== 5/5 OK ===" -ForegroundColor Green
+Write-Host "=== 5/6 Confirmar versao unificada em $machine ===" -ForegroundColor Cyan
+node (Join-Path $PSScriptRoot "verify-integrate-version.js")
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+$versionJson = Get-Content -Raw version.json | ConvertFrom-Json
+$finalVersion = "V$($versionJson.major).$($versionJson.minor).$($versionJson.patch)"
+Write-Host "=== 6/6 OK - versao do sistema: $finalVersion ===" -ForegroundColor Green

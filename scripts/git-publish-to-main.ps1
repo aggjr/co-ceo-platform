@@ -1,4 +1,5 @@
 # Depois de commitar na branch da maquina: integra em main, unifica versao e realinha a branch local.
+# Passo 6/8: bump-version.js --integrate SEMPRE incrementa patch + commit chore(release) — agentes nao devem bump manual.
 # Uso (na raiz, com working tree limpa apos o commit):
 #   .\scripts\git-publish-to-main.ps1
 #
@@ -85,20 +86,20 @@ if ($current -ne $machine) {
   git checkout $machine
 }
 
-Write-Host "=== 1/7 fetch ===" -ForegroundColor Cyan
+Write-Host "=== 1/8 fetch ===" -ForegroundColor Cyan
 git fetch origin
 
-Write-Host "=== 2/7 alinhar $machine com origin/$integration ===" -ForegroundColor Cyan
+Write-Host "=== 2/8 alinhar $machine com origin/$integration ===" -ForegroundColor Cyan
 git merge "origin/$integration" -m "merge($machine): integrar $integration antes de publicar"
 if ($LASTEXITCODE -ne 0) {
   if (Show-Conflicts "pre-push") { exit 1 }
   Write-Error "Falha ao integrar $integration em $machine"
 }
 
-Write-Host "=== 3/7 push $machine ===" -ForegroundColor Cyan
+Write-Host "=== 3/8 push $machine ===" -ForegroundColor Cyan
 git push -u origin $machine
 
-Write-Host "=== 4/7 merge $machine -> $integration ===" -ForegroundColor Cyan
+Write-Host "=== 4/8 merge $machine -> $integration ===" -ForegroundColor Cyan
 git checkout $integration
 git pull origin $integration
 git merge $machine -m "merge($integration): integrar $machine"
@@ -109,29 +110,42 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 if ($peerRefs.Count -eq 0) {
-  Write-Host "=== 5/7 nenhuma branch par (git-machines.json) ===" -ForegroundColor Cyan
+  Write-Host "=== 5/8 nenhuma branch par (git-machines.json) ===" -ForegroundColor Cyan
 } else {
   $peerIndex = 0
   foreach ($peer in $peerRefs) {
     $peerIndex += 1
     if (Test-GitRef $peer) {
-      Write-Host "=== 5/7 merge par $peer -> $integration ===" -ForegroundColor Cyan
+      Write-Host "=== 5/8 merge par $peer -> $integration ===" -ForegroundColor Cyan
       git merge $peer -m "merge($integration): integrar $peer"
       if ($LASTEXITCODE -ne 0) {
         if (Show-Conflicts "merge-par-$peer") { exit 1 }
         Write-Error "Falha ao integrar branch par $peer"
       }
     } else {
-      Write-Host "=== 5/7 par $peer ausente no remoto (ok) ===" -ForegroundColor Cyan
+      Write-Host "=== 5/8 par $peer ausente no remoto (ok) ===" -ForegroundColor Cyan
     }
   }
 }
 
-Write-Host "=== 6/7 bump versao unificada (sempre incrementa patch) ===" -ForegroundColor Cyan
+Write-Host "=== 6/8 bump versao unificada (OBRIGATORIO — incrementa patch) ===" -ForegroundColor Cyan
+if ($env:BUMP_VERSION -eq "0") {
+  Write-Error "BUMP_VERSION=0 proibido no integrate. A versao do sistema deve sempre subir neste passo."
+}
+$versionBefore = Get-Content -Raw version.json | ConvertFrom-Json
+$patchBefore = [int]$versionBefore.patch
+$semverBefore = "V$($versionBefore.major).$($versionBefore.minor).$($versionBefore.patch)"
+Write-Host "Versao antes do bump: $semverBefore (patch=$patchBefore)" -ForegroundColor DarkGray
+
 $env:BUMP_VERSION = "1"
 node scripts/bump-version.js --integrate
 if ($LASTEXITCODE -ne 0) {
   Write-Error "Falha ao bump de versao unificada"
+}
+
+node (Join-Path $PSScriptRoot "verify-integrate-version.js") "--previous-patch=$patchBefore"
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "Verificacao de versao apos bump falhou — integrate abortado"
 }
 
 $versionJson = Get-Content -Raw version.json | ConvertFrom-Json
@@ -141,9 +155,15 @@ git commit -m "chore(release): $appVersion - integracao main"
 if ($LASTEXITCODE -ne 0) {
   Write-Error "Falha ao commitar bump de versao"
 }
-Write-Host "Versao publicada: $appVersion" -ForegroundColor Green
 
-Write-Host "=== 7/7 push $integration e realinhar $machine ===" -ForegroundColor Cyan
+Write-Host "=== 7/8 verificar superficies de versao (login + sidebar) ===" -ForegroundColor Cyan
+npm run verify:version-ui
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "verify:version-ui falhou apos bump — corrija antes do push"
+}
+Write-Host "Versao publicada: $appVersion (patch $($patchBefore) -> $($versionJson.patch))" -ForegroundColor Green
+
+Write-Host "=== 8/8 push $integration e realinhar $machine ===" -ForegroundColor Cyan
 git push origin $integration
 
 git checkout $machine
