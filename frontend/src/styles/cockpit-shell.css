@@ -87,9 +87,27 @@
   margin: 4px 0 8px;
 }
 
+.shell .nav-subgroup-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 25px 4px 34px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.shell .nav-subgroup-toggle:hover .nav-subgroup-label {
+  color: var(--color-accent);
+}
+
+.shell .nav-subgroup-toggle:focus {
+  outline: none;
+}
+
 .shell .nav-subgroup-label {
-  display: block;
-  padding: 6px 25px 4px 48px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.04em;

@@ -91,11 +91,14 @@ async function main() {
   }
 
   await runSqlFile(conn2, 'src/database/migrations/24_ui_menu_text_pt_br.sql');
+  await runSqlFile(conn2, 'src/database/migrations/27_ui_invest_period_labels.sql');
+  await runSqlFile(conn2, 'src/database/migrations/29_ui_invest_options_cards_depara.sql');
 
   const keys = [
     'menu.invest.portfolio',
-    'menu.invest.dashboard',
-    'menu.invest.historico_operacoes',
+    'field.invest.options.strike',
+    'field.invest.options.underlying',
+    'filter.invest.options.expiry',
   ];
   const [sample] = await conn2.query<mysql.RowDataPacket[]>(
     'SELECT text_key, default_text FROM ui_text_catalog WHERE text_key IN (?) AND locale = ?',

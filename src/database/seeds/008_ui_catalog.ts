@@ -247,14 +247,14 @@ export const TEXTS: TextSeed[] = [
     text_key: 'filter.invest.options.all_assets',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Todos os ativos',
+    default_text: 'Todas ações',
   },
   {
     id: '00000000-0000-4003-8000-000000000137',
     text_key: 'filter.invest.options.all_expiries',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Todos os vencimentos',
+    default_text: 'Todos vencimentos',
   },
   {
     id: '00000000-0000-4003-8000-000000000138',
@@ -275,14 +275,14 @@ export const TEXTS: TextSeed[] = [
     text_key: 'filter.invest.options.underlying',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Ação relacionada',
+    default_text: 'Ação ref.',
   },
   {
     id: '00000000-0000-4003-8000-000000000141',
     text_key: 'filter.invest.options.expiry',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Vencimento (strike)',
+    default_text: 'Data strike',
   },
   {
     id: '00000000-0000-4003-8000-000000000142',
@@ -296,7 +296,7 @@ export const TEXTS: TextSeed[] = [
     text_key: 'filter.invest.options.distance',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Distância da ação',
+    default_text: 'Distância',
   },
   {
     id: '00000000-0000-4003-8000-000000000144',
@@ -324,49 +324,49 @@ export const TEXTS: TextSeed[] = [
     text_key: 'filter.invest.options.dist_near',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Perto do strike (até 5%)',
+    default_text: 'Perto do strike (5%)',
   },
   {
     id: '00000000-0000-4003-8000-000000000148',
     text_key: 'filter.invest.options.dist_far',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Mais distante',
+    default_text: 'Longe do strike',
   },
   {
     id: '00000000-0000-4003-8000-000000000149',
     text_key: 'legend.invest.options.itm',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Vermelho: dentro do dinheiro (ITM)',
+    default_text: 'Dentro do dinheiro',
   },
   {
     id: '00000000-0000-4003-8000-000000000150',
     text_key: 'legend.invest.options.near',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Laranja: até 5% do strike',
+    default_text: 'Perto do strike (até 5%)',
   },
   {
     id: '00000000-0000-4003-8000-000000000151',
     text_key: 'legend.invest.options.far',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Ciano: mais distante do strike',
+    default_text: 'Longe do strike',
   },
   {
     id: '00000000-0000-4003-8000-000000000152',
     text_key: 'field.invest.options.ticker',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Opção',
+    default_text: 'Ticker opção',
   },
   {
     id: '00000000-0000-4003-8000-000000000153',
     text_key: 'field.invest.options.underlying',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Ação',
+    default_text: 'Ação ref.',
   },
   {
     id: '00000000-0000-4003-8000-000000000154',
@@ -380,14 +380,14 @@ export const TEXTS: TextSeed[] = [
     text_key: 'field.invest.options.quantity',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Quant.',
+    default_text: 'Quantidade',
   },
   {
     id: '00000000-0000-4003-8000-000000000156',
     text_key: 'field.invest.options.strike',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Strike',
+    default_text: 'Valor strike',
   },
   {
     id: '00000000-0000-4003-8000-000000000157',
@@ -408,7 +408,7 @@ export const TEXTS: TextSeed[] = [
     text_key: 'field.invest.options.quote',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Cotação atual',
+    default_text: 'Cotação opção',
   },
   {
     id: '00000000-0000-4003-8000-000000000160',
@@ -422,21 +422,21 @@ export const TEXTS: TextSeed[] = [
     text_key: 'field.invest.options.underlying_quote',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Cotação da ação',
+    default_text: 'Cotação ação',
   },
   {
     id: '00000000-0000-4003-8000-000000000162',
     text_key: 'field.invest.options.strike_distance',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Dist. strike',
+    default_text: 'Dist. à ação',
   },
   {
     id: '00000000-0000-4003-8000-000000000163',
     text_key: 'field.invest.options.expiry',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Vencimento',
+    default_text: 'Data strike',
   },
   {
     id: '00000000-0000-4003-8000-000000000164',
@@ -513,14 +513,14 @@ export const TEXTS: TextSeed[] = [
     text_key: 'column.invest.options.expiry_strike',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Strike',
+    default_text: 'Valor strike',
   },
   {
     id: '00000000-0000-4003-8000-000000000175',
     text_key: 'column.invest.options.expiry_distance',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'Dist. strike',
+    default_text: 'Dist. à ação',
   },
   {
     id: '00000000-0000-4003-8000-000000000176',
@@ -1135,7 +1135,7 @@ async function run() {
       { entityType: 'ui_text_catalog' }
     );
     if (result === 'inserted') textsInserted++;
-    else if (t.metadata) {
+    else {
       const existingId = await findIdByColumn(
         gateway,
         ctx,
@@ -1145,7 +1145,9 @@ async function run() {
       );
       if (existingId) {
         await gateway.update(ctx, 'ui_text_catalog', existingId, {
-          metadata: t.metadata,
+          default_text: t.default_text,
+          description: t.description ?? null,
+          ...(t.metadata ? { metadata: t.metadata } : {}),
         });
       }
     }

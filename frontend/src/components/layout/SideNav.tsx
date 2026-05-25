@@ -50,6 +50,7 @@ function isPathActive(currentPath: string, itemPath: string, allPaths: string[])
 export function SideNav() {
   const [modules, setModules] = createSignal<MenuModule[]>([]);
   const [expanded, setExpanded] = createSignal<Record<string, boolean>>({});
+  const [expandedSubgroups, setExpandedSubgroups] = createSignal<Record<string, boolean>>({});
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -60,6 +61,7 @@ export function SideNav() {
 
       const current = location.pathname;
       const initialExpanded: Record<string, boolean> = {};
+      const initialExpandedSubgroups: Record<string, boolean> = {};
 
       menu.forEach((mod: MenuModule) => {
         const allPaths = collectPaths(mod.items);
@@ -67,8 +69,15 @@ export function SideNav() {
           itemOrChildActive(item, current, allPaths),
         );
         initialExpanded[mod.id] = hasActive;
+
+        mod.items.forEach((item) => {
+          if (item.children?.length) {
+            initialExpandedSubgroups[item.path] = item.children.some(c => isPathActive(current, c.path, allPaths));
+          }
+        });
       });
       setExpanded(initialExpanded);
+      setExpandedSubgroups(initialExpandedSubgroups);
     } catch (err) {
       console.error('Erro ao carregar menu lateral:', err);
     }
@@ -78,6 +87,13 @@ export function SideNav() {
     setExpanded((prev) => ({
       ...prev,
       [moduleId]: !prev[moduleId],
+    }));
+  };
+
+  const toggleSubgroup = (path: string) => {
+    setExpandedSubgroups((prev) => ({
+      ...prev,
+      [path]: !prev[path],
     }));
   };
 
@@ -124,29 +140,39 @@ export function SideNav() {
                           </a>
                         }
                       >
-                        <div class="nav-subgroup">
-                          <span class="nav-subgroup-label">{item.label}</span>
-                          <For each={item.children!}>
-                            {(child) => (
-                              <a
-                                href={child.path}
-                                class="nav-link nav-link--child"
-                                classList={{
-                                  active: isPathActive(
-                                    location.pathname,
-                                    child.path,
-                                    allPaths,
-                                  ),
-                                }}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  navigate(child.path);
-                                }}
-                              >
-                                {child.label}
-                              </a>
-                            )}
-                          </For>
+                        <div class="nav-subgroup" data-item-path={item.path}>
+                          <button
+                            type="button"
+                            class="nav-subgroup-toggle"
+                            aria-expanded={expandedSubgroups()[item.path] ? 'true' : 'false'}
+                            onClick={() => toggleSubgroup(item.path)}
+                          >
+                            <span class="nav-chevron">{expandedSubgroups()[item.path] ? '▼' : '▶'}</span>
+                            <span class="nav-subgroup-label">{item.label}</span>
+                          </button>
+                          <div class="nav-subgroup-items" hidden={!expandedSubgroups()[item.path]}>
+                            <For each={item.children!}>
+                              {(child) => (
+                                <a
+                                  href={child.path}
+                                  class="nav-link nav-link--child"
+                                  classList={{
+                                    active: isPathActive(
+                                      location.pathname,
+                                      child.path,
+                                      allPaths,
+                                    ),
+                                  }}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    navigate(child.path);
+                                  }}
+                                >
+                                  {child.label}
+                                </a>
+                              )}
+                            </For>
+                          </div>
                         </div>
                       </Show>
                     )}

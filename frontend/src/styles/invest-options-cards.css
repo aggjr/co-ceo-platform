@@ -148,6 +148,8 @@
   color: var(--color-muted, #94a3b8);
   font-weight: 500;
   width: 46%;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .opt-card-table td {
@@ -248,6 +250,8 @@
   text-align: left;
   color: var(--color-muted, #94a3b8);
   font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 .opt-expiry-mini td {

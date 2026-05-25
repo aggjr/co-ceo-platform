@@ -83,7 +83,7 @@ export const MENU_CATALOG = [
             resourceKey: 'screen.invest.portfolio',
           },
           {
-            label: 'Por vencimento',
+            label: 'Ampulheta',
             path: '/invest/opcoes/vencimentos',
             resourceKey: 'screen.invest.portfolio',
           },
