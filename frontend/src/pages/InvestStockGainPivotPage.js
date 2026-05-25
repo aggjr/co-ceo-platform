@@ -12,16 +12,9 @@ import {
   renderExcelTableShell,
 } from '../lib/excelTable.js';
 import { formatBrl } from '../lib/portfolioDisplay.js';
+import { loadInvestUiContext, periodDefaults } from '../lib/investUiContext.js';
 
 const TABLE_ID = 'stock-gain-pivot';
-
-function defaultFrom() {
-  return '2026-01-01';
-}
-
-function defaultTo() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function numCell(v) {
   const n = Number(v ?? 0);
@@ -58,7 +51,7 @@ function sumRowOperations(row) {
   return Math.round((sum - taxas) * 100) / 100;
 }
 
-function buildColumns(columnLabels, columnOrder) {
+function buildColumns(columnLabels, columnOrder, uiTexts = {}) {
   const ordered = columnOrder?.length ? columnOrder : Object.keys(columnLabels);
   const valueCols = ordered.filter(
     (k) => k !== 'ganho_aproximado' && k !== 'preco_estrito' && k !== 'cotacao_atual'
@@ -67,7 +60,7 @@ function buildColumns(columnLabels, columnOrder) {
   const cols = [
     {
       key: 'underlying',
-      label: 'Ação',
+      label: uiTexts['column.invest.stock_gain.underlying'] || columnLabels.underlying || 'underlying',
       align: 'left',
       sortValue: (r) => r.underlying,
       filterText: (r) => r.underlying,
@@ -78,7 +71,7 @@ function buildColumns(columnLabels, columnOrder) {
     },
     {
       key: 'preco_estrito',
-      label: 'Preço estrito (PM)',
+      label: uiTexts['column.invest.stock_gain.preco_estrito'] || 'preco_estrito',
       align: 'right',
       sortValue: (r) => r.preco_estrito ?? -1,
       filterText: (r) => String(r.preco_estrito ?? ''),
@@ -86,7 +79,7 @@ function buildColumns(columnLabels, columnOrder) {
     },
     {
       key: 'cotacao_atual',
-      label: 'Cotação atual',
+      label: uiTexts['column.invest.stock_gain.cotacao_atual'] || 'cotacao_atual',
       align: 'right',
       sortValue: (r) => r.cotacao_atual ?? -1,
       filterText: (r) => String(r.cotacao_atual ?? ''),
@@ -137,11 +130,12 @@ function bindPage(container) {
     clearExcelTableRegistry();
 
     try {
-      const from = fromInput?.value || defaultFrom();
-      const to = toInput?.value || defaultTo();
+      const from = (fromInput?.value || bounds.defaultFrom).slice(0, 10);
+      const toClamped = (toInput?.value || bounds.today).slice(0, 10);
       const data = await apiRequest(
-        `/api/invest/stock-gain-pivot?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+        `/api/invest/stock-gain-pivot?from=${encodeURIComponent(from)}&to=${encodeURIComponent(toClamped)}`
       );
+      if (data?.periodBounds) bounds = periodDefaults(data.periodBounds);
       const pivot = data.pivot;
       const columnLabels = data.columnLabels || {};
       const columnOrder = data.columnOrder || [];
@@ -161,7 +155,7 @@ function bindPage(container) {
         });
       }
 
-      const columns = buildColumns(columnLabels, columnOrder);
+      const columns = buildColumns(columnLabels, columnOrder, uiTexts);
       host.innerHTML = renderExcelTableShell({
         caption: 'Resultados por ação (pivot)',
         columns,
@@ -190,11 +184,18 @@ export async function InvestStockGainPivotPage(container) {
     return;
   }
 
-  const t = await getPageTexts(
-    ['screen.invest.stock_gain.title'],
-    { 'screen.invest.stock_gain.title': 'Resultados por ação' }
-  );
+  const t = await getPageTexts([
+    'screen.invest.stock_gain.title',
+    'label.common.period_from',
+    'label.common.period_to',
+    'action.common.update',
+    'column.invest.stock_gain.underlying',
+    'column.invest.stock_gain.preco_estrito',
+    'column.invest.stock_gain.cotacao_atual',
+  ]);
   const screenTitle = t['screen.invest.stock_gain.title'];
+  const uiCtx = await loadInvestUiContext();
+  const bounds = periodDefaults(uiCtx);
 
   if (isGlobalSession()) {
     await renderShell(container, {
@@ -212,9 +213,9 @@ export async function InvestStockGainPivotPage(container) {
   const content = `
     <div class="card sgp-page invest-table-card">
       <div class="table-period-toolbar">
-        <label>De <input type="date" id="sgp-from" value="${defaultFrom()}" /></label>
-        <label>Até <input type="date" id="sgp-to" value="${defaultTo()}" /></label>
-        <button type="button" id="sgp-reload" class="btn-entrar">Atualizar</button>
+        <label>${t['label.common.period_from']} <input type="date" id="sgp-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
+        <label>${t['label.common.period_to']} <input type="date" id="sgp-to" value="${bounds.today}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
+        <button type="button" id="sgp-reload" class="btn-entrar">${t['action.common.update']}</button>
       </div>
       <div id="sgp-summary" class="table-period-summary"></div>
       <div id="sgp-table-host"><p class="muted">Carregando…</p></div>
@@ -225,5 +226,5 @@ export async function InvestStockGainPivotPage(container) {
     title: `INVEST — ${screenTitle}`,
     contentHtml: content,
   });
-  bindPage(container);
+  bindPage(container, bounds, t);
 }

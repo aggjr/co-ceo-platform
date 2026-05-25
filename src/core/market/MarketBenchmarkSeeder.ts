@@ -113,9 +113,12 @@ export class MarketBenchmarkSeeder {
   ): Promise<MarketBenchmarkSeedResult> {
     const from = options.from.slice(0, 10);
     const to = options.to.slice(0, 10);
-    const stockTicker = (options.stockTicker || process.env.INVEST_CHART_BENCHMARK_TICKER || 'PRIO3')
+    const stockTicker = (options.stockTicker || process.env.INVEST_CHART_BENCHMARK_TICKER || '')
       .trim()
       .toUpperCase();
+    if (!stockTicker) {
+      throw new Error('stockTicker obrigatório (parâmetro ou INVEST_CHART_BENCHMARK_TICKER).');
+    }
 
     let cdiDays = 0;
     let selicDays = 0;

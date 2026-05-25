@@ -13,10 +13,7 @@ export async function InvestClosedTradesPage(container) {
     return;
   }
 
-  const t = await getPageTexts(
-    ['screen.invest.closed_trades.title'],
-    { 'screen.invest.closed_trades.title': 'Opções finalizadas' }
-  );
+  const t = await getPageTexts(['screen.invest.closed_trades.title']);
   const screenTitle = t['screen.invest.closed_trades.title'];
 
   if (isGlobalSession()) {

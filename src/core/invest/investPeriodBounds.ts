@@ -31,10 +31,10 @@ export function resolveInvestPeriodBounds(events: LedgerEvent[]): InvestPeriodBo
   let minDate: string | null = null;
 
   for (const e of events) {
-    const d = String(e.date ?? '').slice(0, 10);
+    const d = String(e.transaction_date ?? '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
     if (!minDate || d < minDate) minDate = d;
-    if (e.type === 'opening_balance') {
+    if (String(e.transaction_type) === 'opening_balance') {
       if (!openingDate || d < openingDate) openingDate = d;
     }
   }

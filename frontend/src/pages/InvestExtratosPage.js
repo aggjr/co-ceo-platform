@@ -88,10 +88,7 @@ export async function InvestExtratosPage(container) {
     return;
   }
 
-  const t = await getPageTexts(
-    ['screen.invest.extratos.title'],
-    { 'screen.invest.extratos.title': 'Extratos de conta' }
-  );
+  const t = await getPageTexts(['screen.invest.extratos.title']);
   const screenTitle = t['screen.invest.extratos.title'];
 
   if (isGlobalSession()) {

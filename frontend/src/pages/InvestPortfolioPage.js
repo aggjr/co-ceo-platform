@@ -32,18 +32,11 @@ async function buildInvestPortfolioPage(container, currentPath, pageType) {
     return;
   }
 
-  const t = await getPageTexts(
-    [
-      'screen.invest.portfolio.title',
-      'screen.invest.options.title',
-      'screen.invest.fixed_income.title',
-    ],
-    {
-      'screen.invest.portfolio.title': 'Ações/FIIs',
-      'screen.invest.options.title': 'Opções',
-      'screen.invest.fixed_income.title': 'Títulos, RF e CDB',
-    }
-  );
+  const t = await getPageTexts([
+    'screen.invest.portfolio.title',
+    'screen.invest.options.title',
+    'screen.invest.fixed_income.title',
+  ]);
 
   let pageTitle = t['screen.invest.portfolio.title'];
   if (pageType === 'options') {

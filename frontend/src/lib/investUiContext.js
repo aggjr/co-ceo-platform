@@ -28,3 +28,11 @@ export function clearInvestUiContextCache() {
 export function todayIsoLocal() {
   return new Date().toISOString().slice(0, 10);
 }
+
+/** Valores padrão de período a partir do contexto da API. */
+export function periodDefaults(context) {
+  const today = context?.today ?? todayIsoLocal();
+  const defaultFrom = context?.defaultFrom ?? today;
+  const periodMin = context?.periodMin ?? defaultFrom;
+  return { today, defaultFrom, periodMin };
+}

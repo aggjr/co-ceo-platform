@@ -224,7 +224,7 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
   const cdiByDate = new Map(
     (opts.cdiBenchmark?.series || []).map((p) => [String(p.date).slice(0, 10), Number(p.indexedLevel)])
   );
-  const stockTicker = String(opts.stockBenchmark?.ticker || 'PRIO3').toUpperCase();
+  const stockTicker = String(opts.stockBenchmark?.ticker || '').toUpperCase();
   const stockByDate = new Map(
     (opts.stockBenchmark?.series || []).map((p) => [
       String(p.date).slice(0, 10),

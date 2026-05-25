@@ -244,6 +244,78 @@ export const TEXTS: TextSeed[] = [
     default_text: 'Opções finalizadas',
   },
 
+  {
+    id: '00000000-0000-4003-8000-000000000110',
+    text_key: 'label.common.period_from',
+    module_code: 'CORE',
+    kind: 'field_label',
+    default_text: 'De',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000111',
+    text_key: 'label.common.period_to',
+    module_code: 'CORE',
+    kind: 'field_label',
+    default_text: 'Até',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000112',
+    text_key: 'action.common.update',
+    module_code: 'CORE',
+    kind: 'button_label',
+    default_text: 'Atualizar',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000113',
+    text_key: 'action.common.load_template',
+    module_code: 'INVEST',
+    kind: 'button_label',
+    default_text: 'Carregar modelo',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000114',
+    text_key: 'action.common.import_recalc',
+    module_code: 'INVEST',
+    kind: 'button_label',
+    default_text: 'Importar e recalcular',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000115',
+    text_key: 'screen.invest.resultado.import_title',
+    module_code: 'INVEST',
+    kind: 'screen_title',
+    default_text: 'Importar carteira e notas',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000116',
+    text_key: 'screen.invest.resultado.import_help',
+    module_code: 'INVEST',
+    kind: 'field_label',
+    default_text:
+      'Cole JSON com opening_date, opening_positions, entries e opcionalmente monthly_statements. O sistema recalcula custódia e o pivot.',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000117',
+    text_key: 'column.invest.stock_gain.underlying',
+    module_code: 'INVEST',
+    kind: 'column_label',
+    default_text: 'Ação',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000118',
+    text_key: 'column.invest.stock_gain.preco_estrito',
+    module_code: 'INVEST',
+    kind: 'column_label',
+    default_text: 'Preço estrito (PM)',
+  },
+  {
+    id: '00000000-0000-4003-8000-000000000119',
+    text_key: 'column.invest.stock_gain.cotacao_atual',
+    module_code: 'INVEST',
+    kind: 'column_label',
+    default_text: 'Cotação atual',
+  },
+
   // ── Colunas da tela Historico Operacoes ─────────────────────────────
   {
     id: '00000000-0000-4003-8000-000000000201',
