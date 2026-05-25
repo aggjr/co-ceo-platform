@@ -17,6 +17,7 @@ import { ImpersonationBar } from './ImpersonationBar';
 import { PlatformJobAlertsBanner } from './PlatformJobAlertsBanner';
 import { MarketQuotesSyncButton } from './MarketQuotesSyncButton';
 import { UiCatalogApplyButton } from './UiCatalogApplyButton';
+import { ProductionDeployButton } from './ProductionDeployButton';
 import '../../styles/app.css';
 import '../../styles/cockpit-shell.css';
 
@@ -115,6 +116,7 @@ export function Shell(props: { children?: JSX.Element }) {
 
             {/* Bloco Direito: sync cotações, usuário logado */}
             <div class="header-right">
+              <ProductionDeployButton />
               <UiCatalogApplyButton />
               <MarketQuotesSyncButton />
               <div class="header-user">
