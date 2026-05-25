@@ -320,6 +320,42 @@ describe('portfolioMapper', () => {
     expect(enriched.strikeDistanceBrl).not.toBeNull();
   });
 
+  it('opção: prêmio (PM) distinto da cotação de mercado (opcoes.net)', () => {
+    const opt = enrichPortfolioRow(
+      {
+        id: 'o-quote',
+        asset_ticker: 'PRIOR580',
+        asset_type: 'option_put',
+        current_quantity: -900,
+        managerial_avg_price: 1.09,
+        acquisition_value: -981,
+        current_value: -981,
+        metadata: { underlying_ticker: 'PRIO3' },
+        status: 'active',
+      },
+      undefined,
+      {
+        ledgerStrikeByTicker: new Map(),
+        marketCatalog: new Map([
+          [
+            'PRIOR580',
+            {
+              ticker: 'PRIOR580',
+              underlyingTicker: 'PRIO3',
+              optionType: 'PUT' as const,
+              strikePrice: 58,
+              expirationDate: '2026-06-19',
+            },
+          ],
+        ]),
+      },
+      { price: 0.75, asOf: '2026-05-22' }
+    );
+    expect(opt.avgPrice).toBeCloseTo(1.09, 2);
+    expect(opt.updatedQuote).toBe(0.75);
+    expect(opt.pnlPct).toBeCloseTo(-31.19, 0);
+  });
+
   it('opções sem ação na lista: usa cotação externa (market_quotes_daily)', () => {
     const marketCatalog = new Map([
       [

@@ -23,6 +23,7 @@ import { fixedIncomeTotalFromLedger } from '../core/invest/patrimonyLedgerGates'
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import { fetchB3Quotes } from '../core/invest/B3QuoteProvider';
+import { fetchOpcoesNetOptionQuotes } from '../core/invest/opcoesNetQuotes';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import {
@@ -201,19 +202,23 @@ export class InvestController {
         continue;
       }
       if (type === 'option_call' || type === 'option_put' || isOptionTicker(t)) {
+        quoteTickers.add(t);
         const und = inferUnderlyingTicker(t);
         if (und) quoteTickers.add(und);
       }
     }
-    const equityTickers = [...quoteTickers];
+    const allQuoteTickers = [...quoteTickers];
     const marketQuoteMap = await this.marketQuoteRepo.loadLatestQuoteMap(
       ctx,
-      equityTickers
+      allQuoteTickers
     );
-    const missingQuotes = equityTickers.filter((t) => !marketQuoteMap.has(t));
-    if (missingQuotes.length) {
+    const missingQuotes = allQuoteTickers.filter((t) => !marketQuoteMap.has(t));
+    const missingEquity = missingQuotes.filter((t) => !isOptionTicker(t));
+    const missingOptions = missingQuotes.filter((t) => isOptionTicker(t));
+
+    if (missingEquity.length) {
       try {
-        const quotes = await fetchB3Quotes(missingQuotes, {
+        const quotes = await fetchB3Quotes(missingEquity, {
           token: process.env.BRAPI_TOKEN,
         });
         const marketCtx = authBootstrapContext();
@@ -232,6 +237,28 @@ export class InvestController {
         }
       } catch (err) {
         console.warn('[listPortfolio] preenchimento brapi de cotações:', err);
+      }
+    }
+
+    if (missingOptions.length) {
+      try {
+        const optQuotes = await fetchOpcoesNetOptionQuotes(missingOptions);
+        const marketCtx = authBootstrapContext();
+        for (const q of optQuotes) {
+          await this.marketQuoteRepo.upsertQuote(marketCtx, {
+            ticker: q.ticker,
+            quoteDate: q.asOf,
+            closingPrice: q.price,
+            source: 'opcoes_net',
+            metadata: { kind: 'option_last' },
+          });
+          marketQuoteMap.set(q.ticker.toUpperCase(), {
+            price: q.price,
+            date: q.asOf,
+          });
+        }
+      } catch (err) {
+        console.warn('[listPortfolio] preenchimento opcoes.net de opções:', err);
       }
     }
 

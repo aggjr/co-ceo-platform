@@ -290,11 +290,15 @@ export function enrichPortfolioRow(
   let updatedQuote: number | null = null;
 
   if (optionLike) {
-    if (metaLast > 0) lastPrice = metaLast;
-    else if (custodyUnitMark > 0) lastPrice = custodyUnitMark;
-    else if (displayAvg > 0) lastPrice = displayAvg;
+    const markDiffersFromPremium = (px: number) =>
+      px > 0 && Math.abs(px - displayAvg) > 1e-4;
     updatedQuote =
-      metaLast > 0 ? metaLast : custodyUnitMark > 0 ? custodyUnitMark : null;
+      marketPx ??
+      (metaLast > 0 && markDiffersFromPremium(metaLast) ? metaLast : null) ??
+      (custodyUnitMark > 0 && markDiffersFromPremium(custodyUnitMark)
+        ? custodyUnitMark
+        : null);
+    lastPrice = updatedQuote ?? (displayAvg > 0 ? displayAvg : 0);
   } else if (equityLike) {
     // Cotação de mercado (market_quotes_daily); fallback legado em invest_position_ext (metadata).
     const legacyPx = metaLast > 0 ? metaLast : null;
@@ -333,7 +337,7 @@ export function enrichPortfolioRow(
 
   if (optionLike && Math.abs(qty) > QTY_ZERO_EPS && displayAvg > 0) {
     const absQ = Math.abs(qty);
-    const mark = lastPrice > 0 ? lastPrice : displayAvg;
+    const mark = updatedQuote ?? (lastPrice > 0 ? lastPrice : displayAvg);
     costBasis = Math.round(displayAvg * absQ * 100) / 100;
     marketValue = Math.round(mark * absQ * 100) / 100;
     if (qty < 0) {
@@ -355,7 +359,9 @@ export function enrichPortfolioRow(
   }
 
   const pnlPct = optionLike
-    ? optionPriceReturnPct(lastPrice, displayAvg)
+    ? updatedQuote != null && updatedQuote > 0
+      ? optionPriceReturnPct(updatedQuote, displayAvg)
+      : 0
     : equityLike && pmB3 > 0 && updatedQuote != null && updatedQuote > 0
       ? optionPriceReturnPct(updatedQuote, pmB3)
       : costBasis > 0

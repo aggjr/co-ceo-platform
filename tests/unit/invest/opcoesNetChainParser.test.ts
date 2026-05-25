@@ -20,6 +20,8 @@ describe('opcoesNetChainParser', () => {
     const put = rows.find((r) => r.ticker === 'PRIOR407');
     const call = rows.find((r) => r.ticker === 'PRIOF407');
     expect(put?.strikePrice).toBe(40.75);
+    expect(put?.lastPrice).toBe(0.05);
+    expect(put?.quoteDate).toBeNull();
     expect(put?.optionType).toBe('PUT');
     expect(put?.expirationDate).toBe('2026-06-19');
     expect(call?.strikePrice).toBe(40.75);

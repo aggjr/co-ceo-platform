@@ -8,6 +8,7 @@ import {
 import { inferOptionExpiryDate, inferOptionMonthFromTicker } from './optionExpiry';
 import { authBootstrapContext } from '../auth/authBootstrapContext';
 import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
+import { fetchOpcoesNetOptionQuotes } from './opcoesNetQuotes';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
@@ -92,10 +93,43 @@ export class InvestQuoteSyncService {
       if (ok) updated += 1;
     }
 
+    const optionTickers: string[] = [];
+    for (const row of await this.assetProjection.listActiveAssets(ctx)) {
+      const ticker = String(row.asset_ticker ?? '').toUpperCase();
+      if (!ticker || !isOptionTicker(ticker)) continue;
+      const type = String(row.asset_type || inferAssetType(ticker));
+      if (
+        type === 'option_call' ||
+        type === 'option_put' ||
+        isOptionTicker(ticker)
+      ) {
+        optionTickers.push(ticker);
+      }
+    }
+    const uniqueOptions = [...new Set(optionTickers)];
+    if (uniqueOptions.length) {
+      try {
+        const optQuotes = await fetchOpcoesNetOptionQuotes(uniqueOptions, { asOfDate });
+        for (const q of optQuotes) {
+          await this.marketQuotes.upsertQuote(marketCtx, {
+            ticker: q.ticker,
+            quoteDate: q.asOf,
+            closingPrice: q.price,
+            source: 'opcoes_net',
+            metadata: { kind: 'option_last' },
+          });
+          const ok = await this.writeQuoteToPositionExt(ctx, q.ticker, q.price, q.asOf);
+          if (ok) updated += 1;
+        }
+      } catch (err) {
+        console.warn('[syncFromBrapi] opcoes.net opções:', err);
+      }
+    }
+
     const asOf = asOfDate?.slice(0, 10) || quotes[0]?.asOf || new Date().toISOString().slice(0, 10);
     return {
       asOf,
-      requested: tickers.length,
+      requested: tickers.length + uniqueOptions.length,
       updated,
       skipped: tickers.length - updated - missing.length,
       missing,
