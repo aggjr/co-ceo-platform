@@ -346,6 +346,25 @@
   letter-spacing: 0.5px;
 }
 
+.shell .header-user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.shell .header-user-login {
+  font-size: 11px;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.65);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
 .shell .avatar {
   width: 32px;
   height: 32px;

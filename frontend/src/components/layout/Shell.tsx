@@ -117,12 +117,17 @@ export function Shell(props: { children?: JSX.Element }) {
             <div class="header-right">
               <UiCatalogApplyButton />
               <MarketQuotesSyncButton />
-              <div
-                class="avatar"
-                title={userTooltip()}
-                aria-label={userTooltip()}
-              >
-                {initial()}
+              <div class="header-user">
+                <div
+                  class="avatar"
+                  title={userTooltip()}
+                  aria-label={userTooltip()}
+                >
+                  {initial()}
+                </div>
+                <span class="header-user-login" title={userTooltip()}>
+                  {user()?.email || user()?.fullName || ''}
+                </span>
               </div>
             </div>
 

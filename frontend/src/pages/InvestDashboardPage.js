@@ -14,6 +14,8 @@ import { loadInvestUiContext, periodDefaults } from '../lib/investUiContext.js';
 
 const D = 'div';
 
+const REFRESH_ICON_SVG = `<svg class="header-sync-icon__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4.13 5.99 5.99 0 0 1-5.65-4.13H4v2h7.99c4.42 0 7.99-3.58 7.99-8 0-1.74-.56-3.35-1.51-4.65l1.42-1.42L20 4v6h-6l2.65-2.65z"/></svg>`;
+
 function localDateParts(d = new Date()) {
   return {
     y: d.getFullYear(),
@@ -70,6 +72,7 @@ function chartLegendLabel(data) {
 function bindPatrimonyChart(container, initialBounds) {
   const fromInput = container.querySelector('#patrimony-from');
   const toInput = container.querySelector('#patrimony-to');
+  const reloadBtn = container.querySelector('#patrimony-reload');
   const summaryHost = container.querySelector('#patrimony-summary');
   const chartHost = container.querySelector('#patrimony-chart-host');
   const metaHost = container.querySelector('#patrimony-meta');
@@ -77,6 +80,8 @@ function bindPatrimonyChart(container, initialBounds) {
 
   const load = async () => {
     if (!chartHost) return;
+    reloadBtn?.classList.add('btn-header-icon-sync--loading');
+    reloadBtn?.setAttribute('aria-busy', 'true');
     destroyHoldingPatrimonyChart();
     chartHost.innerHTML =
       '<div class="holding-chart-canvas-wrap"><canvas id="holding-patrimony-canvas"></canvas></div>';
@@ -149,9 +154,13 @@ function bindPatrimonyChart(container, initialBounds) {
           err.body?.error || err.message || 'Erro ao carregar patrimônio diário.';
       }
       chartHost.replaceChildren(banner);
+    } finally {
+      reloadBtn?.classList.remove('btn-header-icon-sync--loading');
+      reloadBtn?.removeAttribute('aria-busy');
     }
   };
 
+  reloadBtn?.addEventListener('click', load);
   fromInput?.addEventListener('change', load);
   toInput?.addEventListener('change', load);
   load();
@@ -188,6 +197,7 @@ export async function InvestDashboardPage(container) {
       <${D} class="table-period-toolbar patrimony-toolbar">
         <label>${t['label.common.period_from']} <input type="date" id="patrimony-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
         <label>${t['label.common.period_to']} <input type="date" id="patrimony-to" value="${toDefault}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
+        <button type="button" id="patrimony-reload" class="btn-header-icon-sync patrimony-reload-btn" title="Atualizar gráfico e resumo" aria-label="Atualizar gráfico e resumo">${REFRESH_ICON_SVG}</button>
       </${D}>
       <${D} id="patrimony-summary" class="patrimony-summary-host"></${D}>
       <${D} class="patrimony-chart-section">
