@@ -1,7 +1,7 @@
 .ip-page {
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 0;
+  max-width: none;
+  margin: 0;
   color: #e6e9ee;
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
