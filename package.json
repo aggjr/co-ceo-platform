@@ -43,6 +43,8 @@
     "sync:market:quotes:stocks": "node ./node_modules/ts-node/dist/bin.js scripts/sync-market-quotes-stocks.ts",
     "sync:market:quotes:remote": "node scripts/run-remote-stock-quotes.js",
     "sync:options:market": "node ./node_modules/ts-node/dist/bin.js scripts/sync-option-market-opcoes-net.ts",
+    "sync:options:custody": "node ./node_modules/ts-node/dist/bin.js scripts/sync-custody-option-quotes.ts",
+    "sync:options:custody:remote": "node scripts/run-remote-custody-option-quotes.js",
     "sync:market:indices": "node ./node_modules/ts-node/dist/bin.js scripts/sync-market-indices.ts",
     "report:cdi": "node ./node_modules/ts-node/dist/bin.js scripts/report-cdi-coverage.ts",
     "seed:market:benchmarks": "node ./node_modules/ts-node/dist/bin.js scripts/seed-market-benchmarks.ts",
