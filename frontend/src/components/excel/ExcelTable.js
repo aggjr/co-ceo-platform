@@ -337,8 +337,8 @@ export class ExcelTable {
                 return Object.entries(this.activeFilters).every(([key, filter]) => {
                     if (!filter) return true; // Safety
 
-                    const cellVal = item[key];
                     const colDef = this.columns.find(c => c.key === key);
+                    const cellVal = (colDef && typeof colDef.filterText === 'function') ? colDef.filterText(item) : item[key];
                     const type = colDef ? (colDef.type || 'text') : 'text';
 
                     // --- Number/Currency ---
@@ -1354,7 +1354,7 @@ export class ExcelTable {
 
         // ── Get distinct values (client-side) ────────────────────────────────
         const getDistinct = () => {
-            const raw = this.currentData.map(r => r[colKey]);
+            const raw = this.currentData.map(r => (colDef && typeof colDef.filterText === 'function') ? colDef.filterText(r) : r[colKey]);
             if (colType === 'date') {
                 return [...new Set(raw.map(v => {
                     if (!v || v === '') return '__EMPTY__';
