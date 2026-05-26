@@ -31,13 +31,12 @@
 
 /* TIPO — cores padrao via CSS var (override por tenant no manifesto) */
 .notes-type--call {
-  color: var(--invest-type-call, #86efac);
+  color: var(--invest-type-call, #60a5fa);
   font-weight: 700;
-  letter-spacing: 0.04em;
 }
 
 .notes-type--put {
-  color: var(--invest-type-put, #d8b4fe);
+  color: var(--invest-type-put, #fb923c);
   font-weight: 700;
   letter-spacing: 0.04em;
 }

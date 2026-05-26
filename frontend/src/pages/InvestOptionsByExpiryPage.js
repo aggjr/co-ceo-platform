@@ -60,12 +60,13 @@ let currentChartQty = null;
 let currentChartNotional = null;
 
 /** Eixo X numérico (R$ strike) — distância visual proporcional ao valor do strike. */
-function ampLinearXScale(sortedStrikes, quote) {
-  let minS = sortedStrikes[0];
-  let maxS = sortedStrikes[sortedStrikes.length - 1];
-  if (quote != null && Number.isFinite(Number(quote))) {
-    minS = Math.min(minS, Number(quote));
-    maxS = Math.max(maxS, Number(quote));
+function buildXScale(activeStrikes, underlyingQuote) {
+  let minS = Math.min(...activeStrikes);
+  let maxS = Math.max(...activeStrikes);
+  if (underlyingQuote != null && underlyingQuote > 0) {
+    const quote = Number(underlyingQuote);
+    minS = Math.min(minS, quote);
+    maxS = Math.max(maxS, quote);
   }
   const span = maxS - minS || 1;
   const pad = Math.max(0.5, span * 0.025);
@@ -79,14 +80,14 @@ function ampLinearXScale(sortedStrikes, quote) {
       maxRotation: 45,
       minRotation: 45,
       autoSkip: false,
-      values: sortedStrikes,
+      values: activeStrikes,
       callback: (value) => formatBrl(Number(value)),
     },
   };
 }
 
-function ampBarDataset(label, sortedStrikes, volumeByStrike, field, color) {
-  const data = sortedStrikes.map((s) => ({
+function ampBarDataset(label, activeStrikes, volumeByStrike, field, color) {
+  const data = activeStrikes.map((s) => ({
     x: s,
     y: volumeByStrike.get(s)[field],
   }));
@@ -96,7 +97,7 @@ function ampBarDataset(label, sortedStrikes, volumeByStrike, field, color) {
     data,
     parsing: false,
     backgroundColor: color,
-    maxBarThickness: 14,
+    barThickness: 16,
   };
 }
 
@@ -277,22 +278,6 @@ export async function InvestOptionsByExpiryPage(container) {
       sortedStrikes = [...merged].sort((a, b) => a - b);
     }
 
-    if (!sortedStrikes.length) {
-      if (hint) {
-        hint.textContent =
-          'Sem strikes na grade de mercado para esta data. Rode sync de opções (opcoes.net) ou confira a data.';
-      }
-      if (currentChartQty) currentChartQty.destroy();
-      if (currentChartNotional) currentChartNotional.destroy();
-      currentChartQty = null;
-      currentChartNotional = null;
-      return;
-    }
-
-    if (hint) {
-      hint.textContent = `${underlying} · vencimento ${formatDateBr(expiry)} · ${sortedStrikes.length} strikes na grade`;
-    }
-
     let filtered = allRows.filter(
       (r) =>
         String(r.underlying || '').toUpperCase() === underlying &&
@@ -322,17 +307,37 @@ export async function InvestOptionsByExpiryPage(container) {
       }
     });
 
+    const activeStrikes = sortedStrikes.filter((s) => {
+      const b = volumeByStrike.get(s);
+      return b && (b.callQty > 0 || b.putQty > 0 || b.callNotional > 0 || b.putNotional > 0);
+    });
+
+    if (activeStrikes.length === 0) {
+      if (hint) {
+        hint.textContent = 'Não há opções com quantidade ou notional operados para este ativo e vencimento.';
+      }
+      if (currentChartQty) currentChartQty.destroy();
+      if (currentChartNotional) currentChartNotional.destroy();
+      currentChartQty = null;
+      currentChartNotional = null;
+      return;
+    }
+
+    if (hint) {
+      hint.textContent = `${underlying} · vencimento ${formatDateBr(expiry)} · ${activeStrikes.length} strikes com movimento`;
+    }
+
     const datasetsQty = [
       ampBarDataset(
         `${underlying} Call Qtd`,
-        sortedStrikes,
+        activeStrikes,
         volumeByStrike,
         'callQty',
         AMP_COLORS.call
       ),
       ampBarDataset(
         `${underlying} Put Qtd`,
-        sortedStrikes,
+        activeStrikes,
         volumeByStrike,
         'putQty',
         AMP_COLORS.put
@@ -342,14 +347,14 @@ export async function InvestOptionsByExpiryPage(container) {
     const datasetsNotional = [
       ampBarDataset(
         `${underlying} Call Notional`,
-        sortedStrikes,
+        activeStrikes,
         volumeByStrike,
         'callNotional',
         AMP_COLORS.call
       ),
       ampBarDataset(
         `${underlying} Put Notional`,
-        sortedStrikes,
+        activeStrikes,
         volumeByStrike,
         'putNotional',
         AMP_COLORS.put
@@ -367,7 +372,7 @@ export async function InvestOptionsByExpiryPage(container) {
         borderDash: [4, 4],
         label: {
           display: true,
-          content: `▼ Cotação ${underlying}: ${formatBrl(quote)}`,
+          content: `⚡ Cotação ${underlying}: ${formatBrl(quote)}`,
           position: 'start',
           backgroundColor: 'rgba(15, 23, 42, 0.9)',
           color: AMP_COLORS.quoteLine,
