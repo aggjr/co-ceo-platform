@@ -389,8 +389,6 @@ export async function InvestOptionsByExpiryPage(container) {
     if (currentChartQty) currentChartQty.destroy();
     if (currentChartNotional) currentChartNotional.destroy();
 
-    const xScale = ampLinearXScale(sortedStrikes, quote);
-
     const commonOptions = {
       responsive: true,
       maintainAspectRatio: false,
@@ -400,7 +398,7 @@ export async function InvestOptionsByExpiryPage(container) {
         annotation: { annotations },
       },
       scales: {
-        x: xScale,
+        x: buildXScale(activeStrikes, quote),
       },
     };
 
