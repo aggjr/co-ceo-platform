@@ -63,7 +63,7 @@ function bandClass(band) {
   return 'opt-card--far';
 }
 
-function renderCard(row, labels) {
+function renderCard(row, labels, isDetailed) {
   const f = cardFieldRows(row);
   const badgeClass = f.side === 'put' ? 'opt-card-badge--put' : 'opt-card-badge--call';
   const qtyClass = pnlClass(f.quantity);
@@ -74,34 +74,54 @@ function renderCard(row, labels) {
       ? pnlClass(Number(f.distanceBrl))
       : '';
 
-  const rows = [
-    [labels['field.invest.options.underlying'] || 'Ação ref.', escapeHtml(f.underlying || '—')],
-    [labels['field.invest.options.type'] || 'Tipo', escapeHtml(f.typeLabel)],
-    [
-      labels['field.invest.options.quantity'] || 'Quantidade',
-      escapeHtml(formatNumber(f.quantity, 0)),
-      qtyClass,
-    ],
-    [labels['field.invest.options.strike'] || 'Strike', escapeHtml(f.strike != null ? formatBrl(f.strike) : '—')],
-    [labels['field.invest.options.premium'] || 'Prêmio', escapeHtml(formatBrl(f.premium))],
-    [
+  const rows = [];
+
+  if (isDetailed) {
+    rows.push([labels['field.invest.options.underlying'] || 'Ação ref.', escapeHtml(f.underlying || '?')]);
+  }
+  
+  rows.push([labels['field.invest.options.type'] || 'Tipo', escapeHtml(f.typeLabel)]);
+  
+  rows.push([
+    labels['field.invest.options.quantity'] || 'Quantidade',
+    escapeHtml(formatNumber(f.quantity, 0)),
+    qtyClass,
+  ]);
+  
+  rows.push([labels['field.invest.options.strike'] || 'Valor strike', escapeHtml(f.strike != null ? formatBrl(f.strike) : '?')]);
+  
+  rows.push([labels['field.invest.options.premium'] || 'Prêmio', escapeHtml(formatBrl(f.premium))]);
+  
+  if (isDetailed) {
+    rows.push([
       labels['field.invest.options.premium_total'] || 'Prêmio Total',
       escapeHtml(formatBrl(f.premiumTotal)),
-    ],
-    [labels['field.invest.options.quote'] || 'Cotação', escapeHtml(formatBrl(f.quote))],
-    [
-      labels['field.invest.options.notional'] || 'Nocional',
-      escapeHtml(f.notional != null ? formatBrl(f.notional) : '—'),
-    ],
-    [
-      labels['field.invest.options.underlying_quote'] || 'Cotação ref.',
+    ]);
+  }
+  
+  rows.push([labels['field.invest.options.quote'] || 'Cotação opção', escapeHtml(formatBrl(f.quote))]);
+  
+  if (isDetailed) {
+    rows.push([
+      labels['field.invest.options.notional'] || 'Notional',
+      escapeHtml(f.notional != null ? formatBrl(f.notional) : '?'),
+    ]);
+    
+    rows.push([
+      labels['field.invest.options.underlying_quote'] || 'Cotação ação',
       escapeHtml(formatBrl(f.underlyingQuote)),
-    ],
-    [labels['field.invest.options.strike_distance'] || 'Distância strike', escapeHtml(f.distanceText), distRowClass],
-    [labels['field.invest.options.expiry'] || 'Data strike', escapeHtml(formatDateBr(f.expiry))],
-    [labels['field.invest.options.result_pct'] || 'Resultado %', escapeHtml(f.pnlPctFormatted), pnlPctRowClass],
-    [labels['field.invest.options.result'] || 'Resultado', escapeHtml(f.pnlFormatted), pnlRowClass],
-  ];
+    ]);
+    
+    rows.push([labels['field.invest.options.strike_distance'] || 'Dist. à ação', escapeHtml(f.distanceText), distRowClass]);
+  }
+  
+  rows.push([labels['field.invest.options.expiry'] || 'Data strike', escapeHtml(formatDateBr(f.expiry))]);
+  
+  if (isDetailed) {
+    rows.push([labels['field.invest.options.result_pct'] || '% resultado', escapeHtml(f.pnlPctFormatted), pnlPctRowClass]);
+    
+    rows.push([labels['field.invest.options.result'] || 'Resultado (R$)', escapeHtml(f.pnlFormatted), pnlRowClass]);
+  }
 
   const body = rows
     .map(
@@ -161,6 +181,11 @@ function buildToolbarHtml(t, underlyings, expiries, filters) {
           <option value="far"${filters.band === 'far' ? ' selected' : ''}>${escapeHtml(t['filter.invest.options.dist_far'])}</option>
         </select>
       </label>
+      <label>Visualização
+        <button type="button" data-action="toggle-view" style="padding: 7px 10px; border-radius: 8px; border: 1px solid rgba(148, 163, 184, 0.35); background: rgba(15, 23, 42, 0.75); color: inherit; font-size: 13px; cursor: pointer; min-width: 100px;">
+          ${filters.detailedView ? 'Detalhado' : 'Resumido'}
+        </button>
+      </label>
     </div>
     <div class="opt-cards-legend">
       <span class="opt-legend--itm"><i></i>${escapeHtml(t['legend.invest.options.itm'])}</span>
@@ -181,7 +206,7 @@ export async function InvestOptionsCardsPage(container) {
 
   if (isGlobalSession()) {
     await renderShell(container, {
-      title: `INVEST — ${title}`,
+      title: `INVEST - ${title}`,
       contentHtml: `<div class="card"><p class="muted">Personifique o titular da holding para ver opções.</p></div>`,
     });
     return;
@@ -192,20 +217,20 @@ export async function InvestOptionsCardsPage(container) {
     allRows = await fetchOpenOptionsPortfolio();
   } catch (err) {
     await renderShell(container, {
-      title: `INVEST — ${title}`,
+      title: `INVEST - ${title}`,
       contentHtml: `<div class="error-banner">${escapeHtml(err.message)}</div>`,
     });
     return;
   }
 
-  const filters = { underlying: '', expiry: '', type: '', band: '' };
+  const filters = { underlying: '', expiry: '', type: '', band: '', detailedView: true };
   const underlyings = uniqueUnderlyings(allRows);
   const expiries = uniqueExpiryDates(allRows);
 
   const hostId = 'opt-cards-root';
 
   await renderShell(container, {
-    title: `INVEST — ${title}`,
+    title: `INVEST - ${title}`,
     contentHtml: `<div class="card invest-table-card" id="${hostId}"></div>`,
   });
 
@@ -213,14 +238,22 @@ export async function InvestOptionsCardsPage(container) {
   if (!root) return;
 
   function paint() {
-    const filtered = filterOptionsRows(allRows, filters);
+    let filtered = filterOptionsRows(allRows, filters);
+    
+    // Sort by strike (ascending)
+    filtered.sort((a, b) => {
+      const strikeA = cardFieldRows(a).strike || 0;
+      const strikeB = cardFieldRows(b).strike || 0;
+      return strikeA - strikeB;
+    });
+
     const summary = t['screen.invest.options.cards.summary']
       .replace('{shown}', String(filtered.length))
       .replace('{total}', String(allRows.length));
 
     const cards =
       filtered.length > 0
-        ? filtered.map((r) => renderCard(r, t)).join('')
+        ? filtered.map((r) => renderCard(r, t, filters.detailedView)).join('')
         : `<p class="muted">${escapeHtml(t['screen.invest.options.cards.empty'])}</p>`;
 
     root.innerHTML = `
@@ -239,6 +272,14 @@ export async function InvestOptionsCardsPage(container) {
         paint();
       });
     });
+
+    const toggleBtn = root.querySelector('[data-action="toggle-view"]');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        filters.detailedView = !filters.detailedView;
+        paint();
+      });
+    }
   }
 
   paint();

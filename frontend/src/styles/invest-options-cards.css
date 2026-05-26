@@ -109,12 +109,12 @@
 }
 
 .opt-card-header strong {
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: 0.02em;
 }
 
 .opt-card-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   padding: 3px 8px;
@@ -134,7 +134,7 @@
 .opt-card-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .opt-card-table th,
