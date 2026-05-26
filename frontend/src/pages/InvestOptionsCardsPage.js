@@ -99,7 +99,7 @@ function renderCard(row, labels, isDetailed) {
     ]);
   }
   
-  rows.push([labels['field.invest.options.quote'] || 'Cotação opção', escapeHtml(formatBrl(f.quote))]);
+  rows.push([labels['field.invest.options.quote'] || 'Prêmio Atual', escapeHtml(formatBrl(f.quote))]);
   
   if (isDetailed) {
     rows.push([
