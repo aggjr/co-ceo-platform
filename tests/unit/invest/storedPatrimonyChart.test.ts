@@ -1,10 +1,17 @@
-import { buildStoredTwrChartSeries } from '../../../src/core/invest/storedPatrimonyChart';
+import {
+  buildStoredTwrChartSeries,
+  resolvePortfolioIndexedForChart,
+} from '../../../src/core/invest/storedPatrimonyChart';
 import type { StoredPortfolioDay } from '../../../src/core/invest/PatrimonyDailyStore';
 
-function day(date: string, cum: number, daily: number | null = 0.01): StoredPortfolioDay {
+function storedRow(
+  date: string,
+  cumulative: number | null,
+  daily: number | null = null
+): StoredPortfolioDay {
   return {
-    id: `id-${date}`,
-    organization_id: 'org-holding-001',
+    id: '1',
+    organization_id: 'org',
     snapshot_date: date,
     patrimony: 1_000_000,
     patrimony_gross: 1_000_000,
@@ -15,18 +22,48 @@ function day(date: string, cum: number, daily: number | null = 0.01): StoredPort
     external_flow: 0,
     daily_return_simple: daily,
     daily_return_twr: daily,
-    cumulative_twr: cum,
-    quotes_as_of: date,
-    source: 'mtm_economic',
+    cumulative_twr: cumulative,
+    quotes_as_of: null,
+    source: 'mtm_btg_calibrated',
     metadata: null,
   };
 }
 
 describe('buildStoredTwrChartSeries', () => {
-  it('rebaseia TWR acumulado no início do período', () => {
-    const stored = [day('2026-01-01', 0), day('2026-01-02', 0.01), day('2026-01-03', 0.03)];
-    const chart = buildStoredTwrChartSeries(stored, ['2026-01-01', '2026-01-02', '2026-01-03'], '2026-01-01');
-    expect(chart[0]!.periodReturnToDate).toBe(0);
-    expect(chart[chart.length - 1]!.periodReturnToDate).toBeCloseTo(0.03, 3);
+  it('propaga último índice conhecido em dias sem fechamento gravado', () => {
+    const chart = buildStoredTwrChartSeries(
+      [storedRow('2026-01-02', 0), storedRow('2026-01-05', 0.05, 0.02)],
+      ['2026-01-02', '2026-01-03', '2026-01-04', '2026-01-05'],
+      '2026-01-02'
+    );
+    expect(chart[0]!.indexedLevel).toBe(100);
+    expect(chart[1]!.indexedLevel).toBe(100);
+    expect(chart[2]!.indexedLevel).toBe(100);
+    expect(chart[3]!.indexedLevel).toBeCloseTo(105, 1);
+  });
+});
+
+describe('resolvePortfolioIndexedForChart', () => {
+  it('prefere TWR recalculado sobre fechamentos gravados planos', () => {
+    const merged = [
+      { date: '2026-01-01', patrimony: 1_000_000 },
+      { date: '2026-01-02', patrimony: 1_050_000 },
+    ];
+    const performancePoints = [
+      { date: '2026-01-01', cumulativeReturnTwr: 0 },
+      { date: '2026-01-02', cumulativeReturnTwr: 0.05 },
+    ];
+    const flatStored = buildStoredTwrChartSeries(
+      [storedRow('2026-01-01', 0), storedRow('2026-01-02', 0)],
+      ['2026-01-01', '2026-01-02'],
+      '2026-01-01'
+    );
+    const resolved = resolvePortfolioIndexedForChart(
+      merged,
+      performancePoints,
+      flatStored
+    );
+    expect(resolved[1]!.indexedLevel).toBeCloseTo(105, 1);
+    expect(resolved[1]!.periodReturnToDate).toBeCloseTo(0.05, 4);
   });
 });

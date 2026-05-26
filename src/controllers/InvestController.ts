@@ -28,11 +28,12 @@ import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import {
   buildCdiBenchmarkForChart,
-  buildPatrimonyIndexedSeries,
   buildStockBenchmarkForChart,
-  buildTwrPerformanceChartSeries,
 } from '../core/market/indexBenchmark';
-import { buildStoredTwrChartSeries } from '../core/invest/storedPatrimonyChart';
+import {
+  buildStoredTwrChartSeries,
+  resolvePortfolioIndexedForChart,
+} from '../core/invest/storedPatrimonyChart';
 
 import { resolveInvestPeriodBounds } from '../core/invest/investPeriodBounds';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
@@ -42,7 +43,10 @@ import {
   trimZeroPatrimonyTailAfterLastStored,
   PatrimonyDailyStore,
 } from '../core/invest/PatrimonyDailyStore';
-import { listExternalFlows } from '../core/invest/portfolioPerformance';
+import {
+  computePortfolioPerformance,
+  listExternalFlows,
+} from '../core/invest/portfolioPerformance';
 import {
   attachCallCoverageToEquities,
   buildShortCallPremiumPendingByUnderlying,
@@ -63,6 +67,7 @@ import {
   applyCashInvestBalanceToItems,
   enrichPortfolioRow,
   attachUnderlyingMarketData,
+  buildLongEquityPmMapFromAssetRows,
   consolidateTesouroPortfolioItems,
   mergeLedgerCustodyIntoAssetRows,
   mergeOptionStrikeIntoAssetRow,
@@ -84,10 +89,28 @@ import {
 } from '../core/invest/extractLedgerEnrichment';
 import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
 import type { UserContext } from '../core/dal';
+import { SYSTEM_INSTALLER_USER_ID } from '../core/dal/types';
 import pool from '../config/database';
 import { isMissingSchemaError } from '../core/dal/mysqlErrors';
 import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
 import { StockMarketSyncService } from '../core/market/StockMarketSyncService';
+
+function portfolioRowMatchesAssetClass(
+  row: Record<string, unknown>,
+  assetClass: string
+): boolean {
+  const type = String(row.asset_type ?? '').toLowerCase();
+  const t = String(row.asset_ticker ?? '').trim().toUpperCase();
+  const isOpt =
+    type === 'option_call' || type === 'option_put' || isOptionTicker(t);
+  const isFi =
+    type === 'fixed_income' || type === 'cdb' || isFixedIncomeTicker(t);
+  const isCash = type === 'cash' || t.startsWith('CAIXA-');
+  if (assetClass === 'options') return isOpt;
+  if (assetClass === 'fixedIncome') return isFi || isCash;
+  if (assetClass === 'equities') return !isOpt && !isFi && !isCash;
+  return true;
+}
 
 export class InvestController {
   private readonly ledger: LedgerImportService;
@@ -153,6 +176,9 @@ export class InvestController {
       });
     }
 
+    const assetClassQuery = req.query.assetClass as string | undefined;
+    const optionsOnly = assetClassQuery === 'options';
+
     const rows = await this.assetProjection.listActiveAssets(ctx);
 
     const today = new Date().toISOString().slice(0, 10);
@@ -162,29 +188,24 @@ export class InvestController {
       today
     );
     const { assets: ledgerCustody } = rebuildCustodyFromLedger(ledgerEvents);
-    let rowsMerged = mergeLedgerCustodyIntoAssetRows(
+    const allMerged = mergeLedgerCustodyIntoAssetRows(
       rows as Record<string, unknown>[],
       ledgerCustody
     );
-    const assetClassQuery = req.query.assetClass as string | undefined;
+    const equityPmByUnderlying = buildLongEquityPmMapFromAssetRows(allMerged);
+    let rowsMerged = allMerged;
     if (assetClassQuery) {
-      rowsMerged = rowsMerged.filter((r) => {
-        const type = String(r.asset_type ?? '').toLowerCase();
-        const t = String(r.asset_ticker ?? '').trim().toUpperCase();
-        
-        const isOpt = type === 'option_call' || type === 'option_put' || isOptionTicker(t);
-        const isFi = type === 'fixed_income' || type === 'cdb' || isFixedIncomeTicker(t);
-        const isCash = type === 'cash' || t.startsWith('CAIXA-');
-        
-        if (assetClassQuery === 'options') return isOpt;
-        if (assetClassQuery === 'fixedIncome') return isFi || isCash;
-        if (assetClassQuery === 'equities') return !isOpt && !isFi && !isCash;
-        return true;
-      });
+      rowsMerged = allMerged.filter((r) =>
+        portfolioRowMatchesAssetClass(r, assetClassQuery)
+      );
     }
 
-    const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
-    const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents);
+    const threeByUnderlying = optionsOnly
+      ? new Map<string, { strict: number; b3: number; managerial: number }>()
+      : buildThreeAvgPricesByUnderlying(ledgerEvents);
+    const engineSnapshots = optionsOnly
+      ? new Map()
+      : computeThreePricesByUnderlying(ledgerEvents);
     const ledgerStrikeByTicker = buildOptionStrikeMapFromLedgerEvents(ledgerEvents);
     const marketCatalog = await loadOptionMarketCatalog(
       this.gateway,
@@ -240,7 +261,8 @@ export class InvestController {
       }
     }
 
-    if (missingOptions.length) {
+    // Tela de opções: só cotações já no banco (sync manual/cron). Evita grade opcoes.net no request.
+    if (missingOptions.length && !optionsOnly) {
       try {
         const optQuotes = await fetchOpcoesNetOptionQuotes(missingOptions);
         const marketCtx = authBootstrapContext();
@@ -328,58 +350,137 @@ export class InvestController {
       const price = Number(mq.price);
       if (price > 0) underlyingSpots.set(ticker.toUpperCase(), price);
     }
-    const withUnderlyingQuotes = attachUnderlyingMarketData(items, underlyingSpots);
+    const withUnderlyingQuotes = attachUnderlyingMarketData(
+      items,
+      underlyingSpots,
+      equityPmByUnderlying
+    );
     withUnderlyingQuotes.sort((a, b) => b.marketValue - a.marketValue);
     const { open, closedOptions } = partitionPortfolioPositions(withUnderlyingQuotes);
-    const consolidated = consolidateTesouroPortfolioItems(open);
+    const consolidated = optionsOnly
+      ? open
+      : consolidateTesouroPortfolioItems(open);
     const withAllocation = applyAllocationPercents(consolidated);
 
-    const coverageOptions = collectCallCoverageOptionRows(
-      withAllocation,
-      ledgerCustody
-    );
-    const premiumByUnderlying = buildShortCallPremiumPendingByUnderlying(ledgerEvents);
-    const withCallCoverage = attachCallCoverageToEquities(
-      withAllocation,
-      coverageOptions,
-      premiumByUnderlying
-    );
-    const cashInTransit = buildCashInTransitSummary(ledgerEvents, today);
-    const withCash = applyCashInvestBalanceToItems(
-      withCallCoverage,
-      cashInTransit.settledCashBalance
-    );
+    let responseItems = withAllocation;
+    let cashInTransit: ReturnType<typeof buildCashInTransitSummary> | null = null;
+
+    if (optionsOnly) {
+      cashInTransit = {
+        asOfDate: today,
+        settledCashBalance: 0,
+        inTransitNet: 0,
+        receivables: 0,
+        payables: 0,
+        cashIncludingTransit: 0,
+        lines: [],
+      };
+    } else {
+      const coverageOptions = collectCallCoverageOptionRows(
+        withAllocation,
+        ledgerCustody
+      );
+      const premiumByUnderlying =
+        buildShortCallPremiumPendingByUnderlying(ledgerEvents);
+      responseItems = attachCallCoverageToEquities(
+        withAllocation,
+        coverageOptions,
+        premiumByUnderlying
+      );
+      cashInTransit = buildCashInTransitSummary(ledgerEvents, today);
+      responseItems = applyCashInvestBalanceToItems(
+        responseItems,
+        cashInTransit.settledCashBalance
+      );
+    }
 
     const threePricesAudit = { ok: 0, warn: 0, error: 0, pending: [] as Array<{
       ticker: string;
       status: string;
       observation: string;
     }> };
-    for (const it of withCash) {
-      const v = it.threePricesValidation;
-      if (!v) continue;
-      if (v.status === 'ok') threePricesAudit.ok += 1;
-      else if (v.status === 'warn') threePricesAudit.warn += 1;
-      else threePricesAudit.error += 1;
-      if (v.status !== 'ok') {
-        threePricesAudit.pending.push({
-          ticker: it.ticker,
-          status: v.status,
-          observation: v.observation,
-        });
+    if (!optionsOnly) {
+      for (const it of responseItems) {
+        const v = it.threePricesValidation;
+        if (!v) continue;
+        if (v.status === 'ok') threePricesAudit.ok += 1;
+        else if (v.status === 'warn') threePricesAudit.warn += 1;
+        else threePricesAudit.error += 1;
+        if (v.status !== 'ok') {
+          threePricesAudit.pending.push({
+            ticker: it.ticker,
+            status: v.status,
+            observation: v.observation,
+          });
+        }
       }
     }
 
     return res.json({
       success: true,
-      items: withCash,
+      items: responseItems,
       closedOptions,
-      summary: summarizePortfolio(withCash),
-      cashStatementBalance: cashInTransit.settledCashBalance,
+      summary: summarizePortfolio(responseItems),
+      cashStatementBalance: cashInTransit!.settledCashBalance,
       cashInTransit,
       threePricesAudit,
       source: 'custody',
     });
+  };
+
+  getOptionStrikeLadder = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selecione uma organização (personifique a holding).',
+      });
+    }
+    const underlying = String(req.query.underlying ?? '').trim().toUpperCase();
+    const expiry = String(req.query.expiry ?? '').trim().slice(0, 10);
+    if (!underlying || !/^\d{4}-\d{2}-\d{2}$/.test(expiry)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Informe underlying e expiry (YYYY-MM-DD).',
+      });
+    }
+    try {
+      const globalCtx: UserContext = {
+        userId: SYSTEM_INSTALLER_USER_ID,
+        organizationId: null,
+        impersonatorId: null,
+        scope: 'global',
+      };
+      const rows = await this.gateway.readQuery(
+        globalCtx,
+        'invest_options_market_strikes',
+        [underlying, expiry]
+      );
+      const strikes = rows
+        .map((r) => Number(r.strike_price))
+        .filter((s) => Number.isFinite(s) && s > 0);
+      const quoteMap = await this.marketQuoteRepo.loadLatestQuoteMap(ctx, [underlying]);
+      const mq = quoteMap.get(underlying);
+      return res.json({
+        success: true,
+        underlying,
+        expiry,
+        strikes,
+        quote: mq?.price ?? null,
+        quoteAsOf: mq?.date ?? null,
+      });
+    } catch (err) {
+      console.error('[getOptionStrikeLadder]', err);
+      if (isMissingSchemaError(err)) {
+        return res.status(503).json({
+          success: false,
+          error: 'Banco desatualizado: tabela invest_options_market ausente.',
+        });
+      }
+      const message =
+        err instanceof Error ? err.message : 'Falha ao carregar grade de strikes.';
+      return res.status(500).json({ success: false, error: message });
+    }
   };
 
   getPatrimonyDaily = async (req: Request, res: Response) => {
@@ -482,8 +583,23 @@ export class InvestController {
     if (storedDays.length > 0) {
       const merged = mergeStoredPatrimonySeries(result.series, storedDays);
       const series = trimZeroPatrimonyTailAfterLastStored(merged.series, storedDays);
-      result = { ...result, series };
       storedDates = merged.storedDates.filter((d) => series.some((p) => p.date === d));
+      result = { ...result, series };
+    }
+
+    const performanceOnSeries = computePortfolioPerformance(result.series, events, from, to);
+    if (performanceOnSeries) {
+      const anchorExtras = result.performance
+        ? {
+            monthAnchorTwr: result.performance.monthAnchorTwr,
+            monthAnchorBreakdown: result.performance.monthAnchorBreakdown,
+            periodReturnTwrDaily: result.performance.periodReturnTwrDaily,
+          }
+        : {};
+      result = {
+        ...result,
+        performance: { ...performanceOnSeries, ...anchorExtras },
+      };
     }
 
     const fromMonth = from.slice(0, 7);
@@ -539,19 +655,16 @@ export class InvestController {
       storedDays.filter((s) => s.cumulative_twr != null).length >= 2
         ? buildStoredTwrChartSeries(storedDays, chartDates, from)
         : [];
-    const portfolioIndexed =
-      storedTwrChart.length >= 2
-        ? storedTwrChart
-        : result.performance?.points?.length
-          ? buildTwrPerformanceChartSeries(result.performance.points)
-          : buildPatrimonyIndexedSeries(result.series);
+    const portfolioIndexed = resolvePortfolioIndexedForChart(
+      result.series,
+      result.performance?.points ?? null,
+      storedTwrChart
+    );
     const portfolioPeriodReturn =
-      storedTwrChart.length >= 2
-        ? storedTwrChart[storedTwrChart.length - 1]!.periodReturnToDate
-        : result.performance?.periodReturnTwr ??
-          (portfolioIndexed.length >= 2
-            ? portfolioIndexed[portfolioIndexed.length - 1]!.periodReturnToDate
-            : null);
+      result.performance?.periodReturnTwr ??
+      (portfolioIndexed.length >= 2
+        ? portfolioIndexed[portfolioIndexed.length - 1]!.periodReturnToDate
+        : null);
     const cdiComparison =
       cdiBenchmark.available &&
       cdiBenchmark.periodReturn != null &&

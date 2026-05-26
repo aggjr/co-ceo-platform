@@ -95,6 +95,18 @@ export function uniqueExpiryDates(rows) {
   return [...set].sort();
 }
 
+export function uniqueExpiryDatesForUnderlying(rows, underlying) {
+  const u = String(underlying || '').trim().toUpperCase();
+  if (!u) return [];
+  const set = new Set();
+  for (const r of rows) {
+    if (String(r.underlying || '').trim().toUpperCase() !== u) continue;
+    const d = String(r.optionExpiryDate || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) set.add(d);
+  }
+  return [...set].sort();
+}
+
 export function filterOptionsRows(rows, filters) {
   let out = rows;
   if (filters.underlying) {
@@ -128,6 +140,7 @@ export function cardFieldRows(row) {
   const band = optionMoneynessBand(row);
   const side = resolveOptionSide(row);
   const pnlPct = optionPriceReturnPct(row) ?? row.pnlPct;
+  const distanceBrl = dist?.brl ?? null;
   return {
     ticker: row.ticker,
     underlying: row.underlying,
@@ -141,6 +154,7 @@ export function cardFieldRows(row) {
     expiry: row.optionExpiryDate,
     underlyingQuote: Number(row.underlyingLastPrice),
     distanceText: formatDistanceLabel(row),
+    distanceBrl,
     distanceBand: band,
     notional: optionNotionalValue(row),
     pnl: Number(row.pnl),

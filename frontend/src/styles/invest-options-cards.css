@@ -109,12 +109,12 @@
 }
 
 .opt-card-header strong {
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: 0.02em;
 }
 
 .opt-card-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   padding: 3px 8px;
@@ -122,19 +122,19 @@
 }
 
 .opt-card-badge--call {
-  background: rgba(34, 197, 94, 0.2);
-  color: #86efac;
+  background: var(--invest-option-call-bg, rgba(59, 130, 246, 0.2));
+  color: var(--invest-option-call-color, #60a5fa);
 }
 
 .opt-card-badge--put {
-  background: rgba(168, 85, 247, 0.2);
-  color: #d8b4fe;
+  background: var(--invest-option-put-bg, rgba(249, 115, 22, 0.2));
+  color: var(--invest-option-put-color, #fb923c);
 }
 
 .opt-card-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .opt-card-table th,
@@ -162,30 +162,15 @@
   border-bottom: none;
 }
 
-.opt-card-dist--itm td {
-  color: #fca5a5;
-  font-weight: 700;
-}
-
-.opt-card-dist--near td {
-  color: #fdba74;
+/* Valores com sinal: verde positivo, vermelho negativo (igual tabela Excel) */
+.opt-card-table tr.portfolio-pnl--up td {
+  color: #10b981;
   font-weight: 600;
 }
 
-.opt-card-dist--far td {
-  color: #67e8f9;
-}
-
-.opt-card-qty--short td {
-  color: #fca5a5;
-}
-
-.opt-card-pnl--pos td {
-  color: #86efac;
-}
-
-.opt-card-pnl--neg td {
-  color: #fca5a5;
+.opt-card-table tr.portfolio-pnl--down td {
+  color: #e23d52;
+  font-weight: 600;
 }
 
 .opt-expiry-groups {
@@ -266,3 +251,35 @@
 .opt-expiry-row--near td {
   background: rgba(249, 115, 22, 0.06);
 }
+
+.amp-filter-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-muted, #94a3b8);
+  min-width: 160px;
+}
+
+.amp-filter-label > span {
+  font-weight: 600;
+  color: var(--color-text, #e2e8f0);
+}
+
+.amp-filter-select {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.75);
+  color: inherit;
+  font-size: 13px;
+  min-width: 180px;
+}
+
+.amp-chart-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.amp-chart-container { position: relative; height: 500px; width: 100%; margin-top: 20px; }
+

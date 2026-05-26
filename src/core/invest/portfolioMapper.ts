@@ -139,6 +139,8 @@ export type PortfolioItemDto = {
   notional: number | null;
   /** Última cotação do papel objeto (da custódia de ações/FIIs). */
   underlyingLastPrice: number | null;
+  /** PM estrito da ação-mãe em carteira comprada (qty > 0); null se não houver posição long. */
+  underlyingPmStrict: number | null;
   /** Spot − strike (R$); positivo = ação acima do strike. */
   strikeDistanceBrl: number | null;
   /** (Spot − strike) / strike × 100. */
@@ -244,7 +246,7 @@ export function enrichPortfolioRow(
   const meta = parseMetadata(row.metadata);
   const qty = Number(row.current_quantity ?? 0);
   const avg = Number(row.managerial_avg_price ?? 0);
-  const prices =
+  let prices =
     threePrices ??
     ({ strict: avg, b3: avg, managerial: avg } satisfies ThreeAvgPrices);
   const metaLast = Number(meta.last_price ?? 0);
@@ -262,6 +264,14 @@ export function enrichPortfolioRow(
     assetType = inferred;
   }
   const optionLike = isOptionTicker(ticker) || isOptionAssetType(assetType);
+  const pmStrict = row.pm_estrito != null ? Number(row.pm_estrito) : null;
+  const pmB3Stored = row.pm_b3 != null ? Number(row.pm_b3) : null;
+  const pmGerencial = row.pm_gerencial != null ? Number(row.pm_gerencial) : null;
+  if (pmStrict != null && pmStrict > 0) prices = { ...prices, strict: pmStrict };
+  if (pmB3Stored != null && pmB3Stored > 0) prices = { ...prices, b3: pmB3Stored };
+  if (pmGerencial != null && pmGerencial > 0) {
+    prices = { ...prices, managerial: pmGerencial };
+  }
   const acqVal = Number(row.acquisition_value ?? 0);
   const curVal = Number(row.current_value ?? 0);
   const custodyUnitPm =
@@ -395,6 +405,7 @@ export function enrichPortfolioRow(
     premiumReceived,
     notional,
     underlyingLastPrice: null,
+    underlyingPmStrict: null,
     strikeDistanceBrl: null,
     strikeDistancePct: null,
   };
@@ -427,12 +438,62 @@ export function buildUnderlyingSpotMap(
   return spotByTicker;
 }
 
+export type UnderlyingEquityPmMap = Map<
+  string,
+  { strict: number; b3: number; managerial: number }
+>;
+
+/** PM triplo das ações/FIIs compradas (qty > 0) — chave = ticker da ação-mãe. */
+export function buildLongEquityPmMapFromAssetRows(
+  assetRows: Record<string, unknown>[]
+): UnderlyingEquityPmMap {
+  const map: UnderlyingEquityPmMap = new Map();
+  for (const raw of assetRows) {
+    const t = String(raw.asset_ticker ?? '').trim().toUpperCase();
+    if (!t || t.startsWith('CAIXA-')) continue;
+    const type = String(raw.asset_type ?? '').toLowerCase();
+    if (type !== 'stock' && type !== 'fii') continue;
+    const qty = Number(raw.current_quantity ?? 0);
+    if (qty <= QTY_ZERO_EPS) continue;
+    const ger = Number(raw.pm_gerencial ?? raw.managerial_avg_price ?? 0);
+    const strict =
+      raw.pm_estrito != null && Number(raw.pm_estrito) > 0
+        ? Number(raw.pm_estrito)
+        : ger > 0
+          ? ger
+          : 0;
+    const b3 =
+      raw.pm_b3 != null && Number(raw.pm_b3) > 0 ? Number(raw.pm_b3) : strict;
+    if (strict > 0) {
+      map.set(t, {
+        strict,
+        b3: b3 > 0 ? b3 : strict,
+        managerial: ger > 0 ? ger : strict,
+      });
+    }
+  }
+  return map;
+}
+
+function buildLongEquityPmMapFromItems(items: PortfolioItemDto[]): UnderlyingEquityPmMap {
+  const map: UnderlyingEquityPmMap = new Map();
+  for (const item of items) {
+    if (item.assetType !== 'stock' && item.assetType !== 'fii') continue;
+    if (item.quantity <= QTY_ZERO_EPS) continue;
+    map.set(item.ticker.toUpperCase(), item.prices);
+  }
+  return map;
+}
+
 /** Notional = |qty| × strike; cotação e distância ao strike para risco de exercício. */
 export function attachUnderlyingMarketData(
   items: PortfolioItemDto[],
-  externalSpots?: UnderlyingSpotMap
+  externalSpots?: UnderlyingSpotMap,
+  equityPmByUnderlying?: UnderlyingEquityPmMap
 ): PortfolioItemDto[] {
   const spotByTicker = buildUnderlyingSpotMap(items, externalSpots);
+  const pmByUnderlying =
+    equityPmByUnderlying ?? buildLongEquityPmMapFromItems(items);
 
   return items.map((item) => {
     if (!isPortfolioOptionItem(item)) return item;
@@ -449,6 +510,9 @@ export function attachUnderlyingMarketData(
     const underlyingLastPrice = underlyingKey
       ? (spotByTicker.get(underlyingKey) ?? null)
       : null;
+    const equityPm = underlyingKey ? pmByUnderlying.get(underlyingKey) : undefined;
+    const underlyingPmStrict =
+      equityPm != null && equityPm.strict > 0 ? equityPm.strict : null;
 
     let strikeDistanceBrl: number | null = null;
     let strikeDistancePct: number | null = null;
@@ -463,6 +527,7 @@ export function attachUnderlyingMarketData(
       optionStrike: strike,
       notional,
       underlyingLastPrice,
+      underlyingPmStrict,
       strikeDistanceBrl,
       strikeDistancePct,
     };

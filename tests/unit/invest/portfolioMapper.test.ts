@@ -1,6 +1,7 @@
 import {
   applyAllocationPercents,
   attachUnderlyingMarketData,
+  buildLongEquityPmMapFromAssetRows,
   consolidateTesouroPortfolioItems,
   enrichPortfolioRow,
   equityResultFromB3Quote,
@@ -268,6 +269,23 @@ describe('portfolioMapper', () => {
     expect(opt.optionStrikeSource).toBe('market_catalog');
   });
 
+  it('opção: preço estrito vem de pm_estrito na extensão', () => {
+    const opt = enrichPortfolioRow({
+      id: 'o-ext',
+      asset_ticker: 'BBASF224',
+      asset_type: 'option_call',
+      current_quantity: -500,
+      managerial_avg_price: 0.18,
+      pm_estrito: 0.22,
+      pm_b3: 0.2,
+      pm_gerencial: 0.18,
+      status: 'active',
+    });
+    expect(opt.prices.strict).toBe(0.22);
+    expect(opt.prices.b3).toBe(0.2);
+    expect(opt.avgPrice).toBeCloseTo(0.18, 4);
+  });
+
   it('opção vendida: prêmio, resultado e notional a partir da custódia', () => {
     const stock = enrichPortfolioRow(
       {
@@ -276,6 +294,7 @@ describe('portfolioMapper', () => {
         asset_type: 'stock',
         current_quantity: 5400,
         managerial_avg_price: 38.33,
+        pm_estrito: 41.5,
         metadata: { last_price: 65.4 },
         status: 'active',
       },
@@ -317,7 +336,28 @@ describe('portfolioMapper', () => {
     const enriched = items.find((i) => i.ticker === 'PRIOR407')!;
     expect(enriched.notional).toBeCloseTo(6500 * 40.75, 0);
     expect(enriched.underlyingLastPrice).toBe(65.4);
+    expect(enriched.underlyingPmStrict).toBe(41.5);
     expect(enriched.strikeDistanceBrl).not.toBeNull();
+  });
+
+  it('buildLongEquityPmMapFromAssetRows ignora ação vendida a descoberto', () => {
+    const map = buildLongEquityPmMapFromAssetRows([
+      {
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        current_quantity: 100,
+        pm_estrito: 40,
+        managerial_avg_price: 39,
+      },
+      {
+        asset_ticker: 'VALE3',
+        asset_type: 'stock',
+        current_quantity: -50,
+        pm_estrito: 60,
+      },
+    ]);
+    expect(map.get('PRIO3')?.strict).toBe(40);
+    expect(map.has('VALE3')).toBe(false);
   });
 
   it('opção: prêmio (PM) distinto da cotação de mercado (opcoes.net)', () => {

@@ -517,6 +517,14 @@ export function buildInvestOptionsColumns() {
     },
     { key: 'avgPrice', label: 'Prêmio', type: 'currency', align: 'right', width: '104px' },
     {
+      key: 'priceStrict',
+      label: 'Preço estrito',
+      type: 'currency',
+      align: 'right',
+      width: '104px',
+      render: (row) => renderPriceCell(row.prices?.strict),
+    },
+    {
       key: 'updatedQuote',
       label: 'Cotação opção',
       type: 'currency',
@@ -560,6 +568,26 @@ export function buildInvestOptionsColumns() {
       },
     },
     {
+      key: 'underlyingPmStrict',
+      label: 'PM estrito ação',
+      type: 'currency',
+      align: 'right',
+      width: '112px',
+      render: (row) => {
+        const pm = row.underlyingPmStrict;
+        const span = document.createElement('span');
+        if (pm == null || Number(pm) <= 0) {
+          span.className = 'muted';
+          span.textContent = '—';
+          span.title = 'Sem ação comprada na custódia para este subjacente';
+          return span;
+        }
+        span.textContent = formatBrl(pm);
+        span.title = 'Preço médio estrito da posição comprada na ação-mãe';
+        return span;
+      },
+    },
+    {
       key: 'strikeDistancePct',
       label: 'Dist. strike',
       type: 'text',
@@ -576,8 +604,9 @@ export function buildInvestOptionsColumns() {
         const sign = dist.brl >= 0 ? '+' : '';
         const pctSign = dist.pct >= 0 ? '+' : '';
         span.textContent = `${sign}${formatNumber(dist.brl, 2)} (${pctSign}${formatNumber(dist.pct, 1)}%)`;
+        span.className = pnlClass(dist.brl);
+        span.style.fontWeight = '600';
         if (isShortOptionExerciseRisk(row)) {
-          span.className = 'portfolio-option-itm';
           span.title = 'Posição vendida dentro do dinheiro — maior risco de exercício';
         } else {
           span.title = 'Spot − strike (R$ e %). Positivo: ação acima do strike.';
@@ -622,7 +651,7 @@ export function buildInvestOptionsColumns() {
       render: (row) => {
         const span = document.createElement('span');
         const pct = optionPriceReturnPct(row) ?? row.pnlPct;
-        span.className = pnlClass(row.pnl);
+        span.className = pnlClass(Number(pct));
         span.style.fontWeight = '600';
         span.textContent = formatPct(pct);
         span.title = '(Último − Preço médio) / Preço médio';
@@ -696,9 +725,197 @@ function resolveFooterColumnTotals(sheetKey, items) {
   return buildCustodyTableFooterColumnTotals(items);
 }
 
+/** Ordem padrão Ações/FIIs (após coluna fixa Ativo). */
+export const EQUITY_PORTFOLIO_COLUMN_ORDER = [
+  'assetType',
+  'quantity',
+  'callsSold',
+  'priceStrict',
+  'priceB3',
+  'priceManagerial',
+  'updatedQuote',
+  'marketValue',
+  'pnl',
+  'pnlPct',
+  'allocationPct',
+];
+
+export const EQUITY_PORTFOLIO_GRID_ID = 'invest-portfolio-equities';
+
+function buildEquitiesPortfolioColumns() {
+  return [
+    {
+      key: 'ticker',
+      label: 'Ativo',
+      type: 'text',
+      width: '140px',
+      sticky: true,
+      render: (row) => {
+        const el = document.createElement('div');
+        el.style.lineHeight = '1.35';
+        let html = `<strong>${row.ticker || '—'}</strong>`;
+        if (hasDistinctAssetName(row)) {
+          html += `<br><span style="font-size:12px;opacity:0.75">${row.name}</span>`;
+        }
+        el.innerHTML = html;
+        return el;
+      },
+    },
+    {
+      key: 'assetType',
+      label: 'Tipo',
+      type: 'text',
+      width: '100px',
+      filterText: (row) => assetTypeLabel(row.assetType),
+      render: (row) => {
+        const span = document.createElement('span');
+        span.textContent = assetTypeLabel(row.assetType);
+        return span;
+      },
+    },
+    {
+      key: 'quantity',
+      label: 'Qtd',
+      type: 'number',
+      align: 'right',
+      width: '88px',
+      render: (row) => renderQuantityCell(row, qtyDigits(row.assetType)),
+    },
+    {
+      key: 'callsSold',
+      label: 'CALLs vendidas',
+      type: 'number',
+      align: 'right',
+      width: '108px',
+      render: (row) => {
+        const span = document.createElement('span');
+        if (row.callsSold == null) {
+          span.className = 'muted';
+          span.textContent = '—';
+          return span;
+        }
+        span.textContent = formatNumber(row.callsSold, 0);
+        const rem = Number(row.callsRemaining);
+        if (rem < 0) {
+          span.style.fontWeight = '600';
+          span.className = 'portfolio-calls-uncovered';
+          span.title = `Venda a descoberto: há ${formatNumber(Math.abs(rem), 0)} CALLs vendidas a mais do que a quantidade de ações em custódia. Alto risco de exercício descoberto!`;
+        } else {
+          const prem = Number(row.callsPremiumPending);
+          if (prem > 0) {
+            span.title = `CALLs vendidas (soma das posições curtas CALL, incl. PRIOF). Prêmio em trânsito (D+1): ${formatBrl(prem)}`;
+          } else {
+            span.title =
+              'CALLs vendidas — soma das posições curtas CALL (planilha Opções + livro-razão)';
+          }
+        }
+        return span;
+      },
+    },
+    {
+      key: 'priceStrict',
+      label: 'Preço estrito',
+      type: 'currency',
+      align: 'right',
+      width: '104px',
+      render: (row) => renderPriceCell(row.prices?.strict),
+    },
+    {
+      key: 'priceB3',
+      label: 'PM B3',
+      type: 'currency',
+      align: 'right',
+      width: '96px',
+      render: (row) => renderPriceCell(row.prices?.b3),
+    },
+    {
+      key: 'priceManagerial',
+      label: 'Meu PM',
+      type: 'currency',
+      align: 'right',
+      width: '96px',
+      render: (row) => renderPriceCell(row.prices?.managerial ?? row.avgPrice),
+    },
+    {
+      key: 'updatedQuote',
+      label: 'Cotação atual',
+      type: 'currency',
+      align: 'right',
+      width: '108px',
+      render: (row) => renderPriceCell(row.updatedQuote ?? row.lastPrice),
+    },
+    {
+      key: 'marketValue',
+      label: 'Valor',
+      type: 'currency',
+      align: 'right',
+      width: '112px',
+      render: (row) => {
+        const span = document.createElement('span');
+        const value = equityMarketValue(row);
+        span.textContent = value > 0 ? formatBrl(value) : '—';
+        if (value <= 0) span.className = 'muted';
+        span.title =
+          'Cotação de mercado × quantidade (patrimônio). Resultado e % usam PM B3 como custo.';
+        return span;
+      },
+    },
+    {
+      key: 'pnl',
+      label: 'Resultado',
+      type: 'currency',
+      align: 'right',
+      width: '112px',
+      colorLogic: 'inflow',
+      render: (row) => {
+        const span = document.createElement('span');
+        const pnl = equityResultFromB3Quote(row);
+        span.textContent = formatBrl(pnl);
+        span.className = pnlClass(pnl);
+        span.style.fontWeight = '600';
+        span.title = '(Cotação atual − PM B3) × quantidade';
+        return span;
+      },
+    },
+    {
+      key: 'pnlPct',
+      label: '%',
+      type: 'number',
+      align: 'right',
+      width: '56px',
+      render: (row) => {
+        const span = document.createElement('span');
+        const pct = equityReturnPctB3(row);
+        const pnlForColor = equityResultFromB3Quote(row);
+        span.className = pnlClass(pnlForColor);
+        span.style.fontWeight = '600';
+        span.textContent = formatPct(pct);
+        span.title = '(Cotação − PM B3) / PM B3';
+        return span;
+      },
+    },
+    {
+      key: 'allocationPct',
+      label: '% carteira',
+      type: 'number',
+      align: 'right',
+      width: '96px',
+      render: (row) => {
+        const span = document.createElement('span');
+        span.textContent =
+          row.allocationPct != null ? `${formatNumber(row.allocationPct, 1)}%` : '—';
+        return span;
+      },
+    },
+  ];
+}
+
 export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sheetKey = 'equities') {
   if (sheetKey === 'options') {
     return buildInvestOptionsColumns();
+  }
+  if (sheetKey === 'equities') {
+    return buildEquitiesPortfolioColumns();
   }
 
   const cols = [
@@ -776,36 +993,7 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
     });
   }
   cols.push(
-    ...(sheetKey === 'equities'
-      ? [
-          {
-            key: 'priceStrict',
-            label: 'Preço estrito',
-            type: 'currency',
-            align: 'right',
-            width: '104px',
-            render: (row) => renderPriceCell(row.prices?.strict),
-          },
-          {
-            key: 'priceB3',
-            label: 'PM B3',
-            type: 'currency',
-            align: 'right',
-            width: '96px',
-            render: (row) => renderPriceCell(row.prices?.b3),
-          },
-          {
-            key: 'priceManagerial',
-            label: 'Meu PM',
-            type: 'currency',
-            align: 'right',
-            width: '96px',
-            render: (row) =>
-              renderPriceCell(row.prices?.managerial ?? row.avgPrice),
-          },
-
-        ]
-      : [
+    ...([
           {
             key: 'avgPrice',
             label: 'Preço médio',
@@ -814,37 +1002,12 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
             width: '112px',
           },
         ]),
-    ...(sheetKey === 'equities'
-      ? [
-          {
-            key: 'updatedQuote',
-            label: 'Cotação atual',
-            type: 'currency',
-            align: 'right',
-            width: '108px',
-            render: (row) =>
-              renderPriceCell(row.updatedQuote ?? row.lastPrice),
-          },
-        ]
-      : []),
     {
       key: 'marketValue',
       label: 'Valor',
       type: 'currency',
       align: 'right',
       width: '112px',
-      render:
-        sheetKey === 'equities'
-          ? (row) => {
-              const span = document.createElement('span');
-              const value = equityMarketValue(row);
-              span.textContent = value > 0 ? formatBrl(value) : '—';
-              if (value <= 0) span.className = 'muted';
-              span.title =
-                'Cotação de mercado × quantidade (patrimônio). Resultado e % usam PM B3 como custo.';
-              return span;
-            }
-          : undefined,
     },
     {
       key: 'allocationPct',
@@ -866,77 +1029,22 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
       align: 'right',
       width: '112px',
       colorLogic: 'inflow',
-      render:
-        sheetKey === 'equities'
-          ? (row) => {
-              const span = document.createElement('span');
-              const pnl = equityResultFromB3Quote(row);
-              span.textContent = formatBrl(pnl);
-              span.className = pnlClass(pnl);
-              span.style.fontWeight = '600';
-              span.title = '(Cotação atual. − PM B3) × quantidade';
-              return span;
-            }
-          : undefined,
     },
     {
       key: 'pnlPct',
-      label: sheetKey === 'equities' ? '%' : '% Resultado',
+      label: '% Resultado',
       type: 'number',
       align: 'right',
-      width: sheetKey === 'equities' ? '56px' : '96px',
+      width: '96px',
       render: (row) => {
         const span = document.createElement('span');
-        const pct =
-          sheetKey === 'equities' ? equityReturnPctB3(row) : row.pnlPct;
-        const pnlForColor =
-          sheetKey === 'equities' ? equityResultFromB3Quote(row) : row.pnl;
-        span.className = pnlClass(pnlForColor);
+        span.className = pnlClass(row.pnl);
         span.style.fontWeight = '600';
-        span.textContent = formatPct(pct);
-        if (sheetKey === 'equities') {
-          span.title = '(Cotação − PM B3) / PM B3';
-        }
+        span.textContent = formatPct(row.pnlPct);
         return span;
       },
     },
   );
-
-  if (sheetKey === 'equities') {
-    cols.push(
-      {
-        key: 'callsSold',
-        label: 'CALLs vendidas',
-        type: 'number',
-        align: 'right',
-        width: '108px',
-        render: (row) => {
-          const span = document.createElement('span');
-          if (row.callsSold == null) {
-            span.className = 'muted';
-            span.textContent = '—';
-            return span;
-          }
-          span.textContent = formatNumber(row.callsSold, 0);
-          
-          const rem = Number(row.callsRemaining);
-          if (rem < 0) {
-            span.style.fontWeight = '600';
-            span.className = 'portfolio-calls-uncovered';
-            span.title = `Venda a descoberto: há ${formatNumber(Math.abs(rem), 0)} CALLs vendidas a mais do que a quantidade de ações em custódia. Alto risco de exercício descoberto!`;
-          } else {
-            const prem = Number(row.callsPremiumPending);
-            if (prem > 0) {
-              span.title = `CALLs vendidas (soma das posições curtas CALL, incl. PRIOF). Prêmio em trânsito (D+1): ${formatBrl(prem)}`;
-            } else {
-              span.title = 'CALLs vendidas — soma das posições curtas CALL (planilha Opções + livro-razão)';
-            }
-          }
-          return span;
-        },
-      }
-    );
-  }
 
   return cols;
 }
@@ -980,7 +1088,7 @@ function renderTableSection(
       : items;
   const mountId = `pft-${++portfolioTableSeq}`;
   registerCoCeoExcelMount(mountId, {
-    gridId: `invest-portfolio-${mountId}`,
+    gridId: `invest-portfolio-${sheetKey}`,
     coCeoColumns: buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sheetKey),
     rows,
     emptyText: emptyLabel,

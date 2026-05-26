@@ -60,6 +60,55 @@ function indexedToPct(indexLevel) {
   return (Number(indexLevel) / 100 - 1) * 100;
 }
 
+function isoDate(value) {
+  return String(value ?? '').slice(0, 10);
+}
+
+function indexSeriesHasVariation(values) {
+  const nums = values
+    .filter((v) => v != null && Number.isFinite(Number(v)))
+    .map((v) => Number(v));
+  if (nums.length < 2) return false;
+  return Math.max(...nums) - Math.min(...nums) > 0.05;
+}
+
+/**
+ * Curva da carteira no gráfico: API (portfolioIndexed) → performance.points → patrimônio.
+ * Evita linha invisível quando TWR gravado veio plano mas o resumo já mostra rentabilidade.
+ */
+export function buildPortfolioIndexValues(labels, patrimonyBrl, portfolioChartSeries, performance) {
+  const fromApiMap = new Map(
+    (portfolioChartSeries || []).map((p) => [isoDate(p.date), Number(p.indexedLevel)])
+  );
+
+  if (fromApiMap.size) {
+    const aligned = labels.map((d) => {
+      const v = fromApiMap.get(isoDate(d));
+      return v != null && Number.isFinite(v) ? v : null;
+    });
+    const rebased = rebaseIndexedSeries(aligned);
+    if (indexSeriesHasVariation(rebased)) return rebased;
+  }
+
+  const points = performance?.points;
+  if (points?.length) {
+    const perfMap = new Map(
+      points.map((p) => [isoDate(p.date), Number(p.cumulativeReturnTwr ?? 0)])
+    );
+    const fromPerf = rebaseIndexedSeries(
+      labels.map((d) => {
+        const key = isoDate(d);
+        if (!perfMap.has(key)) return null;
+        const twr = perfMap.get(key) ?? 0;
+        return Math.round(100 * (1 + twr) * 1_000_000) / 1_000_000;
+      })
+    );
+    if (indexSeriesHasVariation(fromPerf)) return fromPerf;
+  }
+
+  return rebaseIndexedSeries(toIndexedFromFirst(patrimonyBrl));
+}
+
 function renderCashTransitBlock(cashInTransit) {
   if (!cashInTransit) return '';
   return `<div class="holding-summary-side muted" style="margin-top:8px;text-align:left">
@@ -207,15 +256,12 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
 
   const labels = clipped.map((p) => p.date);
   const patrimonyBrl = clipped.map((p) => Number(p.patrimony));
-  const twrByDate = new Map(
-    (opts.portfolioChartSeries || []).map((p) => [
-      String(p.date).slice(0, 10),
-      Number(p.indexedLevel),
-    ])
+  const portfolioIndexed = buildPortfolioIndexValues(
+    labels,
+    patrimonyBrl,
+    opts.portfolioChartSeries,
+    opts.performance
   );
-  const portfolioIndexed = twrByDate.size
-    ? rebaseIndexedSeries(labels.map((d) => (twrByDate.has(d) ? twrByDate.get(d) : null)))
-    : rebaseIndexedSeries(toIndexedFromFirst(patrimonyBrl));
   const tickSet = new Set(sampleLabels(clipped));
 
   const gold = '#DAB177';
@@ -245,22 +291,19 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
     ? `${opts.datasetLabel} (TWR %)`
     : 'Carteira (TWR %)';
 
+  const indexLevels = [
+    ...portfolioIndexed,
+    ...(hasCdi ? cdiValues : []),
+    ...(hasStock ? stockValues : []),
+  ].filter((v) => v != null && Number.isFinite(Number(v)));
+  const idxMin = indexLevels.length ? Math.min(...indexLevels.map(Number)) : 100;
+  const idxMax = indexLevels.length ? Math.max(...indexLevels.map(Number)) : 100;
+  const yPadding = Math.max(3, (idxMax - idxMin) * 0.06);
+  const yAxisMin = Math.min(100, idxMin) - yPadding;
+
   /** @type {import('chart.js').ChartDataset[]} */
-  const datasets = [
-    {
-      label: portfolioLabel,
-      data: portfolioIndexed,
-      borderColor: gold,
-      backgroundColor: goldFill,
-      borderWidth: 2.5,
-      tension: 0.35,
-      fill: true,
-      pointRadius: 0,
-      pointHitRadius: 8,
-      pointHoverRadius: 4,
-      yAxisID: 'yIndex',
-    },
-  ];
+  /** @type {import('chart.js').ChartDataset[]} */
+  const datasets = [];
 
   if (hasCdi) {
     datasets.push({
@@ -275,6 +318,7 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
       pointHitRadius: 8,
       pointHoverRadius: 3,
       yAxisID: 'yIndex',
+      order: 1,
     });
   }
 
@@ -291,8 +335,25 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
       pointHitRadius: 8,
       pointHoverRadius: 3,
       yAxisID: 'yIndex',
+      order: 2,
     });
   }
+
+  datasets.push({
+    label: portfolioLabel,
+    data: portfolioIndexed,
+    borderColor: gold,
+    backgroundColor: goldFill,
+    borderWidth: 3,
+    tension: 0.35,
+    fill: true,
+    spanGaps: true,
+    pointRadius: 0,
+    pointHitRadius: 8,
+    pointHoverRadius: 4,
+    yAxisID: 'yIndex',
+    order: 10,
+  });
 
   const wrap = canvas.parentElement;
   if (wrap) {
@@ -339,7 +400,8 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
               const pct =
                 y != null ? indexedToPct(y)?.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : null;
               const pctStr = pct != null ? `${pct}%` : '—';
-              if (ctx.datasetIndex === 0) {
+              const isPortfolio = String(ctx.dataset.label || '').includes('(TWR %)');
+              if (isPortfolio) {
                 const i = ctx.dataIndex;
                 const brl = i != null ? patrimonyBrl[i] : null;
                 return [
@@ -355,7 +417,7 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
       scales: {
         yIndex: {
           position: 'left',
-          min: 100,
+          min: yAxisMin,
           grid: { color: 'rgba(255,255,255,0.06)' },
           ticks: {
             color: '#94A3B8',

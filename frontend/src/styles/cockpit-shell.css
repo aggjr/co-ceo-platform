@@ -123,7 +123,7 @@
 }
 
 .shell .nav-module-items .nav-link--child {
-  padding: 8px 20px 8px 16px;
+  padding: 8px 20px 8px 35px;
   font-size: 12px;
   border-left: 4px solid transparent;
 }
@@ -344,6 +344,25 @@
   color: rgba(255, 255, 255, 0.4);
   font-size: 11px;
   letter-spacing: 0.5px;
+}
+
+.shell .header-user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.shell .header-user-login {
+  font-size: 11px;
+  line-height: 1.2;
+  color: rgba(255, 255, 255, 0.65);
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
 }
 
 .shell .avatar {

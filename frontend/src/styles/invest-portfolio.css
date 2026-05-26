@@ -1,3 +1,13 @@
+/* CALL / PUT — mesma paleta em tabela Excel, cards e histórico */
+:root {
+  --invest-option-call-color: #60a5fa;
+  --invest-option-call-bg: rgba(59, 130, 246, 0.2);
+  --invest-option-put-color: #fb923c;
+  --invest-option-put-bg: rgba(249, 115, 22, 0.2);
+  --invest-type-call: var(--invest-option-call-color);
+  --invest-type-put: var(--invest-option-put-color);
+}
+
 .portfolio-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -284,8 +294,12 @@
   color: #c7364a !important;
 }
 
+.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-option-type--call {
+  color: var(--invest-option-call-color) !important;
+}
+
 .portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-option-type--put {
-  color: #ea580c !important;
+  color: var(--invest-option-put-color) !important;
 }
 
 .portfolio-excel-section .coceo-excel-grid-host .table-wrapper table thead tr {
@@ -358,11 +372,13 @@
 }
 
 .portfolio-excel-section .portfolio-option-type--call {
-  color: #60a5fa;
+  color: var(--invest-option-call-color);
+  font-weight: 600;
 }
 
 .portfolio-excel-section .portfolio-option-type--put {
-  color: #f97316;
+  color: var(--invest-option-put-color);
+  font-weight: 600;
 }
 
 /* Qtd negativa — mesmo tom do histórico de operações (.notes-cv--sell) */
@@ -377,7 +393,7 @@
 }
 
 .portfolio-excel-section .portfolio-options-call-total strong {
-  color: #60a5fa;
+  color: var(--invest-option-call-color);
   font-weight: 700;
 }
 

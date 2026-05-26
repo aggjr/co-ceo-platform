@@ -117,7 +117,8 @@ function buildColumns(columnLabels, columnOrder, uiTexts = {}) {
   return cols;
 }
 
-function bindPage(container) {
+function bindPage(container, initialBounds, uiTexts) {
+  let bounds = initialBounds;
   const fromInput = container.querySelector('#sgp-from');
   const toInput = container.querySelector('#sgp-to');
   const reloadBtn = container.querySelector('#sgp-reload');

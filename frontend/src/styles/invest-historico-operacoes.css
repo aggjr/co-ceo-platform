@@ -33,11 +33,10 @@
 .notes-type--call {
   color: var(--invest-type-call, #60a5fa);
   font-weight: 700;
-  letter-spacing: 0.04em;
 }
 
 .notes-type--put {
-  color: var(--invest-type-put, #f97316);
+  color: var(--invest-type-put, #fb923c);
   font-weight: 700;
   letter-spacing: 0.04em;
 }

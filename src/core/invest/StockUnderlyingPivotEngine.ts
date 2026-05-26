@@ -305,10 +305,15 @@ export function buildStockUnderlyingPivot(
     if (!isStockUnderlying(ticker)) continue;
     const row = getRow(ticker);
     
-    // Calcula o "resultado_custodia" = caixa travado ou recebido pela posição aberta
-    if (Math.abs(pos.quantity) > 0 && pos.avgPrice > 0) {
-       const openCashFlow = pos.quantity > 0 ? -(pos.quantity * pos.avgPrice) : (Math.abs(pos.quantity) * pos.avgPrice);
-       addToRow(row, 'resultado_custodia', openCashFlow);
+    // Resultado de custódia: apenas prêmio de opções vendidas ainda abertas.
+    // Não entra custo da ação comprada (isso é capital investido, não ganho/perda).
+    if (
+      (pos.assetType === 'option_call' || pos.assetType === 'option_put') &&
+      pos.quantity < 0 &&
+      pos.avgPrice > 0
+    ) {
+      const openPremium = Math.abs(pos.quantity) * pos.avgPrice;
+      addToRow(row, 'resultado_custodia', openPremium);
     }
   }
 

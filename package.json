@@ -1,6 +1,6 @@
 {
   "name": "co-ceo-core",
-  "version": "0.0.115",
+  "version": "0.0.143",
   "description": "co-CEO Platform Core API",
   "main": "dist/index.js",
   "scripts": {
@@ -80,6 +80,7 @@
   "dependencies": {
     "bcrypt": "^5.1.1",
     "chart.js": "^4.5.1",
+    "chartjs-plugin-annotation": "^3.1.0",
     "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
