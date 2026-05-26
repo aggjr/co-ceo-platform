@@ -63,6 +63,7 @@ import {
   applyCashInvestBalanceToItems,
   enrichPortfolioRow,
   attachUnderlyingMarketData,
+  buildLongEquityPmMapFromAssetRows,
   consolidateTesouroPortfolioItems,
   mergeLedgerCustodyIntoAssetRows,
   mergeOptionStrikeIntoAssetRow,
@@ -175,12 +176,6 @@ export class InvestController {
     const optionsOnly = assetClassQuery === 'options';
 
     const rows = await this.assetProjection.listActiveAssets(ctx);
-    let assetRows = rows as Record<string, unknown>[];
-    if (assetClassQuery) {
-      assetRows = assetRows.filter((r) =>
-        portfolioRowMatchesAssetClass(r, assetClassQuery)
-      );
-    }
 
     const today = new Date().toISOString().slice(0, 10);
     const ledgerEvents = await this.ledger.listLedgerEvents(
@@ -189,7 +184,17 @@ export class InvestController {
       today
     );
     const { assets: ledgerCustody } = rebuildCustodyFromLedger(ledgerEvents);
-    const rowsMerged = mergeLedgerCustodyIntoAssetRows(assetRows, ledgerCustody);
+    const allMerged = mergeLedgerCustodyIntoAssetRows(
+      rows as Record<string, unknown>[],
+      ledgerCustody
+    );
+    const equityPmByUnderlying = buildLongEquityPmMapFromAssetRows(allMerged);
+    let rowsMerged = allMerged;
+    if (assetClassQuery) {
+      rowsMerged = allMerged.filter((r) =>
+        portfolioRowMatchesAssetClass(r, assetClassQuery)
+      );
+    }
 
     const threeByUnderlying = optionsOnly
       ? new Map<string, { strict: number; b3: number; managerial: number }>()
@@ -341,7 +346,11 @@ export class InvestController {
       const price = Number(mq.price);
       if (price > 0) underlyingSpots.set(ticker.toUpperCase(), price);
     }
-    const withUnderlyingQuotes = attachUnderlyingMarketData(items, underlyingSpots);
+    const withUnderlyingQuotes = attachUnderlyingMarketData(
+      items,
+      underlyingSpots,
+      equityPmByUnderlying
+    );
     withUnderlyingQuotes.sort((a, b) => b.marketValue - a.marketValue);
     const { open, closedOptions } = partitionPortfolioPositions(withUnderlyingQuotes);
     const consolidated = optionsOnly

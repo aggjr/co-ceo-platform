@@ -568,6 +568,26 @@ export function buildInvestOptionsColumns() {
       },
     },
     {
+      key: 'underlyingPmStrict',
+      label: 'PM estrito ação',
+      type: 'currency',
+      align: 'right',
+      width: '112px',
+      render: (row) => {
+        const pm = row.underlyingPmStrict;
+        const span = document.createElement('span');
+        if (pm == null || Number(pm) <= 0) {
+          span.className = 'muted';
+          span.textContent = '—';
+          span.title = 'Sem ação comprada na custódia para este subjacente';
+          return span;
+        }
+        span.textContent = formatBrl(pm);
+        span.title = 'Preço médio estrito da posição comprada na ação-mãe';
+        return span;
+      },
+    },
+    {
       key: 'strikeDistancePct',
       label: 'Dist. strike',
       type: 'text',
