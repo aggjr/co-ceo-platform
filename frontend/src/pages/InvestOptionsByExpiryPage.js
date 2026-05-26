@@ -59,21 +59,53 @@ const AMP_COLORS = {
 let currentChartQty = null;
 let currentChartNotional = null;
 
-function getFractionalIndex(quote, sortedStrikesList) {
-  if (sortedStrikesList.length === 0) return 0;
-  if (quote <= sortedStrikesList[0]) return 0;
-  if (quote >= sortedStrikesList[sortedStrikesList.length - 1]) {
-    return sortedStrikesList.length - 1;
+/** Eixo X numérico (R$ strike) — distância visual proporcional ao valor do strike. */
+function ampLinearXScale(sortedStrikes, quote) {
+  let minS = sortedStrikes[0];
+  let maxS = sortedStrikes[sortedStrikes.length - 1];
+  if (quote != null && Number.isFinite(Number(quote))) {
+    minS = Math.min(minS, Number(quote));
+    maxS = Math.max(maxS, Number(quote));
   }
-  for (let i = 0; i < sortedStrikesList.length - 1; i++) {
-    const s1 = sortedStrikesList[i];
-    const s2 = sortedStrikesList[i + 1];
-    if (quote >= s1 && quote <= s2) {
-      const ratio = (quote - s1) / (s2 - s1);
-      return i + ratio;
-    }
-  }
-  return 0;
+  const span = maxS - minS || 1;
+  const pad = Math.max(0.5, span * 0.025);
+  return {
+    type: 'linear',
+    min: minS - pad,
+    max: maxS + pad,
+    grid: { color: 'rgba(148, 163, 184, 0.1)' },
+    ticks: {
+      color: '#94a3b8',
+      maxRotation: 45,
+      minRotation: 45,
+      autoSkip: false,
+      values: sortedStrikes,
+      callback: (value) => formatBrl(Number(value)),
+    },
+  };
+}
+
+function ampBarDataset(label, sortedStrikes, volumeByStrike, field, color) {
+  const data = sortedStrikes.map((s) => ({
+    x: s,
+    y: volumeByStrike.get(s)[field],
+  }));
+  if (!data.some((p) => p.y > 0)) return null;
+  return {
+    label,
+    data,
+    parsing: false,
+    backgroundColor: color,
+    maxBarThickness: 14,
+  };
+}
+
+function ampTooltipLabel(ctx, formatValue) {
+  const y = ctx.parsed?.y ?? 0;
+  const x = ctx.parsed?.x;
+  const strike =
+    x != null && Number.isFinite(Number(x)) ? formatBrl(Number(x)) : '—';
+  return `${ctx.dataset.label}: ${formatValue(y)} · strike ${strike}`;
 }
 
 function strikesFromPortfolio(rows, underlying, expiry) {
@@ -290,57 +322,46 @@ export async function InvestOptionsByExpiryPage(container) {
       }
     });
 
-    const labels = sortedStrikes.map((s) => formatBrl(s));
-    const cQty = sortedStrikes.map((s) => volumeByStrike.get(s).callQty);
-    const pQty = sortedStrikes.map((s) => volumeByStrike.get(s).putQty);
-    const cNot = sortedStrikes.map((s) => volumeByStrike.get(s).callNotional);
-    const pNot = sortedStrikes.map((s) => volumeByStrike.get(s).putNotional);
+    const datasetsQty = [
+      ampBarDataset(
+        `${underlying} Call Qtd`,
+        sortedStrikes,
+        volumeByStrike,
+        'callQty',
+        AMP_COLORS.call
+      ),
+      ampBarDataset(
+        `${underlying} Put Qtd`,
+        sortedStrikes,
+        volumeByStrike,
+        'putQty',
+        AMP_COLORS.put
+      ),
+    ].filter(Boolean);
 
-    const datasetsQty = [];
-    const datasetsNotional = [];
-    if (cQty.some((v) => v > 0)) {
-      datasetsQty.push({
-        label: `${underlying} Call Qtd`,
-        data: cQty,
-        backgroundColor: AMP_COLORS.call,
-        maxBarThickness: 36,
-        barPercentage: 0.85,
-        categoryPercentage: 0.9,
-      });
-      datasetsNotional.push({
-        label: `${underlying} Call Notional`,
-        data: cNot,
-        backgroundColor: AMP_COLORS.call,
-        maxBarThickness: 36,
-        barPercentage: 0.85,
-        categoryPercentage: 0.9,
-      });
-    }
-    if (pQty.some((v) => v > 0)) {
-      datasetsQty.push({
-        label: `${underlying} Put Qtd`,
-        data: pQty,
-        backgroundColor: AMP_COLORS.put,
-        maxBarThickness: 36,
-        barPercentage: 0.85,
-        categoryPercentage: 0.9,
-      });
-      datasetsNotional.push({
-        label: `${underlying} Put Notional`,
-        data: pNot,
-        backgroundColor: AMP_COLORS.put,
-        maxBarThickness: 36,
-        barPercentage: 0.85,
-        categoryPercentage: 0.9,
-      });
-    }
+    const datasetsNotional = [
+      ampBarDataset(
+        `${underlying} Call Notional`,
+        sortedStrikes,
+        volumeByStrike,
+        'callNotional',
+        AMP_COLORS.call
+      ),
+      ampBarDataset(
+        `${underlying} Put Notional`,
+        sortedStrikes,
+        volumeByStrike,
+        'putNotional',
+        AMP_COLORS.put
+      ),
+    ].filter(Boolean);
 
     const annotations = {};
     if (quote != null) {
       annotations['quote-line'] = {
         type: 'line',
         scaleID: 'x',
-        value: getFractionalIndex(quote, sortedStrikes),
+        value: quote,
         borderColor: AMP_COLORS.quoteLine,
         borderWidth: 2,
         borderDash: [4, 4],
@@ -363,25 +384,24 @@ export async function InvestOptionsByExpiryPage(container) {
     if (currentChartQty) currentChartQty.destroy();
     if (currentChartNotional) currentChartNotional.destroy();
 
+    const xScale = ampLinearXScale(sortedStrikes, quote);
+
     const commonOptions = {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
       plugins: {
         legend: { position: 'top', labels: { color: '#cbd5e1' } },
         annotation: { annotations },
       },
       scales: {
-        x: {
-          ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 45 },
-          grid: { color: 'rgba(148, 163, 184, 0.1)' },
-        },
+        x: xScale,
       },
     };
 
     currentChartQty = new Chart(canvasQty, {
       type: 'bar',
-      data: { labels, datasets: datasetsQty },
+      data: { datasets: datasetsQty },
       options: {
         ...commonOptions,
         plugins: {
@@ -395,7 +415,7 @@ export async function InvestOptionsByExpiryPage(container) {
           },
           tooltip: {
             callbacks: {
-              label: (ctx) => `${ctx.dataset.label}: ${formatNumber(ctx.raw, 0)}`,
+              label: (ctx) => ampTooltipLabel(ctx, (v) => formatNumber(v, 0)),
             },
           },
         },
@@ -413,7 +433,7 @@ export async function InvestOptionsByExpiryPage(container) {
 
     currentChartNotional = new Chart(canvasNotional, {
       type: 'bar',
-      data: { labels, datasets: datasetsNotional },
+      data: { datasets: datasetsNotional },
       options: {
         ...commonOptions,
         plugins: {
@@ -427,7 +447,7 @@ export async function InvestOptionsByExpiryPage(container) {
           },
           tooltip: {
             callbacks: {
-              label: (ctx) => `${ctx.dataset.label}: ${formatBrl(ctx.raw)}`,
+              label: (ctx) => ampTooltipLabel(ctx, (v) => formatBrl(v)),
             },
           },
         },
