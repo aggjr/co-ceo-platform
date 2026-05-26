@@ -88,13 +88,13 @@ export const MENU_CATALOG = [
             resourceKey: 'screen.invest.portfolio',
           },
           {
-<<<<<<< HEAD
             label: 'Exposição',
             path: '/invest/opcoes/exposicao',
-=======
-            label: 'PrevisAo',
+            resourceKey: 'screen.invest.portfolio',
+          },
+          {
+            label: 'Previsão',
             path: '/invest/opcoes/previsao',
->>>>>>> origin/main
             resourceKey: 'screen.invest.portfolio',
           },
         ],

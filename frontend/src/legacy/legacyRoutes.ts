@@ -17,11 +17,8 @@ import {
 import { InvestOptionsRedirectPage } from '../pages/InvestOptionsRedirectPage.js';
 import { InvestOptionsCardsPage } from '../pages/InvestOptionsCardsPage.js';
 import { InvestOptionsByExpiryPage } from '../pages/InvestOptionsByExpiryPage.js';
-<<<<<<< HEAD
 import { InvestOptionsExposurePage } from '../pages/InvestOptionsExposurePage.js';
-=======
 import { InvestOptionsForecastPage } from '../pages/InvestOptionsForecastPage.js';
->>>>>>> origin/main
 import { InvestResultadoPage } from '../pages/InvestResultadoPage.js';
 import { InvestClosedTradesPage } from '../pages/InvestClosedTradesPage.js';
 import { InvestStockGainPivotPage } from '../pages/InvestStockGainPivotPage.js';
@@ -50,11 +47,8 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/invest/opcoes/tabela', loader: InvestOptionsTablePage },
   { path: '/invest/opcoes/cards', loader: InvestOptionsCardsPage },
   { path: '/invest/opcoes/vencimentos', loader: InvestOptionsByExpiryPage },
-<<<<<<< HEAD
   { path: '/invest/opcoes/exposicao', loader: InvestOptionsExposurePage },
-=======
   { path: '/invest/opcoes/previsao', loader: InvestOptionsForecastPage },
->>>>>>> origin/main
   { path: '/invest/titulos', loader: InvestFixedIncomePage },
   { path: '/invest/carteira-acoes-fiis', loader: InvestEquitiesPage },
   { path: '/invest/resultado', loader: InvestResultadoPage },
