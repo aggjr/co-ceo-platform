@@ -1,4 +1,15 @@
 -- Tela Exposição notional (PUTs / CALLs por vencimento)
+ALTER TABLE ui_text_catalog
+  MODIFY COLUMN kind ENUM(
+    'menu_item',
+    'screen_title',
+    'column_label',
+    'field_label',
+    'value_label',
+    'button_label',
+    'description'
+  ) NOT NULL;
+
 INSERT INTO ui_text_catalog (id, text_key, module_code, kind, default_text, locale)
 VALUES
   ('00000000-0000-4003-8000-000000000183', 'menu.invest.options.exposure', 'INVEST', 'menu_item', 'Exposição', 'pt-BR'),
