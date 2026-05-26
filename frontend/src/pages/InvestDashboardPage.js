@@ -117,9 +117,14 @@ function bindPatrimonyChart(container, initialBounds) {
 
       const canvas = chartHost.querySelector('#holding-patrimony-canvas');
       if (canvas) {
+        const todayChart = todayIso();
+        const portfolioChartSeries = (data.portfolioIndexed || []).filter(
+          (p) => String(p.date).slice(0, 10) <= todayChart
+        );
         const result = mountHoldingPatrimonyChart(canvas, series, {
           datasetLabel: chartLegendLabel(data),
-          portfolioChartSeries: data.portfolioIndexed,
+          portfolioChartSeries,
+          performance: data.performance,
           cdiBenchmark: data.cdiBenchmark,
           stockBenchmark: data.stockBenchmark,
         });

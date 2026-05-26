@@ -583,7 +583,12 @@ export class InvestController {
     if (storedDays.length > 0) {
       const merged = mergeStoredPatrimonySeries(result.series, storedDays);
       const series = trimZeroPatrimonyTailAfterLastStored(merged.series, storedDays);
-      const mergedPerformance = computePortfolioPerformance(series, events, from, to);
+      storedDates = merged.storedDates.filter((d) => series.some((p) => p.date === d));
+      result = { ...result, series };
+    }
+
+    const performanceOnSeries = computePortfolioPerformance(result.series, events, from, to);
+    if (performanceOnSeries) {
       const anchorExtras = result.performance
         ? {
             monthAnchorTwr: result.performance.monthAnchorTwr,
@@ -593,12 +598,8 @@ export class InvestController {
         : {};
       result = {
         ...result,
-        series,
-        performance: mergedPerformance
-          ? { ...mergedPerformance, ...anchorExtras }
-          : result.performance,
+        performance: { ...performanceOnSeries, ...anchorExtras },
       };
-      storedDates = merged.storedDates.filter((d) => series.some((p) => p.date === d));
     }
 
     const fromMonth = from.slice(0, 7);
