@@ -97,11 +97,6 @@ export const MENU_CATALOG = [
             path: '/invest/opcoes/exposicao',
             resourceKey: 'screen.invest.portfolio',
           },
-          {
-            label: 'Previsão',
-            path: '/invest/opcoes/previsao',
-            resourceKey: 'screen.invest.portfolio',
-          },
         ],
       },
       {
