@@ -60,13 +60,18 @@ let currentChartQty = null;
 let currentChartNotional = null;
 
 /** Eixo X numérico (R$ strike) — distância visual proporcional ao valor do strike. */
-function buildXScale(activeStrikes, underlyingQuote) {
+function buildXScale(activeStrikes, underlyingQuote, pmStrict) {
   let minS = Math.min(...activeStrikes);
   let maxS = Math.max(...activeStrikes);
   if (underlyingQuote != null && underlyingQuote > 0) {
     const quote = Number(underlyingQuote);
     minS = Math.min(minS, quote);
     maxS = Math.max(maxS, quote);
+  }
+  if (pmStrict != null && pmStrict > 0) {
+    const pm = Number(pmStrict);
+    minS = Math.min(minS, pm);
+    maxS = Math.max(maxS, pm);
   }
   const span = maxS - minS || 1;
   const pad = Math.max(0.5, span * 0.025);
@@ -289,6 +294,7 @@ export async function InvestOptionsByExpiryPage(container) {
       volumeByStrike.set(s, { callQty: 0, callNotional: 0, putQty: 0, putNotional: 0 });
     }
 
+    let pmStrict = null;
     filtered.forEach((row) => {
       const f = cardFieldRows(row);
       if (f.strike == null || !volumeByStrike.has(f.strike)) return;
@@ -304,6 +310,9 @@ export async function InvestOptionsByExpiryPage(container) {
       }
       if (quote == null && f.underlyingQuote > 0) {
         quote = f.underlyingQuote;
+      }
+      if (pmStrict == null && row.underlyingPmStrict > 0) {
+        pmStrict = Number(row.underlyingPmStrict);
       }
     });
 
@@ -382,6 +391,28 @@ export async function InvestOptionsByExpiryPage(container) {
       };
     }
 
+    if (pmStrict != null && pmStrict > 0) {
+      const pmLabelY = (quote != null && Math.abs(pmStrict - quote) < (quote * 0.05)) ? 30 : 0;
+      annotations['pm-strict-line'] = {
+        type: 'line',
+        scaleID: 'x',
+        value: pmStrict,
+        borderColor: 'rgba(255, 215, 0, 0.8)',
+        borderWidth: 2,
+        borderDash: [4, 4],
+        label: {
+          display: true,
+          content: `PM Estrito ${underlying}: ${formatBrl(pmStrict)}`,
+          position: 'start',
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          color: 'rgba(255, 215, 0, 0.8)',
+          font: { size: 12, weight: 'bold' },
+          padding: 6,
+          yAdjust: pmLabelY
+        },
+      };
+    }
+
     const canvasQty = document.getElementById('amp-chart-qty');
     const canvasNotional = document.getElementById('amp-chart-notional');
     if (!canvasQty || !canvasNotional) return;
@@ -398,7 +429,7 @@ export async function InvestOptionsByExpiryPage(container) {
         annotation: { annotations },
       },
       scales: {
-        x: buildXScale(activeStrikes, quote),
+        x: buildXScale(activeStrikes, quote, pmStrict),
       },
     };
 
