@@ -1,9 +1,9 @@
 /* CALL / PUT — mesma paleta em tabela Excel, cards e histórico */
 :root {
-  --invest-option-call-color: #86efac;
-  --invest-option-call-bg: rgba(34, 197, 94, 0.2);
-  --invest-option-put-color: #d8b4fe;
-  --invest-option-put-bg: rgba(168, 85, 247, 0.2);
+  --invest-option-call-color: #60a5fa;
+  --invest-option-call-bg: rgba(59, 130, 246, 0.2);
+  --invest-option-put-color: #fb923c;
+  --invest-option-put-bg: rgba(249, 115, 22, 0.2);
   --invest-type-call: var(--invest-option-call-color);
   --invest-type-put: var(--invest-option-put-color);
 }

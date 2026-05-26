@@ -51,9 +51,9 @@ const TEXT_KEYS = [
 
 /** Mesma paleta ITUB: call clara, put escura — uma ação por vez. */
 const AMP_COLORS = {
-  call: 'rgba(125, 211, 252, 0.9)',
-  put: 'rgba(2, 132, 199, 0.9)',
-  quoteLine: 'rgba(125, 211, 252, 1)',
+  call: 'rgba(59, 130, 246, 0.8)',
+  put: 'rgba(249, 115, 22, 0.8)',
+  quoteLine: 'rgba(200, 200, 200, 0.8)',
 };
 
 let currentChartQty = null;
