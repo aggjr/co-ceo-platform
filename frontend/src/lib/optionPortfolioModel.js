@@ -45,12 +45,32 @@ export function isOptionInTheMoney(row) {
 /**
  * itm = dentro do dinheiro; near = até 5% do strike (fora do dinheiro); far = mais distante.
  */
-export function optionMoneynessBand(row) {
+export function optionMoneynessBand(row, nearPct = 5) {
   const dist = computeStrikeDistance(row);
   if (!dist) return 'unknown';
   if (isOptionInTheMoney(row)) return 'itm';
-  if (Math.abs(dist.pct) <= 5) return 'near';
+  if (Math.abs(dist.pct) <= nearPct) return 'near';
   return 'far';
+}
+
+/** Distância % spot vs strike (positivo = spot acima do strike). */
+export function optionDistancePct(row) {
+  const dist = computeStrikeDistance(row);
+  return dist?.pct ?? null;
+}
+
+/**
+ * Faixas cumulativas para panorama/previsão (percentuais customizáveis).
+ * itm | withinPct1 (|dist|≤pct1 ou ITM) | withinPct2 (|dist|≤pct2 ou ITM) | beyond
+ */
+export function optionMoneynessCumulativeBand(row, pct1 = 5, pct2 = 10) {
+  if (isOptionInTheMoney(row)) return 'itm';
+  const pct = optionDistancePct(row);
+  if (pct == null || !Number.isFinite(pct)) return 'unknown';
+  const abs = Math.abs(pct);
+  if (abs <= pct1) return 'withinPct1';
+  if (abs <= pct2) return 'withinPct2';
+  return 'beyond';
 }
 
 export function optionPremiumTotal(row) {
@@ -137,7 +157,7 @@ export function formatDistanceLabel(row) {
 
 export function cardFieldRows(row) {
   const dist = computeStrikeDistance(row);
-  const band = optionMoneynessBand(row);
+  const band = optionMoneynessBand(row, 5);
   const side = resolveOptionSide(row);
   const pnlPct = optionPriceReturnPct(row) ?? row.pnlPct;
   const distanceBrl = dist?.brl ?? null;
@@ -156,6 +176,7 @@ export function cardFieldRows(row) {
     distanceText: formatDistanceLabel(row),
     distanceBrl,
     distanceBand: band,
+    band,
     notional: optionNotionalValue(row),
     pnl: Number(row.pnl),
     pnlPct,
