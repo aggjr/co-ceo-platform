@@ -128,6 +128,7 @@ export function cardFieldRows(row) {
   const band = optionMoneynessBand(row);
   const side = resolveOptionSide(row);
   const pnlPct = optionPriceReturnPct(row) ?? row.pnlPct;
+  const distanceBrl = dist?.brl ?? null;
   return {
     ticker: row.ticker,
     underlying: row.underlying,
@@ -141,6 +142,7 @@ export function cardFieldRows(row) {
     expiry: row.optionExpiryDate,
     underlyingQuote: Number(row.underlyingLastPrice),
     distanceText: formatDistanceLabel(row),
+    distanceBrl,
     distanceBand: band,
     notional: optionNotionalValue(row),
     pnl: Number(row.pnl),

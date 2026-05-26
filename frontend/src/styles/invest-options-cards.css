@@ -162,30 +162,15 @@
   border-bottom: none;
 }
 
-.opt-card-dist--itm td {
-  color: #fca5a5;
-  font-weight: 700;
-}
-
-.opt-card-dist--near td {
-  color: #fdba74;
+/* Valores com sinal: verde positivo, vermelho negativo (igual tabela Excel) */
+.opt-card-table tr.portfolio-pnl--up td {
+  color: #10b981;
   font-weight: 600;
 }
 
-.opt-card-dist--far td {
-  color: #67e8f9;
-}
-
-.opt-card-qty--short td {
-  color: #fca5a5;
-}
-
-.opt-card-pnl--pos td {
-  color: #86efac;
-}
-
-.opt-card-pnl--neg td {
-  color: #fca5a5;
+.opt-card-table tr.portfolio-pnl--down td {
+  color: #e23d52;
+  font-weight: 600;
 }
 
 .opt-expiry-groups {

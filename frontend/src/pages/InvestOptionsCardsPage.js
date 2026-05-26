@@ -10,7 +10,7 @@ import {
   uniqueExpiryDates,
   uniqueUnderlyings,
 } from '../lib/optionPortfolioModel.js';
-import { formatBrl, formatNumber, formatPct } from '../lib/portfolioDisplay.js';
+import { formatBrl, formatNumber, formatPct, pnlClass } from '../lib/portfolioDisplay.js';
 import { fetchOpenOptionsPortfolio } from '../lib/investOptionsShared.js';
 
 function escapeHtml(s) {
@@ -66,9 +66,13 @@ function bandClass(band) {
 function renderCard(row, labels) {
   const f = cardFieldRows(row);
   const badgeClass = f.side === 'put' ? 'opt-card-badge--put' : 'opt-card-badge--call';
-  const qtyClass = f.quantity < 0 ? 'opt-card-qty--short' : '';
-  const pnlClass = f.pnl > 0 ? 'opt-card-pnl--pos' : f.pnl < 0 ? 'opt-card-pnl--neg' : '';
-  const distRowClass = `opt-card-dist--${f.distanceBand}`;
+  const qtyClass = pnlClass(f.quantity);
+  const pnlRowClass = pnlClass(f.pnl);
+  const pnlPctRowClass = pnlClass(Number(f.pnlPct));
+  const distRowClass =
+    f.distanceBrl != null && Number.isFinite(Number(f.distanceBrl))
+      ? pnlClass(Number(f.distanceBrl))
+      : '';
 
   const rows = [
     [labels['field.invest.options.underlying'] || 'Ação ref.', escapeHtml(f.underlying || '—')],
@@ -95,8 +99,8 @@ function renderCard(row, labels) {
     ],
     [labels['field.invest.options.strike_distance'] || 'Distância strike', escapeHtml(f.distanceText), distRowClass],
     [labels['field.invest.options.expiry'] || 'Data strike', escapeHtml(formatDateBr(f.expiry))],
-    [labels['field.invest.options.result_pct'] || 'Resultado %', escapeHtml(f.pnlPctFormatted)],
-    [labels['field.invest.options.result'] || 'Resultado', escapeHtml(f.pnlFormatted), pnlClass],
+    [labels['field.invest.options.result_pct'] || 'Resultado %', escapeHtml(f.pnlPctFormatted), pnlPctRowClass],
+    [labels['field.invest.options.result'] || 'Resultado', escapeHtml(f.pnlFormatted), pnlRowClass],
   ];
 
   const body = rows

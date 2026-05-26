@@ -576,8 +576,9 @@ export function buildInvestOptionsColumns() {
         const sign = dist.brl >= 0 ? '+' : '';
         const pctSign = dist.pct >= 0 ? '+' : '';
         span.textContent = `${sign}${formatNumber(dist.brl, 2)} (${pctSign}${formatNumber(dist.pct, 1)}%)`;
+        span.className = pnlClass(dist.brl);
+        span.style.fontWeight = '600';
         if (isShortOptionExerciseRisk(row)) {
-          span.className = 'portfolio-option-itm';
           span.title = 'Posição vendida dentro do dinheiro — maior risco de exercício';
         } else {
           span.title = 'Spot − strike (R$ e %). Positivo: ação acima do strike.';
@@ -622,7 +623,7 @@ export function buildInvestOptionsColumns() {
       render: (row) => {
         const span = document.createElement('span');
         const pct = optionPriceReturnPct(row) ?? row.pnlPct;
-        span.className = pnlClass(row.pnl);
+        span.className = pnlClass(Number(pct));
         span.style.fontWeight = '600';
         span.textContent = formatPct(pct);
         span.title = '(Último − Preço médio) / Preço médio';
