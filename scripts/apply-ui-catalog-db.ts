@@ -94,6 +94,7 @@ async function main() {
   await runSqlFile(conn2, 'src/database/migrations/27_ui_invest_period_labels.sql');
   await runSqlFile(conn2, 'src/database/migrations/29_ui_invest_options_cards_depara.sql');
   await runSqlFile(conn2, 'src/database/migrations/30_ui_catalog_apply_button_labels.sql');
+  await runSqlFile(conn2, 'src/database/migrations/31_ui_invest_options_exposure.sql');
 
   const keys = [
     'menu.invest.portfolio',

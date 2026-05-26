@@ -1,0 +1,98 @@
+.opt-exposure-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 20px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.opt-exposure-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--color-muted, #94a3b8);
+  min-width: 120px;
+}
+
+.opt-exposure-toolbar select,
+.opt-exposure-toolbar input[type='number'] {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.75);
+  color: inherit;
+  font-size: 13px;
+  min-width: 140px;
+}
+
+.opt-exposure-section {
+  margin-bottom: 28px;
+}
+
+.opt-exposure-section h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.opt-exposure-section .opt-exposure-help {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--color-muted, #94a3b8);
+}
+
+.opt-exposure-table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.opt-exposure-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.opt-exposure-table th,
+.opt-exposure-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  text-align: right;
+}
+
+.opt-exposure-table th:first-child,
+.opt-exposure-table td:first-child {
+  text-align: left;
+  font-weight: 600;
+}
+
+.opt-exposure-table thead th {
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--color-muted, #94a3b8);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.opt-exposure-table tbody tr:hover td {
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.opt-exposure-table tfoot td {
+  font-weight: 700;
+  background: rgba(218, 177, 119, 0.08);
+  border-top: 2px solid rgba(218, 177, 119, 0.25);
+}
+
+.opt-exposure-table .opt-exposure-approx {
+  opacity: 0.92;
+}
+
+.opt-exposure-table .opt-exposure-zero {
+  color: rgba(148, 163, 184, 0.55);
+}

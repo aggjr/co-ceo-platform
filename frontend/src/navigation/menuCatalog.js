@@ -87,6 +87,11 @@ export const MENU_CATALOG = [
             path: '/invest/opcoes/vencimentos',
             resourceKey: 'screen.invest.portfolio',
           },
+          {
+            label: 'Exposição',
+            path: '/invest/opcoes/exposicao',
+            resourceKey: 'screen.invest.portfolio',
+          },
         ],
       },
       {
