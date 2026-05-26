@@ -517,6 +517,14 @@ export function buildInvestOptionsColumns() {
     },
     { key: 'avgPrice', label: 'Prêmio', type: 'currency', align: 'right', width: '104px' },
     {
+      key: 'priceStrict',
+      label: 'Preço estrito',
+      type: 'currency',
+      align: 'right',
+      width: '104px',
+      render: (row) => renderPriceCell(row.prices?.strict),
+    },
+    {
       key: 'updatedQuote',
       label: 'Cotação opção',
       type: 'currency',

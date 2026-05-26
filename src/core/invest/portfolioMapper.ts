@@ -244,7 +244,7 @@ export function enrichPortfolioRow(
   const meta = parseMetadata(row.metadata);
   const qty = Number(row.current_quantity ?? 0);
   const avg = Number(row.managerial_avg_price ?? 0);
-  const prices =
+  let prices =
     threePrices ??
     ({ strict: avg, b3: avg, managerial: avg } satisfies ThreeAvgPrices);
   const metaLast = Number(meta.last_price ?? 0);
@@ -262,6 +262,16 @@ export function enrichPortfolioRow(
     assetType = inferred;
   }
   const optionLike = isOptionTicker(ticker) || isOptionAssetType(assetType);
+  if (optionLike) {
+    const pmStrict = row.pm_estrito != null ? Number(row.pm_estrito) : null;
+    const pmB3Stored = row.pm_b3 != null ? Number(row.pm_b3) : null;
+    const pmGerencial = row.pm_gerencial != null ? Number(row.pm_gerencial) : null;
+    if (pmStrict != null && pmStrict > 0) prices = { ...prices, strict: pmStrict };
+    if (pmB3Stored != null && pmB3Stored > 0) prices = { ...prices, b3: pmB3Stored };
+    if (pmGerencial != null && pmGerencial > 0) {
+      prices = { ...prices, managerial: pmGerencial };
+    }
+  }
   const acqVal = Number(row.acquisition_value ?? 0);
   const curVal = Number(row.current_value ?? 0);
   const custodyUnitPm =

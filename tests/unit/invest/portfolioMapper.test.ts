@@ -268,6 +268,23 @@ describe('portfolioMapper', () => {
     expect(opt.optionStrikeSource).toBe('market_catalog');
   });
 
+  it('opção: preço estrito vem de pm_estrito na extensão', () => {
+    const opt = enrichPortfolioRow({
+      id: 'o-ext',
+      asset_ticker: 'BBASF224',
+      asset_type: 'option_call',
+      current_quantity: -500,
+      managerial_avg_price: 0.18,
+      pm_estrito: 0.22,
+      pm_b3: 0.2,
+      pm_gerencial: 0.18,
+      status: 'active',
+    });
+    expect(opt.prices.strict).toBe(0.22);
+    expect(opt.prices.b3).toBe(0.2);
+    expect(opt.avgPrice).toBeCloseTo(0.18, 4);
+  });
+
   it('opção vendida: prêmio, resultado e notional a partir da custódia', () => {
     const stock = enrichPortfolioRow(
       {
