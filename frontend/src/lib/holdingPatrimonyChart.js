@@ -245,6 +245,16 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
     ? `${opts.datasetLabel} (TWR %)`
     : 'Carteira (TWR %)';
 
+  const indexLevels = [
+    ...portfolioIndexed,
+    ...(hasCdi ? cdiValues : []),
+    ...(hasStock ? stockValues : []),
+  ].filter((v) => v != null && Number.isFinite(Number(v)));
+  const idxMin = indexLevels.length ? Math.min(...indexLevels.map(Number)) : 100;
+  const idxMax = indexLevels.length ? Math.max(...indexLevels.map(Number)) : 100;
+  const yPadding = Math.max(3, (idxMax - idxMin) * 0.06);
+  const yAxisMin = Math.min(100, idxMin) - yPadding;
+
   /** @type {import('chart.js').ChartDataset[]} */
   const datasets = [
     {
@@ -355,7 +365,7 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
       scales: {
         yIndex: {
           position: 'left',
-          min: 100,
+          min: yAxisMin,
           grid: { color: 'rgba(255,255,255,0.06)' },
           ticks: {
             color: '#94A3B8',

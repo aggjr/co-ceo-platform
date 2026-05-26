@@ -28,11 +28,12 @@ import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import {
   buildCdiBenchmarkForChart,
-  buildPatrimonyIndexedSeries,
   buildStockBenchmarkForChart,
-  buildTwrPerformanceChartSeries,
 } from '../core/market/indexBenchmark';
-import { buildStoredTwrChartSeries } from '../core/invest/storedPatrimonyChart';
+import {
+  buildStoredTwrChartSeries,
+  resolvePortfolioIndexedForChart,
+} from '../core/invest/storedPatrimonyChart';
 
 import { resolveInvestPeriodBounds } from '../core/invest/investPeriodBounds';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
@@ -42,7 +43,10 @@ import {
   trimZeroPatrimonyTailAfterLastStored,
   PatrimonyDailyStore,
 } from '../core/invest/PatrimonyDailyStore';
-import { listExternalFlows } from '../core/invest/portfolioPerformance';
+import {
+  computePortfolioPerformance,
+  listExternalFlows,
+} from '../core/invest/portfolioPerformance';
 import {
   attachCallCoverageToEquities,
   buildShortCallPremiumPendingByUnderlying,
@@ -579,7 +583,21 @@ export class InvestController {
     if (storedDays.length > 0) {
       const merged = mergeStoredPatrimonySeries(result.series, storedDays);
       const series = trimZeroPatrimonyTailAfterLastStored(merged.series, storedDays);
-      result = { ...result, series };
+      const mergedPerformance = computePortfolioPerformance(series, events, from, to);
+      const anchorExtras = result.performance
+        ? {
+            monthAnchorTwr: result.performance.monthAnchorTwr,
+            monthAnchorBreakdown: result.performance.monthAnchorBreakdown,
+            periodReturnTwrDaily: result.performance.periodReturnTwrDaily,
+          }
+        : {};
+      result = {
+        ...result,
+        series,
+        performance: mergedPerformance
+          ? { ...mergedPerformance, ...anchorExtras }
+          : result.performance,
+      };
       storedDates = merged.storedDates.filter((d) => series.some((p) => p.date === d));
     }
 
@@ -636,19 +654,16 @@ export class InvestController {
       storedDays.filter((s) => s.cumulative_twr != null).length >= 2
         ? buildStoredTwrChartSeries(storedDays, chartDates, from)
         : [];
-    const portfolioIndexed =
-      storedTwrChart.length >= 2
-        ? storedTwrChart
-        : result.performance?.points?.length
-          ? buildTwrPerformanceChartSeries(result.performance.points)
-          : buildPatrimonyIndexedSeries(result.series);
+    const portfolioIndexed = resolvePortfolioIndexedForChart(
+      result.series,
+      result.performance?.points ?? null,
+      storedTwrChart
+    );
     const portfolioPeriodReturn =
-      storedTwrChart.length >= 2
-        ? storedTwrChart[storedTwrChart.length - 1]!.periodReturnToDate
-        : result.performance?.periodReturnTwr ??
-          (portfolioIndexed.length >= 2
-            ? portfolioIndexed[portfolioIndexed.length - 1]!.periodReturnToDate
-            : null);
+      result.performance?.periodReturnTwr ??
+      (portfolioIndexed.length >= 2
+        ? portfolioIndexed[portfolioIndexed.length - 1]!.periodReturnToDate
+        : null);
     const cdiComparison =
       cdiBenchmark.available &&
       cdiBenchmark.periodReturn != null &&
