@@ -223,7 +223,11 @@ export async function InvestOptionsCardsPage(container) {
     return;
   }
 
-  const filters = { underlying: '', expiry: '', type: '', band: '', detailedView: true };
+  const VIEW_PREF_KEY = 'invest_options_cards_detailed_view';
+  const savedPref = localStorage.getItem(VIEW_PREF_KEY);
+  const initialDetailedView = savedPref !== null ? savedPref === 'true' : false;
+
+  const filters = { underlying: '', expiry: '', type: '', band: '', detailedView: initialDetailedView };
   const underlyings = uniqueUnderlyings(allRows);
   const expiries = uniqueExpiryDates(allRows);
 
@@ -277,6 +281,7 @@ export async function InvestOptionsCardsPage(container) {
     if (toggleBtn) {
       toggleBtn.addEventListener('click', () => {
         filters.detailedView = !filters.detailedView;
+        localStorage.setItem(VIEW_PREF_KEY, String(filters.detailedView));
         paint();
       });
     }

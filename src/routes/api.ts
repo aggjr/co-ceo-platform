@@ -183,6 +183,12 @@ router.get(
   invest.listPortfolio.bind(invest)
 );
 router.get(
+  '/invest/options/strike-ladder',
+  AuthMiddleware.protect,
+  requirePermission('invest:custody:read'),
+  invest.getOptionStrikeLadder.bind(invest)
+);
+router.get(
   '/invest/pnl-pivot',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:read'),

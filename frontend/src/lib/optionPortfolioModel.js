@@ -95,6 +95,18 @@ export function uniqueExpiryDates(rows) {
   return [...set].sort();
 }
 
+export function uniqueExpiryDatesForUnderlying(rows, underlying) {
+  const u = String(underlying || '').trim().toUpperCase();
+  if (!u) return [];
+  const set = new Set();
+  for (const r of rows) {
+    if (String(r.underlying || '').trim().toUpperCase() !== u) continue;
+    const d = String(r.optionExpiryDate || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) set.add(d);
+  }
+  return [...set].sort();
+}
+
 export function filterOptionsRows(rows, filters) {
   let out = rows;
   if (filters.underlying) {

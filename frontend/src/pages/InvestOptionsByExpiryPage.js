@@ -7,10 +7,11 @@ import { formatDateBr } from '../lib/dateFormat.js';
 import {
   cardFieldRows,
   uniqueUnderlyings,
-  uniqueExpiryDates
+  uniqueExpiryDatesForUnderlying,
 } from '../lib/optionPortfolioModel.js';
 import { formatBrl, formatNumber } from '../lib/portfolioDisplay.js';
 import { fetchOpenOptionsPortfolio } from '../lib/investOptionsShared.js';
+import { apiRequest } from '../api/client.js';
 
 import {
   Chart,
@@ -20,7 +21,7 @@ import {
   CategoryScale,
   Tooltip,
   Legend,
-  Title
+  Title,
 } from 'chart.js';
 import annotationPlugin from 'chartjs-plugin-annotation';
 
@@ -45,14 +46,47 @@ function escapeHtml(s) {
 
 const TEXT_KEYS = [
   'screen.invest.options.expiry.title',
-  'filter.invest.options.all_assets',
-  'filter.invest.options.all_types',
   'filter.invest.options.underlying',
-  'filter.invest.options.type'
 ];
+
+/** Mesma paleta ITUB: call clara, put escura — uma ação por vez. */
+const AMP_COLORS = {
+  call: 'rgba(125, 211, 252, 0.9)',
+  put: 'rgba(2, 132, 199, 0.9)',
+  quoteLine: 'rgba(125, 211, 252, 1)',
+};
 
 let currentChartQty = null;
 let currentChartNotional = null;
+
+function getFractionalIndex(quote, sortedStrikesList) {
+  if (sortedStrikesList.length === 0) return 0;
+  if (quote <= sortedStrikesList[0]) return 0;
+  if (quote >= sortedStrikesList[sortedStrikesList.length - 1]) {
+    return sortedStrikesList.length - 1;
+  }
+  for (let i = 0; i < sortedStrikesList.length - 1; i++) {
+    const s1 = sortedStrikesList[i];
+    const s2 = sortedStrikesList[i + 1];
+    if (quote >= s1 && quote <= s2) {
+      const ratio = (quote - s1) / (s2 - s1);
+      return i + ratio;
+    }
+  }
+  return 0;
+}
+
+function strikesFromPortfolio(rows, underlying, expiry) {
+  const set = new Set();
+  for (const row of rows) {
+    const f = cardFieldRows(row);
+    if (f.strike == null) continue;
+    if (String(f.underlying || '').toUpperCase() !== underlying) continue;
+    if (String(f.expiry || '').slice(0, 10) !== expiry) continue;
+    set.add(f.strike);
+  }
+  return [...set].sort((a, b) => a - b);
+}
 
 export async function InvestOptionsByExpiryPage(container) {
   if (!isAuthenticated()) {
@@ -83,13 +117,34 @@ export async function InvestOptionsByExpiryPage(container) {
   }
 
   const underlyings = uniqueUnderlyings(allRows);
-  const expiries = uniqueExpiryDates(allRows);
+  if (!underlyings.length) {
+    await renderShell(container, {
+      title: `INVEST - ${title}`,
+      contentHtml: `<div class="card"><p class="muted">Nenhuma opção em carteira.</p></div>`,
+    });
+    return;
+  }
 
-  // Filters state
   const filters = {
-    underlyings: new Set(),
-    expiry: ''
+    underlying: underlyings[0],
+    expiry: '',
   };
+
+  const expiryDatesForUnderlying = () =>
+    uniqueExpiryDatesForUnderlying(allRows, filters.underlying);
+
+  function ensureExpiryDefault() {
+    const dates = expiryDatesForUnderlying();
+    if (!dates.length) {
+      filters.expiry = '';
+      return;
+    }
+    if (!dates.includes(filters.expiry)) {
+      filters.expiry = dates[0];
+    }
+  }
+
+  ensureExpiryDefault();
 
   const hostId = 'opt-amp-root';
 
@@ -102,33 +157,34 @@ export async function InvestOptionsByExpiryPage(container) {
   if (!root) return;
 
   function renderFilters() {
-    const expiryOpts = [
-      `<option value="">Todas as Datas</option>`,
-      ...expiries.map(
-        (e) => `<option value="${escapeHtml(e)}"${filters.expiry === e ? ' selected' : ''}>${escapeHtml(formatDateBr(e))}</option>`
-      ),
-    ].join('');
+    const dates = expiryDatesForUnderlying();
+    const underlyingOpts = underlyings
+      .map(
+        (u) =>
+          `<option value="${escapeHtml(u)}"${filters.underlying === u ? ' selected' : ''}>${escapeHtml(u)}</option>`
+      )
+      .join('');
 
-    const underlyingsChecks = underlyings.map(u => {
-      const checked = filters.underlyings.has(u) ? 'checked' : '';
-      return `<label><input type="checkbox" value="${escapeHtml(u)}" ${checked} data-filter-asset /> ${escapeHtml(u)}</label>`;
-    }).join('');
+    const expiryOpts = dates
+      .map(
+        (e) =>
+          `<option value="${escapeHtml(e)}"${filters.expiry === e ? ' selected' : ''}>${escapeHtml(formatDateBr(e))}</option>`
+      )
+      .join('');
 
     root.innerHTML = `
-      <div class="opt-cards-toolbar" style="align-items: flex-start; margin-bottom: 20px; gap: 20px;">
-        <div class="multi-select-dropdown" id="amp-asset-dropdown">
-          <label style="display:block; margin-bottom: 4px; color: var(--text-color); font-weight: bold;">Ativo (Ação)</label>
-          <button type="button" class="multi-select-btn" id="amp-asset-btn">Selecionar Ações...</button>
-          <div class="multi-select-content">
-            ${underlyingsChecks}
-          </div>
-        </div>
-        <label style="display:flex; flex-direction:column; gap:4px;">
-          <span style="color: var(--text-color); font-weight: bold;">Data do Strike</span>
-          <select data-filter="expiry" style="padding: 6px 12px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid #334155; border-radius: 4px;">${expiryOpts}</select>
+      <div class="opt-cards-toolbar amp-toolbar" style="margin-bottom: 20px; gap: 20px;">
+        <label class="amp-filter-label">
+          <span>Ativo (Ação)</span>
+          <select data-filter="underlying" class="amp-filter-select">${underlyingOpts}</select>
+        </label>
+        <label class="amp-filter-label">
+          <span>Data do Strike</span>
+          <select data-filter="expiry" class="amp-filter-select"${dates.length ? '' : ' disabled'}>${expiryOpts || '<option value="">—</option>'}</select>
         </label>
       </div>
-      <div class="amp-charts-wrapper" style="display: flex; flex-direction: column; gap: 40px; height: calc(100vh - 220px); min-height: 700px;">
+      <p class="amp-chart-hint muted" id="amp-hint"></p>
+      <div class="amp-charts-wrapper" style="display: flex; flex-direction: column; gap: 40px; height: calc(100vh - 240px); min-height: 700px;">
         <div class="amp-chart-container" style="flex: 1; position: relative;">
           <canvas id="amp-chart-qty"></canvas>
         </div>
@@ -138,215 +194,194 @@ export async function InvestOptionsByExpiryPage(container) {
       </div>
     `;
 
-    // Dropdown logic
-    const dropdown = root.querySelector('#amp-asset-dropdown');
-    const btn = root.querySelector('#amp-asset-btn');
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdown.classList.toggle('open');
-    });
-    document.addEventListener('click', (e) => {
-      if (!dropdown.contains(e.target)) dropdown.classList.remove('open');
-    });
-
-    root.querySelectorAll('[data-filter-asset]').forEach(cb => {
-      cb.addEventListener('change', () => {
-        if (cb.checked) filters.underlyings.add(cb.value);
-        else filters.underlyings.delete(cb.value);
-        
-        // Update button text
-        const size = filters.underlyings.size;
-        btn.textContent = size === 0 ? 'Todas as Ações' : size === 1 ? [...filters.underlyings][0] : `${size} Ações`;
-        
-        paintChart();
-      });
+    root.querySelector('[data-filter="underlying"]').addEventListener('change', (e) => {
+      filters.underlying = e.target.value;
+      ensureExpiryDefault();
+      renderFilters();
+      void paintChart();
     });
 
     root.querySelector('[data-filter="expiry"]').addEventListener('change', (e) => {
       filters.expiry = e.target.value;
-      paintChart();
+      void paintChart();
     });
   }
 
-  function paintChart() {
-    // 1. Filter rows
-    let filtered = allRows;
-    if (filters.underlyings.size > 0) {
-      filtered = filtered.filter(r => filters.underlyings.has(r.underlying));
-    }
-    if (filters.expiry) {
-      filtered = filtered.filter(r => (r.optionExpiryDate || '').slice(0, 10) === filters.expiry);
+  async function paintChart() {
+    const hint = root.querySelector('#amp-hint');
+    const underlying = filters.underlying;
+    const expiry = filters.expiry;
+
+    if (!underlying || !expiry) {
+      if (hint) {
+        hint.textContent = 'Selecione ação e data do strike para exibir os gráficos.';
+      }
+      return;
     }
 
-    // 2. Aggregate by Strike -> Underlying -> Side
-    const strikeMap = new Map();
-    // To track current quotes for annotations
-    const quoteMap = new Map(); 
+    let sortedStrikes = [];
+    let quote = null;
 
-    filtered.forEach(row => {
+    try {
+      const ladder = await apiRequest(
+        `/api/invest/options/strike-ladder?underlying=${encodeURIComponent(underlying)}&expiry=${encodeURIComponent(expiry)}`
+      );
+      sortedStrikes = (ladder.strikes || [])
+        .map((s) => Number(s))
+        .filter((s) => Number.isFinite(s) && s > 0)
+        .sort((a, b) => a - b);
+      if (ladder.quote != null && Number(ladder.quote) > 0) {
+        quote = Number(ladder.quote);
+      }
+    } catch {
+      /* fallback só custódia */
+    }
+
+    const portfolioStrikes = strikesFromPortfolio(allRows, underlying, expiry);
+    if (!sortedStrikes.length) {
+      sortedStrikes = portfolioStrikes;
+    } else {
+      const merged = new Set([...sortedStrikes, ...portfolioStrikes]);
+      sortedStrikes = [...merged].sort((a, b) => a - b);
+    }
+
+    if (!sortedStrikes.length) {
+      if (hint) {
+        hint.textContent =
+          'Sem strikes na grade de mercado para esta data. Rode sync de opções (opcoes.net) ou confira a data.';
+      }
+      if (currentChartQty) currentChartQty.destroy();
+      if (currentChartNotional) currentChartNotional.destroy();
+      currentChartQty = null;
+      currentChartNotional = null;
+      return;
+    }
+
+    if (hint) {
+      hint.textContent = `${underlying} · vencimento ${formatDateBr(expiry)} · ${sortedStrikes.length} strikes na grade`;
+    }
+
+    let filtered = allRows.filter(
+      (r) =>
+        String(r.underlying || '').toUpperCase() === underlying &&
+        String(r.optionExpiryDate || '').slice(0, 10) === expiry
+    );
+
+    const volumeByStrike = new Map();
+    for (const s of sortedStrikes) {
+      volumeByStrike.set(s, { callQty: 0, callNotional: 0, putQty: 0, putNotional: 0 });
+    }
+
+    filtered.forEach((row) => {
       const f = cardFieldRows(row);
-      if (f.strike == null || !f.underlying) return;
-      
-      if (!strikeMap.has(f.strike)) {
-        strikeMap.set(f.strike, {});
-      }
-      
-      const st = strikeMap.get(f.strike);
-      if (!st[f.underlying]) {
-        st[f.underlying] = { callQty: 0, callNotional: 0, putQty: 0, putNotional: 0 };
-      }
-
-      const uObj = st[f.underlying];
+      if (f.strike == null || !volumeByStrike.has(f.strike)) return;
+      const bucket = volumeByStrike.get(f.strike);
       const absQty = Math.abs(f.quantity || 0);
       const absNotional = Math.abs(f.notional || 0);
-
       if (f.side === 'call') {
-        uObj.callQty += absQty;
-        uObj.callNotional += absNotional;
+        bucket.callQty += absQty;
+        bucket.callNotional += absNotional;
       } else if (f.side === 'put') {
-        uObj.putQty += absQty;
-        uObj.putNotional += absNotional;
+        bucket.putQty += absQty;
+        bucket.putNotional += absNotional;
       }
-
-      if (f.underlyingQuote) {
-        quoteMap.set(f.underlying, f.underlyingQuote);
+      if (quote == null && f.underlyingQuote > 0) {
+        quote = f.underlyingQuote;
       }
     });
 
-    // 3. Prepare Chart Data
-    const sortedStrikes = [...strikeMap.keys()].sort((a, b) => a - b);
-    const labels = sortedStrikes.map(s => formatBrl(s));
+    const labels = sortedStrikes.map((s) => formatBrl(s));
+    const cQty = sortedStrikes.map((s) => volumeByStrike.get(s).callQty);
+    const pQty = sortedStrikes.map((s) => volumeByStrike.get(s).putQty);
+    const cNot = sortedStrikes.map((s) => volumeByStrike.get(s).callNotional);
+    const pNot = sortedStrikes.map((s) => volumeByStrike.get(s).putNotional);
 
-    // Paleta de cores com "tom mais claro (Call)" e "tom mais escuro (Put)"
-    const BASE_COLORS = [
-      { call: 'rgba(125, 211, 252, 0.9)', put: 'rgba(2, 132, 199, 0.9)' },   // Azul Claro / Azul Escuro
-      { call: 'rgba(253, 224, 71, 0.9)', put: 'rgba(161, 98, 7, 0.9)' },     // Amarelo Claro / Amarelo Escuro
-      { call: 'rgba(134, 239, 172, 0.9)', put: 'rgba(21, 128, 61, 0.9)' },   // Verde Claro / Verde Escuro
-      { call: 'rgba(252, 165, 165, 0.9)', put: 'rgba(185, 28, 28, 0.9)' },   // Vermelho Claro / Vermelho Escuro
-      { call: 'rgba(216, 180, 254, 0.9)', put: 'rgba(126, 34, 206, 0.9)' },  // Roxo Claro / Roxo Escuro
-      { call: 'rgba(253, 186, 116, 0.9)', put: 'rgba(194, 65, 12, 0.9)' }    // Laranja Claro / Laranja Escuro
-    ];
-
-    const activeUnderlyings = filters.underlyings.size > 0 ? [...filters.underlyings] : underlyings;
     const datasetsQty = [];
     const datasetsNotional = [];
-    const annotations = {};
-
-    function getFractionalIndex(quote, sortedStrikesList) {
-      if (sortedStrikesList.length === 0) return 0;
-      if (quote <= sortedStrikesList[0]) return 0;
-      if (quote >= sortedStrikesList[sortedStrikesList.length - 1]) return sortedStrikesList.length - 1;
-      for (let i = 0; i < sortedStrikesList.length - 1; i++) {
-        const s1 = sortedStrikesList[i];
-        const s2 = sortedStrikesList[i+1];
-        if (quote >= s1 && quote <= s2) {
-          const ratio = (quote - s1) / (s2 - s1);
-          return i + ratio;
-        }
-      }
-      return 0;
+    if (cQty.some((v) => v > 0)) {
+      datasetsQty.push({
+        label: `${underlying} Call Qtd`,
+        data: cQty,
+        backgroundColor: AMP_COLORS.call,
+        maxBarThickness: 36,
+        barPercentage: 0.85,
+        categoryPercentage: 0.9,
+      });
+      datasetsNotional.push({
+        label: `${underlying} Call Notional`,
+        data: cNot,
+        backgroundColor: AMP_COLORS.call,
+        maxBarThickness: 36,
+        barPercentage: 0.85,
+        categoryPercentage: 0.9,
+      });
+    }
+    if (pQty.some((v) => v > 0)) {
+      datasetsQty.push({
+        label: `${underlying} Put Qtd`,
+        data: pQty,
+        backgroundColor: AMP_COLORS.put,
+        maxBarThickness: 36,
+        barPercentage: 0.85,
+        categoryPercentage: 0.9,
+      });
+      datasetsNotional.push({
+        label: `${underlying} Put Notional`,
+        data: pNot,
+        backgroundColor: AMP_COLORS.put,
+        maxBarThickness: 36,
+        barPercentage: 0.85,
+        categoryPercentage: 0.9,
+      });
     }
 
-    activeUnderlyings.forEach((u, i) => {
-      const color = BASE_COLORS[i % BASE_COLORS.length];
-      
-      const cQty = sortedStrikes.map(s => strikeMap.get(s)[u]?.callQty || 0);
-      const cNot = sortedStrikes.map(s => strikeMap.get(s)[u]?.callNotional || 0);
-      const pQty = sortedStrikes.map(s => strikeMap.get(s)[u]?.putQty || 0);
-      const pNot = sortedStrikes.map(s => strikeMap.get(s)[u]?.putNotional || 0);
-
-      const hasCalls = cQty.some(v => v > 0);
-      const hasPuts = pQty.some(v => v > 0);
-
-      if (hasCalls) {
-        datasetsQty.push({
-          label: `${u} Call Qtd`, data: cQty, backgroundColor: color.call,
-          barPercentage: 0.8, categoryPercentage: 0.8
-        });
-        datasetsNotional.push({
-          label: `${u} Call Notional`, data: cNot, backgroundColor: color.call,
-          barPercentage: 0.8, categoryPercentage: 0.8
-        });
-      }
-      
-      if (hasPuts) {
-        datasetsQty.push({
-          label: `${u} Put Qtd`, data: pQty, backgroundColor: color.put,
-          barPercentage: 0.8, categoryPercentage: 0.8
-        });
-        datasetsNotional.push({
-          label: `${u} Put Notional`, data: pNot, backgroundColor: color.put,
-          barPercentage: 0.8, categoryPercentage: 0.8
-        });
-      }
-
-      // Seta/Linha da Cotação
-      const quote = quoteMap.get(u);
-      if (quote != null) {
-        const fracIndex = getFractionalIndex(quote, sortedStrikes);
-        // Usa a cor clara da CALL para destacar no fundo escuro
-        annotations[`line-${u}`] = {
-          type: 'line',
-          scaleID: 'x',
-          value: fracIndex,
-          borderColor: color.call, 
-          borderWidth: 2,
-          borderDash: [4, 4],
-          label: {
-            display: true,
-            content: `▼ Cotação ${u}: ${formatBrl(quote)}`,
-            position: i % 2 === 0 ? 'start' : 'end',
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
-            color: color.call,
-            font: { size: 12, weight: 'bold' },
-            padding: 6
-          }
-        };
-      }
-    });
+    const annotations = {};
+    if (quote != null) {
+      annotations['quote-line'] = {
+        type: 'line',
+        scaleID: 'x',
+        value: getFractionalIndex(quote, sortedStrikes),
+        borderColor: AMP_COLORS.quoteLine,
+        borderWidth: 2,
+        borderDash: [4, 4],
+        label: {
+          display: true,
+          content: `▼ Cotação ${underlying}: ${formatBrl(quote)}`,
+          position: 'start',
+          backgroundColor: 'rgba(15, 23, 42, 0.9)',
+          color: AMP_COLORS.quoteLine,
+          font: { size: 12, weight: 'bold' },
+          padding: 6,
+        },
+      };
+    }
 
     const canvasQty = document.getElementById('amp-chart-qty');
     const canvasNotional = document.getElementById('amp-chart-notional');
     if (!canvasQty || !canvasNotional) return;
 
-    if (currentChartQty) {
-      currentChartQty.destroy();
-    }
-    if (currentChartNotional) {
-      currentChartNotional.destroy();
-    }
+    if (currentChartQty) currentChartQty.destroy();
+    if (currentChartNotional) currentChartNotional.destroy();
 
     const commonOptions = {
       responsive: true,
       maintainAspectRatio: false,
-      interaction: {
-        mode: 'index',
-        intersect: false,
-      },
+      interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: {
-          position: 'top',
-          labels: { color: '#cbd5e1' }
-        },
-        annotation: {
-          annotations
-        }
+        legend: { position: 'top', labels: { color: '#cbd5e1' } },
+        annotation: { annotations },
       },
       scales: {
         x: {
-          ticks: { color: '#94a3b8' },
-          grid: { color: 'rgba(148, 163, 184, 0.1)' }
-        }
-      }
+          ticks: { color: '#94a3b8', maxRotation: 45, minRotation: 45 },
+          grid: { color: 'rgba(148, 163, 184, 0.1)' },
+        },
+      },
     };
 
-    // Render QTY Chart
     currentChartQty = new Chart(canvasQty, {
       type: 'bar',
-      data: {
-        labels,
-        datasets: datasetsQty
-      },
+      data: { labels, datasets: datasetsQty },
       options: {
         ...commonOptions,
         plugins: {
@@ -356,36 +391,29 @@ export async function InvestOptionsByExpiryPage(container) {
             text: 'Quantidade de Opções por Strike',
             color: '#fff',
             font: { size: 16, weight: 'normal' },
-            padding: { top: 10, bottom: 20 }
+            padding: { top: 10, bottom: 20 },
           },
           tooltip: {
             callbacks: {
-              label: function(context) {
-                return `${context.dataset.label}: ${formatNumber(context.raw, 0)}`;
-              }
-            }
-          }
+              label: (ctx) => `${ctx.dataset.label}: ${formatNumber(ctx.raw, 0)}`,
+            },
+          },
         },
         scales: {
           ...commonOptions.scales,
           y: {
             type: 'linear',
             display: true,
-            position: 'left',
             ticks: { color: '#94a3b8' },
-            grid: { color: 'rgba(148, 163, 184, 0.1)' }
-          }
-        }
-      }
+            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+          },
+        },
+      },
     });
 
-    // Render NOTIONAL Chart
     currentChartNotional = new Chart(canvasNotional, {
       type: 'bar',
-      data: {
-        labels,
-        datasets: datasetsNotional
-      },
+      data: { labels, datasets: datasetsNotional },
       options: {
         ...commonOptions,
         plugins: {
@@ -395,35 +423,30 @@ export async function InvestOptionsByExpiryPage(container) {
             text: 'Notional (R$) por Strike',
             color: '#fff',
             font: { size: 16, weight: 'normal' },
-            padding: { top: 10, bottom: 20 }
+            padding: { top: 10, bottom: 20 },
           },
           tooltip: {
             callbacks: {
-              label: function(context) {
-                return `${context.dataset.label}: ${formatBrl(context.raw)}`;
-              }
-            }
-          }
+              label: (ctx) => `${ctx.dataset.label}: ${formatBrl(ctx.raw)}`,
+            },
+          },
         },
         scales: {
           ...commonOptions.scales,
           y: {
             type: 'linear',
             display: true,
-            position: 'left',
             ticks: {
               color: '#94a3b8',
-              callback: function(value) {
-                return formatBrl(value);
-              }
+              callback: (value) => formatBrl(value),
             },
-            grid: { color: 'rgba(148, 163, 184, 0.1)' }
-          }
-        }
-      }
+            grid: { color: 'rgba(148, 163, 184, 0.1)' },
+          },
+        },
+      },
     });
   }
 
   renderFilters();
-  paintChart();
+  void paintChart();
 }

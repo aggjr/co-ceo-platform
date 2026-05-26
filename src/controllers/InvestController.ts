@@ -84,6 +84,7 @@ import {
 } from '../core/invest/extractLedgerEnrichment';
 import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
 import type { UserContext } from '../core/dal';
+import { SYSTEM_INSTALLER_USER_ID } from '../core/dal/types';
 import pool from '../config/database';
 import { isMissingSchemaError } from '../core/dal/mysqlErrors';
 import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
@@ -412,6 +413,61 @@ export class InvestController {
       threePricesAudit,
       source: 'custody',
     });
+  };
+
+  getOptionStrikeLadder = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selecione uma organização (personifique a holding).',
+      });
+    }
+    const underlying = String(req.query.underlying ?? '').trim().toUpperCase();
+    const expiry = String(req.query.expiry ?? '').trim().slice(0, 10);
+    if (!underlying || !/^\d{4}-\d{2}-\d{2}$/.test(expiry)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Informe underlying e expiry (YYYY-MM-DD).',
+      });
+    }
+    try {
+      const globalCtx: UserContext = {
+        userId: SYSTEM_INSTALLER_USER_ID,
+        organizationId: null,
+        impersonatorId: null,
+        scope: 'global',
+      };
+      const rows = await this.gateway.readQuery(
+        globalCtx,
+        'invest_options_market_strikes',
+        [underlying, expiry]
+      );
+      const strikes = rows
+        .map((r) => Number(r.strike_price))
+        .filter((s) => Number.isFinite(s) && s > 0);
+      const quoteMap = await this.marketQuoteRepo.loadLatestQuoteMap(ctx, [underlying]);
+      const mq = quoteMap.get(underlying);
+      return res.json({
+        success: true,
+        underlying,
+        expiry,
+        strikes,
+        quote: mq?.price ?? null,
+        quoteAsOf: mq?.date ?? null,
+      });
+    } catch (err) {
+      console.error('[getOptionStrikeLadder]', err);
+      if (isMissingSchemaError(err)) {
+        return res.status(503).json({
+          success: false,
+          error: 'Banco desatualizado: tabela invest_options_market ausente.',
+        });
+      }
+      const message =
+        err instanceof Error ? err.message : 'Falha ao carregar grade de strikes.';
+      return res.status(500).json({ success: false, error: message });
+    }
   };
 
   getPatrimonyDaily = async (req: Request, res: Response) => {

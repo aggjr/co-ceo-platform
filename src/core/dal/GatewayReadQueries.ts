@@ -35,6 +35,7 @@ export type GatewayReadQueryKey =
   | 'invest_open_option_tickers'
   | 'invest_open_option_tickers_for_org'
   | 'invest_options_market_for_org'
+  | 'invest_options_market_strikes'
   | 'market_quotes_bulk_range'
   | 'ui_menu_nodes_active'
   | 'ui_texts_resolved_for_org'
@@ -376,6 +377,15 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
            AND pi.deleted_at IS NULL
            AND ABS(pi.quantity) > 0.0001
           WHERE m.strike_price > 0`,
+  },
+  invest_options_market_strikes: {
+    requiresGlobalScope: true,
+    sql: `SELECT DISTINCT m.strike_price
+          FROM invest_options_market m
+          WHERE m.underlying_ticker = ?
+            AND m.expiration_date = ?
+            AND m.strike_price > 0
+          ORDER BY m.strike_price`,
   },
   platform_admin_alerts_unread: {
     requiresGlobalScope: true,
