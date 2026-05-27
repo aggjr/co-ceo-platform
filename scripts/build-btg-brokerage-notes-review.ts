@@ -89,9 +89,14 @@ async function main() {
       console.warn('ZIP ausente:', zip);
       continue;
     }
-    const folder = path.join(CACHE_DIR, path.basename(zip, '.zip'));
-    console.log('Expandindo', path.basename(zip));
-    expandZip(zip, folder);
+    let folder = zip;
+    if (!fs.statSync(zip).isDirectory()) {
+      folder = path.join(CACHE_DIR, path.basename(zip, '.zip'));
+      console.log('Expandindo', path.basename(zip));
+      expandZip(zip, folder);
+    } else {
+      console.log('Lendo diretório direto:', zip);
+    }
     for (const pdf of listReviewPdfs(folder)) {
       const lines = await pdfToLines(pdf);
       const rel = path.relative(folder, pdf).replace(/\\/g, '/');

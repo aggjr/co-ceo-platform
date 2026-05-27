@@ -24,7 +24,8 @@ type TextKind =
   | 'column_label'
   | 'field_label'
   | 'value_label'
-  | 'button_label';
+  | 'button_label'
+  | 'description';
 type MenuVisibility = 'all' | 'platform_only' | 'client_only';
 
 interface TextSeed {

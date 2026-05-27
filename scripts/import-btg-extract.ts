@@ -27,8 +27,9 @@ import type { UserContext } from '../src/core/dal';
 import type { LedgerImportLine, LedgerTransactionType } from '../src/core/invest/ledgerTypes';
 
 const ORG_ID = process.env.PORTFOLIO_ORG_ID || 'org-holding-001';
-const OPENING_BALANCE = 58758.79;
+const DEFAULT_OPENING_BALANCE = 58758.79;
 const CASH_ACCOUNT_EXTERNAL_ID = 'BTG';
+const BR_NUMBER = /(\d{1,3}(?:\.\d{3})*,\d{2}|-\d{1,3}(?:\.\d{3})*,\d{2})/;
 
 type Args = {
   file: string;
@@ -60,6 +61,22 @@ function readAndNormalize(filePath: string): { normalized: string[]; raw: string
   return { normalized: normalized.split(/\r?\n/), raw: raw.split(/\r?\n/) };
 }
 
+function parseBrMoney(raw: string): number {
+  const neg = raw.trim().startsWith('-');
+  const n = Number(raw.replace(/^-/, '').replace(/\./g, '').replace(',', '.'));
+  return neg ? -n : n;
+}
+
+/** Saldo inicial declarado no extrato parcial (ex.: 26/04/2026). */
+function extractOpeningBalance(lines: string[]): number | null {
+  for (const line of lines) {
+    if (!/Saldo\s+Inicial/i.test(line)) continue;
+    const m = line.match(BR_NUMBER);
+    if (m) return parseBrMoney(m[1]!);
+  }
+  return null;
+}
+
 function extractDeclaredFinalBalance(lines: string[]): number | null {
   const BR = /-?\d{1,3}(?:\.\d{3})*,\d{2}/g;
   // No PDF cru, o saldo final aparece colado: "6.397,36Saldo Final".
@@ -80,7 +97,11 @@ function extractDeclaredFinalBalance(lines: string[]): number | null {
   const { normalized: lines, raw: rawLines } = readAndNormalize(args.file);
   console.log(`Lido ${lines.length} linhas de ${args.file}`);
 
-  const entries = btgLinesToImportEntries(lines, OPENING_BALANCE);
+  const openingBalance = extractOpeningBalance(lines) ?? DEFAULT_OPENING_BALANCE;
+  const entries = btgLinesToImportEntries(lines, openingBalance);
+  console.log(
+    `Saldo inicial do extrato: R$ ${openingBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+  );
   console.log(`Parser classificou ${entries.length} lancamentos (LIQ BOLSA foi skipada).`);
 
   const byOp: Record<string, { count: number; total: number }> = {};
@@ -101,9 +122,9 @@ function extractDeclaredFinalBalance(lines: string[]): number | null {
   }
 
   const totalMovido = entries.reduce((s, e) => s + e.total_net_value, 0);
-  const saldoPrevisto = OPENING_BALANCE + totalMovido;
+  const saldoPrevisto = openingBalance + totalMovido;
   const saldoDeclarado = extractDeclaredFinalBalance(rawLines);
-  console.log(`\nSaldo abertura (01/01)  : R$ ${OPENING_BALANCE.toFixed(2)}`);
+  console.log(`\nSaldo abertura extrato  : R$ ${openingBalance.toFixed(2)}`);
   console.log(`Movimentos classificados: R$ ${totalMovido.toFixed(2)}`);
   console.log(`Saldo previsto pelo nucleo no fim do periodo: R$ ${saldoPrevisto.toFixed(2)}`);
   if (saldoDeclarado != null) {
@@ -121,12 +142,13 @@ function extractDeclaredFinalBalance(lines: string[]): number | null {
     return;
   }
 
-  console.log(`\n--apply: importando no servidor remoto (${process.env.REMOTE_DB_HOST})...`);
+  const dbHost = process.env.REMOTE_DB_HOST || process.env.DB_HOST || '127.0.0.1';
+  console.log(`\n--apply: importando em ${dbHost} (${process.env.REMOTE_DB_NAME || process.env.DB_NAME || 'co_ceo_platform'})...`);
   const pool = mysql.createPool({
-    host: process.env.REMOTE_DB_HOST || '69.62.99.34',
-    user: process.env.REMOTE_DB_USER || 'root',
-    password: process.env.REMOTE_DB_PASSWORD!,
-    database: 'co_ceo_platform',
+    host: dbHost,
+    user: process.env.REMOTE_DB_USER || process.env.DB_USER || 'root',
+    password: process.env.REMOTE_DB_PASSWORD ?? process.env.DB_PASSWORD ?? '',
+    database: process.env.REMOTE_DB_NAME || process.env.DB_NAME || 'co_ceo_platform',
     waitForConnections: true,
     connectionLimit: 4,
   });
@@ -140,12 +162,16 @@ function extractDeclaredFinalBalance(lines: string[]): number | null {
     scope: 'global',
   };
 
-  // Anota broker_note_ref unico por linha para idempotencia (re-rodar nao duplica)
-  const fingerprinted: LedgerImportLine[] = entries.map((e, i) => ({
-    ...e,
-    operation: e.operation as LedgerTransactionType,
-    broker_note_ref: `BTG-EXTRACT:${firstDate}:${lastDate}:${i}:${e.operation}:${e.total_net_value}`,
-  }));
+  const byDate = new Map<string, number>();
+  const fingerprinted: LedgerImportLine[] = entries.map((e) => {
+    const seq = (byDate.get(e.date) ?? 0) + 1;
+    byDate.set(e.date, seq);
+    return {
+      ...e,
+      operation: e.operation as LedgerTransactionType,
+      broker_note_ref: `BTG-EXT-${e.date}#${String(seq).padStart(2, '0')}`,
+    };
+  });
 
   const result = await ledger.importEntriesOnly(ctx, fingerprinted, {
     sourceLabel: `Extrato BTG ${firstDate}->${lastDate}`,

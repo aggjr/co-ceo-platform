@@ -1,3 +1,5 @@
+import '../styles/coceo-excel-table.css';
+import '../styles/invest-portfolio.css';
 import '../styles/invest-options-exposure.css';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
@@ -64,8 +66,8 @@ function renderExposureTable(data, labels, colNearKey, colFarKey) {
     .join('');
 
   return `
-    <div class="opt-exposure-table-wrap">
-      <table class="opt-exposure-table">
+    <div class="table-wrapper opt-exposure-table-wrap">
+      <table class="excel-table opt-exposure-table">
         <thead>
           <tr>
             <th>${escapeHtml(labels.asset)}</th>
@@ -77,7 +79,7 @@ function renderExposureTable(data, labels, colNearKey, colFarKey) {
         </thead>
         <tbody>${body}</tbody>
         <tfoot>
-          <tr>
+          <tr class="excel-column-totals-row">
             <td>${escapeHtml(labels.totalRow)}</td>
             <td>${formatCell(data.totals.itm)}</td>
             <td>${formatCell(data.totals.bandNear)}</td>
@@ -174,29 +176,31 @@ export async function InvestOptionsExposurePage(container) {
       .join('');
 
     root.innerHTML = `
-      <div class="opt-exposure-toolbar" id="opt-exposure-filters">
-        <label>${escapeHtml(t['filter.invest.options.expiry'])}
-          <select data-filter="expiry">${expiryOpts || `<option value="">—</option>`}</select>
-        </label>
-        <label>${escapeHtml(t['field.invest.options.exposure.pct_near'])}
-          <input type="number" data-filter="pctNear" min="0.5" max="50" step="0.5" value="${params.pctNear}" />
-        </label>
-        <label>${escapeHtml(t['field.invest.options.exposure.pct_far'])}
-          <input type="number" data-filter="pctFar" min="1" max="80" step="0.5" value="${params.pctFar}" />
-        </label>
+      <div class="portfolio-excel-section opt-exposure-page">
+        <div class="table-period-toolbar" id="opt-exposure-filters">
+          <label>${escapeHtml(t['filter.invest.options.expiry'])}
+            <select data-filter="expiry">${expiryOpts || `<option value="">—</option>`}</select>
+          </label>
+          <label>${escapeHtml(t['field.invest.options.exposure.pct_near'])}
+            <input type="number" data-filter="pctNear" min="0.5" max="50" step="0.5" value="${params.pctNear}" />
+          </label>
+          <label>${escapeHtml(t['field.invest.options.exposure.pct_far'])}
+            <input type="number" data-filter="pctFar" min="1" max="80" step="0.5" value="${params.pctFar}" />
+          </label>
+        </div>
+
+        <section class="opt-exposure-section opt-exposure-section--put">
+          <h2 class="portfolio-excel-title">${escapeHtml(t['screen.invest.options.exposure.put_title'])}</h2>
+          <p class="opt-exposure-help">${escapeHtml(t['screen.invest.options.exposure.put_help'].replace('{pct}', String(params.pctFar)))}</p>
+          ${renderExposureTable(puts, tableLabels('put'))}
+        </section>
+
+        <section class="opt-exposure-section opt-exposure-section--call">
+          <h2 class="portfolio-excel-title">${escapeHtml(t['screen.invest.options.exposure.call_title'])}</h2>
+          <p class="opt-exposure-help">${escapeHtml(t['screen.invest.options.exposure.call_help'].replace('{pct}', String(params.pctFar)))}</p>
+          ${renderExposureTable(calls, tableLabels('call'))}
+        </section>
       </div>
-
-      <section class="opt-exposure-section">
-        <h2>${escapeHtml(t['screen.invest.options.exposure.put_title'])}</h2>
-        <p class="opt-exposure-help">${escapeHtml(t['screen.invest.options.exposure.put_help'].replace('{pct}', String(params.pctFar)))}</p>
-        ${renderExposureTable(puts, tableLabels('put'))}
-      </section>
-
-      <section class="opt-exposure-section">
-        <h2>${escapeHtml(t['screen.invest.options.exposure.call_title'])}</h2>
-        <p class="opt-exposure-help">${escapeHtml(t['screen.invest.options.exposure.call_help'].replace('{pct}', String(params.pctFar)))}</p>
-        ${renderExposureTable(calls, tableLabels('call'))}
-      </section>
     `;
 
     root.querySelectorAll('[data-filter]').forEach((el) => {

@@ -1,98 +1,167 @@
-.opt-exposure-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 12px 20px;
-  margin-bottom: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+/* Exposição notional — tema INVEST (alinhado a portfolio-excel / tabela opções) */
+
+.invest-table-card .portfolio-excel-section.opt-exposure-page {
+  --coceo-table-wrapper-bg: rgba(15, 23, 42, 0.92);
+  --coceo-table-wrapper-border: rgba(218, 177, 119, 0.25);
 }
 
-.opt-exposure-toolbar label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 12px;
-  color: var(--color-muted, #94a3b8);
-  min-width: 120px;
+.invest-table-card .opt-exposure-page .table-period-toolbar {
+  margin-bottom: 16px;
 }
 
-.opt-exposure-toolbar select,
-.opt-exposure-toolbar input[type='number'] {
-  padding: 7px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: rgba(15, 23, 42, 0.75);
-  color: inherit;
-  font-size: 13px;
+.invest-table-card .opt-exposure-page .table-period-toolbar select,
+.invest-table-card .opt-exposure-page .table-period-toolbar input[type='number'] {
   min-width: 140px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(218, 177, 119, 0.35);
+  background: #1e293b;
+  color: var(--color-text, #e2e8f0);
+  font-size: 13px;
+}
+
+.invest-table-card .opt-exposure-page .table-period-toolbar select:focus,
+.invest-table-card .opt-exposure-page .table-period-toolbar input:focus {
+  outline: none;
+  border-color: var(--color-accent, #dab177);
+  box-shadow: 0 0 0 2px rgba(218, 177, 119, 0.2);
 }
 
 .opt-exposure-section {
   margin-bottom: 28px;
 }
 
-.opt-exposure-section h2 {
-  margin: 0 0 6px;
-  font-size: 16px;
-  font-weight: 600;
+.opt-exposure-section:last-child {
+  margin-bottom: 0;
 }
 
-.opt-exposure-section .opt-exposure-help {
+.opt-exposure-section--put .portfolio-excel-title {
+  color: var(--invest-option-put-color, #fb923c);
+}
+
+.opt-exposure-section--call .portfolio-excel-title {
+  color: var(--invest-option-call-color, #60a5fa);
+}
+
+.opt-exposure-section .portfolio-excel-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  letter-spacing: 0.03em;
+}
+
+.opt-exposure-help {
   margin: 0 0 12px;
   font-size: 12px;
-  color: var(--color-muted, #94a3b8);
+  color: var(--color-text-muted, #94a3b8);
+  line-height: 1.45;
+  max-width: 72ch;
 }
 
-.opt-exposure-table-wrap {
+.invest-table-card .opt-exposure-page .table-wrapper {
+  border: 1px solid rgba(218, 177, 119, 0.25);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: none;
   overflow-x: auto;
-  border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.22);
 }
 
-.opt-exposure-table {
+.invest-table-card .opt-exposure-page .opt-exposure-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
-.opt-exposure-table th,
-.opt-exposure-table td {
-  padding: 10px 14px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-  text-align: right;
+.invest-table-card .opt-exposure-page .opt-exposure-table thead tr {
+  background: linear-gradient(135deg, #0f2740 0%, #1e3a5f 100%);
+  color: #fff;
 }
 
-.opt-exposure-table th:first-child,
-.opt-exposure-table td:first-child {
+.invest-table-card .opt-exposure-page .opt-exposure-table thead th {
+  padding: 0.75rem 14px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: right;
+  border-bottom: 2px solid rgba(218, 177, 119, 0.35);
+  white-space: nowrap;
+}
+
+.invest-table-card .opt-exposure-page .opt-exposure-table thead th:first-child {
+  text-align: left;
+}
+
+.invest-table-card .opt-exposure-page .opt-exposure-table tbody td {
+  padding: 0.65rem 14px;
+  text-align: right;
+  color: var(--color-text, #e2e8f0);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.invest-table-card .opt-exposure-page .opt-exposure-table tbody td:first-child {
   text-align: left;
   font-weight: 600;
+  color: var(--color-accent, #dab177);
 }
 
-.opt-exposure-table thead th {
-  background: rgba(15, 23, 42, 0.9);
-  color: var(--color-muted, #94a3b8);
-  font-weight: 600;
-  font-size: 12px;
-  text-transform: none;
-  letter-spacing: normal;
+.invest-table-card .opt-exposure-page .opt-exposure-table tbody tr.hoverable-row {
+  transition: background-color 0.12s ease, color 0.12s ease;
+  cursor: default;
 }
 
-.opt-exposure-table tbody tr:hover td {
-  background: rgba(148, 163, 184, 0.06);
+.invest-table-card .opt-exposure-page .opt-exposure-table tbody tr.hoverable-row:hover td {
+  background-color: #edd8bb !important;
+  color: #0f172a !important;
 }
 
-.opt-exposure-table tfoot td {
+.invest-table-card .opt-exposure-page .opt-exposure-table tbody tr.hoverable-row:hover td:first-child {
+  color: #0f172a !important;
+}
+
+.invest-table-card .opt-exposure-page .opt-exposure-table tbody tr.hoverable-row:hover .opt-exposure-zero {
+  color: #64748b !important;
+}
+
+.invest-table-card .opt-exposure-page .opt-exposure-table tfoot td {
+  padding: 0.75rem 14px;
+  text-align: right;
   font-weight: 700;
-  background: rgba(218, 177, 119, 0.08);
-  border-top: 2px solid rgba(218, 177, 119, 0.25);
+  color: var(--color-accent, #dab177);
+  background: rgba(15, 23, 42, 0.98);
+  border-top: 2px solid rgba(218, 177, 119, 0.45);
 }
 
-.opt-exposure-table .opt-exposure-approx {
-  opacity: 0.92;
+.invest-table-card .opt-exposure-page .opt-exposure-table tfoot td:first-child {
+  text-align: left;
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.05em;
 }
 
-.opt-exposure-table .opt-exposure-zero {
+.invest-table-card .opt-exposure-page .opt-exposure-table .opt-exposure-approx {
+  opacity: 0.95;
+}
+
+.invest-table-card .opt-exposure-page .opt-exposure-table .opt-exposure-zero {
   color: rgba(148, 163, 184, 0.55);
+}
+
+.invest-table-card .opt-exposure-page .opt-exposure-table tbody tr.hoverable-row:hover .opt-exposure-approx,
+.invest-table-card .opt-exposure-page .opt-exposure-table tbody tr.hoverable-row:hover .opt-exposure-zero {
+  color: #334155 !important;
+}
+
+.invest-table-card .opt-exposure-page .table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.invest-table-card .opt-exposure-page .table-wrapper::-webkit-scrollbar-thumb {
+  background: var(--color-accent, #dab177);
+  border-radius: 8px;
+}
+
+.invest-table-card .opt-exposure-page .table-wrapper::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.6);
 }

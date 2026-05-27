@@ -1,0 +1,128 @@
+/* Panorama geral — tabela única no padrão INVEST (portfolio-excel / exposição) */
+
+.invest-table-card .portfolio-excel-section.panorama-page {
+  --coceo-table-wrapper-bg: rgba(15, 23, 42, 0.92);
+  --coceo-table-wrapper-border: rgba(218, 177, 119, 0.25);
+}
+
+.invest-table-card .panorama-page .portfolio-excel-title {
+  margin: 0 0 8px;
+}
+
+.invest-table-card .panorama-page .panorama-lead {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--color-text-muted, #94a3b8);
+  max-width: 72ch;
+  line-height: 1.45;
+}
+
+.invest-table-card .panorama-page .table-wrapper {
+  border: 1px solid rgba(218, 177, 119, 0.25);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: none;
+  overflow-x: auto;
+}
+
+.invest-table-card .panorama-page .panorama-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.invest-table-card .panorama-page .panorama-table thead tr {
+  background: linear-gradient(135deg, #0f2740 0%, #1e3a5f 100%);
+  color: #fff;
+}
+
+.invest-table-card .panorama-page .panorama-table thead th {
+  padding: 0.75rem 14px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid rgba(218, 177, 119, 0.35);
+  white-space: nowrap;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody td {
+  padding: 0.65rem 14px;
+  color: var(--color-text, #e2e8f0);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.invest-table-card .panorama-page .panorama-table tbody td.panorama-col-grupo {
+  color: var(--color-text-muted, #94a3b8);
+  font-size: 12px;
+  width: 130px;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody td.panorama-col-label {
+  color: #e2e8f0;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody td.panorama-col-valor {
+  text-align: right;
+  font-weight: 600;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody td.panorama-col-ref {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.hoverable-row {
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.hoverable-row:hover td {
+  background-color: #edd8bb !important;
+  color: #0f172a !important;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.hoverable-row:hover .panorama-col-grupo,
+.invest-table-card .panorama-page .panorama-table tbody tr.hoverable-row:hover .panorama-col-ref {
+  color: #475569 !important;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.summary-row td {
+  font-weight: 600;
+  background: rgba(15, 23, 42, 0.65);
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.panorama-row--put .panorama-col-label {
+  color: var(--invest-option-put-color, #fb923c);
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.panorama-row--call .panorama-col-label {
+  color: var(--invest-option-call-color, #60a5fa);
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.panorama-row--final td {
+  border-top: 2px solid rgba(218, 177, 119, 0.45);
+  background: rgba(15, 23, 42, 0.98);
+  font-weight: 700;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.panorama-row--final .panorama-col-label {
+  color: var(--color-accent, #dab177);
+}
+
+.invest-table-card .panorama-page .panorama-table .panorama-val--zero {
+  color: rgba(148, 163, 184, 0.55);
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.hoverable-row:hover .portfolio-pnl--up {
+  color: #047857 !important;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.hoverable-row:hover .portfolio-pnl--down {
+  color: #c7364a !important;
+}
+
+.invest-table-card .panorama-page .panorama-table tbody tr.hoverable-row:hover .panorama-val--zero {
+  color: #64748b !important;
+}

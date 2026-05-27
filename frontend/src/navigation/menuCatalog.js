@@ -68,6 +68,11 @@ export const MENU_CATALOG = [
         resourceKey: 'screen.invest.portfolio',
       },
       {
+        label: 'Panorama geral',
+        path: '/invest/panorama',
+        resourceKey: 'screen.invest.portfolio',
+      },
+      {
         label: 'Opções',
         path: '/invest/opcoes',
         resourceKey: 'screen.invest.portfolio',
@@ -90,11 +95,6 @@ export const MENU_CATALOG = [
           {
             label: 'Exposição',
             path: '/invest/opcoes/exposicao',
-            resourceKey: 'screen.invest.portfolio',
-          },
-          {
-            label: 'Previsão',
-            path: '/invest/opcoes/previsao',
             resourceKey: 'screen.invest.portfolio',
           },
         ],

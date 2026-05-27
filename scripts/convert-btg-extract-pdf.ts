@@ -11,21 +11,58 @@ import {
   parseExtractCashSeries,
 } from '../src/core/invest/btgExtractCashSeries';
 
+async function readPdfTextWithPdfJs(pdfPath: string): Promise<string> {
+  const { createRequire } = await import('module');
+  const nodeRequire = createRequire(__filename);
+  const { getDocument } = nodeRequire('pdfjs-dist/legacy/build/pdf.mjs') as {
+    getDocument: (opts: { data: Uint8Array; verbosity: number }) => {
+      promise: Promise<{
+        numPages: number;
+        getPage: (n: number) => Promise<{
+          getTextContent: () => Promise<{ items: Array<{ str: string; transform: number[] }> }>;
+        }>;
+      }>;
+    };
+  };
+  const buf = fs.readFileSync(pdfPath);
+  const doc = await getDocument({ data: new Uint8Array(buf), verbosity: 0 }).promise;
+  const lines: string[] = [];
+  for (let p = 1; p <= doc.numPages; p++) {
+    const page = await doc.getPage(p);
+    const content = await page.getTextContent();
+    let lastY: number | null = null;
+    let line: string[] = [];
+    for (const item of content.items) {
+      const y = Math.round(item.transform[5]!);
+      if (lastY !== null && Math.abs(y - lastY) > 3) {
+        if (line.length) lines.push(line.join(' ').trim());
+        line = [];
+      }
+      line.push(item.str);
+      lastY = y;
+    }
+    if (line.length) lines.push(line.join(' ').trim());
+  }
+  return lines.join('\n');
+}
+
 function readPdfText(pdfPath: string): Promise<string> {
   const rawTxt = pdfPath.replace(/\.pdf$/i, '.txt');
   if (fs.existsSync(rawTxt)) {
     return Promise.resolve(fs.readFileSync(rawTxt, 'utf8'));
   }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
-    const buf = fs.readFileSync(pdfPath);
-    return pdfParse(buf).then((d) => d.text);
-  } catch {
-    throw new Error(
-      `Instale pdf-parse (npm install pdf-parse --no-save) ou coloque ${rawTxt} ao lado do PDF.`
-    );
-  }
+  return readPdfTextWithPdfJs(pdfPath).catch(async () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>;
+      const buf = fs.readFileSync(pdfPath);
+      return pdfParse(buf).then((d) => d.text);
+    } catch {
+      throw new Error(
+        `Nao foi possivel ler o PDF. Coloque ${rawTxt} ao lado do PDF ou instale pdfjs-dist.`
+      );
+    }
+  });
 }
 
 async function main() {
@@ -39,8 +76,9 @@ async function main() {
   );
   const pdfPath = path.resolve(process.argv[2] || defaultPdf);
   const outDir = path.dirname(pdfPath);
-  const rawTxt = path.join(outDir, 'Extrato.txt');
-  const normTxt = path.join(outDir, 'Extrato-normalized.txt');
+  const base = path.basename(pdfPath, path.extname(pdfPath));
+  const rawTxt = path.join(outDir, `${base}.txt`);
+  const normTxt = path.join(outDir, `${base}-normalized.txt`);
 
   if (!fs.existsSync(pdfPath)) {
     console.error('PDF não encontrado:', pdfPath);

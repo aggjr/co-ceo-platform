@@ -429,18 +429,14 @@ function isShortOptionExerciseRisk(row) {
   return spot > strike;
 }
 
-function formatStrikeDistance(row) {
-  const brl = row.strikeDistanceBrl;
+/** Distância % spot − strike (positivo = ação acima do strike). Fonte para filtro numérico e exibição. */
+export function resolveStrikeDistancePct(row) {
   const pct = row.strikeDistancePct;
-  if (brl == null || pct == null || !Number.isFinite(brl) || !Number.isFinite(pct)) {
-    const spot = Number(row.underlyingLastPrice);
-    const strike = resolveOptionStrike(row);
-    if (!Number.isFinite(spot) || strike == null || strike <= 0) return null;
-    const dBrl = Math.round((spot - strike) * 100) / 100;
-    const dPct = Math.round(((spot - strike) / strike) * 10000) / 100;
-    return { brl: dBrl, pct: dPct };
-  }
-  return { brl, pct };
+  if (pct != null && Number.isFinite(Number(pct))) return Number(pct);
+  const spot = Number(row.underlyingLastPrice);
+  const strike = resolveOptionStrike(row);
+  if (!Number.isFinite(spot) || strike == null || strike <= 0) return null;
+  return Math.round(((spot - strike) / strike) * 10000) / 100;
 }
 
 /** Planilha de opções — colunas dedicadas (sem C/V; qtd negativa = venda líquida). */
@@ -589,27 +585,28 @@ export function buildInvestOptionsColumns() {
     },
     {
       key: 'strikeDistancePct',
-      label: 'Dist. strike',
-      type: 'text',
+      label: 'Dist. strike %',
+      type: 'number',
+      numberFormat: 'percent',
       align: 'right',
-      width: '116px',
+      width: '108px',
+      filterValue: (row) => resolveStrikeDistancePct(row),
       render: (row) => {
-        const dist = formatStrikeDistance(row);
+        const pct = resolveStrikeDistancePct(row);
         const span = document.createElement('span');
-        if (!dist) {
+        if (pct == null || !Number.isFinite(pct)) {
           span.className = 'muted';
           span.textContent = '—';
           return span;
         }
-        const sign = dist.brl >= 0 ? '+' : '';
-        const pctSign = dist.pct >= 0 ? '+' : '';
-        span.textContent = `${sign}${formatNumber(dist.brl, 2)} (${pctSign}${formatNumber(dist.pct, 1)}%)`;
-        span.className = pnlClass(dist.brl);
+        const sign = pct >= 0 ? '+' : '';
+        span.textContent = `${sign}${formatNumber(pct, 2)}%`;
+        span.className = pnlClass(pct);
         span.style.fontWeight = '600';
         if (isShortOptionExerciseRisk(row)) {
           span.title = 'Posição vendida dentro do dinheiro — maior risco de exercício';
         } else {
-          span.title = 'Spot − strike (R$ e %). Positivo: ação acima do strike.';
+          span.title = '(Spot − strike) / strike × 100. Positivo: ação acima do strike.';
         }
         return span;
       },
@@ -646,8 +643,10 @@ export function buildInvestOptionsColumns() {
       key: 'pnlPct',
       label: '% Resultado',
       type: 'number',
+      numberFormat: 'percent',
       align: 'right',
       width: '96px',
+      filterValue: (row) => optionPriceReturnPct(row) ?? row.pnlPct,
       render: (row) => {
         const span = document.createElement('span');
         const pct = optionPriceReturnPct(row) ?? row.pnlPct;
@@ -662,8 +661,10 @@ export function buildInvestOptionsColumns() {
       key: 'allocationPct',
       label: '% carteira',
       type: 'number',
+      numberFormat: 'percent',
       align: 'right',
       width: '88px',
+      filterValue: (row) => row.allocationPct,
       render: (row) => {
         const span = document.createElement('span');
         span.textContent =
@@ -867,6 +868,7 @@ function buildEquitiesPortfolioColumns() {
       align: 'right',
       width: '112px',
       colorLogic: 'inflow',
+      filterValue: (row) => equityResultFromB3Quote(row),
       render: (row) => {
         const span = document.createElement('span');
         const pnl = equityResultFromB3Quote(row);
@@ -881,8 +883,10 @@ function buildEquitiesPortfolioColumns() {
       key: 'pnlPct',
       label: '%',
       type: 'number',
+      numberFormat: 'percent',
       align: 'right',
       width: '56px',
+      filterValue: (row) => equityReturnPctB3(row),
       render: (row) => {
         const span = document.createElement('span');
         const pct = equityReturnPctB3(row);
@@ -898,8 +902,10 @@ function buildEquitiesPortfolioColumns() {
       key: 'allocationPct',
       label: '% carteira',
       type: 'number',
+      numberFormat: 'percent',
       align: 'right',
       width: '96px',
+      filterValue: (row) => row.allocationPct,
       render: (row) => {
         const span = document.createElement('span');
         span.textContent =
@@ -1013,8 +1019,10 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
       key: 'allocationPct',
       label: '% carteira',
       type: 'number',
+      numberFormat: 'percent',
       align: 'right',
       width: '96px',
+      filterValue: (row) => row.allocationPct,
       render: (row) => {
         const span = document.createElement('span');
         span.textContent =
@@ -1034,8 +1042,10 @@ export function buildInvestPortfolioColumns(showUnderlying, showExpiryColumn, sh
       key: 'pnlPct',
       label: '% Resultado',
       type: 'number',
+      numberFormat: 'percent',
       align: 'right',
       width: '96px',
+      filterValue: (row) => row.pnlPct,
       render: (row) => {
         const span = document.createElement('span');
         span.className = pnlClass(row.pnl);
