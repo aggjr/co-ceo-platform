@@ -151,3 +151,18 @@
 .import-status-table--extract td {
   font-size: 0.75rem;
 }
+
+.import-month-details {
+  margin-top: 1rem;
+  font-size: 0.85rem;
+}
+
+.import-month-details dt {
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+.import-month-details dd {
+  margin: 0.15rem 0 0;
+  color: var(--text-muted, #9aa5b5);
+}
