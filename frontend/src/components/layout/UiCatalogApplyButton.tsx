@@ -1,73 +1,77 @@
 /**
- * TEMPORÁRIO — remover quando o DE-PARA for aplicado automaticamente no deploy.
- * Sessão plataforma (escopo global): POST /api/platform/ui-catalog/apply
+ * TEMPORÁRIO — Limpa histórico financeiro/patrimonial:
+ * remove pernas zeradas, proventos órfãos, repara links bidirecionais e elimina duplicatas.
+ * Visível só em escopo global (equipe co-CEO).
  */
-import { Show, createSignal, onMount } from 'solid-js';
+import { Show, createSignal } from 'solid-js';
 import { ApiError, apiRequest } from '../../api/client.js';
-import { clearUiManifestCache } from '../../navigation/uiManifest.js';
-import { getPageTexts } from '../../navigation/pageTexts.js';
 import { activeContext } from '../../shell/shellState';
 
-type ApplyStatus = 'idle' | 'loading';
+type CleanupStatus = 'idle' | 'loading';
 
-const TEXT_KEYS = [
-  'action.platform.ui_catalog_apply',
-  'action.platform.ui_catalog_apply.hint',
-  'action.platform.ui_catalog_apply.done',
-] as const;
+interface CouplingFixSummary {
+  dryRun: boolean;
+  executedAt: string;
+  step1_zeroAmountFinancialLegs: number;
+  step2_orphanIncomeInKindPatrimony: number;
+  step3_repairedBidirectionalLinks: number;
+  step4_financialDuplicatesRemoved: number;
+  step4_patrimonyDuplicatesRemoved: number;
+}
+
+function formatSummary(s: CouplingFixSummary): string {
+  const total =
+    s.step1_zeroAmountFinancialLegs +
+    s.step2_orphanIncomeInKindPatrimony +
+    s.step4_financialDuplicatesRemoved +
+    s.step4_patrimonyDuplicatesRemoved;
+  if (total === 0 && s.step3_repairedBidirectionalLinks === 0) {
+    return 'Histórico limpo — nenhuma anomalia encontrada.';
+  }
+  const parts: string[] = [];
+  if (s.step1_zeroAmountFinancialLegs > 0)
+    parts.push(`${s.step1_zeroAmountFinancialLegs} perna(s) fin. zerada(s) removida(s)`);
+  if (s.step2_orphanIncomeInKindPatrimony > 0)
+    parts.push(`${s.step2_orphanIncomeInKindPatrimony} provento(s) patrimonial(is) órfão(s) removido(s)`);
+  if (s.step3_repairedBidirectionalLinks > 0)
+    parts.push(`${s.step3_repairedBidirectionalLinks} link(s) bidirecional(is) reparado(s)`);
+  if (s.step4_financialDuplicatesRemoved + s.step4_patrimonyDuplicatesRemoved > 0)
+    parts.push(
+      `${s.step4_financialDuplicatesRemoved + s.step4_patrimonyDuplicatesRemoved} duplicata(s) removida(s)`
+    );
+  return parts.join(' | ');
+}
 
 export function UiCatalogApplyButton() {
-  const [status, setStatus] = createSignal<ApplyStatus>('idle');
+  const [status, setStatus] = createSignal<CleanupStatus>('idle');
   const [flash, setFlash] = createSignal<string | null>(null);
-  const [label, setLabel] = createSignal<string>(TEXT_KEYS[0]);
-  const [hint, setHint] = createSignal('');
-
-  onMount(async () => {
-    const t = await getPageTexts([...TEXT_KEYS]);
-    if (t['action.platform.ui_catalog_apply'] !== 'action.platform.ui_catalog_apply') {
-      setLabel(t['action.platform.ui_catalog_apply']);
-    }
-    if (t['action.platform.ui_catalog_apply.hint'] !== 'action.platform.ui_catalog_apply.hint') {
-      setHint(t['action.platform.ui_catalog_apply.hint']);
-    }
-  });
 
   const visible = () => activeContext()?.scope === 'global';
 
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
-
   const showFlash = (message: string) => {
     setFlash(message);
     if (flashTimer) clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => setFlash(null), 12000);
+    flashTimer = setTimeout(() => setFlash(null), 15000);
   };
 
-  const runApply = async () => {
+  const runCleanup = async () => {
     if (status() === 'loading') return;
     setStatus('loading');
     try {
-      const data = await apiRequest('/api/platform/ui-catalog/apply', {
+      const data = await apiRequest('/api/platform/invest/audit-fix-coupling', {
         method: 'POST',
-        body: {},
+        body: { dryRun: false },
       });
-      clearUiManifestCache();
-      const t = await getPageTexts([...TEXT_KEYS]);
-      const template = t['action.platform.ui_catalog_apply.done'];
-      const texts = Number(data.textsUpserted ?? 0);
-      const menu = Number(data.menuUpserted ?? 0);
-      const msg =
-        template !== 'action.platform.ui_catalog_apply.done'
-          ? template.replace('{texts}', String(texts)).replace('{menu}', String(menu))
-          : `Catálogo sincronizado (${texts} textos, ${menu} menu).`;
-      showFlash(msg);
-      window.dispatchEvent(new CustomEvent('coceo:route-refresh'));
+      const summary = data.summary as CouplingFixSummary;
+      showFlash(formatSummary(summary));
     } catch (err) {
       const msg =
         err instanceof ApiError
           ? err.message
           : err instanceof Error
             ? err.message
-            : 'Falha ao sincronizar catálogo UI.';
+            : 'Falha na limpeza de acoplamento.';
       showFlash(msg);
     } finally {
       setStatus('idle');
@@ -79,15 +83,16 @@ export function UiCatalogApplyButton() {
       <div class="header-ui-catalog-apply">
         <button
           type="button"
+          id="btn-audit-fix-coupling"
           class="btn-header-quotes btn-header-quotes--temp"
           classList={{ 'btn-header-quotes--loading': status() === 'loading' }}
           disabled={status() === 'loading'}
-          title={hint() || label()}
-          aria-label={label()}
+          title="Limpar histórico: remove pernas zeradas, proventos órfãos, duplicatas e repara links bidirecionais."
+          aria-label="Limpar histórico de acoplamento"
           aria-busy={status() === 'loading'}
-          onClick={() => void runApply()}
+          onClick={() => void runCleanup()}
         >
-          {status() === 'loading' ? '…' : label()}
+          {status() === 'loading' ? '…' : 'Limpar histórico'}
         </button>
         <Show when={flash()}>
           <span class="header-quotes-sync__flash" role="status">

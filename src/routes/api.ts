@@ -51,6 +51,12 @@ router.post(
   AuthMiddleware.requireGlobalScope,
   platformDeploy.triggerProduction
 );
+router.post(
+  '/platform/invest/audit-fix-coupling',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  invest.auditAndFixCoupling.bind(invest)
+);
 
 // --- Cockpit plataforma (co-CEO) ---
 router.get(
