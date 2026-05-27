@@ -94,22 +94,49 @@ function sumRows(rows, pick) {
   return rows.reduce((s, r) => s + pick(r), 0);
 }
 
+function roundMoney(v) {
+  return Math.round((Number(v) || 0) * 100) / 100;
+}
+
 /** Totais para panorama: PUTs (cum pct1) negativos; CALLs só ITM positivos. */
 export function computePanoramaOptionFlows(allRows, thresholds = DEFAULT_PANORAMA_THRESHOLDS) {
   const { calls, puts } = processForecastData(allRows, 'ALL', 'ALL', thresholds);
 
-  const putsCashNeed = sumRows(puts, (p) => p.notionalCumPct1);
-  const callsCashGeneration = sumRows(calls, (c) => c.notionalItm);
+  const putsItm = roundMoney(sumRows(puts, (p) => p.notionalItm));
+  const putsCumPct1 = roundMoney(sumRows(puts, (p) => p.notionalCumPct1));
+  const putsCumPct2 = roundMoney(sumRows(puts, (p) => p.notionalCumPct2));
+  const putsTotal = roundMoney(sumRows(puts, (p) => p.notionalTotal));
 
-  const putsR = Math.round(putsCashNeed * 100) / 100;
-  const callsR = Math.round(callsCashGeneration * 100) / 100;
+  const callsItm = roundMoney(sumRows(calls, (c) => c.notionalItm));
+  const callsCumPct1 = roundMoney(sumRows(calls, (c) => c.notionalCumPct1));
+  const callsCumPct2 = roundMoney(sumRows(calls, (c) => c.notionalCumPct2));
+  const callsTotal = roundMoney(sumRows(calls, (c) => c.notionalTotal));
+
+  const putsR = putsCumPct1;
+  const callsR = callsItm;
 
   return {
+    putsItm,
+    putsCumPct1,
+    putsCumPct2,
+    putsTotal,
+    putsSignedItm: -putsItm,
+    putsSignedCumPct1: -putsCumPct1,
+    putsSignedCumPct2: -putsCumPct2,
+    putsSignedTotal: -putsTotal,
+    callsItm,
+    callsCumPct1,
+    callsCumPct2,
+    callsTotal,
+    callsSignedItm: callsItm,
+    callsSignedCumPct1: callsCumPct1,
+    callsSignedCumPct2: callsCumPct2,
+    callsSignedTotal: callsTotal,
     putsCashNeed: putsR,
     callsCashGeneration: callsR,
     putsSigned: -putsR,
     callsSigned: callsR,
-    netOptionFlow: Math.round((callsR - putsR) * 100) / 100,
+    netOptionFlow: roundMoney(callsR - putsR),
     calls,
     puts,
     thresholds,

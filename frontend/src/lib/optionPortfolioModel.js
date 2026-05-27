@@ -148,11 +148,10 @@ export function filterOptionsRows(rows, filters) {
 }
 
 export function formatDistanceLabel(row) {
-  const dist = computeStrikeDistance(row);
-  if (!dist) return '—';
-  const sign = dist.brl >= 0 ? '+' : '';
-  const pctSign = dist.pct >= 0 ? '+' : '';
-  return `${sign}${formatNumber(dist.brl, 2)} (${pctSign}${formatNumber(dist.pct, 1)}%)`;
+  const pct = optionDistancePct(row);
+  if (pct == null || !Number.isFinite(pct)) return '—';
+  const sign = pct >= 0 ? '+' : '';
+  return `${sign}${formatNumber(pct, 2)}%`;
 }
 
 export function cardFieldRows(row) {

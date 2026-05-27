@@ -1,19 +1,12 @@
 const mysql = require('mysql2/promise');
-
 async function test() {
   try {
     const conn = await mysql.createConnection({
-      host: '127.0.0.1',
-      user: 'root',
-      password: 'Dani160779!',
-      database: 'co_ceo_db'
+      host: '127.0.0.1', user: 'root', password: 'Dani160779!', database: 'co_ceo_db'
     });
-    const [rows] = await conn.query('SHOW TABLES;');
-    console.log(rows);
+    await conn.query('ALTER TABLE ui_components MODIFY COLUMN kind VARCHAR(50) NOT NULL');
+    console.log('Altered table successfully');
     conn.end();
-  } catch (err) {
-    console.error(err);
-  }
+  } catch(e) { console.error(e); }
 }
-
 test();

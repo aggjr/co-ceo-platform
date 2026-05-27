@@ -1,4 +1,6 @@
 import '../styles/coceo-excel-table.css';
+import '../styles/invest-portfolio.css';
+import '../styles/invest-panorama.css';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated } from '../auth/session.js';
@@ -9,28 +11,7 @@ import {
   bandColumnLabels,
   buildPanoramaDecisionModel,
   DEFAULT_PANORAMA_THRESHOLDS,
-  processForecastData,
 } from '../lib/investOptionsForecastModel.js';
-
-const PANORAMA_THRESH_KEY = 'invest.panorama.thresholds';
-
-function loadThresholds() {
-  try {
-    const raw = sessionStorage.getItem(PANORAMA_THRESH_KEY);
-    if (!raw) return { ...DEFAULT_PANORAMA_THRESHOLDS };
-    const p = JSON.parse(raw);
-    return {
-      pct1: Number(p.pct1) > 0 ? Number(p.pct1) : DEFAULT_PANORAMA_THRESHOLDS.pct1,
-      pct2: Number(p.pct2) > 0 ? Number(p.pct2) : DEFAULT_PANORAMA_THRESHOLDS.pct2,
-    };
-  } catch {
-    return { ...DEFAULT_PANORAMA_THRESHOLDS };
-  }
-}
-
-function saveThresholds(t) {
-  sessionStorage.setItem(PANORAMA_THRESH_KEY, JSON.stringify(t));
-}
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -40,17 +21,43 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-function signedBrl(value, { emphasize = false } = {}) {
+function signedBrlCell(value, { emphasize = false } = {}) {
   const n = Number(value) || 0;
-  const cls =
-    n > 0 ? 'panorama-val--pos' : n < 0 ? 'panorama-val--neg' : 'panorama-val--zero';
-  const weight = emphasize ? 'font-weight:700;font-size:1.05rem;' : 'font-weight:600;';
+  let cls = 'panorama-val--zero';
+  if (n > 0) cls = 'portfolio-pnl--up';
+  else if (n < 0) cls = 'portfolio-pnl--down';
+  const weight = emphasize ? 'font-weight:700;font-size:1.02rem;' : '';
   return `<span class="${cls}" style="${weight}">${formatBrl(n)}</span>`;
+}
+
+function renderTableRow(row) {
+  const trClass = [
+    'hoverable-row',
+    row.summary ? 'summary-row' : '',
+    row.final ? 'panorama-row--final' : '',
+    row.side === 'put' ? 'panorama-row--put' : '',
+    row.side === 'call' ? 'panorama-row--call' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return `
+    <tr class="${trClass}">
+      <td class="panorama-col-grupo">${escapeHtml(row.grupo)}</td>
+      <td class="panorama-col-label">${escapeHtml(row.label)}</td>
+      <td class="panorama-col-valor">${signedBrlCell(row.valor, { emphasize: row.final })}</td>
+      <td class="panorama-col-ref">${escapeHtml(row.nota)}</td>
+    </tr>
+  `;
 }
 
 function renderMainTable(model) {
   const { capital, options, posicaoLiquida, thresholds } = model;
-  const p1 = thresholds?.pct1 ?? 5;
+  const p1 = thresholds?.pct1 ?? DEFAULT_PANORAMA_THRESHOLDS.pct1;
+  const p2 = thresholds?.pct2 ?? DEFAULT_PANORAMA_THRESHOLDS.pct2;
+  const putLabels = bandColumnLabels('put', thresholds);
+  const callLabels = bandColumnLabels('call', thresholds);
+
   const rows = [
     {
       grupo: 'Liquidez atual',
@@ -78,22 +85,84 @@ function renderMainTable(model) {
       summary: true,
     },
     {
-      grupo: 'Previsão opções',
-      label: `PUTs ITM + até ${p1}% (cumulativo)`,
+      grupo: 'Notional PUT',
+      side: 'put',
+      label: `PUT — ${putLabels.itm}`,
+      valor: options.putsSignedItm,
+      nota: 'Necessidade de caixa (negativo)',
+    },
+    {
+      grupo: 'Notional PUT',
+      side: 'put',
+      label: `PUT — ${putLabels.cumPct1}`,
+      valor: options.putsSignedCumPct1,
+      nota: `Cumulativo até ~${p1}% abaixo do strike`,
+    },
+    {
+      grupo: 'Notional PUT',
+      side: 'put',
+      label: `PUT — ${putLabels.cumPct2}`,
+      valor: options.putsSignedCumPct2,
+      nota: `Cumulativo até ~${p2}% abaixo do strike`,
+    },
+    {
+      grupo: 'Notional PUT',
+      side: 'put',
+      label: `PUT — ${putLabels.total}`,
+      valor: options.putsSignedTotal,
+      nota: 'Soma de todas as faixas (negativo)',
+      summary: true,
+    },
+    {
+      grupo: 'Notional CALL',
+      side: 'call',
+      label: `CALL — ${callLabels.itm}`,
+      valor: options.callsSignedItm,
+      nota: 'Geração de caixa por venda de ações (positivo)',
+    },
+    {
+      grupo: 'Notional CALL',
+      side: 'call',
+      label: `CALL — ${callLabels.cumPct1}`,
+      valor: options.callsSignedCumPct1,
+      nota: `Cumulativo até ~${p1}% acima do strike`,
+    },
+    {
+      grupo: 'Notional CALL',
+      side: 'call',
+      label: `CALL — ${callLabels.cumPct2}`,
+      valor: options.callsSignedCumPct2,
+      nota: `Cumulativo até ~${p2}% acima do strike`,
+    },
+    {
+      grupo: 'Notional CALL',
+      side: 'call',
+      label: `CALL — ${callLabels.total}`,
+      valor: options.callsSignedTotal,
+      nota: 'Soma de todas as faixas (positivo)',
+      summary: true,
+    },
+    {
+      grupo: 'Síntese opções',
+      side: 'put',
+      label: `PUT na síntese (ITM + até ${p1}%)`,
       valor: options.putsSigned,
-      nota: 'Necessidade de caixa (2ª faixa)',
+      nota: 'Entra negativo na posição líquida',
+      summary: true,
     },
     {
-      grupo: 'Previsão opções',
-      label: 'CALLs ITM (1º nível)',
+      grupo: 'Síntese opções',
+      side: 'call',
+      label: 'CALL na síntese (só ITM)',
       valor: options.callsSigned,
-      nota: 'Venda de ações → geração de caixa',
+      nota: 'Entra positivo na posição líquida',
+      summary: true,
     },
     {
-      grupo: 'Previsão opções',
+      grupo: 'Síntese opções',
       label: 'Efeito líquido opções',
       valor: options.netOptionFlow,
-      nota: 'CALLs ITM − PUTs (ITM + próximo)',
+      nota: 'CALLs ITM − PUTs (ITM + 1ª faixa)',
       summary: true,
     },
     {
@@ -106,149 +175,43 @@ function renderMainTable(model) {
     },
   ];
 
-  let body = '';
-  for (const row of rows) {
-    const trClass = row.final ? 'summary-row panorama-row--final' : row.summary ? 'summary-row' : '';
-    body += `
-      <tr class="${trClass}">
-        <td style="text-align:left;color:#94a3b8;font-size:12px;">${escapeHtml(row.grupo)}</td>
-        <td style="text-align:left;color:#e2e8f0;">${escapeHtml(row.label)}</td>
-        <td style="text-align:right;">${signedBrl(row.valor, { emphasize: row.final })}</td>
-        <td style="text-align:left;color:#64748b;font-size:12px;">${escapeHtml(row.nota)}</td>
-      </tr>
-    `;
-  }
+  const body = rows.map(renderTableRow).join('');
 
   return `
-    <table class="coceo-excel-table panorama-table" style="width:100%;max-width:960px;">
-      <thead>
-        <tr>
-          <th style="text-align:left;width:120px;">Bloco</th>
-          <th style="text-align:left;">Indicador</th>
-          <th style="text-align:right;width:160px;">Valor (R$)</th>
-          <th style="text-align:left;">Referência</th>
-        </tr>
-      </thead>
-      <tbody>${body}</tbody>
-    </table>
-  `;
-}
-
-function cellBrl(value, negate) {
-  const n = negate ? -Math.abs(Number(value) || 0) : Number(value) || 0;
-  if (n === 0) return '<span style="color:#64748b;">—</span>';
-  return signedBrl(n);
-}
-
-/** Tabela estilo referência: Ativo | ITM | Até pct1 | Até pct2 | Total */
-function renderBandTable(title, rows, side, thresholds, { negate = false } = {}) {
-  const labels = bandColumnLabels(side, thresholds);
-  if (!rows?.length) {
-    return `<p class="muted">${escapeHtml(title)}: sem posições vendidas.</p>`;
-  }
-
-  const totals = {
-    itm: 0,
-    cumPct1: 0,
-    cumPct2: 0,
-    total: 0,
-  };
-  let body = '';
-  for (const r of rows) {
-    totals.itm += r.notionalItm;
-    totals.cumPct1 += r.notionalCumPct1;
-    totals.cumPct2 += r.notionalCumPct2;
-    totals.total += r.notionalTotal;
-    body += `
-      <tr>
-        <td style="font-weight:600;">${escapeHtml(r.underlying)}</td>
-        <td style="text-align:right;">${cellBrl(r.notionalItm, negate)}</td>
-        <td style="text-align:right;">${cellBrl(r.notionalCumPct1, negate)}</td>
-        <td style="text-align:right;">${cellBrl(r.notionalCumPct2, negate)}</td>
-        <td style="text-align:right;">${cellBrl(r.notionalTotal, negate)}</td>
-      </tr>
-    `;
-  }
-
-  return `
-    <h3 style="color:#f8fafc;font-size:1.05rem;margin:24px 0 10px;">${escapeHtml(title)}</h3>
-    <div style="overflow-x:auto;">
-      <table class="coceo-excel-table" style="width:100%;min-width:520px;">
+    <div class="table-wrapper">
+      <table class="excel-table panorama-table">
         <thead>
           <tr>
-            <th style="text-align:left;">Ativo</th>
-            <th style="text-align:right;">${escapeHtml(labels.itm)}</th>
-            <th style="text-align:right;">${escapeHtml(labels.cumPct1)}</th>
-            <th style="text-align:right;">${escapeHtml(labels.cumPct2)}</th>
-            <th style="text-align:right;">${escapeHtml(labels.total)}</th>
+            <th style="text-align:left;width:130px;">Bloco</th>
+            <th style="text-align:left;">Indicador</th>
+            <th style="text-align:right;width:168px;">Valor (R$)</th>
+            <th style="text-align:left;">Referência</th>
           </tr>
         </thead>
         <tbody>${body}</tbody>
-        <tfoot>
-          <tr class="summary-row">
-            <td>TOTAL</td>
-            <td style="text-align:right;">${cellBrl(totals.itm, negate)}</td>
-            <td style="text-align:right;">${cellBrl(totals.cumPct1, negate)}</td>
-            <td style="text-align:right;">${cellBrl(totals.cumPct2, negate)}</td>
-            <td style="text-align:right;">${cellBrl(totals.total, negate)}</td>
-          </tr>
-        </tfoot>
       </table>
     </div>
   `;
 }
 
-let panoramaState = { optionRows: [], titulosPayload: null, thresholds: loadThresholds() };
-
-function renderPanorama(root) {
-  const thresholds = panoramaState.thresholds;
+function renderPanorama(root, optionRows, titulosPayload) {
   const model = buildPanoramaDecisionModel(
-    panoramaState.optionRows,
-    panoramaState.titulosPayload?.items || [],
-    panoramaState.titulosPayload?.cashStatementBalance ?? 0,
-    thresholds
+    optionRows,
+    titulosPayload?.items || [],
+    titulosPayload?.cashStatementBalance ?? 0,
+    DEFAULT_PANORAMA_THRESHOLDS,
   );
-  const { calls, puts } = processForecastData(panoramaState.optionRows, 'ALL', 'ALL', thresholds);
 
   root.innerHTML = `
-    <style>
-      .panorama-val--pos { color: #22c55e; }
-      .panorama-val--neg { color: #ef4444; }
-      .panorama-val--zero { color: #94a3b8; }
-      .panorama-row--final td { border-top: 2px solid rgba(218,177,119,0.45); }
-      .panorama-thresholds { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin-bottom:16px; }
-      .panorama-thresholds label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:#94a3b8; }
-      .panorama-thresholds input { width:72px; padding:6px 8px; border-radius:4px; border:1px solid rgba(148,163,184,0.35); background:rgba(15,23,42,0.8); color:#fff; }
-    </style>
-    <div style="padding:1rem;">
-      <p style="color:#94a3b8;font-size:0.95rem;margin:0 0 1rem;max-width:800px;">
-        Notional por faixa (valores cumulativos nas colunas de %). PUTs em <strong style="color:#ef4444">negativo</strong> = caixa necessário;
-        CALLs ITM em <strong style="color:#22c55e">positivo</strong> na síntese = venda de ações.
+    <div class="portfolio-excel-section panorama-page">
+      <p class="panorama-lead">
+        Notionais por faixa (cumulativos). PUTs em vermelho = caixa necessário; CALLs ITM em verde = venda de ações.
+        Faixas fixas: ${DEFAULT_PANORAMA_THRESHOLDS.pct1}% e ${DEFAULT_PANORAMA_THRESHOLDS.pct2}%.
       </p>
-      <div class="panorama-thresholds">
-        <label>1ª faixa (%)
-          <input type="number" id="panorama-pct1" min="0.1" max="50" step="0.5" value="${thresholds.pct1}" />
-        </label>
-        <label>2ª faixa (%)
-          <input type="number" id="panorama-pct2" min="0.1" max="80" step="0.5" value="${thresholds.pct2}" />
-        </label>
-        <button type="button" id="panorama-apply-pct" class="btn-primary" style="padding:8px 14px;font-size:0.85rem;">Aplicar %</button>
-      </div>
-      <h3 style="color:#DAB177;font-size:1rem;margin:20px 0 8px;">Liquidez e síntese</h3>
+      <h2 class="portfolio-excel-title">Liquidez e síntese</h2>
       ${renderMainTable(model)}
-      ${renderBandTable('CALLs vendidas', calls, 'call', thresholds, { negate: false })}
-      ${renderBandTable('PUTs vendidas', puts, 'put', thresholds, { negate: true })}
     </div>
   `;
-
-  root.querySelector('#panorama-apply-pct')?.addEventListener('click', () => {
-    const pct1 = Number(root.querySelector('#panorama-pct1')?.value);
-    const pct2 = Number(root.querySelector('#panorama-pct2')?.value);
-    if (!Number.isFinite(pct1) || !Number.isFinite(pct2) || pct2 < pct1) return;
-    panoramaState.thresholds = { pct1, pct2 };
-    saveThresholds(panoramaState.thresholds);
-    renderPanorama(root);
-  });
 }
 
 export async function InvestPanoramaPage(container) {
@@ -273,10 +236,7 @@ export async function InvestPanoramaPage(container) {
       fetchOpenOptionsPortfolio(),
       apiRequest('/api/invest/portfolio?assetClass=fixedIncome'),
     ]);
-    panoramaState.optionRows = optionRows;
-    panoramaState.titulosPayload = titulosPayload;
-    panoramaState.thresholds = loadThresholds();
-    renderPanorama(root);
+    renderPanorama(root, optionRows, titulosPayload);
   } catch (err) {
     root.innerHTML = `<div style="padding:2rem;color:#ef4444;">${escapeHtml(err.message)}</div>`;
   }

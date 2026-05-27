@@ -33,6 +33,16 @@ function columnWidthToLayoutPx(widthVal, fallbackPx = 88) {
     return Number.isFinite(loose) && loose > 0 ? Math.round(loose) : fallbackPx;
 }
 
+/** Valor bruto para filtro/ordenação (prioriza filterValue; evita filtrar texto formatado). */
+function resolveColumnCellValue(colDef, item) {
+    if (!colDef) return undefined;
+    if (typeof colDef.filterValue === 'function') return colDef.filterValue(item);
+    const raw = item[colDef.key];
+    if (raw !== undefined && raw !== null && raw !== '') return raw;
+    if (typeof colDef.filterText === 'function') return colDef.filterText(item);
+    return raw;
+}
+
 function dateRangePreset(op) {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -338,7 +348,7 @@ export class ExcelTable {
                     if (!filter) return true; // Safety
 
                     const colDef = this.columns.find(c => c.key === key);
-                    const cellVal = (colDef && typeof colDef.filterText === 'function') ? colDef.filterText(item) : item[key];
+                    const cellVal = resolveColumnCellValue(colDef, item);
                     const type = colDef ? (colDef.type || 'text') : 'text';
 
                     // --- Number/Currency ---
@@ -517,8 +527,8 @@ export class ExcelTable {
             };
 
             this.currentData.sort((a, b) => {
-                const valA = a[key];
-                const valB = b[key];
+                const valA = resolveColumnCellValue(colDef, a);
+                const valB = resolveColumnCellValue(colDef, b);
 
                 if (type === 'date') {
                     const dateA = new Date(valA).getTime() || 0;
@@ -1354,7 +1364,7 @@ export class ExcelTable {
 
         // ── Get distinct values (client-side) ────────────────────────────────
         const getDistinct = () => {
-            const raw = this.currentData.map(r => (colDef && typeof colDef.filterText === 'function') ? colDef.filterText(r) : r[colKey]);
+            const raw = this.currentData.map((r) => resolveColumnCellValue(colDef, r));
             if (colType === 'date') {
                 return [...new Set(raw.map(v => {
                     if (!v || v === '') return '__EMPTY__';
@@ -1556,7 +1566,14 @@ export class ExcelTable {
         const formatVal = v => {
             if (v === '__EMPTY__') return '(Vazias)';
             if (colType === 'currency') return fmtCur(v);
-            if (colType === 'number')   return fmtNum(v);
+            if (colType === 'number') {
+                const n = Number(v);
+                if (colDef?.numberFormat === 'percent' && Number.isFinite(n)) {
+                    const sign = n >= 0 ? '+' : '';
+                    return `${sign}${n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })}%`;
+                }
+                return fmtNum(v);
+            }
             if (colType === 'date') {
                 const br = formatDateBr(v);
                 return br !== '—' ? br : String(v);
