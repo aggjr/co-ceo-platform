@@ -55,7 +55,7 @@ function renderExposureTable(data, labels, colNearKey, colFarKey) {
   const body = data.lines
     .map(
       (line) => `
-      <tr>
+      <tr class="hoverable-row">
         <td>${escapeHtml(line.underlying)}</td>
         <td>${formatCell(line.itm)}</td>
         <td>${formatCell(line.bandNear)}</td>
@@ -146,16 +146,17 @@ export async function InvestOptionsExposurePage(container) {
       side === 'put'
         ? 'column.invest.options.exposure.band_far_put'
         : 'column.invest.options.exposure.band_far_call';
+    const val = (k, fallback) => (t[k] && t[k] !== k ? t[k] : fallback);
     return {
-      empty: t['screen.invest.options.exposure.empty'],
-      asset: t['column.invest.options.exposure.asset'],
-      itm: t['column.invest.options.exposure.itm'],
-      bandNear: t[nearKey].replace('{pct}', String(params.pctNear)).replace('{pctFar}', String(params.pctFar)),
-      bandFar: t[farKey]
+      empty: val('screen.invest.options.exposure.empty', 'Nenhuma posição encontrada.'),
+      asset: val('column.invest.options.exposure.asset', 'Ativo'),
+      itm: val('column.invest.options.exposure.itm', 'ITM'),
+      bandNear: val(nearKey, side === 'put' ? 'Faixa {pct}% abaixo' : 'Faixa {pct}% acima').replace('{pct}', String(params.pctNear)).replace('{pctFar}', String(params.pctFar)),
+      bandFar: val(farKey, side === 'put' ? 'Faixa entre {pctNear}% e {pct}% abaixo' : 'Faixa entre {pctNear}% e {pct}% acima')
         .replace('{pct}', String(params.pctFar))
         .replace('{pctNear}', String(params.pctNear)),
-      total: t['column.invest.options.exposure.total'],
-      totalRow: t['column.invest.options.exposure.total_row'],
+      total: val('column.invest.options.exposure.total', 'Total'),
+      totalRow: val('column.invest.options.exposure.total_row', 'Total Geral'),
     };
   }
 
