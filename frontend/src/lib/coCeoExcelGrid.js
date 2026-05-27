@@ -105,6 +105,7 @@ function mountGridHost(parent, {
   footerAggregate,
   footerColumnTotals,
   summaryLabels,
+  fixedLeadingColumns: fixedLeadingColumnsOpt,
 }) {
   const host = document.createElement('div');
   host.className = 'coceo-excel-grid-host';
@@ -128,6 +129,14 @@ function mountGridHost(parent, {
     ...row,
   }));
 
+  const stickyCount = columns.filter((c) => c.sticky).length;
+  const fixedLeadingColumns =
+    fixedLeadingColumnsOpt != null
+      ? Math.max(0, Number(fixedLeadingColumnsOpt) || 0)
+      : stickyCount > 0
+        ? stickyCount
+        : 0;
+
   const table = new ExcelTable({
     container: host,
     columns,
@@ -135,7 +144,7 @@ function mountGridHost(parent, {
     projectId: 0,
     endpointPrefix: null,
     enableSelection: false,
-    fixedLeadingColumns: columns.some((c) => c.sticky) ? 1 : 0,
+    fixedLeadingColumns,
     tableTheme: tableTheme || INVEST_EXCEL_THEME,
     summaryLabels: summaryLabels || { total: 'Linhas', selected: '' },
     footerAggregate: footerAggregate || null,
@@ -181,6 +190,7 @@ export function mountCoCeoExcelGrid(container, config) {
     footerAggregate: config.footerAggregate,
     footerColumnTotals: config.footerColumnTotals,
     summaryLabels: config.summaryLabels,
+    fixedLeadingColumns: config.fixedLeadingColumns,
   });
 }
 
@@ -218,6 +228,7 @@ export function mountCoCeoExcelGrids(root) {
       footerAggregate: cfg.footerAggregate,
       footerColumnTotals: cfg.footerColumnTotals,
       summaryLabels: cfg.summaryLabels,
+      fixedLeadingColumns: cfg.fixedLeadingColumns,
     });
   });
 }

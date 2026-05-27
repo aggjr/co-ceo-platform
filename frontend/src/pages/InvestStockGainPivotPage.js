@@ -33,6 +33,7 @@ const ROW_TOTAL_COMPONENT_KEYS = new Set([
   'compra_call',
   'venda_put',
   'compra_put',
+  'resultado_custodia',
   'dividendos',
   'jcp',
   'locacao_acao',
@@ -42,7 +43,10 @@ const ROW_TOTAL_COMPONENT_KEYS = new Set([
   'outros_ganhos',
 ]);
 
-function sumRowOperations(row) {
+function rowPeriodResult(row) {
+  if (row.ganho_aproximado != null && Number.isFinite(Number(row.ganho_aproximado))) {
+    return Number(row.ganho_aproximado);
+  }
   let sum = 0;
   for (const key of ROW_TOTAL_COMPONENT_KEYS) {
     sum += Number(row[key] ?? 0);
@@ -51,23 +55,57 @@ function sumRowOperations(row) {
   return Math.round((sum - taxas) * 100) / 100;
 }
 
+function buildFooterColumnTotals(totals) {
+  if (!totals) return null;
+  return () => {
+    const cells = {
+      underlying: '<strong>Total geral</strong>',
+      ganho_aproximado: numCell(totals.ganho_aproximado ?? 0),
+      preco_estrito: '',
+      cotacao_atual: '',
+    };
+    for (const [key, value] of Object.entries(totals)) {
+      if (key === 'underlying' || key === 'label' || key === 'ganho_aproximado') continue;
+      if (key === 'preco_estrito' || key === 'cotacao_atual') continue;
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        cells[key] = numCell(value);
+      }
+    }
+    return cells;
+  };
+}
+
 function buildColumns(columnLabels, columnOrder, uiTexts = {}) {
   const ordered = columnOrder?.length ? columnOrder : Object.keys(columnLabels);
   const valueCols = ordered.filter(
-    (k) => k !== 'ganho_aproximado' && k !== 'preco_estrito' && k !== 'cotacao_atual'
+    (k) =>
+      k !== 'ganho_aproximado' &&
+      k !== 'preco_estrito' &&
+      k !== 'cotacao_atual' &&
+      k !== 'underlying'
   );
 
   const cols = [
     {
       key: 'underlying',
-      label: uiTexts['column.invest.stock_gain.underlying'] || columnLabels.underlying || 'underlying',
+      label: uiTexts['column.invest.stock_gain.underlying'] || columnLabels.underlying || 'Ação',
       align: 'left',
+      sticky: true,
+      width: '108px',
       sortValue: (r) => r.underlying,
       filterText: (r) => r.underlying,
-      cell: (r) =>
-        r.underlying === 'TOTAL'
-          ? '<strong>Total geral</strong>'
-          : `<strong>${r.label || r.underlying}</strong>`,
+      cell: (r) => `<strong>${r.label || r.underlying}</strong>`,
+    },
+    {
+      key: 'ganho_aproximado',
+      label: columnLabels.ganho_aproximado || 'Resultado',
+      align: 'right',
+      sticky: true,
+      width: '120px',
+      sortValue: (r) => rowPeriodResult(r),
+      filterText: (r) => String(rowPeriodResult(r)),
+      cell: (r) => numCell(rowPeriodResult(r)),
+      cellClass: () => 'sgp-total-col',
     },
     {
       key: 'preco_estrito',
@@ -75,7 +113,7 @@ function buildColumns(columnLabels, columnOrder, uiTexts = {}) {
       align: 'right',
       sortValue: (r) => r.preco_estrito ?? -1,
       filterText: (r) => String(r.preco_estrito ?? ''),
-      cell: (r) => (r.underlying === 'TOTAL' ? '' : priceCell(r.preco_estrito)),
+      cell: (r) => priceCell(r.preco_estrito),
     },
     {
       key: 'cotacao_atual',
@@ -83,7 +121,7 @@ function buildColumns(columnLabels, columnOrder, uiTexts = {}) {
       align: 'right',
       sortValue: (r) => r.cotacao_atual ?? -1,
       filterText: (r) => String(r.cotacao_atual ?? ''),
-      cell: (r) => (r.underlying === 'TOTAL' ? '' : priceCell(r.cotacao_atual)),
+      cell: (r) => priceCell(r.cotacao_atual),
     },
   ];
 
@@ -97,22 +135,6 @@ function buildColumns(columnLabels, columnOrder, uiTexts = {}) {
       cell: (r) => numCell(r[key]),
     });
   }
-
-  cols.push({
-    key: 'ganho_aproximado',
-    label: columnLabels.ganho_aproximado || 'Total',
-    align: 'right',
-    sortValue: (r) => Number(r.ganho_aproximado ?? sumRowOperations(r)),
-    filterText: (r) => String(r.ganho_aproximado ?? sumRowOperations(r)),
-    cell: (r) => {
-      const v =
-        r.ganho_aproximado != null && Number.isFinite(Number(r.ganho_aproximado))
-          ? Number(r.ganho_aproximado)
-          : sumRowOperations(r);
-      return numCell(v);
-    },
-    cellClass: () => 'sgp-total-col',
-  });
 
   return cols;
 }
@@ -148,14 +170,6 @@ function bindPage(container, initialBounds, uiTexts) {
       }
 
       const rows = [...(pivot?.rows || [])];
-      if (pivot?.totals) {
-        rows.push({
-          ...pivot.totals,
-          underlying: 'TOTAL',
-          label: 'Total geral',
-        });
-      }
-
       const columns = buildColumns(columnLabels, columnOrder, uiTexts);
       host.innerHTML = renderExcelTableShell({
         caption: 'Resultados por ação (pivot)',
@@ -167,7 +181,9 @@ function bindPage(container, initialBounds, uiTexts) {
         columns,
         rows,
         emptyText: 'Sem lançamentos no período para as ações da carteira.',
-        rowAttrs: (r) => (r.underlying === 'TOTAL' ? 'class="sgp-totals-row"' : ''),
+        footerColumnTotals: buildFooterColumnTotals(pivot?.totals),
+        summaryLabels: { total: 'Linhas', selected: '' },
+        fixedLeadingColumns: 2,
       });
       mountExcelTables(host);
     } catch (err) {

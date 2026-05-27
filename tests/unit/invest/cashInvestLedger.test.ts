@@ -62,6 +62,47 @@ describe('cashInvestLedger', () => {
     expect(resolveCashInvestDisplayBalance(entries, '2026-02-10')).toBeCloseTo(7_500, 2);
   });
 
+  it('ignora saldo inicial manual duplicado quando já há BTG-EXTRATO-OPENING', () => {
+    const entries = [
+      {
+        id: 'c1',
+        asset_id: 'c1',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'opening_balance',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 449_963.32,
+        transaction_date: '2026-01-02',
+        broker_note_ref: 'MANUAL-OPENING',
+      },
+      {
+        id: 'c2',
+        asset_id: 'c2',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'opening_balance',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 449_963.32,
+        transaction_date: '2026-01-02',
+        broker_note_ref: 'BTG-EXTRATO-OPENING-2026-01',
+      },
+      {
+        id: 'c3',
+        asset_id: 'c3',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'fee',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: -100,
+        transaction_date: '2026-05-20',
+      },
+    ];
+    expect(cashBalanceFromLedger(entries, '2026-05-20')).toBeCloseTo(449_863.32, 2);
+  });
+
   it('lançamentos posteriores à data de corte são ignorados', () => {
     const entries = [
       {
