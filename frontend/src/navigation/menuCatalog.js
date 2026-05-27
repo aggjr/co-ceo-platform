@@ -119,6 +119,11 @@ export const MENU_CATALOG = [
         path: '/invest/extratos',
         resourceKey: 'screen.invest.results',
       },
+      {
+        label: 'Importar fontes BTG',
+        path: '/invest/importacao',
+        resourceKey: 'screen.invest.results',
+      },
     ],
   },
 ];

@@ -1,0 +1,153 @@
+.invest-import-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.invest-import-card h2 {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.invest-import-card--wide {
+  min-width: 0;
+}
+
+.invest-import-drop {
+  border: 1px dashed var(--border-subtle, #3a4556);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.02));
+}
+
+.invest-import-drop input[type='file'] {
+  width: 100%;
+  font-size: 0.85rem;
+  margin-bottom: 0.35rem;
+}
+
+.import-field-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.import-path-label {
+  font-size: 0.75rem;
+  margin: 0.75rem 0 0.15rem;
+  opacity: 0.75;
+}
+
+.import-path-value {
+  font-size: 0.85rem;
+  word-break: break-all;
+  margin: 0;
+}
+
+.invest-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  align-items: center;
+}
+
+.invest-import-actions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  margin-right: 0.5rem;
+}
+
+.import-table-host {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.import-status-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.import-status-table th,
+.import-status-table td {
+  border: 1px solid var(--border-subtle, #3a4556);
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.import-status-table th {
+  background: rgba(0, 0, 0, 0.2);
+  font-weight: 600;
+}
+
+.import-path-cell {
+  max-width: 220px;
+  word-break: break-all;
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+
+.import-detail-cell {
+  min-width: 160px;
+  font-size: 0.78rem;
+  color: var(--text-muted, #9aa5b5);
+}
+
+.import-status {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.import-status--ok {
+  background: rgba(40, 120, 60, 0.35);
+  color: #8fd4a0;
+}
+
+.import-status--err {
+  background: rgba(140, 40, 40, 0.35);
+  color: #f0a0a0;
+}
+
+.import-status--muted {
+  color: var(--text-muted, #888);
+}
+
+.import-totals {
+  margin-top: 0.75rem;
+}
+
+.import-banner {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+}
+
+.import-row--blocked {
+  opacity: 0.65;
+}
+
+.import-money {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.78rem;
+}
+
+.import-delta {
+  font-size: 0.7rem;
+  color: var(--text-muted, #9aa5b5);
+}
+
+.import-status-table--extract th,
+.import-status-table--extract td {
+  font-size: 0.75rem;
+}

@@ -12,7 +12,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 const webDist = path.join(__dirname, '../frontend/dist');
 
-app.use(express.json());
+app.use(express.json({ limit: '30mb' }));
 app.use('/api', apiRoutes);
 
 app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {

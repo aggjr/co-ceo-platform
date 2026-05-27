@@ -48,7 +48,15 @@ async function readPdfTextWithPdfJs(pdfPath: string): Promise<string> {
 
 function readPdfText(pdfPath: string): Promise<string> {
   const rawTxt = pdfPath.replace(/\.pdf$/i, '.txt');
-  if (fs.existsSync(rawTxt)) {
+  const forcePdf = process.argv.includes('--force-pdf');
+  if (!forcePdf && fs.existsSync(rawTxt) && fs.existsSync(pdfPath)) {
+    const pdfMtime = fs.statSync(pdfPath).mtimeMs;
+    const txtMtime = fs.statSync(rawTxt).mtimeMs;
+    if (txtMtime >= pdfMtime) {
+      return Promise.resolve(fs.readFileSync(rawTxt, 'utf8'));
+    }
+    console.warn('Extrato.txt mais antigo que Extrato.pdf — relendo PDF.');
+  } else if (!forcePdf && fs.existsSync(rawTxt)) {
     return Promise.resolve(fs.readFileSync(rawTxt, 'utf8'));
   }
   return readPdfTextWithPdfJs(pdfPath).catch(async () => {
