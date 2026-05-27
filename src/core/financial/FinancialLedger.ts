@@ -22,12 +22,13 @@ export class FinancialLedger {
 
   async record(
     ctx: UserContext,
-    input: RecordCashMovementInput
+    input: RecordCashMovementInput,
+    options: { allowZeroAmount?: boolean } = {}
   ): Promise<FinancialLedgerRow> {
-    if (input.amount <= 0) {
+    if (input.amount < 0 || (input.amount === 0 && !options.allowZeroAmount)) {
       throw new GatewayError(
         'FINANCIAL_RULE_VIOLATION',
-        `amount deve ser positivo; sinal eh dado pela direction (in/out). Recebido: ${input.amount}`,
+        `amount deve ser positivo (ou zero com allowZeroAmount); sinal eh dado pela direction (in/out). Recebido: ${input.amount}`,
         400
       );
     }

@@ -98,6 +98,8 @@ export class LedgerEventProjection {
         return 'bonus';
       case 'cost_adjustment':
         return 'fee';
+      case 'income_in_kind':
+        return 'dividend';
       default:
         return signedQty >= 0 ? 'buy' : 'sell';
     }

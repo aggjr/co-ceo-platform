@@ -684,6 +684,26 @@ export class InvestOperations {
         Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price))
       );
       if (amount === 0) return { skipped: true, reason: 'amount zero' };
+
+      // Proventos (dividend/jcp/cash_yield) e aportes/retiradas de capital sao
+      // pernas exclusivamente financeiras por design:
+      //   - Proventos: o ativo gerador pode nao estar identificado no extrato (ex:
+      //     dividendo lanado pelo banco sem referencia ao ticker). Quando o ticker
+      //     NAO for de caixa, o campo target_ticker no metadata marca a intencao
+      //     de rastreabilidade futura, mas nao forcamos uma perna patrimonial.
+      //   - Capital: conceitualmente nao e ativo patrimonial; e moeda de alta
+      //     liquidez que transita pelo caixa.
+      // Pernas sem link sao legitimas quando genuinamente nao ha relacao.
+      const finMeta: Record<string, unknown> = {
+        legacy_op: op,
+        broker_note_ref: ref ?? null,
+      };
+      // Registra o ticker candidato no metadata para rastreabilidade futura
+      // (quando source do dividendo for identificavel).
+      if (PASSIVE_INCOME_OPS.has(op) && !isCash) {
+        finMeta.target_ticker = ticker;
+      }
+
       await this.financialLedger.record(ctx, {
         accountId,
         transactionDate: line.date,
@@ -694,8 +714,9 @@ export class InvestOperations {
         settlementDate: line.settlement_date ?? line.date,
         businessEventId,
         externalRef: ref ? `BROKER_REF:${ref}` : null,
-        metadata: { legacy_op: op, broker_note_ref: ref ?? null },
+        metadata: finMeta,
       });
+
       return { skipped: false };
     }
 
@@ -705,7 +726,48 @@ export class InvestOperations {
         Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price))
       );
       if (amount === 0) return { skipped: true, reason: 'amount zero' };
-      await this.financialLedger.record(ctx, {
+
+      // GAP 3: perna patrimonial para despesas quando o ticker eh de ativo (nao caixa)
+      let patrimonyEntryId: string | null = null;
+      if (!isCash) {
+        const expAssetClass = assetType as InvestAssetClass;
+        const { item } = await this.inventoryRegistry.ensure(ctx, {
+          category: 'financial_asset',
+          subcategory: InvestOperations.subcategoryOf(expAssetClass),
+          identifier: ticker,
+          name: ticker,
+        });
+        const { entry: patEntry } = await this.inventoryLedger.recordMovement(ctx, {
+          itemId: item.id,
+          transactionDate: line.date,
+          movementType: 'cost_adjustment',
+          quantityDelta: 0,
+          unitValue: amount,
+          notes: line.notes ?? op,
+          externalRef: ref ? `BROKER_REF:${ref}` : undefined,
+          businessEventId,
+          metadata: {
+            legacy_op: op,
+            broker_note_ref: ref ?? null,
+            applies_to_b3: false,
+            target_ticker: ticker,
+          },
+        });
+        patrimonyEntryId = patEntry.id;
+      }
+
+      // GAP 4: metadata enriquecido
+      const expFinMeta: Record<string, unknown> = {
+        legacy_op: op,
+        broker_note_ref: ref ?? null,
+      };
+      if (!isCash) {
+        expFinMeta.target_ticker = ticker;
+        const resolvedItem = await this.inventoryRegistry.findByIdentifier(ctx, 'INVEST', ticker);
+        if (resolvedItem) expFinMeta.patrimony_item_id = resolvedItem.id;
+      }
+
+      const finEntry = await this.financialLedger.record(ctx, {
         accountId,
         transactionDate: line.date,
         direction: 'out',
@@ -715,8 +777,15 @@ export class InvestOperations {
         settlementDate: line.settlement_date ?? line.date,
         businessEventId,
         externalRef: ref ? `BROKER_REF:${ref}` : null,
-        metadata: { legacy_op: op, broker_note_ref: ref ?? null },
+        metadata: expFinMeta,
       });
+
+      // GAP 5: link bidirecional
+      if (patrimonyEntryId) {
+        await this.inventoryLedger.linkToFinancialLedger(ctx, patrimonyEntryId, finEntry.id);
+        await this.financialLedger.linkToPatrimonyLedger(ctx, finEntry.id, patrimonyEntryId);
+      }
+
       return { skipped: false };
     }
 
@@ -740,7 +809,7 @@ export class InvestOperations {
       );
       if (amount === 0) return { skipped: true, reason: 'cost_adjustment com custo zero' };
 
-      await this.inventoryLedger.recordMovement(ctx, {
+      const { entry: caPatEntry } = await this.inventoryLedger.recordMovement(ctx, {
         itemId: item.id,
         transactionDate: line.date,
         movementType: 'cost_adjustment',
@@ -758,7 +827,7 @@ export class InvestOperations {
       });
 
       const { accountId } = await this.resolveCashAccount(ctx, 'CAIXA-DEFAULT', line.date);
-      await this.financialLedger.record(ctx, {
+      const caFinEntry = await this.financialLedger.record(ctx, {
         accountId,
         transactionDate: line.date,
         direction: 'out',
@@ -772,8 +841,13 @@ export class InvestOperations {
           legacy_op: 'fee',
           broker_note_ref: ref ?? null,
           target_ticker: ticker,
+          patrimony_item_id: item.id,
         },
       });
+
+      // GAP 5: link bidirecional
+      await this.inventoryLedger.linkToFinancialLedger(ctx, caPatEntry.id, caFinEntry.id);
+      await this.financialLedger.linkToPatrimonyLedger(ctx, caFinEntry.id, caPatEntry.id);
 
       return { skipped: false };
     }
@@ -858,7 +932,7 @@ export class InvestOperations {
       return { skipped: true, reason: `operacao desconhecida: ${op}` };
     }
 
-    await this.inventoryLedger.recordMovement(ctx, {
+    const { entry: tradePatEntry } = await this.inventoryLedger.recordMovement(ctx, {
       itemId: item.id,
       transactionDate: line.date,
       movementType,
@@ -897,6 +971,9 @@ export class InvestOperations {
       }
     }
 
+    // Trades e opcoes: geram fluxo de caixa real → perna patrimonial + perna financeira linkadas.
+    // Corporate actions (split/bonus/revaluation): sem fluxo de caixa → apenas perna patrimonial.
+    // Pernas sem link sao legitimas quando genuinamente nao ha relacao com o outro mundo.
     if (cashDirection) {
       const { accountId } = await this.resolveCashAccount(ctx, 'CAIXA-DEFAULT', line.date);
       const totalCash = Math.abs(Number(line.total_net_value ?? line.quantity * line.unit_price));
@@ -904,7 +981,7 @@ export class InvestOperations {
         (line.brokerage_fee ?? 0) + (line.b3_fees ?? 0) + (line.irrf_tax ?? 0)
       );
       if (totalCash > 0) {
-        await this.financialLedger.record(ctx, {
+        const tradeFinEntry = await this.financialLedger.record(ctx, {
           accountId,
           transactionDate: line.date,
           direction: cashDirection,
@@ -921,10 +998,20 @@ export class InvestOperations {
             brokerage_fee: line.brokerage_fee ?? 0,
             b3_fees: line.b3_fees ?? 0,
             irrf_tax: line.irrf_tax ?? 0,
+            patrimony_item_id: item.id,
+            target_ticker: ticker,
           },
         });
+        // Link bidirecional: trade tem AMBAS as pernas → relaciona-las explicitamente.
+        await this.inventoryLedger.linkToFinancialLedger(ctx, tradePatEntry.id, tradeFinEntry.id);
+        await this.financialLedger.linkToPatrimonyLedger(ctx, tradeFinEntry.id, tradePatEntry.id);
       }
+      // Se totalCash=0 (ex: exercicio de opcao sem valor residual), a perna
+      // patrimonial fica sem link financeiro — comportamento correto.
     }
+    // split/bonus/revaluation: cashDirection=null → sem perna financeira.
+    // Estas operacoes corporativas nao geram fluxo de caixa e legitimamente
+    // existem apenas no livro patrimonial.
 
     return { skipped: false };
   }
