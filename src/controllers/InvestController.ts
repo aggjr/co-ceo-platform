@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import type mysql from 'mysql2/promise';
 import { Request, Response } from 'express';
 import { FieldPolicyService } from '../core/auth/FieldPolicyService';
 import { CoCeoDataGateway } from '../core/dal';
@@ -1215,6 +1216,145 @@ export class InvestController {
       return res.json({ success: true, ...report });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      return res.status(500).json({ success: false, error: message });
+    }
+  };
+
+  /**
+   * TEMPORÁRIO — Varredura e limpeza de acoplamento do histórico financeiro/patrimonial.
+   * Remove pernas zeradas de ações corporativas, proventos patrimoniais órfãos,
+   * repara links bidirecionais faltantes e elimina duplicatas por external_ref.
+   * Escopo: plataforma global.
+   */
+  auditAndFixCoupling = async (req: Request, res: Response) => {
+    if (req.userContext?.scope !== 'global') {
+      return res.status(403).json({
+        success: false,
+        error: 'Somente sessão plataforma pode executar a limpeza de acoplamento.',
+      });
+    }
+
+    const dryRun = req.body?.dryRun === true;
+    const now = new Date();
+
+    const summary = {
+      dryRun,
+      executedAt: now.toISOString(),
+      step1_zeroAmountFinancialLegs: 0,
+      step2_orphanIncomeInKindPatrimony: 0,
+      step3_repairedBidirectionalLinks: 0,
+      step4_financialDuplicatesRemoved: 0,
+      step4_patrimonyDuplicatesRemoved: 0,
+    };
+
+    try {
+      // 1. Pernas financeiras com amount = 0 (resquícios de corporate actions)
+      const [zeroFin] = await pool.query<mysql.RowDataPacket[]>(
+        `SELECT id FROM financial_ledger_entries WHERE amount = 0 AND deleted_at IS NULL`
+      );
+      summary.step1_zeroAmountFinancialLegs = zeroFin.length;
+      if (!dryRun && zeroFin.length > 0) {
+        const ids = zeroFin.map((r) => r.id);
+        await pool.query(
+          `UPDATE financial_ledger_entries SET deleted_at = ? WHERE id IN (?)`,
+          [now, ids]
+        );
+      }
+
+      // 2. Pernas patrimoniais income_in_kind sem link financeiro (dividendos forçados indevidamente)
+      const [orphanPat] = await pool.query<mysql.RowDataPacket[]>(
+        `SELECT id FROM patrimony_ledger_entries
+         WHERE movement_type = 'income_in_kind'
+           AND related_financial_entry_id IS NULL
+           AND deleted_at IS NULL`
+      );
+      summary.step2_orphanIncomeInKindPatrimony = orphanPat.length;
+      if (!dryRun && orphanPat.length > 0) {
+        const ids = orphanPat.map((r) => r.id);
+        await pool.query(
+          `UPDATE patrimony_ledger_entries SET deleted_at = ? WHERE id IN (?)`,
+          [now, ids]
+        );
+      }
+
+      // 3. Reparação de links bidirecionais faltantes (mesmo external_ref)
+      const [unlinked] = await pool.query<mysql.RowDataPacket[]>(
+        `SELECT ple.id AS ple_id, fle.id AS fle_id
+         FROM patrimony_ledger_entries ple
+         JOIN financial_ledger_entries fle
+           ON ple.external_ref = fle.external_ref
+           AND ple.organization_id = fle.organization_id
+         WHERE ple.external_ref IS NOT NULL
+           AND ple.deleted_at IS NULL
+           AND fle.deleted_at IS NULL
+           AND (ple.related_financial_entry_id IS NULL OR fle.related_patrimony_ledger_id IS NULL)`
+      );
+      summary.step3_repairedBidirectionalLinks = unlinked.length;
+      if (!dryRun && unlinked.length > 0) {
+        for (const row of unlinked) {
+          await pool.query(
+            `UPDATE patrimony_ledger_entries SET related_financial_entry_id = ? WHERE id = ? AND related_financial_entry_id IS NULL`,
+            [row.fle_id, row.ple_id]
+          );
+          await pool.query(
+            `UPDATE financial_ledger_entries SET related_patrimony_ledger_id = ? WHERE id = ? AND related_patrimony_ledger_id IS NULL`,
+            [row.ple_id, row.fle_id]
+          );
+        }
+      }
+
+      // 4. Duplicatas por external_ref — financeiro
+      const [finDupeGroups] = await pool.query<mysql.RowDataPacket[]>(
+        `SELECT external_ref, COUNT(*) AS c
+         FROM financial_ledger_entries
+         WHERE external_ref IS NOT NULL AND external_ref != '' AND deleted_at IS NULL
+         GROUP BY external_ref HAVING c > 1`
+      );
+      for (const group of finDupeGroups) {
+        const [rows] = await pool.query<mysql.RowDataPacket[]>(
+          `SELECT id FROM financial_ledger_entries
+           WHERE external_ref = ? AND deleted_at IS NULL
+           ORDER BY created_at ASC`,
+          [group.external_ref]
+        );
+        const toDelete = rows.slice(1).map((r) => r.id);
+        summary.step4_financialDuplicatesRemoved += toDelete.length;
+        if (!dryRun && toDelete.length > 0) {
+          await pool.query(
+            `UPDATE financial_ledger_entries SET deleted_at = ? WHERE id IN (?)`,
+            [now, toDelete]
+          );
+        }
+      }
+
+      // 4b. Duplicatas por external_ref — patrimônio
+      const [patDupeGroups] = await pool.query<mysql.RowDataPacket[]>(
+        `SELECT external_ref, COUNT(*) AS c
+         FROM patrimony_ledger_entries
+         WHERE external_ref IS NOT NULL AND external_ref != '' AND deleted_at IS NULL
+         GROUP BY external_ref HAVING c > 1`
+      );
+      for (const group of patDupeGroups) {
+        const [rows] = await pool.query<mysql.RowDataPacket[]>(
+          `SELECT id FROM patrimony_ledger_entries
+           WHERE external_ref = ? AND deleted_at IS NULL
+           ORDER BY created_at ASC`,
+          [group.external_ref]
+        );
+        const toDelete = rows.slice(1).map((r) => r.id);
+        summary.step4_patrimonyDuplicatesRemoved += toDelete.length;
+        if (!dryRun && toDelete.length > 0) {
+          await pool.query(
+            `UPDATE patrimony_ledger_entries SET deleted_at = ? WHERE id IN (?)`,
+            [now, toDelete]
+          );
+        }
+      }
+
+      return res.json({ success: true, summary });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error('[auditAndFixCoupling]', e);
       return res.status(500).json({ success: false, error: message });
     }
   };
