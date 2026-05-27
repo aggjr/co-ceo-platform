@@ -21,10 +21,94 @@
   background: var(--surface-elevated, rgba(255, 255, 255, 0.02));
 }
 
-.invest-import-drop input[type='file'] {
-  width: 100%;
+.invest-import-drop input[type='month'] {
+  max-width: 220px;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #3a4556);
+  background: var(--color-bg, #0f1419);
+  color: var(--color-text, #e8e8e8);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.import-picker {
+  margin-bottom: 0.85rem;
+}
+
+.import-picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.import-picker-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.import-picker-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border, #4a5568);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text, #e8e8e8);
+  font-weight: 600;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.import-picker-btn:hover {
+  border-color: var(--color-accent, #c9a227);
+  background: rgba(201, 162, 39, 0.1);
+  color: var(--color-text, #fff);
+}
+
+.import-picker-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.import-picker-name {
+  flex: 1;
+  min-width: 140px;
   font-size: 0.85rem;
-  margin-bottom: 0.35rem;
+  color: var(--color-text-muted, #9aa5b5);
+  word-break: break-all;
+}
+
+.import-picker-name--ok {
+  color: var(--color-text, #d4dae3);
+}
+
+.invest-import-actions .btn {
+  min-height: 44px;
+  padding: 12px 20px;
+  font-size: 0.9rem;
+}
+
+.invest-import-actions .btn-import-analyze {
+  background: transparent;
+  color: var(--color-text, #e8e8e8);
+  border: 1px solid var(--color-accent, #c9a227);
+}
+
+.invest-import-actions .btn-import-analyze:hover:not(:disabled) {
+  background: rgba(201, 162, 39, 0.14);
+  color: var(--color-text, #fff);
+}
+
+.invest-import-actions .btn-import-analyze:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .import-field-label {

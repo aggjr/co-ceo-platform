@@ -4,6 +4,7 @@ import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import { getPageTexts } from '../navigation/pageTexts.js';
+import { bindImportFilePicker } from '../lib/importFilePicker.js';
 
 const TEXT_FALLBACKS = {
   'screen.invest.importacao.title': 'Importar fontes BTG',
@@ -17,6 +18,8 @@ const TEXT_FALLBACKS = {
     'Selecione a pasta que contém os PDFs (inclui subpastas). Apenas arquivos .pdf são processados.',
   'action.invest.importacao.preview': 'Analisar',
   'action.invest.importacao.apply': 'Importar no livro',
+  'action.invest.importacao.pick_file': 'Escolher arquivos',
+  'action.invest.importacao.pick_folder': 'Escolher pasta',
   'label.invest.importacao.dry_run': 'Só analisar (não gravar)',
   'column.invest.importacao.path': 'Arquivo',
   'column.invest.importacao.month': 'Mês',
@@ -227,17 +230,33 @@ function bindExtractPanel(container, t) {
     pathDisplay.textContent = `${root} · ${extracts.length} extrato(s) PDF/CSV/TXT`;
   };
 
-  dirInput?.addEventListener('change', () => {
-    selectedFiles = dirInput.files ? [...dirInput.files] : [];
+  const syncFiles = () => {
+    selectedFiles = dirInput?.files?.length
+      ? [...dirInput.files]
+      : fileInput?.files?.length
+        ? [...fileInput.files]
+        : [];
     updatePathSummary();
+  };
+
+  bindImportFilePicker(container, {
+    inputSelector: '#import-extract-dir',
+    buttonSelector: '#import-extract-dir-btn',
+    labelSelector: '#import-extract-dir-label',
+    emptyLabel: 'Nenhuma pasta selecionada',
+    onChange: syncFiles,
   });
 
-  fileInput?.addEventListener('change', () => {
-    selectedFiles = fileInput.files ? [...fileInput.files] : [];
-    updatePathSummary();
+  bindImportFilePicker(container, {
+    inputSelector: '#import-extract-files',
+    buttonSelector: '#import-extract-files-btn',
+    labelSelector: '#import-extract-files-label',
+    emptyLabel: 'Nenhum arquivo selecionado',
+    onChange: syncFiles,
   });
 
   const run = async (forceDry) => {
+    syncFiles();
     const extracts = collectExtractFiles(selectedFiles);
     if (!extracts.length) {
       if (tableHost) {
@@ -312,17 +331,33 @@ function bindNotesPanel(container, t) {
     pathDisplay.textContent = `${root} · ${pdfs.length} PDF(s) de ${selectedFiles.length} arquivo(s) total`;
   };
 
-  dirInput?.addEventListener('change', () => {
-    selectedFiles = dirInput.files ? [...dirInput.files] : [];
+  const syncFiles = () => {
+    selectedFiles = dirInput?.files?.length
+      ? [...dirInput.files]
+      : fileInput?.files?.length
+        ? [...fileInput.files]
+        : [];
     updatePathSummary();
+  };
+
+  bindImportFilePicker(container, {
+    inputSelector: '#import-notes-dir',
+    buttonSelector: '#import-notes-dir-btn',
+    labelSelector: '#import-notes-dir-label',
+    emptyLabel: 'Nenhuma pasta selecionada',
+    onChange: syncFiles,
   });
 
-  fileInput?.addEventListener('change', () => {
-    selectedFiles = fileInput.files ? [...fileInput.files] : [];
-    updatePathSummary();
+  bindImportFilePicker(container, {
+    inputSelector: '#import-notes-files',
+    buttonSelector: '#import-notes-files-btn',
+    labelSelector: '#import-notes-files-label',
+    emptyLabel: 'Nenhum arquivo selecionado',
+    onChange: syncFiles,
   });
 
   const run = async (forceDry) => {
+    syncFiles();
     const pdfs = collectPdfFiles(selectedFiles);
     if (!pdfs.length) {
       if (tableHost) {
@@ -387,21 +422,40 @@ export async function InvestImportacaoPage(container) {
 
   const content = `
     <p class="muted" style="margin-bottom:1rem">${t['screen.invest.importacao.lead']}</p>
+    <p class="muted" style="margin-bottom:1rem"><a href="/invest/importacao-mes">Importar um mês (recomendado)</a></p>
     <div class="invest-import-grid">
       <div class="card invest-import-card invest-import-card--wide">
         <h2>${t['screen.invest.importacao.extract_title']}</h2>
         <p class="muted">${t['screen.invest.importacao.extract_help']}</p>
         <div class="invest-import-drop">
-          <label class="import-field-label">Pasta com extratos mensais</label>
-          <input type="file" id="import-extract-dir" webkitdirectory directory multiple />
-          <label class="import-field-label" style="margin-top:0.75rem">Ou arquivos avulsos (PDF/CSV)</label>
-          <input type="file" id="import-extract-files" accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain" multiple />
-          <p class="import-path-label">Origem:</p>
+          <div class="import-picker">
+            <span class="import-field-label">Pasta com extratos mensais</span>
+            <div class="import-picker-row">
+              <input type="file" id="import-extract-dir" class="import-picker-input" webkitdirectory directory multiple />
+              <button type="button" class="import-picker-btn" id="import-extract-dir-btn">
+                <span class="import-picker-icon" aria-hidden="true">📂</span>
+                <span>${t['action.invest.importacao.pick_folder']}</span>
+              </button>
+              <span class="import-picker-name" id="import-extract-dir-label">Nenhuma pasta selecionada</span>
+            </div>
+          </div>
+          <div class="import-picker">
+            <span class="import-field-label">Ou arquivos avulsos (PDF/CSV)</span>
+            <div class="import-picker-row">
+              <input type="file" id="import-extract-files" class="import-picker-input" accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain" multiple />
+              <button type="button" class="import-picker-btn" id="import-extract-files-btn">
+                <span class="import-picker-icon" aria-hidden="true">📂</span>
+                <span>${t['action.invest.importacao.pick_file']}</span>
+              </button>
+              <span class="import-picker-name" id="import-extract-files-label">Nenhum arquivo selecionado</span>
+            </div>
+          </div>
+          <p class="import-path-label">Resumo:</p>
           <p id="import-extract-path" class="import-path-value muted">Nenhuma pasta selecionada</p>
         </div>
         <div class="invest-import-actions">
           <label><input type="checkbox" id="import-extract-dry" /> ${t['label.invest.importacao.dry_run']}</label>
-          <button type="button" class="btn btn-secondary" id="import-extract-preview">${t['action.invest.importacao.preview']}</button>
+          <button type="button" class="btn btn-import-analyze" id="import-extract-preview">${t['action.invest.importacao.preview']}</button>
           <button type="button" class="btn btn-primary" id="import-extract-apply">${t['action.invest.importacao.apply']}</button>
         </div>
         <div id="import-extract-table" class="import-table-host"></div>
@@ -410,16 +464,34 @@ export async function InvestImportacaoPage(container) {
         <h2>${t['screen.invest.importacao.notes_title']}</h2>
         <p class="muted">${t['screen.invest.importacao.notes_help']}</p>
         <div class="invest-import-drop">
-          <label class="import-field-label">Pasta com notas (recomendado)</label>
-          <input type="file" id="import-notes-dir" webkitdirectory directory multiple />
-          <label class="import-field-label" style="margin-top:0.75rem">Ou selecione PDFs avulsos</label>
-          <input type="file" id="import-notes-files" accept=".pdf,application/pdf" multiple />
-          <p class="import-path-label">Origem:</p>
+          <div class="import-picker">
+            <span class="import-field-label">Pasta com notas (recomendado)</span>
+            <div class="import-picker-row">
+              <input type="file" id="import-notes-dir" class="import-picker-input" webkitdirectory directory multiple />
+              <button type="button" class="import-picker-btn" id="import-notes-dir-btn">
+                <span class="import-picker-icon" aria-hidden="true">📂</span>
+                <span>${t['action.invest.importacao.pick_folder']}</span>
+              </button>
+              <span class="import-picker-name" id="import-notes-dir-label">Nenhuma pasta selecionada</span>
+            </div>
+          </div>
+          <div class="import-picker">
+            <span class="import-field-label">Ou PDFs avulsos</span>
+            <div class="import-picker-row">
+              <input type="file" id="import-notes-files" class="import-picker-input" accept=".pdf,application/pdf" multiple />
+              <button type="button" class="import-picker-btn" id="import-notes-files-btn">
+                <span class="import-picker-icon" aria-hidden="true">📂</span>
+                <span>${t['action.invest.importacao.pick_file']}</span>
+              </button>
+              <span class="import-picker-name" id="import-notes-files-label">Nenhum arquivo selecionado</span>
+            </div>
+          </div>
+          <p class="import-path-label">Resumo:</p>
           <p id="import-notes-path" class="import-path-value muted">Nenhuma pasta/arquivos selecionados</p>
         </div>
         <div class="invest-import-actions">
           <label><input type="checkbox" id="import-notes-dry" /> ${t['label.invest.importacao.dry_run']}</label>
-          <button type="button" class="btn btn-secondary" id="import-notes-preview">${t['action.invest.importacao.preview']}</button>
+          <button type="button" class="btn btn-import-analyze" id="import-notes-preview">${t['action.invest.importacao.preview']}</button>
           <button type="button" class="btn btn-primary" id="import-notes-apply">${t['action.invest.importacao.apply']}</button>
         </div>
         <div id="import-notes-table" class="import-table-host"></div>

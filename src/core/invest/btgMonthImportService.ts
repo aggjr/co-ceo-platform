@@ -8,6 +8,8 @@ import { settledCashBalanceFromLedger } from './cashInvestLedger';
 import {
   buildExtractReconcileFields,
   inferExtractMonth,
+  isExtractMonthInLedger,
+  MONTH_IMPORT_CASH_TOLERANCE,
   type ParsedExtractForBatch,
 } from './btgExtractBatchReconcile';
 import {
@@ -19,12 +21,14 @@ import { pdfBufferToLines } from './btgPdfTextExtract';
 import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
 import { MAIN_CASH_TICKER } from './ledgerTypes';
 import { LedgerImportService } from './LedgerImportService';
+import { importLineExpectedCashNet } from './cashExtractDedup';
 import {
   applyBtgBrokerageUpload,
   applyBtgExtractUpload,
   type BtgBrokerageImportPreview,
   type BtgExtractFileResult,
   type BtgUploadFileInput,
+  parseExtractUploadImportLines,
   previewBtgBrokerageUpload,
   previewBtgExtractUpload,
 } from './btgUploadImportService';
@@ -98,12 +102,35 @@ export function filterFilesForMonth(files: BtgUploadFileInput[], month: string):
 
   return files.filter((f) => {
     const p = String(f.name || '').replace(/\\/g, '/').toLowerCase();
+    if (/_summary\.pdf$/i.test(p)) return false;
     return needles.some((n) => p.includes(n.replace(/\\/g, '/')));
   });
 }
 
 function isPdfPath(name: string): boolean {
   return /\.pdf$/i.test(name.split(/[/\\]/).pop() || '');
+}
+
+function projectedCashFromExtractLines(lines: LedgerImportLine[]): LedgerEvent[] {
+  const out: LedgerEvent[] = [];
+  for (const line of lines) {
+    const net = importLineExpectedCashNet(line);
+    if (net == null || Math.abs(net) < 0.005) continue;
+    const d = String(line.date || '').slice(0, 10);
+    if (!d) continue;
+    out.push({
+      asset_id: `proj-ext-${line.broker_note_ref || d}`,
+      asset_ticker: MAIN_CASH_TICKER,
+      asset_type: 'cash',
+      transaction_type: line.operation as LedgerTransactionType,
+      transaction_date: d,
+      quantity: 1,
+      unit_price: net,
+      total_net_value: net,
+      broker_note_ref: line.broker_note_ref ? `${line.broker_note_ref}:CASH` : null,
+    });
+  }
+  return out;
 }
 
 function projectedCashFromNoteLines(lines: LedgerImportLine[]): LedgerEvent[] {
@@ -133,7 +160,8 @@ function projectedCashFromNoteLines(lines: LedgerImportLine[]): LedgerEvent[] {
 async function buildProjectedLedger(
   ctx: UserContext,
   ledger: LedgerImportService,
-  noteFiles: BtgUploadFileInput[]
+  noteFiles: BtgUploadFileInput[],
+  extractFile?: BtgUploadFileInput
 ): Promise<LedgerEvent[]> {
   const today = new Date().toISOString().slice(0, 10);
   const base = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
@@ -150,7 +178,16 @@ async function buildProjectedLedger(
   }
   const { kept } = dedupeBrokerageNotes(allNotes);
   const importLines = brokerageNotesToLedgerLines(kept);
-  return [...base, ...projectedCashFromNoteLines(importLines)];
+  let projected = [...base, ...projectedCashFromNoteLines(importLines)];
+  if (extractFile?.contentBase64) {
+    try {
+      const extractLines = await parseExtractUploadImportLines(extractFile);
+      projected = [...projected, ...projectedCashFromExtractLines(extractLines)];
+    } catch {
+      /* preview de extrato falha em parse; financialOk refletirá */
+    }
+  }
+  return projected;
 }
 
 function evaluateMonthPreview(
@@ -251,7 +288,9 @@ export async function previewBtgMonthImport(
   );
 
   const notes = await previewBtgBrokerageUpload(noteFiles);
-  const projectedLedger = await buildProjectedLedger(ctx, ledger, noteFiles);
+  const today = new Date().toISOString().slice(0, 10);
+  const baseLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+  const projectedLedger = await buildProjectedLedger(ctx, ledger, noteFiles, extractFile);
 
   const parsedExtract = await previewBtgExtractUpload(extractFile);
   let extract: BtgExtractFileResult = parsedExtract;
@@ -262,8 +301,14 @@ export async function previewBtgMonthImport(
       fileName: parsedExtract.fileName,
       preview: parsedExtract.preview,
     };
-    const recon = buildExtractReconcileFields(parsed, projectedLedger, null);
-    extract = { ...parsedExtract, ...recon };
+    const recon = buildExtractReconcileFields(parsed, projectedLedger, null, {
+      tolerance: MONTH_IMPORT_CASH_TOLERANCE,
+    });
+    extract = {
+      ...parsedExtract,
+      ...recon,
+      monthAlreadyImported: isExtractMonthInLedger(baseLedger, monthNorm),
+    };
   }
 
   const flags = evaluateMonthPreview(
@@ -307,6 +352,33 @@ export async function applyBtgMonthImport(
     };
   }
 
+  if (preview.extract.monthAlreadyImported) {
+    return {
+      ...preview,
+      applied: false,
+      notesInserted: 0,
+      notesSkipped: 0,
+      extractInserted: 0,
+      extractSkipped: 0,
+      resultDetail:
+        'Extrato deste mês já consta no livro (BTG-EXT). Apague o mês antes de reimportar.',
+    };
+  }
+
+  if (!preview.financialOk) {
+    return {
+      ...preview,
+      applied: false,
+      notesInserted: 0,
+      notesSkipped: 0,
+      extractInserted: 0,
+      extractSkipped: 0,
+      resultDetail:
+        preview.financialDetail ||
+        'Batimento financeiro não OK — ajuste abertura ou extrato antes de gravar.',
+    };
+  }
+
   const noteFiles = filterFilesForMonth(
     noteFilesAll.filter((f) => isPdfPath(f.name)),
     preview.month
@@ -321,17 +393,19 @@ export async function applyBtgMonthImport(
   const extractSkipped = extractApply.skipped ?? 0;
 
   const afterPreview = await previewBtgMonthImport(ctx, ledger, month, extractFile, noteFilesAll);
+  const applied = Boolean(extractApply.importOk);
 
   return {
     ...afterPreview,
-    applied: Boolean(extractApply.importOk),
+    applied,
     notesInserted,
     notesSkipped,
     extractInserted,
     extractSkipped,
-    resultDetail: extractApply.importOk
+    financialOk: applied ? preview.financialOk : afterPreview.financialOk,
+    resultOk: applied && preview.resultOk,
+    resultDetail: applied
       ? `Importado: notas +${notesInserted}/-${notesSkipped}, extrato +${extractInserted}/-${extractSkipped}.`
       : extractApply.importError || 'Falha ao gravar extrato.',
-    resultOk: afterPreview.resultOk && Boolean(extractApply.importOk),
   };
 }

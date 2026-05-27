@@ -253,6 +253,7 @@ function buildExtractPreview(
   const block = extractMovementBlock(lines.join('\n'));
   const series = parseExtractCashSeries(block, openingBalance);
   const last = lastExtractCashPoint(series);
+  const closingDate = last?.date || lastDate;
 
   return {
     kind: 'extract',
@@ -263,7 +264,7 @@ function buildExtractPreview(
     entryCount: entries.length,
     openingBalance,
     firstDate,
-    lastDate,
+    lastDate: closingDate,
     lastExtractBalance: last?.balance ?? null,
     byOperation,
   };
@@ -525,6 +526,22 @@ export async function previewBtgExtractUpload(
   return parsed;
 }
 
+/** Linhas do extrato prontas para import (mesma lógica do apply). */
+export async function parseExtractUploadImportLines(
+  file: BtgUploadFileInput
+): Promise<LedgerImportLine[]> {
+  const { raw, format } = await rawTextFromExtractUpload(file);
+  const lines = normalizeExtractLines(raw, format);
+  const openingBalance = extractOpeningBalance(lines) ?? DEFAULT_OPENING_BALANCE;
+  const rawEntries = btgLinesToImportEntries(lines, openingBalance);
+  return assignExtractRefs(
+    rawEntries.map((e) => ({
+      ...e,
+      operation: e.operation as LedgerTransactionType,
+    }))
+  );
+}
+
 export async function applyBtgExtractUpload(
   ctx: UserContext,
   ledger: LedgerImportService,
@@ -540,16 +557,7 @@ export async function applyBtgExtractUpload(
   }
 
   try {
-    const { raw, format } = await rawTextFromExtractUpload(file);
-    const lines = normalizeExtractLines(raw, format);
-    const openingBalance = extractOpeningBalance(lines) ?? DEFAULT_OPENING_BALANCE;
-    const rawEntries = btgLinesToImportEntries(lines, openingBalance);
-    const entries = assignExtractRefs(
-      rawEntries.map((e) => ({
-        ...e,
-        operation: e.operation as LedgerTransactionType,
-      }))
-    );
+    const entries = await parseExtractUploadImportLines(file);
 
     const result = await ledger.importEntriesOnly(ctx, entries, {
       sourceLabel: `Extrato BTG upload ${previewResult.preview.firstDate ?? ''}->${previewResult.preview.lastDate ?? ''}`,

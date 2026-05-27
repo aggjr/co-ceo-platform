@@ -25,6 +25,15 @@ describe('BtgExtractLineParser', () => {
     expect(
       classifyBtgDescription('LIQ BOLSA (Operacoes)- Pregão:05/01/2026').skip
     ).toBe(true);
+    expect(
+      classifyBtgDescription('LIQ BOLSA (TAXA SOBRE VALOR EM CUSTÓDIA TAXA').skip
+    ).toBe(true);
+  });
+
+  it('maps conta remunerada resgate como cash_yield', () => {
+    const map = classifyBtgDescription('CONTA REMUNERADA - RESGATE REMUNERAÇÃO -');
+    expect(map.operation).toBe('cash_yield');
+    expect(map.skip).toBeFalsy();
   });
 
   it('maps tesouro compra', () => {
@@ -185,7 +194,7 @@ describe('BtgExtractLineParser', () => {
       expect(irrf.every((e) => e.extract_category === 1)).toBe(true);
     });
 
-    it('LIQ BOLSA (Corretagem BTC Aluguel) vira cost_adjustment em PRIO3', () => {
+    it('ignora LIQ BOLSA (Corretagem BTC) — detalhe vem das notas', () => {
       const entries = btgLinesToImportEntries(
         [
           'Saldo Inicial 100.000,00',
@@ -193,13 +202,10 @@ describe('BtgExtractLineParser', () => {
         ],
         100000
       );
-      const adj = entries.find((e) => e.operation === 'cost_adjustment');
-      expect(adj).toBeDefined();
-      expect(adj?.ticker).toBe('PRIO3');
-      expect(adj?.event_source_ref).toBe('BTG-BTC-PRIO3:2026-01');
+      expect(entries.length).toBe(0);
     });
 
-    it('LIQ BOLSA (TAXA SOBRE VALOR EM CUSTODIA) vai pro header mensal de custodia', () => {
+    it('ignora LIQ BOLSA (taxa custódia agregada) — não duplicar no livro', () => {
       const entries = btgLinesToImportEntries(
         [
           'Saldo Inicial 100.000,00',
@@ -207,10 +213,7 @@ describe('BtgExtractLineParser', () => {
         ],
         100000
       );
-      const fee = entries.find((e) => e.operation === 'fee');
-      expect(fee).toBeDefined();
-      expect(fee?.event_source_ref).toBe('BTG-CUSTODIA-MENSAL:2026-01');
-      expect(fee?.extract_category).toBe(2);
+      expect(entries.length).toBe(0);
     });
 
     it('TED enviada/recebida sao cat 3 sem event_source_ref', () => {

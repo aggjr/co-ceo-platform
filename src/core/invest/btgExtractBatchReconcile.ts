@@ -6,6 +6,8 @@ import { settledCashBalanceFromLedger } from './cashInvestLedger';
 import type { BtgExtractImportPreview } from './btgUploadImportService';
 
 export const CASH_RECON_TOLERANCE = 0.01;
+/** Batimento mensal (notas + extrato simulado): centavos de taxa/IR no PDF. */
+export const MONTH_IMPORT_CASH_TOLERANCE = 10;
 
 export type ParsedExtractForBatch = {
   path: string;
@@ -90,8 +92,14 @@ export type ExtractReconcileFields = {
 export function buildExtractReconcileFields(
   parsed: ParsedExtractForBatch,
   ledgerEvents: LedgerEvent[],
-  previousClosingExtract: number | null
+  previousClosingExtract: number | null,
+  options?: { tolerance?: number }
 ): ExtractReconcileFields {
+  const tolerance = options?.tolerance ?? CASH_RECON_TOLERANCE;
+  const moneyOk = (a: number | null | undefined, b: number | null | undefined) => {
+    if (a == null || b == null || Number.isNaN(a) || Number.isNaN(b)) return false;
+    return Math.abs(a - b) <= tolerance;
+  };
   const { preview } = parsed;
   const month =
     inferExtractMonth(parsed.fileName, preview.firstDate, preview.lastDate) ||
@@ -106,22 +114,38 @@ export function buildExtractReconcileFields(
   let openingChainDelta: number | null = null;
   if (previousClosingExtract != null) {
     openingChainDelta = Math.round((openingExtract - previousClosingExtract) * 100) / 100;
-    openingChainOk = moneyMatch(openingExtract, previousClosingExtract);
+    openingChainOk = moneyOk(openingExtract, previousClosingExtract);
   }
 
   let openingLedgerOk: boolean | null = null;
   let openingLedgerBalance: number | null = null;
   let openingLedgerDelta: number | null = null;
   if (preview.firstDate) {
+    // Saldo do extrato = conta no início do primeiro dia com movimento no PDF (antes das linhas do dia).
     const asOf = dayBefore(preview.firstDate);
     openingLedgerBalance = settledCashBalanceFromLedger(ledgerEvents, asOf);
     openingLedgerDelta = Math.round((openingExtract - openingLedgerBalance) * 100) / 100;
-    openingLedgerOk = moneyMatch(openingExtract, openingLedgerBalance);
+    openingLedgerOk = moneyOk(openingExtract, openingLedgerBalance);
+    // Extrato mensal BTG costuma começar após o dia 1; tolerância se o livro só tem abertura 01/01.
+    if (
+      !openingLedgerOk &&
+      month &&
+      preview.firstDate > `${month}-01` &&
+      openingLedgerBalance != null &&
+      Math.abs(openingLedgerDelta) > CASH_RECON_TOLERANCE
+    ) {
+      const monthStartBal = settledCashBalanceFromLedger(ledgerEvents, `${month}-01`);
+      if (moneyOk(openingExtract, monthStartBal)) {
+        openingLedgerOk = true;
+        openingLedgerBalance = monthStartBal;
+        openingLedgerDelta = Math.round((openingExtract - monthStartBal) * 100) / 100;
+      }
+    }
   } else if (month) {
     const asOf = lastDayOfPreviousMonth(month);
     openingLedgerBalance = settledCashBalanceFromLedger(ledgerEvents, asOf);
     openingLedgerDelta = Math.round((openingExtract - openingLedgerBalance) * 100) / 100;
-    openingLedgerOk = moneyMatch(openingExtract, openingLedgerBalance);
+    openingLedgerOk = moneyOk(openingExtract, openingLedgerBalance);
   }
 
   let closingLedgerOk: boolean | null = null;
@@ -130,7 +154,7 @@ export function buildExtractReconcileFields(
   if (closingDate && closingExtract != null) {
     closingLedgerBalance = settledCashBalanceFromLedger(ledgerEvents, closingDate);
     closingLedgerDelta = Math.round((closingExtract - closingLedgerBalance) * 100) / 100;
-    closingLedgerOk = moneyMatch(closingExtract, closingLedgerBalance);
+    closingLedgerOk = moneyOk(closingExtract, closingLedgerBalance);
   }
 
   const monthAlreadyImported = month ? isExtractMonthInLedger(ledgerEvents, month) : false;

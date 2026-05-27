@@ -80,11 +80,16 @@ function parseLftTicker(description: string): string {
 export function classifyBtgDescription(description: string): BtgLedgerMapping {
   const d = description.toUpperCase();
 
-  if (d.includes('LIQ BOLSA (OPERACOES)') || d.includes('LIQ BOLSA (OPERA')) {
+  if (d.includes('LIQ BOLSA')) {
     return { operation: 'skip', ticker: CASH_TICKER, skip: true };
   }
   if (d.includes('CONTA REMUNERADA - RESGATE')) {
-    return { operation: 'skip', ticker: CASH_TICKER, skip: true };
+    return {
+      operation: 'cash_yield',
+      ticker: CASH_TICKER,
+      asset_type: 'cash',
+      notes: description,
+    };
   }
 
   if (d.includes('TED ENVIADA')) {

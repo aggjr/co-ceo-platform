@@ -4,6 +4,7 @@ import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import { getPageTexts } from '../navigation/pageTexts.js';
+import { bindImportFilePicker } from '../lib/importFilePicker.js';
 
 const TEXT_FALLBACKS = {
   'screen.invest.importacao_mes.title': 'Importar mês BTG',
@@ -12,6 +13,8 @@ const TEXT_FALLBACKS = {
   'label.invest.importacao_mes.month': 'Mês',
   'label.invest.importacao_mes.extract': 'Extrato do mês (PDF ou CSV)',
   'label.invest.importacao_mes.notes_dir': 'Pasta de notas (filtra PDFs do mês)',
+  'action.invest.importacao.pick_file': 'Escolher arquivo',
+  'action.invest.importacao.pick_folder': 'Escolher pasta',
   'column.invest.importacao_mes.financial': 'Financeiro OK',
   'column.invest.importacao_mes.notes': 'Notas corretagem OK',
   'column.invest.importacao_mes.result': 'Resultado OK',
@@ -113,16 +116,37 @@ export async function InvestImportacaoMesPage(container) {
     </p>
     <div class="card invest-import-card">
       <div class="invest-import-drop">
-        <label class="import-field-label">${t['label.invest.importacao_mes.month']}</label>
+        <label class="import-field-label" for="import-mes-month">${t['label.invest.importacao_mes.month']}</label>
         <input type="month" id="import-mes-month" value="2026-01" />
-        <label class="import-field-label" style="margin-top:0.75rem">${t['label.invest.importacao_mes.extract']}</label>
-        <input type="file" id="import-mes-extract" accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain" />
-        <label class="import-field-label" style="margin-top:0.75rem">${t['label.invest.importacao_mes.notes_dir']}</label>
-        <input type="file" id="import-mes-notes-dir" webkitdirectory directory multiple />
-        <p id="import-mes-summary" class="import-path-value muted" style="margin-top:0.5rem">—</p>
+
+        <div class="import-picker">
+          <span class="import-field-label">${t['label.invest.importacao_mes.extract']}</span>
+          <div class="import-picker-row">
+            <input type="file" id="import-mes-extract" class="import-picker-input" accept=".pdf,.csv,.txt,application/pdf,text/csv,text/plain" />
+            <button type="button" class="import-picker-btn" id="import-mes-extract-btn" aria-controls="import-mes-extract">
+              <span class="import-picker-icon" aria-hidden="true">📂</span>
+              <span>${t['action.invest.importacao.pick_file']}</span>
+            </button>
+            <span class="import-picker-name" id="import-mes-extract-label">Nenhum arquivo selecionado</span>
+          </div>
+        </div>
+
+        <div class="import-picker">
+          <span class="import-field-label">${t['label.invest.importacao_mes.notes_dir']}</span>
+          <div class="import-picker-row">
+            <input type="file" id="import-mes-notes-dir" class="import-picker-input" webkitdirectory directory multiple />
+            <button type="button" class="import-picker-btn" id="import-mes-notes-btn" aria-controls="import-mes-notes-dir">
+              <span class="import-picker-icon" aria-hidden="true">📂</span>
+              <span>${t['action.invest.importacao.pick_folder']}</span>
+            </button>
+            <span class="import-picker-name" id="import-mes-notes-label">Nenhuma pasta selecionada</span>
+          </div>
+        </div>
+
+        <p id="import-mes-summary" class="import-path-value muted" style="margin-top:0.75rem">—</p>
       </div>
       <div class="invest-import-actions">
-        <button type="button" class="btn btn-secondary" id="import-mes-preview">${t['action.invest.importacao.preview']}</button>
+        <button type="button" class="btn btn-import-analyze" id="import-mes-preview">${t['action.invest.importacao.preview']}</button>
         <button type="button" class="btn btn-primary" id="import-mes-apply">${t['action.invest.importacao.apply']}</button>
       </div>
       <div id="import-mes-result" class="import-table-host"></div>
@@ -138,6 +162,33 @@ export async function InvestImportacaoMesPage(container) {
   const resultHost = container.querySelector('#import-mes-result');
   const previewBtn = container.querySelector('#import-mes-preview');
   const applyBtn = container.querySelector('#import-mes-apply');
+
+  const updateSummary = () => {
+    if (!summary) return;
+    const month = monthInput?.value || '—';
+    const ex = extractInput?.files?.[0];
+    const notes = notesDir?.files ? [...notesDir.files] : [];
+    const exName = ex ? ex.name : '—';
+    summary.textContent = `${month} · extrato: ${exName} · ${notes.length} arquivo(s) na pasta de notas`;
+  };
+
+  bindImportFilePicker(container, {
+    inputSelector: '#import-mes-extract',
+    buttonSelector: '#import-mes-extract-btn',
+    labelSelector: '#import-mes-extract-label',
+    emptyLabel: 'Nenhum arquivo selecionado',
+    onChange: updateSummary,
+  });
+
+  bindImportFilePicker(container, {
+    inputSelector: '#import-mes-notes-dir',
+    buttonSelector: '#import-mes-notes-btn',
+    labelSelector: '#import-mes-notes-label',
+    emptyLabel: 'Nenhuma pasta selecionada',
+    onChange: updateSummary,
+  });
+
+  monthInput?.addEventListener('change', updateSummary);
 
   const gatherPayload = async () => {
     const month = monthInput?.value || '';
@@ -162,9 +213,7 @@ export async function InvestImportacaoMesPage(container) {
     }
     try {
       const { month, extractFile, noteFiles, noteCount } = await gatherPayload();
-      if (summary) {
-        summary.textContent = `${month} · extrato: ${extractFile.name} · ${noteCount} arquivo(s) na pasta`;
-      }
+      updateSummary();
       const data = await apiRequest('/api/invest/import/btg-month', {
         method: 'POST',
         body: { month, extractFile, noteFiles, dryRun },
