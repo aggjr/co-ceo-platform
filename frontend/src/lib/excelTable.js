@@ -34,6 +34,9 @@ export function registerExcelTable(id, config) {
     rowAttrs: config.rowAttrs,
     onRowClick: config.onRowClick,
     coCeoColumns: config.coCeoColumns,
+    footerColumnTotals: config.footerColumnTotals,
+    summaryLabels: config.summaryLabels,
+    fixedLeadingColumns: config.fixedLeadingColumns,
   });
 }
 

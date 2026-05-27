@@ -1,7 +1,18 @@
 import type { LedgerEvent } from './CustodyEngine';
 import { AUTO_D2_REF_PREFIX } from './AutoPendingSettlementSync';
+import { isDuplicateManualOpeningCash } from './extractLedgerEnrichment';
 
 const CASH_TICKER_PREFIX = 'CAIXA';
+
+/** Mesma regra do extrato BTG na UI: ignora abertura manual duplicada quando já há BTG-EXTRATO-OPENING. */
+export function cashLedgerEventsForBalance(
+  entries: LedgerEvent[] | null | undefined
+): LedgerEvent[] {
+  const cashOnly = (entries || []).filter((e) =>
+    isCashInvestTicker(String(e.asset_ticker || ''))
+  );
+  return cashOnly.filter((e) => !isDuplicateManualOpeningCash(e, cashOnly));
+}
 
 /** Saldo em conta investimento = soma dos total_net_value dos lançamentos de caixa até a data. */
 export function cashBalanceFromLedger(
@@ -10,9 +21,7 @@ export function cashBalanceFromLedger(
 ): number {
   const asOf = (asOfDate || new Date().toISOString()).slice(0, 10);
   let sum = 0;
-  for (const e of entries || []) {
-    const t = String(e.asset_ticker || '').toUpperCase();
-    if (!t.startsWith(CASH_TICKER_PREFIX)) continue;
+  for (const e of cashLedgerEventsForBalance(entries)) {
     const d = String(e.transaction_date || '').slice(0, 10);
     if (d && d > asOf) continue;
     sum += Number(e.total_net_value ?? 0);
@@ -29,9 +38,7 @@ function sumOpenPendingOnCash(
   asOfDate: string
 ): number {
   const byRef = new Map<string, number>();
-  for (const e of entries || []) {
-    const t = String(e.asset_ticker || '').toUpperCase();
-    if (!t.startsWith(CASH_TICKER_PREFIX)) continue;
+  for (const e of cashLedgerEventsForBalance(entries)) {
     if (String(e.transaction_type) !== 'pending_settlement') continue;
     const d = String(e.transaction_date || '').slice(0, 10);
     if (d && d > asOfDate) continue;

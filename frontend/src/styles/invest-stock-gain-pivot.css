@@ -18,6 +18,16 @@ tr.sgp-totals-row td {
   font-weight: 600;
 }
 
+tr.excel-column-totals-row td {
+  border-top: 2px solid rgba(218, 177, 119, 0.45);
+  background: rgba(218, 177, 119, 0.08);
+  font-weight: 600;
+}
+
+tr.excel-column-totals-row td.sgp-total-col {
+  background: rgba(218, 177, 119, 0.18);
+}
+
 tr.sgp-totals-row td.sgp-total-col {
   background: rgba(218, 177, 119, 0.18);
 }

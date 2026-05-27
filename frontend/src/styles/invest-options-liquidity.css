@@ -1,0 +1,47 @@
+.opt-liquidity-card {
+  margin-bottom: 2rem;
+}
+
+.opt-liquidity-card h2 {
+  font-size: 1.1rem;
+  margin: 0 0 1rem;
+  color: #f8fafc;
+}
+
+.opt-liquidity-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.opt-liquidity-table th,
+.opt-liquidity-table td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  text-align: left;
+}
+
+.opt-liquidity-table th:nth-child(3),
+.opt-liquidity-table td:nth-child(3) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.opt-liquidity-table tbody tr.opt-liquidity-bloc td {
+  font-weight: 600;
+  color: #cbd5e1;
+  background: rgba(30, 41, 59, 0.45);
+}
+
+.opt-liquidity-pos {
+  color: #22c55e;
+}
+
+.opt-liquidity-neg {
+  color: #ef4444;
+}
+
+.opt-liquidity-ref {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}

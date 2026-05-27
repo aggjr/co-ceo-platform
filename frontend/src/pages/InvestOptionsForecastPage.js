@@ -1,10 +1,12 @@
 import '../styles/coceo-excel-table.css';
+import '../styles/invest-options-liquidity.css';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated } from '../auth/session.js';
 import { cardFieldRows } from '../lib/optionPortfolioModel.js';
-import { formatBrl, formatNumber } from '../lib/portfolioDisplay.js';
-import { fetchOpenOptionsPortfolio } from '../lib/investOptionsShared.js';
+import { buildLiquiditySynthesis } from '../lib/optionLiquiditySynthesis.js';
+import { formatBrl } from '../lib/portfolioDisplay.js';
+import { fetchInvestPortfolio, fetchOpenOptionsPortfolio } from '../lib/investOptionsShared.js';
 
 function escapeHtml(s) {
   return String(s ?? '')
@@ -124,8 +126,110 @@ function renderTable(title, data, emptyMessage) {
   `;
 }
 
-function renderForecast(container, allRows) {
+function valueCell(amount, { negate = false } = {}) {
+  const n = negate ? -Math.abs(amount) : amount;
+  if (!n || Math.abs(n) < 0.005) {
+    return '<span class="opt-liquidity-ref">R$ 0,00</span>';
+  }
+  const cls = n > 0 ? 'opt-liquidity-pos' : 'opt-liquidity-neg';
+  return `<span class="${cls}">${formatBrl(n)}</span>`;
+}
+
+function renderLiquiditySynthesis(synth) {
+  const rows = [
+    {
+      bloc: 'Liquidez atual',
+      indicator: '',
+      value: '',
+      ref: '',
+      isBloc: true,
+    },
+    {
+      indicator: 'Conta corrente (caixa BTG)',
+      value: valueCell(synth.cashSettled),
+      ref: 'Saldo liquidado no extrato',
+    },
+    {
+      indicator: 'Renda fixa (Tesouro / LFT)',
+      value: valueCell(synth.tesouroMv),
+      ref: 'Valor de mercado na custódia',
+    },
+    {
+      indicator: 'CDB',
+      value: valueCell(synth.cdbMv),
+      ref: 'Valor de mercado na custódia',
+    },
+    {
+      indicator: 'Subtotal liquidez',
+      value: valueCell(synth.liquiditySubtotal),
+      ref: 'Caixa + RF + CDB',
+    },
+    {
+      bloc: 'Previsão opções',
+      indicator: '',
+      value: '',
+      ref: '',
+      isBloc: true,
+    },
+    {
+      indicator: 'PUTs ITM + até 5% (cumulativo)',
+      value: valueCell(synth.putsCashNeed, { negate: true }),
+      ref: 'Necessidade de caixa (2ª faixa)',
+    },
+    {
+      indicator: 'CALLs ITM (1º nível)',
+      value: valueCell(synth.callsCashGen),
+      ref: 'Venda de ações → geração de caixa',
+    },
+    {
+      indicator: 'Efeito líquido opções',
+      value: valueCell(synth.optionsNet),
+      ref: 'CALLs ITM − PUTs (ITM + próximo)',
+    },
+  ];
+
+  const body = rows
+    .map((r) => {
+      if (r.isBloc) {
+        return `<tr class="opt-liquidity-bloc"><td colspan="4">${escapeHtml(r.bloc)}</td></tr>`;
+      }
+      return `<tr>
+        <td></td>
+        <td>${escapeHtml(r.indicator)}</td>
+        <td>${r.value}</td>
+        <td class="opt-liquidity-ref">${escapeHtml(r.ref)}</td>
+      </tr>`;
+    })
+    .join('');
+
+  return `
+    <section class="opt-liquidity-card">
+      <h2>Liquidez e síntese</h2>
+      <div style="overflow-x:auto">
+        <table class="opt-liquidity-table coceo-excel-table">
+          <thead>
+            <tr>
+              <th>BLOCO</th>
+              <th>INDICADOR</th>
+              <th>VALOR (R$)</th>
+              <th>REFERÊNCIA</th>
+            </tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>
+    </section>
+  `;
+}
+
+function renderForecast(container, allRows, portfolioPayload) {
   const { calls, puts } = processForecastData(allRows);
+  const synth = buildLiquiditySynthesis({
+    portfolioItems: portfolioPayload?.items || [],
+    cashStatementBalance: portfolioPayload?.cashStatementBalance ?? 0,
+    optionRows: allRows,
+    pctNear: 5,
+  });
 
   const headerHtml = `
     <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
@@ -154,7 +258,7 @@ function renderForecast(container, allRows) {
   container.innerHTML = `
     <div style="padding: 1rem;">
       ${headerHtml}
-      
+      ${renderLiquiditySynthesis(synth)}
       <div style="display: grid; grid-template-columns: 1fr; gap: 2rem;">
         ${callsSection}
         ${putsSection}
@@ -189,8 +293,11 @@ export async function InvestOptionsForecastPage(container) {
   if (!root) return;
 
   try {
-    const allRows = await fetchOpenOptionsPortfolio();
-    renderForecast(root, allRows);
+    const [allRows, portfolioPayload] = await Promise.all([
+      fetchOpenOptionsPortfolio(),
+      fetchInvestPortfolio(),
+    ]);
+    renderForecast(root, allRows, portfolioPayload);
   } catch (err) {
     root.innerHTML = `
       <div style="padding: 2rem; color: #ef4444;">

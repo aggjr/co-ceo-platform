@@ -160,7 +160,8 @@ export function isDuplicateManualOpeningCash(
   if (ref?.includes('BTG-EXTRATO-OPENING')) return false;
   const amt = Math.abs(Number(ce.total_net_value ?? 0));
   const hasExtrato = cashEvents.some((o) => {
-    if (o.id === ce.id) return false;
+    if (o === ce) return false;
+    if (o.id && ce.id && o.id === ce.id) return false;
     const r = normalizeBrokerNoteRef(o.broker_note_ref);
     if (!r?.includes('BTG-EXTRATO-OPENING')) return false;
     return (
