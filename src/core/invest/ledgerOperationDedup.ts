@@ -4,9 +4,18 @@
  */
 import type { LedgerEvent } from './CustodyEngine';
 import { inferAssetType } from './assetClassifier';
+import {
+  cashNetKey,
+  importLineExpectedCashNet,
+  roundCashNet,
+} from './cashExtractDedup';
 import type { LedgerImportLine } from './ledgerTypes';
 
-export type DedupMatchKind = 'broker_note_ref' | 'bare_note_number' | 'operation_fingerprint';
+export type DedupMatchKind =
+  | 'broker_note_ref'
+  | 'bare_note_number'
+  | 'operation_fingerprint'
+  | 'cash_net';
 
 export type IndexedLedgerOperation = {
   patrimonyEventId?: string;
@@ -28,6 +37,14 @@ export type LedgerDedupIndex = {
   byRef: Map<string, IndexedLedgerOperation>;
   byNoteNumber: Map<string, IndexedLedgerOperation>;
   byFingerprint: Map<string, IndexedLedgerOperation[]>;
+  byCashNet: Map<string, CashNetIndexed[]>;
+};
+
+export type CashNetIndexed = {
+  cashEventId: string;
+  brokerNoteRef: string | null;
+  date: string;
+  net: number;
 };
 
 function roundMoney(n: number): number {
@@ -103,6 +120,7 @@ export function buildLedgerDedupIndex(events: LedgerEvent[]): LedgerDedupIndex {
   const byRef = new Map<string, IndexedLedgerOperation>();
   const byNoteNumber = new Map<string, IndexedLedgerOperation>();
   const byFingerprint = new Map<string, IndexedLedgerOperation[]>();
+  const byCashNet = new Map<string, CashNetIndexed[]>();
   const cashByRef = new Map<string, { id?: string; amount: number; fees: number }>();
 
   for (const e of events) {
@@ -171,7 +189,23 @@ export function buildLedgerDedupIndex(events: LedgerEvent[]): LedgerDedupIndex {
     byFingerprint.set(fp, fpList);
   }
 
-  return { byRef, byNoteNumber, byFingerprint };
+  for (const e of events) {
+    if (!String(e.asset_ticker || '').toUpperCase().startsWith('CAIXA')) continue;
+    const net = roundCashNet(Number(e.total_net_value ?? 0));
+    const date = String(e.transaction_date || '').slice(0, 10);
+    const key = cashNetKey(date, net);
+    const hit: CashNetIndexed = {
+      cashEventId: String(e.id),
+      brokerNoteRef: e.broker_note_ref ? String(e.broker_note_ref) : null,
+      date,
+      net,
+    };
+    const list = byCashNet.get(key) || [];
+    list.push(hit);
+    byCashNet.set(key, list);
+  }
+
+  return { byRef, byNoteNumber, byFingerprint, byCashNet };
 }
 
 export type DedupLookupResult = {
@@ -205,6 +239,46 @@ export function lookupDuplicate(
     };
   }
 
+  const expectedCash = importLineExpectedCashNet(line);
+  if (expectedCash != null && Math.abs(expectedCash) >= 0.01) {
+    const key = cashNetKey(line.date, expectedCash);
+    const cashHits = index.byCashNet.get(key) || [];
+    if (cashHits.length > 0) {
+      const pseudo: IndexedLedgerOperation = {
+        cashEventId: cashHits[0]!.cashEventId,
+        brokerNoteRef: cashHits[0]!.brokerNoteRef,
+        bareNoteNumber: null,
+        fingerprint: key,
+        date: line.date,
+        ticker: 'CAIXA-BTG',
+        assetType: 'cash',
+        operation: line.operation,
+        quantity: 0,
+        unitPrice: 0,
+        cashAmount: Math.abs(expectedCash),
+        feesTotal: 0,
+      };
+      return {
+        existing: pseudo,
+        match: 'cash_net',
+        fingerprintSiblings: cashHits.map((h) => ({
+          cashEventId: h.cashEventId,
+          brokerNoteRef: h.brokerNoteRef,
+          bareNoteNumber: null,
+          fingerprint: key,
+          date: h.date,
+          ticker: 'CAIXA-BTG',
+          assetType: 'cash',
+          operation: line.operation,
+          quantity: 0,
+          unitPrice: 0,
+          cashAmount: Math.abs(h.net),
+          feesTotal: 0,
+        })),
+      };
+    }
+  }
+
   const fp = fingerprintFromImportLine(line);
   const siblings = index.byFingerprint.get(fp) || [];
   if (siblings.length > 0) {
@@ -231,6 +305,12 @@ export function wouldDoubleCash(
   existing: IndexedLedgerOperation,
   line: LedgerImportLine
 ): boolean {
+  const expected = importLineExpectedCashNet(line);
+  if (expected != null && existing.cashEventId) {
+    if (Math.abs(roundCashNet(expected) - roundCashNet(existing.cashAmount ?? expected)) < 0.02) {
+      return true;
+    }
+  }
   if (existing.cashEventId && existing.cashAmount != null) {
     const incoming = roundMoney(Math.abs(Number(line.total_net_value) || 0));
     if (incoming > 0 && Math.abs(existing.cashAmount - incoming) < 0.02) {
@@ -239,3 +319,5 @@ export function wouldDoubleCash(
   }
   return false;
 }
+
+export { findCashNetHits, importLineExpectedCashNet } from './cashExtractDedup';
