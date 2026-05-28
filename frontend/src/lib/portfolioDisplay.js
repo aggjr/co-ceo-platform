@@ -394,12 +394,11 @@ export function optionPriceReturnPct(row) {
 }
 
 function optionPremiumReceived(row) {
-  if (row.premiumReceived != null && Number.isFinite(Number(row.premiumReceived))) {
-    return Number(row.premiumReceived);
-  }
   const qty = Number(row.quantity);
   const pm = Number(row.avgPrice);
-  if (qty < 0 && pm > 0) return Math.abs(qty) * pm;
+  if (Number.isFinite(qty) && Number.isFinite(pm)) {
+    return Math.abs(qty) * pm;
+  }
   return 0;
 }
 
@@ -512,14 +511,7 @@ export function buildInvestOptionsColumns() {
       },
     },
     { key: 'avgPrice', label: 'Prêmio', type: 'currency', align: 'right', width: '104px' },
-    {
-      key: 'priceStrict',
-      label: 'Preço estrito',
-      type: 'currency',
-      align: 'right',
-      width: '104px',
-      render: (row) => renderPriceCell(row.prices?.strict),
-    },
+
     {
       key: 'updatedQuote',
       label: 'Cotação opção',

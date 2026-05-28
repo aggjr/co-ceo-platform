@@ -16,8 +16,6 @@ import { SideNav } from './SideNav';
 import { ImpersonationBar } from './ImpersonationBar';
 import { PlatformJobAlertsBanner } from './PlatformJobAlertsBanner';
 import { MarketQuotesSyncButton } from './MarketQuotesSyncButton';
-import { UiCatalogApplyButton } from './UiCatalogApplyButton';
-import { ProductionDeployButton } from './ProductionDeployButton';
 import '../../styles/app.css';
 import '../../styles/cockpit-shell.css';
 
@@ -77,7 +75,7 @@ export function Shell(props: { children?: JSX.Element }) {
         <div class="sidebar-footer">
           <div
             data-app-version
-            style={{ "margin-bottom": "12px", "font-size": "11px", color: "var(--color-accent)", opacity: 0.7, "text-align": "center", "font-weight": 500, "letter-spacing": "1px" }}
+            style={{ width: "100%", "margin-bottom": "12px", "font-size": "11px", color: "var(--color-accent)", opacity: 0.7, "text-align": "center", "font-weight": 500, "letter-spacing": "1px" }}
           >
             {appVersion()}
           </div>
@@ -116,8 +114,6 @@ export function Shell(props: { children?: JSX.Element }) {
 
             {/* Bloco Direito: sync cotações, usuário logado */}
             <div class="header-right">
-              <ProductionDeployButton />
-              <UiCatalogApplyButton />
               <MarketQuotesSyncButton />
               <div class="header-user">
                 <div
