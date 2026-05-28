@@ -403,7 +403,7 @@ function applyEvent(s: UnderlyingState, e: LedgerEvent): void {
   const assetType = effectiveAssetType(e);
 
   if (STOCK_LIKE.has(assetType)) {
-    if (!impactsPrice(e.impacts_managerial_price)) return;
+    // if (!impactsPrice(e.impacts_managerial_price)) return;
     if (type === 'buy' || type === 'opening_balance' || type === 'bonus') {
       applyStockBuy(s, e);
       return;
@@ -448,7 +448,7 @@ function applyEvent(s: UnderlyingState, e: LedgerEvent): void {
       }
       return;
     }
-    if (!impactsPrice(e.impacts_managerial_price)) return;
+    // if (!impactsPrice(e.impacts_managerial_price)) return;
     if (OPTION_SELL_TX.has(type) || OPTION_BUY_TX.has(type)) {
       applyOptionTrade(s, e);
       return;
