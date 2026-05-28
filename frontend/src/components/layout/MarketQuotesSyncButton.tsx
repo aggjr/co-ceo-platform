@@ -87,6 +87,7 @@ export function MarketQuotesSyncButton() {
           });
           const updated = Number(data.updated ?? 0);
           showFlash(`${updated} posições recalculadas.`);
+          setTimeout(() => window.location.reload(), 1000);
         } else if (path.includes('/invest/panorama') || path.includes('/invest/historico')) {
           const data = await apiRequest('/api/invest/admin/recalc-curve', {
             method: 'POST',
@@ -94,6 +95,7 @@ export function MarketQuotesSyncButton() {
           });
           const processed = Number(data.processed ?? 0);
           showFlash(`Curva recalculada: ${processed} dias processados.`);
+          setTimeout(() => window.location.reload(), 1000);
         } else {
           const data = await apiRequest('/api/invest/quotes/sync-b3', {
             method: 'POST',
