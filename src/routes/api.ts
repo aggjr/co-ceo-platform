@@ -190,14 +190,14 @@ router.post(
 router.post(
   '/invest/admin/recalc-curve',
   AuthMiddleware.protect,
-  AuthMiddleware.requireGlobalScope,
+  requirePermission('invest:ledger:write'),
   remoteRecalc.recalcCurve.bind(remoteRecalc)
 );
 
 router.post(
   '/invest/admin/recalc-positions',
   AuthMiddleware.protect,
-  AuthMiddleware.requireGlobalScope,
+  requirePermission('invest:ledger:write'),
   remoteRecalc.recalcPositions.bind(remoteRecalc)
 );
 
