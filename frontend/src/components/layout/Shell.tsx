@@ -16,7 +16,6 @@ import { SideNav } from './SideNav';
 import { ImpersonationBar } from './ImpersonationBar';
 import { PlatformJobAlertsBanner } from './PlatformJobAlertsBanner';
 import { MarketQuotesSyncButton } from './MarketQuotesSyncButton';
-import { RemoteMigrationButton } from './RemoteMigrationButton';
 import '../../styles/app.css';
 import '../../styles/cockpit-shell.css';
 
@@ -115,7 +114,6 @@ export function Shell(props: { children?: JSX.Element }) {
 
             {/* Bloco Direito: sync cotações, usuário logado */}
             <div class="header-right">
-              <RemoteMigrationButton />
               <MarketQuotesSyncButton />
               <div class="header-user">
                 <div
