@@ -22,14 +22,14 @@ async function main() {
   const pool = mysql.createPool({
     host: 'localhost',
     user: 'root',
-    password: 'Dani160779!',
+    password: process.env.DB_PASSWORD || 'Dani160779!',
     database: 'co_ceo_db'
   });
   
   const [rows] = await pool.query<mysql.RowDataPacket[]>(
     `SELECT SUM(CASE WHEN direction = 'in' THEN amount ELSE -amount END) as currentBalance 
      FROM financial_ledger_entries 
-     WHERE organization_id = ? AND transaction_date <= ?`,
+     WHERE organization_id = ? AND transaction_date <= ? AND status != 'canceled'`,
     [ORG, endOfMonth]
   );
   
@@ -46,10 +46,6 @@ async function main() {
   const direction = delta > 0 ? 'in' : 'out';
   const amount = Math.abs(delta);
   const desc = `Ajuste manual de caixa (mês ${month}) para fechar com extrato BTG`;
-  const lastDay = month + '-31'; 
-  
-  // const d = new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0);
-  // const endOfMonth = d.toISOString().split('T')[0];
   
   const [accounts] = await pool.query<mysql.RowDataPacket[]>(
     `SELECT id FROM financial_accounts WHERE organization_id = ? AND external_id = 'BTG'`,
