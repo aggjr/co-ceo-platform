@@ -202,7 +202,7 @@ export async function InvestDashboardPage(container) {
       <${D} class="table-period-toolbar patrimony-toolbar">
         <label>${t['label.common.period_from']} <input type="date" id="patrimony-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
         <label>${t['label.common.period_to']} <input type="date" id="patrimony-to" value="${toDefault}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
-        <button type="button" id="patrimony-reload" class="btn-header-icon-sync patrimony-reload-btn" title="Atualizar gráfico e resumo" aria-label="Atualizar gráfico e resumo">${REFRESH_ICON_SVG}</button>
+        <button type="button" id="patrimony-reload" class="btn btn-outline" title="Filtrar Datas" aria-label="Filtrar Datas" style="padding: 4px 12px; height: 32px;">Filtrar Datas</button>
       </${D}>
       <${D} id="patrimony-summary" class="patrimony-summary-host"></${D}>
       <p id="patrimony-meta" class="patrimony-meta muted"></p>

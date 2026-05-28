@@ -521,8 +521,7 @@
 }
 
 .shell .topbar-impersonate--active {
-  background: rgba(218, 177, 119, 0.1);
-  border-color: rgba(218, 177, 119, 0.35);
+  /* removed stretched background */
 }
 
 .shell .badge-impersonation {
