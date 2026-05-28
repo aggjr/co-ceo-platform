@@ -118,6 +118,22 @@ function buyCost(e: LedgerEvent): number {
   return q * p;
 }
 
+/** Custo de entrada (abertura/bônus/compra) — usa total_net quando PM unitário veio zerado. */
+function entryCost(e: LedgerEvent): number {
+  const type = String(e.transaction_type);
+  const q = Math.abs(Number(e.quantity ?? 0));
+  if (q <= 0) return 0;
+  const strike = Number(e.unit_price ?? 0);
+  if (type === 'opening_balance' || type === 'bonus') {
+    if (strike > 0) return q * strike;
+    const net = Number(e.total_net_value ?? 0);
+    if (net < 0) return -net;
+    if (net > 0) return net;
+    return buyCost(e);
+  }
+  return buyCost(e);
+}
+
 /** Reduz totais proporcionais à fração vendida — preserva os três PM do lote. */
 function applyProportionalReduction(s: UnderlyingState, qtyOut: number): void {
   if (s.qty <= 0) return;
@@ -264,10 +280,7 @@ function applyStockBuy(s: UnderlyingState, e: LedgerEvent): void {
     return;
   }
 
-  const cost =
-    type === 'opening_balance' || type === 'bonus'
-      ? q * strike
-      : buyCost(e);
+  const cost = entryCost(e);
   s.qty += q;
   s.estritoTotal += cost;
 }
@@ -390,7 +403,7 @@ function applyEvent(s: UnderlyingState, e: LedgerEvent): void {
   const assetType = effectiveAssetType(e);
 
   if (STOCK_LIKE.has(assetType)) {
-    if (!impactsPrice(e.impacts_managerial_price)) return;
+    // if (!impactsPrice(e.impacts_managerial_price)) return;
     if (type === 'buy' || type === 'opening_balance' || type === 'bonus') {
       applyStockBuy(s, e);
       return;
@@ -435,7 +448,7 @@ function applyEvent(s: UnderlyingState, e: LedgerEvent): void {
       }
       return;
     }
-    if (!impactsPrice(e.impacts_managerial_price)) return;
+    // if (!impactsPrice(e.impacts_managerial_price)) return;
     if (OPTION_SELL_TX.has(type) || OPTION_BUY_TX.has(type)) {
       applyOptionTrade(s, e);
       return;

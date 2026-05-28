@@ -143,6 +143,15 @@ async function main() {
     );
     console.log('business_events órfãos removidos:', be.affectedRows);
 
+    const [orphanExt] = await conn.query<mysql.ResultSetHeader>(
+      `DELETE ext FROM invest_position_ext ext
+       JOIN patrimony_items pi ON pi.id = ext.patrimony_item_id
+       LEFT JOIN patrimony_ledger_entries ple ON ple.patrimony_item_id = pi.id
+       WHERE pi.organization_id = ? AND ple.id IS NULL`,
+      [ORG]
+    );
+    console.log('invest_position_ext órfãos removidos:', orphanExt.affectedRows);
+
     const [orphanItems] = await conn.query<mysql.ResultSetHeader>(
       `DELETE pi FROM patrimony_items pi
        LEFT JOIN patrimony_ledger_entries ple ON ple.patrimony_item_id = pi.id

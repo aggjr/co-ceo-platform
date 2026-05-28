@@ -152,7 +152,7 @@ export function rebuildCustodyFromLedger(entries: LedgerEvent[]): CustodyRebuild
       continue;
     }
 
-    if (!impactsPrice(e.impacts_managerial_price)) continue;
+    // if (!impactsPrice(e.impacts_managerial_price)) continue;
 
     if (type === 'split' && Number(e.quantity) > 0 && s.qty > 0) {
       s.qty = Number(e.quantity);

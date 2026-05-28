@@ -175,6 +175,26 @@ beforeEach(() => {
 });
 
 describe('threePricesEngine', () => {
+  it('abertura com unit_price zerado usa total_net_value', () => {
+    const out = computeThreePricesByUnderlying([
+      {
+        id: nextId(),
+        asset_id: 'ITUB4',
+        asset_ticker: 'ITUB4',
+        asset_type: 'stock',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-02',
+        quantity: 500,
+        unit_price: 0,
+        total_net_value: -18200,
+      },
+    ]);
+    const p = out.get('ITUB4')!;
+    expect(p.qty).toBe(500);
+    expect(p.estrito).toBeCloseTo(36.4, 2);
+    expect(p.b3).toBeCloseTo(36.4, 2);
+  });
+
   it('compra simples — três preços iguais', () => {
     const out = computeThreePricesByUnderlying([buy('PRIO3', 100, 40, '2026-01-10')]);
     const p = out.get('PRIO3')!;
