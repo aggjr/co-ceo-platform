@@ -17,6 +17,12 @@ app.use('/api', apiRoutes);
 
 app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
   if (res.headersSent) return next(err);
+  
+  // Catch express.json() parsing errors
+  if (err instanceof SyntaxError && 'status' in (err as any) && (err as any).status === 400 && 'body' in err) {
+    return res.status(400).json({ success: false, error: 'JSON inválido enviado na requisição.' });
+  }
+
   console.error('[co-CEO Core] Erro na API:', err);
   if (err instanceof GatewayError) {
     return res.status(err.httpStatus).json({ success: false, error: err.message });
