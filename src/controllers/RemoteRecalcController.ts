@@ -66,6 +66,7 @@ export class RemoteRecalcController {
       let updatedCount = 0;
       for (const asset of assets) {
         if (!asset.assetId) continue;
+        if (asset.assetType === 'cash') continue;
         
         // Verifica se existe invest_position_ext
         const extRows = await this.gateway.findWhere(
