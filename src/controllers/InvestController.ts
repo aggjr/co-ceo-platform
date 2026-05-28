@@ -77,6 +77,7 @@ import {
 } from '../core/invest/portfolioMapper';
 import {
   buildThreeAvgPricesByUnderlying,
+  resolveEquityThreePricesForPortfolioRow,
   resolveThreePricesForAsset,
 } from '../core/invest/portfolioThreePrices';
 import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
@@ -308,13 +309,21 @@ export class InvestController {
               }
             })()
           : (filtered.metadata as { underlying_ticker?: string }) || {};
-      const three = resolveThreePricesForAsset(
-        String(filtered.asset_ticker ?? ''),
-        String(filtered.asset_type ?? ''),
-        meta.underlying_ticker,
-        threeByUnderlying,
-        Number(filtered.managerial_avg_price ?? 0)
-      );
+      const assetTypeForPm = String(filtered.asset_type ?? '');
+      const three =
+        assetTypeForPm === 'stock' || assetTypeForPm === 'fii'
+          ? resolveEquityThreePricesForPortfolioRow(
+              filtered,
+              threeByUnderlying,
+              engineSnapshots
+            )
+          : resolveThreePricesForAsset(
+              String(filtered.asset_ticker ?? ''),
+              assetTypeForPm,
+              meta.underlying_ticker,
+              threeByUnderlying,
+              Number(filtered.managerial_avg_price ?? 0)
+            );
       const ticker = String(filtered.asset_ticker ?? '').toUpperCase();
       const mq = marketQuoteMap.get(ticker);
       const marketQuote = mq
