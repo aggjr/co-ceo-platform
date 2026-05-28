@@ -249,6 +249,24 @@ router.post(
   invest.importLedger.bind(invest)
 );
 router.post(
+  '/invest/import/btg-extract',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.importBtgExtractUpload.bind(invest)
+);
+router.post(
+  '/invest/import/btg-brokerage-notes',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.importBtgBrokerageUpload.bind(invest)
+);
+router.post(
+  '/invest/import/btg-month',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.importBtgMonthUpload.bind(invest)
+);
+router.post(
   '/invest/custody/reconcile',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:write'),

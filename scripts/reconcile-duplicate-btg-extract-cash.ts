@@ -53,7 +53,9 @@ async function main() {
 
   const events = await ledger.listLedgerEvents(ctx, '2000-01-01', TODAY);
   const before = settledCashBalanceFromLedger(events, TODAY);
-  const duplicates = findBtgExtractCashDuplicates(events, { minAbsAmount: 1000 });
+  const minArg = process.argv.find((a) => a.startsWith('--min='));
+  const minAbs = minArg ? Number(minArg.split('=')[1]) : 0.01;
+  const duplicates = findBtgExtractCashDuplicates(events, { minAbsAmount: minAbs });
   const removeSum = roundCashNet(duplicates.reduce((s, d) => s + d.net, 0));
   const afterEst = roundCashNet(before - removeSum);
 

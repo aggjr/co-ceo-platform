@@ -21,22 +21,27 @@ const mysql = require('mysql2/promise');
 const ORG_ID = process.env.PORTFOLIO_ORG_ID || 'org-holding-001';
 const CONFIRM = process.argv.includes('--confirm');
 
-// Ordem importa: filhos antes dos pais.
+// Ordem importa: filhos antes dos pais. DELETE físico (inclui linhas soft-deleted).
 const DELETE_PLAN = [
-  // Pernas (refs para items/accounts/business_events)
   { table: 'patrimony_ledger_entries', scoped: true },
   { table: 'financial_ledger_entries', scoped: true },
-  // Extensoes do core (FK pra patrimony_items)
+  { table: 'patrimony_closings', scoped: true },
+  { table: 'financial_closings', scoped: true },
   { table: 'invest_option_ext', scoped: true },
   { table: 'invest_position_ext', scoped: true },
-  // Headers
+  { table: 'patrimony_item_locations', scoped: true },
   { table: 'business_events', scoped: true },
-  // Itens e contas
   { table: 'patrimony_items', scoped: true },
+  { table: 'patrimony_locations', scoped: true },
   { table: 'financial_accounts', scoped: true },
   // Snapshots/diarios (re-buildaveis)
   { table: 'invest_daily_snapshots', scoped: true },
   { table: 'invest_portfolio_daily', scoped: true },
+  { table: 'invest_broker_custody_snapshot_lines', scoped: true },
+  { table: 'invest_broker_custody_snapshots', scoped: true },
+  { table: 'invest_patrimony_monthly_anchors', scoped: true },
+  { table: 'invest_assets', scoped: true },
+  { table: 'invest_ledger_entries', scoped: true },
 ];
 
 async function main() {
@@ -49,7 +54,10 @@ async function main() {
     charset: 'utf8mb4',
   });
 
-  console.log(`\nReset INVEST em org=${ORG_ID} @ ${host} ${CONFIRM ? '(EXECUTANDO)' : '(DRY-RUN)'}`);
+  console.log(
+    `\nReset INVEST em org=${ORG_ID} @ ${host} ${CONFIRM ? '(DELETE FÍSICO)' : '(DRY-RUN)'}`
+  );
+  console.log('Modo: DELETE FROM (hard delete) — não usa soft_delete.');
 
   console.log('\n--- ANTES ---');
   const before = {};

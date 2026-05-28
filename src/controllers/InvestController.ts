@@ -90,6 +90,17 @@ import {
   normalizeBrokerNoteRef,
 } from '../core/invest/extractLedgerEnrichment';
 import type { LedgerImportPayload } from '../core/invest/ledgerTypes';
+import {
+  applyBtgBrokerageUpload,
+  applyBtgExtractBatchUpload,
+  previewBtgExtractBatchUpload,
+  previewBtgBrokerageUpload,
+  type BtgUploadFileInput,
+} from '../core/invest/btgUploadImportService';
+import {
+  applyBtgMonthImport,
+  previewBtgMonthImport,
+} from '../core/invest/btgMonthImportService';
 import type { UserContext } from '../core/dal';
 import { SYSTEM_INSTALLER_USER_ID } from '../core/dal/types';
 import pool from '../config/database';
@@ -1128,6 +1139,128 @@ export class InvestController {
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       return res.status(500).json({ success: false, error: message });
+    }
+  };
+
+  /** Upload extrato BTG (PDF/TXT) → preview ou importação no livro. */
+  importBtgExtractUpload = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selecione uma organização (personifique a holding).',
+      });
+    }
+    const filesBody = req.body?.files as BtgUploadFileInput[] | undefined;
+    const fileSingle = req.body?.file as BtgUploadFileInput | undefined;
+    const files =
+      Array.isArray(filesBody) && filesBody.length
+        ? filesBody
+        : fileSingle?.name && fileSingle?.contentBase64
+          ? [fileSingle]
+          : [];
+    const dryRun = Boolean(req.body?.dryRun);
+    if (!files.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Envie files: [{ name, contentBase64 }, ...] ou file único.',
+      });
+    }
+    try {
+      if (dryRun) {
+        const preview = await previewBtgExtractBatchUpload(ctx, this.ledger, files);
+        return res.json({ success: true, dryRun: true, preview });
+      }
+      const result = await applyBtgExtractBatchUpload(ctx, this.ledger, files);
+      return res.json({ success: true, dryRun: false, ...result });
+    } catch (err: unknown) {
+      const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+      const message = err instanceof Error ? err.message : 'Falha na importação do extrato.';
+      return res.status(status).json({ success: false, error: message });
+    }
+  };
+
+  /** Upload notas BTG (PDF, múltiplos) → preview ou importação no livro. */
+  importBtgBrokerageUpload = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selecione uma organização (personifique a holding).',
+      });
+    }
+    const files = req.body?.files as BtgUploadFileInput[] | undefined;
+    const dryRun = Boolean(req.body?.dryRun);
+    if (!Array.isArray(files) || !files.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Envie files: [{ name, contentBase64 }, ...].',
+      });
+    }
+    try {
+      if (dryRun) {
+        const preview = await previewBtgBrokerageUpload(files);
+        return res.json({ success: true, dryRun: true, preview });
+      }
+      const result = await applyBtgBrokerageUpload(ctx, this.ledger, files);
+      return res.json({ success: true, dryRun: false, ...result });
+    } catch (err: unknown) {
+      const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+      const message =
+        err instanceof Error ? err.message : 'Falha na importação das notas.';
+      return res.status(status).json({ success: false, error: message });
+    }
+  };
+
+  /** Importação mensal unificada: extrato + notas do mesmo YYYY-MM. */
+  importBtgMonthUpload = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selecione uma organização (personifique a holding).',
+      });
+    }
+    const month = String(req.body?.month || '').trim();
+    const extractFile = req.body?.extractFile as BtgUploadFileInput | undefined;
+    const noteFiles = req.body?.noteFiles as BtgUploadFileInput[] | undefined;
+    const dryRun = Boolean(req.body?.dryRun);
+    if (!extractFile?.name || !extractFile?.contentBase64) {
+      return res.status(400).json({
+        success: false,
+        error: 'Envie extractFile: { name, contentBase64 }.',
+      });
+    }
+    if (!Array.isArray(noteFiles)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Envie noteFiles: [{ name, contentBase64 }, ...] (pasta de notas).',
+      });
+    }
+    try {
+      if (dryRun) {
+        const preview = await previewBtgMonthImport(
+          ctx,
+          this.ledger,
+          month,
+          extractFile,
+          noteFiles
+        );
+        return res.json({ success: true, dryRun: true, preview });
+      }
+      const result = await applyBtgMonthImport(
+        ctx,
+        this.ledger,
+        month,
+        extractFile,
+        noteFiles
+      );
+      return res.json({ success: true, dryRun: false, ...result });
+    } catch (err: unknown) {
+      const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+      const message =
+        err instanceof Error ? err.message : 'Falha na importação mensal BTG.';
+      return res.status(status).json({ success: false, error: message });
     }
   };
 

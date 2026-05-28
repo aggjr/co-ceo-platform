@@ -1,6 +1,6 @@
 {
   "name": "co-ceo-core",
-  "version": "0.0.152",
+  "version": "0.0.157",
   "description": "co-CEO Platform Core API",
   "main": "dist/index.js",
   "scripts": {
@@ -54,6 +54,8 @@
     "check:branch-overlap": "node ./node_modules/ts-node/dist/bin.js scripts/check-branch-overlap.ts",
     "audit:btg:notes-fees": "node ./node_modules/ts-node/dist/bin.js scripts/audit-btg-notes-fees-only.ts",
     "invest:purge-keep-opening": "node ./node_modules/ts-node/dist/bin.js scripts/purge-holding-keep-opening.ts",
+    "invest:purge-month": "node ./node_modules/ts-node/dist/bin.js scripts/purge-invest-month.ts",
+    "invest:reimport-btg-month": "node ./node_modules/ts-node/dist/bin.js scripts/reimport-btg-month.ts",
     "invest:rebuild-btg-notes": "node ./node_modules/ts-node/dist/bin.js scripts/rebuild-holding-from-btg-notes.ts",
     "task:list": "node scripts/task-queue.js list",
     "task:add": "node scripts/task-queue.js add",
