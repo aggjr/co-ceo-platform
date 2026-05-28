@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-05-28T02:46:53.398Z",
+  "updated_at": "2026-05-28T12:31:36.812Z",
   "tasks": [
     {
       "id": "W3-02",
-      "title": "prioridade: 80\r",
+      "title": "prioridade: 0\r",
       "spec": null,
       "priority": 0,
-      "status": "claimed",
-      "claimed_by": "antigravity-gamer",
-      "claimed_at": "2026-05-28T02:46:53.398Z",
+      "status": "done",
+      "claimed_by": null,
+      "claimed_at": null,
       "started_at": null,
-      "completed_at": null,
-      "release_version": null,
-      "description": "prioridade: 80\r\nstatus: pending\r\nspec: tasks/wave-3/02.md\r\n\r\ntitulo: INVEST: recalcular resultados por ação desde 2026\r\n\r\nINVEST: recalcular resultados por ação desde 2026\r",
+      "completed_at": "2026-05-28T12:31:36.811Z",
+      "release_version": "V0.0.164",
+      "description": "prioridade: 0\r\nstatus: claimed\r\nagente: antigravity-gamer\r\nassumida: 2026-05-28T02:46:53.398Z\r\n\r\ntitulo: prioridade: 80\r\n\r\nprioridade: 80\r\nstatus: pending\r\nspec: tasks/wave-3/02.md\r\n\r\ntitulo: INVEST: recalcular resultados por ação desde 2026\r\n\r\nINVEST: recalcular resultados por ação desde 2026\r",
       "notes": ""
     }
   ]
