@@ -13,6 +13,7 @@ import { UiManifestController } from '../controllers/UiManifestController';
 import { PlatformAlertsController } from '../controllers/PlatformAlertsController';
 import { PlatformDeployController } from '../controllers/PlatformDeployController';
 import { RemoteMigrationController } from '../controllers/RemoteMigrationController';
+import { RemoteRecalcController } from '../controllers/RemoteRecalcController';
 
 const router = Router();
 const gateway = dataGateway;
@@ -23,6 +24,7 @@ const platformDeploy = new PlatformDeployController();
 const telemetry = createTelemetryController(gateway);
 const uiManifest = new UiManifestController(gateway);
 const remoteMigration = new RemoteMigrationController(gateway);
+const remoteRecalc = new RemoteRecalcController(gateway);
 
 // --- Auth ---
 router.post('/auth/login', AuthController.login);
@@ -183,6 +185,13 @@ router.post(
   AuthMiddleware.protect,
   AuthMiddleware.requireGlobalScope,
   remoteMigration.runMigration.bind(remoteMigration)
+);
+
+router.post(
+  '/invest/admin/recalc-curve',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  remoteRecalc.recalcCurve.bind(remoteRecalc)
 );
 
 router.get(
