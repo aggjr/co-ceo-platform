@@ -205,18 +205,12 @@ export async function InvestDashboardPage(container) {
         <button type="button" id="patrimony-reload" class="btn-header-icon-sync patrimony-reload-btn" title="Atualizar gráfico e resumo" aria-label="Atualizar gráfico e resumo">${REFRESH_ICON_SVG}</button>
       </${D}>
       <${D} id="patrimony-summary" class="patrimony-summary-host"></${D}>
+      <p id="patrimony-meta" class="patrimony-meta muted"></p>
       <${D} class="patrimony-chart-section">
         <${D} id="patrimony-chart-host" class="patrimony-chart-panel">
           <p class="muted">Carregando...</p>
         </${D}>
-        <p id="patrimony-meta" class="patrimony-meta muted"></p>
       </${D}>
-      <nav class="invest-patrimony-links" aria-label="Atalhos INVEST">
-        <a href="/invest/portfolio" data-link>Portfólio →</a>
-        · <a href="/invest/extratos" data-link>Extratos →</a>
-        · <a href="/invest/historico-operacoes" data-link>Notas / operações →</a>
-        · <a href="/invest/ganhos-por-acao" data-link>Resultados por ação →</a>
-      </nav>
     </${D}>
   </${D}>`;
 
