@@ -79,14 +79,31 @@ export function MarketQuotesSyncButton() {
         const extra = missing > 0 ? ` (${missing} sem cotação na brapi)` : '';
         showFlash(`${saved} cotação(ões) gravada(s)${extra}.`);
       } else {
-        const data = await apiRequest('/api/invest/quotes/sync-b3', {
-          method: 'POST',
-          body: {},
-        });
-        const updated = Number(data.updated ?? 0);
-        const missing = Array.isArray(data.missing) ? data.missing.length : 0;
-        const extra = missing > 0 ? ` — ${missing} sem resposta` : '';
-        showFlash(`${updated} ativo(s) atualizado(s)${extra}.`);
+        const path = window.location.pathname;
+        if (path.includes('/invest/portfolio')) {
+          const data = await apiRequest('/api/invest/admin/recalc-positions', {
+            method: 'POST',
+            body: {},
+          });
+          const updated = Number(data.updated ?? 0);
+          showFlash(`${updated} posições recalculadas.`);
+        } else if (path.includes('/invest/panorama') || path.includes('/invest/historico')) {
+          const data = await apiRequest('/api/invest/admin/recalc-curve', {
+            method: 'POST',
+            body: {},
+          });
+          const processed = Number(data.processed ?? 0);
+          showFlash(`Curva recalculada: ${processed} dias processados.`);
+        } else {
+          const data = await apiRequest('/api/invest/quotes/sync-b3', {
+            method: 'POST',
+            body: {},
+          });
+          const updated = Number(data.updated ?? 0);
+          const missing = Array.isArray(data.missing) ? data.missing.length : 0;
+          const extra = missing > 0 ? ` — ${missing} sem resposta` : '';
+          showFlash(`${updated} ativo(s) atualizado(s)${extra}.`);
+        }
       }
       window.dispatchEvent(new CustomEvent('coceo:route-refresh'));
     } catch (err) {
@@ -95,7 +112,7 @@ export function MarketQuotesSyncButton() {
           ? err.message
           : err instanceof Error
             ? err.message
-            : 'Falha ao atualizar cotações.';
+            : 'Falha ao atualizar dados.';
       showFlash(msg);
     } finally {
       setStatus('idle');

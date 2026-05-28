@@ -194,6 +194,13 @@ router.post(
   remoteRecalc.recalcCurve.bind(remoteRecalc)
 );
 
+router.post(
+  '/invest/admin/recalc-positions',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  remoteRecalc.recalcPositions.bind(remoteRecalc)
+);
+
 router.get(
   '/invest/ui-context',
   AuthMiddleware.protect,
