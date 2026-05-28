@@ -27,32 +27,22 @@ Criterio de aceite, arquivos, banco remoto, etc.
 ## W3-02
 
 prioridade: 0
-status: done
+status: pending
 agente: 
 spec: 
 assumida: 
-concluida: 2026-05-28T12:32:01.022Z
-release: V0.0.165
-
-titulo: prioridade: 0
-
-prioridade: 0
-status: done
-concluida: 2026-05-28T12:31:36.811Z
-release: V0.0.164
-
-titulo: prioridade: 0
-
-prioridade: 0
-status: claimed
-agente: antigravity-gamer
-assumida: 2026-05-28T02:46:53.398Z
+concluida: 
+release: 
 
 titulo: prioridade: 80
 
 prioridade: 80
-status: pending
+status: done
+agente: antigravity-gamer
 spec: tasks/wave-3/02.md
+assumida: 2026-05-28T02:46:53.398Z
+concluida: 2026-05-28T12:32:01.022Z
+release: V0.0.165
 
 titulo: INVEST: recalcular resultados por ação desde 2026
 
