@@ -6,8 +6,8 @@ import { settledCashBalanceFromLedger } from './cashInvestLedger';
 import type { BtgExtractImportPreview } from './btgUploadImportService';
 
 export const CASH_RECON_TOLERANCE = 0.01;
-/** Batimento mensal (notas + extrato simulado): centavos de taxa/IR no PDF. */
-export const MONTH_IMPORT_CASH_TOLERANCE = 10;
+/** Batimento mensal (notas + extrato simulado): taxas BTC/aluguel e arredondamento PDF. */
+export const MONTH_IMPORT_CASH_TOLERANCE = 20;
 
 export type ParsedExtractForBatch = {
   path: string;

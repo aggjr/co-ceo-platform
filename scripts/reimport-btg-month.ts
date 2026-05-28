@@ -19,25 +19,20 @@ import {
 } from '../src/core/invest/btgMonthImportService';
 import type { BtgUploadFileInput } from '../src/core/invest/btgUploadImportService';
 import { settledCashBalanceFromLedger } from '../src/core/invest/cashInvestLedger';
+import {
+  BTG_MONTHS_2026,
+  btgSourcesBase,
+  listNotePdfs,
+  resolveExtractPath,
+  resolveNotesDir,
+} from './lib/btg-2026-months';
 
 dotenv.config();
 
 const MONTH = process.argv[2] || '';
 const SKIP_PURGE = process.argv.includes('--skip-purge');
 const ORG = process.env.PORTFOLIO_ORG_ID || 'org-holding-001';
-const BASE =
-  process.env.BTG_SOURCES_DIR || path.join('G:', 'Meu Drive', '01 - Nova Estrutura');
-
-function listPdfs(dir: string): string[] {
-  const out: string[] = [];
-  if (!fs.existsSync(dir)) return out;
-  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, ent.name);
-    if (ent.isDirectory()) out.push(...listPdfs(full));
-    else if (/\.pdf$/i.test(ent.name) && !/summary\.pdf$/i.test(ent.name)) out.push(full);
-  }
-  return out;
-}
+const BASE = btgSourcesBase();
 
 function toUpload(filePath: string, relBase: string): BtgUploadFileInput {
   return {
@@ -47,31 +42,11 @@ function toUpload(filePath: string, relBase: string): BtgUploadFileInput {
 }
 
 function monthPaths(month: string) {
-  const [y, m] = month.split('-');
-  const monNames = [
-    'jan',
-    'fev',
-    'mar',
-    'abr',
-    'mai',
-    'jun',
-    'jul',
-    'ago',
-    'set',
-    'out',
-    'nov',
-    'dez',
-  ];
-  const label = monNames[Number(m) - 1];
-  const extractCandidates = [
-    path.join(BASE, `${label?.charAt(0).toUpperCase()}${label?.slice(1)}_${y}.pdf`),
-    path.join(BASE, `${label}_${y}.pdf`),
-    path.join(BASE, 'extrato', `extrato-${month}.pdf`),
-  ];
-  const notesDir = path.join(BASE, 'Notas Corretagem', `004176105_${y}${m}01_${y}${m}31`);
-  const extract =
-    extractCandidates.find((p) => fs.existsSync(p)) ||
-    path.join(BASE, `${label}_${y}.pdf`);
+  const spec = BTG_MONTHS_2026.find((s) => s.month === month);
+  if (!spec) return null;
+  const notesDir = resolveNotesDir(BASE, spec);
+  const extract = resolveExtractPath(BASE, spec);
+  if (!notesDir) return null;
   return { extract, notesDir };
 }
 
@@ -81,17 +56,18 @@ async function main() {
     process.exit(1);
   }
 
-  const { extract, notesDir } = monthPaths(MONTH);
+  const paths = monthPaths(MONTH);
+  if (!paths) {
+    console.error('Mês não configurado ou pasta de notas ausente:', MONTH);
+    process.exit(1);
+  }
+  const { extract, notesDir } = paths;
   if (!fs.existsSync(extract)) {
     console.error('Extrato não encontrado:', extract);
     process.exit(1);
   }
-  if (!fs.existsSync(notesDir)) {
-    console.error('Pasta de notas não encontrada:', notesDir);
-    process.exit(1);
-  }
 
-  const notePdfs = listPdfs(notesDir);
+  const notePdfs = listNotePdfs(notesDir);
   console.log('Mês:', MONTH);
   console.log('Extrato:', extract);
   console.log('Notas:', notePdfs.length, 'PDF em', notesDir);
@@ -135,8 +111,10 @@ async function main() {
       process.exit(1);
     }
 
-    if (!before.financialOk) {
-      console.error('\nAbortado: batimento financeiro não OK na prévia.');
+    const reconciled =
+      before.extract.openingLedgerOk === true && before.extract.closingLedgerOk === true;
+    if (!reconciled) {
+      console.error('\nAbortado: batimento financeiro não OK na prévia.', before.financialDetail);
       process.exit(1);
     }
 
@@ -150,7 +128,8 @@ async function main() {
     console.log('Resultado OK:', applied.resultOk);
     console.log(applied.resultDetail);
 
-    const events = await ledger.listLedgerEvents(ctx, `${MONTH}-01`, `${MONTH}-31`);
+    const today = new Date().toISOString().slice(0, 10);
+    const events = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
     const cashEnd = settledCashBalanceFromLedger(events, applied.extract.closingDate || `${MONTH}-28`);
     console.log('\nSaldo caixa livro:', cashEnd.toFixed(2));
     console.log('Saldo caixa extrato:', applied.extract.closingExtract?.toFixed(2) ?? '—');

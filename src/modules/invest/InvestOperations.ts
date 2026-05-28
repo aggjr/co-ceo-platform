@@ -20,6 +20,7 @@ import type {
   OpeningPositionInput,
 } from './types';
 import { inferAssetType, inferUnderlyingTicker } from '../../core/invest/assetClassifier';
+import { defersCashSettlement } from '../../core/invest/settlementCalendar';
 import { inferOptionExpiryDate } from '../../core/invest/optionExpiry';
 import type { LedgerImportLine } from '../../core/invest/ledgerTypes';
 import {
@@ -981,9 +982,13 @@ export class InvestOperations {
         (line.brokerage_fee ?? 0) + (line.b3_fees ?? 0) + (line.irrf_tax ?? 0)
       );
       if (totalCash > 0) {
+        const cashDefers = defersCashSettlement(assetClass, op, ticker);
+        const cashTxnDate = cashDefers
+          ? String(line.settlement_date ?? line.date).slice(0, 10)
+          : line.date;
         const tradeFinEntry = await this.financialLedger.record(ctx, {
           accountId,
-          transactionDate: line.date,
+          transactionDate: cashTxnDate,
           direction: cashDirection,
           amount: totalCash,
           description: line.notes ?? op,

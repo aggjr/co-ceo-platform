@@ -95,33 +95,59 @@ async function main() {
 
     await conn.beginTransaction();
 
-    const monthScopePle = `organization_id = ? AND transaction_date >= ? AND transaction_date <= ?
+    const monthScopePle = `ple.organization_id = ? AND ple.transaction_date >= ? AND ple.transaction_date <= ?
+         AND NOT (ple.business_event_id IN (?) OR ${preservePle.replace(/movement_type/g, 'ple.movement_type').replace(/transaction_date/g, 'ple.transaction_date')})`;
+    const preserveFleFle = preserveFle
+      .replace(/description/g, 'fle.description')
+      .replace(/transaction_date/g, 'fle.transaction_date')
+      .replace(/metadata/g, 'fle.metadata');
+    const monthScopeFle = `fle.organization_id = ? AND fle.transaction_date >= ? AND fle.transaction_date <= ?
+         AND NOT (fle.business_event_id IN (?) OR ${preserveFleFle})`;
+    const monthScopePleBare = `organization_id = ? AND transaction_date >= ? AND transaction_date <= ?
          AND NOT (business_event_id IN (?) OR ${preservePle})`;
-    const monthScopeFle = `organization_id = ? AND transaction_date >= ? AND transaction_date <= ?
+    const monthScopeFleBare = `organization_id = ? AND transaction_date >= ? AND transaction_date <= ?
          AND NOT (business_event_id IN (?) OR ${preserveFle})`;
 
     const [unlinkPle] = await conn.query<mysql.ResultSetHeader>(
       `UPDATE patrimony_ledger_entries SET related_financial_entry_id = NULL
-       WHERE ${monthScopePle}`,
+       WHERE ${monthScopePleBare}`,
       [ORG, from, to, openingInSql, OPENING_DATE]
     );
-    console.log('patrimony_ledger FK caixa desligadas:', unlinkPle.affectedRows);
+    console.log('patrimony_ledger FK caixa desligadas (mês):', unlinkPle.affectedRows);
 
-    const [unlinkFle] = await conn.query<mysql.ResultSetHeader>(
-      `UPDATE financial_ledger_entries SET related_patrimony_ledger_id = NULL
+    const [unlinkPleForFin] = await conn.query<mysql.ResultSetHeader>(
+      `UPDATE patrimony_ledger_entries ple
+       INNER JOIN financial_ledger_entries fle ON fle.id = ple.related_financial_entry_id
+       SET ple.related_financial_entry_id = NULL
        WHERE ${monthScopeFle}`,
       [ORG, from, to, openingInSql, OPENING_DATE]
     );
-    console.log('financial_ledger FK patrimônio desligadas:', unlinkFle.affectedRows);
+    console.log('patrimony_ledger FK caixa desligadas (fora do mês):', unlinkPleForFin.affectedRows);
+
+    const [unlinkFle] = await conn.query<mysql.ResultSetHeader>(
+      `UPDATE financial_ledger_entries SET related_patrimony_ledger_id = NULL
+       WHERE ${monthScopeFleBare}`,
+      [ORG, from, to, openingInSql, OPENING_DATE]
+    );
+    console.log('financial_ledger FK patrimônio desligadas (mês):', unlinkFle.affectedRows);
+
+    const [unlinkFleForPle] = await conn.query<mysql.ResultSetHeader>(
+      `UPDATE financial_ledger_entries fle
+       INNER JOIN patrimony_ledger_entries ple ON ple.id = fle.related_patrimony_ledger_id
+       SET fle.related_patrimony_ledger_id = NULL
+       WHERE ${monthScopePle}`,
+      [ORG, from, to, openingInSql, OPENING_DATE]
+    );
+    console.log('financial_ledger FK patrimônio desligadas (fora do mês):', unlinkFleForPle.affectedRows);
 
     const [fle] = await conn.query<mysql.ResultSetHeader>(
-      `DELETE FROM financial_ledger_entries WHERE ${monthScopeFle}`,
+      `DELETE FROM financial_ledger_entries WHERE ${monthScopeFleBare}`,
       [ORG, from, to, openingInSql, OPENING_DATE]
     );
     console.log('financial_ledger removidos:', fle.affectedRows);
 
     const [ple] = await conn.query<mysql.ResultSetHeader>(
-      `DELETE FROM patrimony_ledger_entries WHERE ${monthScopePle}`,
+      `DELETE FROM patrimony_ledger_entries WHERE ${monthScopePleBare}`,
       [ORG, from, to, openingInSql, OPENING_DATE]
     );
     console.log('patrimony_ledger removidos:', ple.affectedRows);

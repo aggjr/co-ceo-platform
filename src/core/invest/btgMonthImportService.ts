@@ -4,7 +4,7 @@
 import type { UserContext } from '../dal';
 import { GatewayError } from '../dal';
 import type { LedgerEvent } from './CustodyEngine';
-import { settledCashBalanceFromLedger } from './cashInvestLedger';
+import { isCashInvestTicker } from './cashInvestLedger';
 import {
   buildExtractReconcileFields,
   inferExtractMonth,
@@ -22,6 +22,7 @@ import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
 import { MAIN_CASH_TICKER } from './ledgerTypes';
 import { LedgerImportService } from './LedgerImportService';
 import { importLineExpectedCashNet } from './cashExtractDedup';
+import type { BtgExtractParseOptions } from './BtgExtractLineParser';
 import {
   applyBtgBrokerageUpload,
   applyBtgExtractUpload,
@@ -33,15 +34,8 @@ import {
   previewBtgExtractUpload,
 } from './btgUploadImportService';
 
-const CASH_OPS = new Set<LedgerTransactionType>([
-  'buy',
-  'sell',
-  'put_sell',
-  'put_buy',
-  'call_sell',
-  'call_buy',
-  'option_exercise',
-]);
+/** Notas = patrimônio; caixa = extrato (inclui LIQ BOLSA agregada). */
+const MONTH_IMPORT_EXTRACT_OPTS: BtgExtractParseOptions = { includeLiqBolsa: true };
 
 export type BtgMonthImportPreview = {
   kind: 'month_import';
@@ -111,6 +105,37 @@ function isPdfPath(name: string): boolean {
   return /\.pdf$/i.test(name.split(/[/\\]/).pop() || '');
 }
 
+/** Caixa do mês que seria recriado por notas + extrato (não inclui abertura 01/01). */
+export function isMonthBtgImportCashEvent(event: LedgerEvent, month: string): boolean {
+  const ym = String(event.transaction_date || '').slice(0, 7);
+  if (ym !== month) return false;
+  if (!isCashInvestTicker(String(event.asset_ticker || ''))) return false;
+  const ref = String(event.broker_note_ref || '');
+  if (/OPENING:\d{4}-\d{2}-\d{2}/i.test(ref)) return false;
+  if (ref.startsWith('BTG-EXT-')) return true;
+  if (ref.includes('BTG-NOTA') || ref.includes(':CASH')) return true;
+  return false;
+}
+
+export function stripMonthImportCashFromLedger(
+  events: LedgerEvent[],
+  month: string
+): LedgerEvent[] {
+  return events.filter((e) => !isMonthBtgImportCashEvent(e, month));
+}
+
+/** Remove caixa BTG do mês alvo em diante (reimportação parcial sem duplicar meses posteriores). */
+export function stripBtgImportCashFromMonthForward(
+  events: LedgerEvent[],
+  fromMonth: string
+): LedgerEvent[] {
+  return events.filter((e) => {
+    const ym = String(e.transaction_date || '').slice(0, 7);
+    if (ym < fromMonth) return true;
+    return !isMonthBtgImportCashEvent(e, ym);
+  });
+}
+
 function projectedCashFromExtractLines(lines: LedgerImportLine[]): LedgerEvent[] {
   const out: LedgerEvent[] = [];
   for (const line of lines) {
@@ -133,61 +158,35 @@ function projectedCashFromExtractLines(lines: LedgerImportLine[]): LedgerEvent[]
   return out;
 }
 
-function projectedCashFromNoteLines(lines: LedgerImportLine[]): LedgerEvent[] {
-  const out: LedgerEvent[] = [];
-  for (const line of lines) {
-    const op = line.operation as LedgerTransactionType;
-    if (!CASH_OPS.has(op)) continue;
-    const net = Number(line.total_net_value ?? 0);
-    if (Math.abs(net) < 0.005) continue;
-    const d = String(line.settlement_date || line.date || '').slice(0, 10);
-    if (!d) continue;
-    out.push({
-      asset_id: `proj-${line.broker_note_ref || d}`,
-      asset_ticker: MAIN_CASH_TICKER,
-      asset_type: 'cash',
-      transaction_type: op,
-      transaction_date: d,
-      quantity: 1,
-      unit_price: net,
-      total_net_value: net,
-      broker_note_ref: line.broker_note_ref ? `${line.broker_note_ref}:CASH` : null,
-    });
-  }
-  return out;
-}
-
-async function buildProjectedLedger(
+/**
+ * Livro para batimento do mês: se já importado, usa o livro real; senão remove caixa
+ * do mês do livro e simula notas + extrato uma vez (evita Δ ~55k por dupla contagem).
+ */
+export async function buildMonthReconcileLedger(
   ctx: UserContext,
   ledger: LedgerImportService,
+  month: string,
   noteFiles: BtgUploadFileInput[],
-  extractFile?: BtgUploadFileInput
+  extractFile: BtgUploadFileInput | undefined,
+  baseLedger: LedgerEvent[]
 ): Promise<LedgerEvent[]> {
-  const today = new Date().toISOString().slice(0, 10);
-  const base = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
-  const allNotes = [];
-  for (const file of noteFiles) {
-    if (!isPdfPath(file.name)) continue;
-    try {
-      const buf = Buffer.from(String(file.contentBase64 || ''), 'base64');
-      const lines = await pdfBufferToLines(buf);
-      allNotes.push(...parseBtgBrokerageNoteBlocks(lines, file.name));
-    } catch {
-      /* preview ignora PDF inválido; notesOk ficará false */
-    }
+  if (isExtractMonthInLedger(baseLedger, month)) {
+    return baseLedger;
   }
-  const { kept } = dedupeBrokerageNotes(allNotes);
-  const importLines = brokerageNotesToLedgerLines(kept);
-  let projected = [...base, ...projectedCashFromNoteLines(importLines)];
+
+  const stripped = stripBtgImportCashFromMonthForward(baseLedger, month);
   if (extractFile?.contentBase64) {
     try {
-      const extractLines = await parseExtractUploadImportLines(extractFile);
-      projected = [...projected, ...projectedCashFromExtractLines(extractLines)];
+      const extractLines = await parseExtractUploadImportLines(
+        extractFile,
+        MONTH_IMPORT_EXTRACT_OPTS
+      );
+      return [...stripped, ...projectedCashFromExtractLines(extractLines)];
     } catch {
-      /* preview de extrato falha em parse; financialOk refletirá */
+      /* parse falha */
     }
   }
-  return projected;
+  return stripped;
 }
 
 function evaluateMonthPreview(
@@ -223,19 +222,26 @@ function evaluateMonthPreview(
 
   const monthMatch = !extractMonth || extractMonth === month;
 
-  const financialOk =
+  const reconciled =
     Boolean(extract.parseOk) &&
     monthMatch &&
     extract.openingLedgerOk === true &&
-    extract.closingLedgerOk === true &&
-    !extract.monthAlreadyImported;
+    extract.closingLedgerOk === true;
+
+  const financialOk = reconciled && !extract.monthAlreadyImported;
 
   const financialParts: string[] = [];
   if (!extract.parseOk) financialParts.push(extract.parseError || 'extrato ilegível');
   if (extractMonth && extractMonth !== month) {
     financialParts.push(`extrato parece ser ${extractMonth}, não ${month}`);
   }
-  if (extract.monthAlreadyImported) financialParts.push('extrato deste mês já importado');
+  if (extract.monthAlreadyImported && reconciled) {
+    financialParts.push(
+      `mês importado · fecha OK · saldo fim extrato R$ ${extract.closingExtract?.toFixed(2) ?? '?'}`
+    );
+  } else if (extract.monthAlreadyImported) {
+    financialParts.push('extrato deste mês já importado');
+  }
   if (extract.openingLedgerOk === false) {
     financialParts.push(`ini. Δ R$ ${extract.openingLedgerDelta?.toFixed(2) ?? '?'}`);
   }
@@ -250,11 +256,13 @@ function evaluateMonthPreview(
   const financialDetail =
     financialParts.join(' · ') || (extract.parseOk ? 'extrato coerente com o livro (+ notas simuladas)' : '—');
 
-  const resultOk = notesOk && financialOk;
+  const resultOk = notesOk && reconciled;
 
   let resultDetail = '';
   if (resultOk) {
-    resultDetail = 'Mês pronto para importar: notas e extrato coerentes com o livro (simulação pós-notas).';
+    resultDetail = extract.monthAlreadyImported
+      ? 'Mês importado: notas e extrato batem com o livro.'
+      : 'Mês pronto para importar: notas e extrato coerentes com o livro (simulação pós-notas).';
   } else if (notesOk && extract.parseOk && extract.closingLedgerOk === false) {
     resultDetail =
       'Notas OK, mas caixa do extrato não fecha com o livro após simular as notas. Pode haver LIQ BOLSA duplicada ao importar o extrato — revise antes de gravar.';
@@ -290,7 +298,14 @@ export async function previewBtgMonthImport(
   const notes = await previewBtgBrokerageUpload(noteFiles);
   const today = new Date().toISOString().slice(0, 10);
   const baseLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
-  const projectedLedger = await buildProjectedLedger(ctx, ledger, noteFiles, extractFile);
+  const reconcileLedger = await buildMonthReconcileLedger(
+    ctx,
+    ledger,
+    monthNorm,
+    noteFiles,
+    extractFile,
+    baseLedger
+  );
 
   const parsedExtract = await previewBtgExtractUpload(extractFile);
   let extract: BtgExtractFileResult = parsedExtract;
@@ -301,7 +316,7 @@ export async function previewBtgMonthImport(
       fileName: parsedExtract.fileName,
       preview: parsedExtract.preview,
     };
-    const recon = buildExtractReconcileFields(parsed, projectedLedger, null, {
+    const recon = buildExtractReconcileFields(parsed, reconcileLedger, null, {
       tolerance: MONTH_IMPORT_CASH_TOLERANCE,
     });
     extract = {
@@ -384,8 +399,12 @@ export async function applyBtgMonthImport(
     preview.month
   );
 
-  const notesApply = await applyBtgBrokerageUpload(ctx, ledger, noteFiles);
-  const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile);
+  const notesApply = await applyBtgBrokerageUpload(ctx, ledger, noteFiles, {
+    cashFromExtractOnly: true,
+  });
+  const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
+    parseOptions: MONTH_IMPORT_EXTRACT_OPTS,
+  });
 
   const notesInserted = notesApply.totals.inserted;
   const notesSkipped = notesApply.totals.skipped;
