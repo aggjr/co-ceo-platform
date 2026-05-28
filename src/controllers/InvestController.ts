@@ -848,7 +848,9 @@ export class InvestController {
     const toRaw = String(req.query.to || bounds.today).slice(0, 10);
     const to = toRaw > bounds.today ? bounds.today : toRaw;
 
-    const events = await this.ledger.listLedgerEvents(ctx, from, to);
+    // Reconstrói custódia desde periodMin para evitar "lote nascendo" no meio do período.
+    // O engine usa `from..to` apenas para colunas do período.
+    const events = await this.ledger.listLedgerEvents(ctx, bounds.periodMin, to);
     let pivot = buildStockUnderlyingPivot(events, from, to);
 
     const underlyings = [
