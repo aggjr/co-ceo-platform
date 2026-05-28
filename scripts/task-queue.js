@@ -260,7 +260,10 @@ function ensureCleanForPublish() {
     .split('\n')
     .filter(Boolean)
     .every((line) => {
-      const file = line.slice(3).trim();
+      // git porcelain is typically: XY<space>path. Some environments may strip
+      // one of the status columns when printing/copying; be defensive here.
+      const m = line.match(/^[ MADRCU?!]{2}\s+(.*)$/);
+      const file = (m ? m[1] : line.slice(3)).trim();
       return QUEUE_FILES.includes(file);
     });
   if (!onlyQueue) {
