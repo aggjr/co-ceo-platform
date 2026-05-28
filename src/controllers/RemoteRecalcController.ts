@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import { LedgerImportService } from '../core/invest/LedgerImportService';
 import { rebuildCustodyFromLedger } from '../core/invest/CustodyEngine';
+import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
 import { CoCeoDataGateway } from '../core/dal/CoCeoDataGateway';
 import { SYSTEM_INSTALLER_USER_ID } from '../core/dal/types';
 
@@ -60,28 +61,38 @@ export class RemoteRecalcController {
       const to = new Date().toISOString().slice(0, 10);
       const events = await ledgerService.listLedgerEvents(ctx, from, to);
       const { assets } = rebuildCustodyFromLedger(events);
+      const pricesMap = computeThreePricesByUnderlying(events);
 
       let updatedCount = 0;
       for (const asset of assets) {
-        if (!asset.patrimonyItemId) continue;
+        if (!asset.assetId) continue;
         
         // Verifica se existe invest_position_ext
         const extRows = await this.gateway.findWhere(
           { userId: SYSTEM_INSTALLER_USER_ID, organizationId: orgId, impersonatorId: null, scope: 'global' },
           'invest_position_ext',
-          { patrimony_item_id: asset.patrimonyItemId },
+          { patrimony_item_id: asset.assetId },
           { limit: 1 }
         );
 
-        const pmA = asset.prices.strict;
-        const pmB = asset.prices.b3;
-        const pmC = asset.prices.managerial;
+        let pmA = asset.avgPrice;
+        let pmB = asset.avgPrice;
+        let pmC = asset.avgPrice;
+
+        if (asset.assetType === 'stock' || asset.assetType === 'fii') {
+          const tp = pricesMap.get(asset.ticker);
+          if (tp) {
+            pmA = tp.estrito;
+            pmB = tp.b3;
+            pmC = tp.gerencial;
+          }
+        }
 
         if (extRows.length > 0) {
           await this.gateway.update(
             { userId: SYSTEM_INSTALLER_USER_ID, organizationId: orgId, impersonatorId: null, scope: 'global' },
             'invest_position_ext',
-            asset.patrimonyItemId,
+            extRows[0].id,
             { pm_estrito: pmA, pm_b3: pmB, pm_gerencial: pmC }
           );
           updatedCount++;
@@ -90,7 +101,7 @@ export class RemoteRecalcController {
             { userId: SYSTEM_INSTALLER_USER_ID, organizationId: orgId, impersonatorId: null, scope: 'global' },
             'invest_position_ext',
             { 
-              patrimony_item_id: asset.patrimonyItemId,
+              patrimony_item_id: asset.assetId,
               asset_class: asset.assetType,
               pm_estrito: pmA,
               pm_b3: pmB,
