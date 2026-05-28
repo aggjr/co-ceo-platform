@@ -12,6 +12,7 @@ import { InvestController } from '../controllers/InvestController';
 import { UiManifestController } from '../controllers/UiManifestController';
 import { PlatformAlertsController } from '../controllers/PlatformAlertsController';
 import { PlatformDeployController } from '../controllers/PlatformDeployController';
+import { RemoteMigrationController } from '../controllers/RemoteMigrationController';
 
 const router = Router();
 const gateway = dataGateway;
@@ -21,6 +22,7 @@ const platformAlerts = new PlatformAlertsController(gateway);
 const platformDeploy = new PlatformDeployController();
 const telemetry = createTelemetryController(gateway);
 const uiManifest = new UiManifestController(gateway);
+const remoteMigration = new RemoteMigrationController(gateway);
 
 // --- Auth ---
 router.post('/auth/login', AuthController.login);
@@ -176,6 +178,13 @@ router.post(
 );
 
 // --- INVEST ---
+router.post(
+  '/invest/admin/migrate-remote',
+  AuthMiddleware.protect,
+  AuthMiddleware.requireGlobalScope,
+  remoteMigration.runMigration.bind(remoteMigration)
+);
+
 router.get(
   '/invest/ui-context',
   AuthMiddleware.protect,
