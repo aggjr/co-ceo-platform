@@ -10,7 +10,7 @@ import {
   type BtgBrokerageNote,
   type BtgBrokerageNoteTrade,
 } from './btgBrokerageNoteParser';
-import type { LedgerImportLine } from './ledgerTypes';
+import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
 
 export const BTG_NOTE_LEDGER_REF_PREFIX = 'BTG-NOTA';
 export const BTG_NOTE_EVENT_REF_PREFIX = 'BTG-NOTA';
@@ -118,6 +118,8 @@ function loanToLedger(
     settlement_status: 'pending',
   };
   applyFeesToLine(line, share, trade);
+  // Caixa do aluguel vem do extrato (BTC); evita micro-duplicata com nota LOAN.
+  line.total_net_value = 0;
   return line;
 }
 
@@ -171,4 +173,22 @@ export function brokerageNotesToLedgerLines(notes: BtgBrokerageNote[]): LedgerIm
     });
   }
   return lines;
+}
+
+const NOTE_CASH_OPS = new Set<LedgerTransactionType>([
+  'buy',
+  'sell',
+  'put_sell',
+  'put_buy',
+  'call_sell',
+  'call_buy',
+  'option_exercise',
+]);
+
+/** Import mensal: patrimônio na nota, caixa no extrato (LIQ BOLSA). */
+export function suppressBrokerageNoteCashLines(lines: LedgerImportLine[]): LedgerImportLine[] {
+  return lines.map((line) => {
+    if (!NOTE_CASH_OPS.has(line.operation as LedgerTransactionType)) return line;
+    return { ...line, total_net_value: 0, unit_price: 0 };
+  });
 }

@@ -11,6 +11,7 @@ import {
   type BtgBrokerageNote,
 } from './btgBrokerageNoteParser';
 import { brokerageNotesToLedgerLines } from './btgBrokerageNoteLedgerTranslator';
+import { suppressBrokerageNoteCashLines } from './btgBrokerageNoteLedgerTranslator';
 import { normalizeBtgExtractPdfText } from './btgExtractPdfText';
 import { pdfBufferToLines, pdfBufferToText } from './btgPdfTextExtract';
 import { LedgerImportService } from './LedgerImportService';
@@ -528,12 +529,13 @@ export async function previewBtgExtractUpload(
 
 /** Linhas do extrato prontas para import (mesma lógica do apply). */
 export async function parseExtractUploadImportLines(
-  file: BtgUploadFileInput
+  file: BtgUploadFileInput,
+  options?: import('./BtgExtractLineParser').BtgExtractParseOptions
 ): Promise<LedgerImportLine[]> {
   const { raw, format } = await rawTextFromExtractUpload(file);
   const lines = normalizeExtractLines(raw, format);
   const openingBalance = extractOpeningBalance(lines) ?? DEFAULT_OPENING_BALANCE;
-  const rawEntries = btgLinesToImportEntries(lines, openingBalance);
+  const rawEntries = btgLinesToImportEntries(lines, openingBalance, undefined, options);
   return assignExtractRefs(
     rawEntries.map((e) => ({
       ...e,
@@ -545,7 +547,8 @@ export async function parseExtractUploadImportLines(
 export async function applyBtgExtractUpload(
   ctx: UserContext,
   ledger: LedgerImportService,
-  file: BtgUploadFileInput
+  file: BtgUploadFileInput,
+  options?: { parseOptions?: import('./BtgExtractLineParser').BtgExtractParseOptions }
 ): Promise<BtgExtractFileResult> {
   const previewResult = await previewBtgExtractUpload(file);
   if (!previewResult.parseOk || !previewResult.preview) {
@@ -557,7 +560,7 @@ export async function applyBtgExtractUpload(
   }
 
   try {
-    const entries = await parseExtractUploadImportLines(file);
+    const entries = await parseExtractUploadImportLines(file, options?.parseOptions);
 
     const result = await ledger.importEntriesOnly(ctx, entries, {
       sourceLabel: `Extrato BTG upload ${previewResult.preview.firstDate ?? ''}->${previewResult.preview.lastDate ?? ''}`,
@@ -647,7 +650,8 @@ export async function previewBtgBrokerageUpload(
 export async function applyBtgBrokerageUpload(
   ctx: UserContext,
   ledger: LedgerImportService,
-  files: BtgUploadFileInput[]
+  files: BtgUploadFileInput[],
+  options?: { cashFromExtractOnly?: boolean }
 ): Promise<{
   fileResults: BtgBrokerageFileResult[];
   totals: BtgImportApplyResult;
@@ -700,7 +704,10 @@ export async function applyBtgBrokerageUpload(
         });
         continue;
       }
-      const entries = brokerageNotesToLedgerLines(kept);
+      let entries = brokerageNotesToLedgerLines(kept);
+      if (options?.cashFromExtractOnly) {
+        entries = suppressBrokerageNoteCashLines(entries);
+      }
       const result = await ledger.importEntriesOnly(ctx, entries, {
         sourceLabel: `Nota BTG ${fileName}`,
       });
