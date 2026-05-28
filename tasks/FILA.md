@@ -24,3 +24,17 @@ Criterio de aceite, arquivos, banco remoto, etc.
 
 ---
 
+## W3-02
+
+prioridade: 80
+status: pending
+agente: 
+spec: tasks/wave-3/02.md
+assumida: 
+concluida: 
+release: 
+
+titulo: INVEST: recalcular resultados por ação desde 2026
+
+INVEST: recalcular resultados por ação desde 2026
+
