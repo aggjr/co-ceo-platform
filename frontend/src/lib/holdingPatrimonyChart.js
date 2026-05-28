@@ -163,6 +163,7 @@ export function renderHoldingPatrimonySummary(
             · Carteira (índice): ${formatPct(cdiComparison.portfolioPeriodReturn)}
             · vs CDI: <strong class="${cdiComparison.excessReturn >= 0 ? 'is-positive' : 'is-negative'}">${cdiComparison.excessReturn >= 0 ? '+' : ''}${formatPct(cdiComparison.excessReturn)}</strong>
           </span>`
+        : '';
     return `
     <div class="holding-summary">
       <div class="holding-summary-main">
