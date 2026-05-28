@@ -260,10 +260,14 @@ function ensureCleanForPublish() {
     .split('\n')
     .filter(Boolean)
     .every((line) => {
-      // git porcelain is typically: XY<space>path. Some environments may strip
-      // one of the status columns when printing/copying; be defensive here.
-      const m = line.match(/^[ MADRCU?!]{2}\s+(.*)$/);
-      const file = (m ? m[1] : line.slice(3)).trim();
+      // git porcelain is typically: "XY path". Be robust across environments
+      // that may render variable spacing or collapse the 2nd status column.
+      const trimmed = String(line || '').trim();
+      const parts = trimmed.split(/\s+/);
+      parts.shift(); // status
+      let file = parts.join(' ').trim();
+      if (!file) file = trimmed.slice(3).trim();
+      if (file.includes('->')) file = file.split('->').pop().trim();
       return QUEUE_FILES.includes(file);
     });
   if (!onlyQueue) {
