@@ -260,9 +260,10 @@ function ensureCleanForPublish() {
     .split('\n')
     .filter(Boolean)
     .every((line) => {
+      const trimmed = String(line || '').trim();
+      if (trimmed.startsWith('??')) return true;
       // git porcelain is typically: "XY path". Be robust across environments
       // that may render variable spacing or collapse the 2nd status column.
-      const trimmed = String(line || '').trim();
       const parts = trimmed.split(/\s+/);
       parts.shift(); // status
       let file = parts.join(' ').trim();
