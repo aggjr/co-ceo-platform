@@ -93,7 +93,7 @@ export class RemoteRecalcController {
           await this.gateway.update(
             { userId: SYSTEM_INSTALLER_USER_ID, organizationId: orgId, impersonatorId: null, scope: 'global' },
             'invest_position_ext',
-            extRows[0].id,
+            asset.assetId,
             { pm_estrito: pmA, pm_b3: pmB, pm_gerencial: pmC }
           );
           updatedCount++;
