@@ -53,8 +53,8 @@ const MONTHS: Array<{
   {
     month: '2026-05',
     extractFile: 'Mai_2026.pdf',
-    notesDir: '004176105_20260421_20260520',
-    label: 'Mai/2026 (notas ~até 20/05)',
+    notesDir: '004176105_20260426_20260525',
+    label: 'Mai/2026',
   },
 ];
 

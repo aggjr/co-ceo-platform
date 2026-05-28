@@ -281,6 +281,11 @@ const IS_GENERIC_CUSTODY_RE = /(?:^|\s)(TAXA\s+DE\s+CUST|CUST[ÓO]DIA|REEMBOLSO\
 const BTC_PRIO3_DESC_RE = /BTC\s*PRIO3|CORRETAGEM\s*BTC|IR\s*-\s*BTC|TAXA.+BTC\s*PRIO3|REMUNERA[ÇC][ÃA]O.+BTC\s*PRIO3/i;
 const NEG_PENALTY_RE = /JUROS\s+SOBRE\s+SALDO\s+NEGATIVO|IOF\s+SOBRE\s+SALDO\s+NEGATIVO/i;
 
+export type BtgExtractParseOptions = {
+  /** Inclui LIQ BOLSA como caixa (importação mensal com notas só em patrimônio). */
+  includeLiqBolsa?: boolean;
+};
+
 export interface BtgExtractResolvers {
   /**
    * Retorna o ticker da opcao vendida (ou ativo principal) no dia util anterior, 
@@ -298,7 +303,8 @@ export interface BtgExtractResolvers {
 export function btgLinesToImportEntries(
   lines: string[],
   openingBalance?: number,
-  resolvers?: BtgExtractResolvers
+  resolvers?: BtgExtractResolvers,
+  options?: BtgExtractParseOptions
 ): BtgExtractEntry[] {
   const out: BtgExtractEntry[] = [];
   let prev = openingBalance ?? null;
@@ -326,12 +332,31 @@ export function btgLinesToImportEntries(
     prev = parsed.balance;
 
     const map = classifyBtgDescription(parsed.description);
+    const upperDesc = parsed.description.toUpperCase();
+    if (
+      (map.skip || map.operation === 'skip') &&
+      options?.includeLiqBolsa &&
+      upperDesc.includes('LIQ BOLSA')
+    ) {
+      const liqNet = Math.round(parsed.signedCash * 100) / 100;
+      out.push({
+        date: parsed.date,
+        ticker: CASH_TICKER,
+        operation: liqNet >= 0 ? 'capital_deposit' : 'capital_withdrawal',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: liqNet,
+        asset_type: 'cash',
+        notes: parsed.description,
+        extract_category: 3,
+      });
+      continue;
+    }
     if (map.skip || map.operation === 'skip') continue;
 
     const sign = getBtgOperationSign(map.operation, parsed.description);
     const net = sign * Math.abs(parsed.movementAmount);
     const ym = ymOf(parsed.date);
-    const upperDesc = parsed.description.toUpperCase();
 
     // Caso 1A — operacao TD spot (compra/venda): registra no buffer mensal.
     if (
