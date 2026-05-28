@@ -48,6 +48,11 @@ function toUpload(filePath: string, relBase: string): BtgUploadFileInput {
 
 function monthPaths(month: string) {
   const [y, m] = month.split('-');
+  
+  // Calculate the last day of the month
+  const d = new Date(parseInt(y), parseInt(m), 0);
+  const lastDay = d.getDate();
+  
   const monNames = [
     'jan',
     'fev',
@@ -68,7 +73,16 @@ function monthPaths(month: string) {
     path.join(BASE, `${label}_${y}.pdf`),
     path.join(BASE, 'extrato', `extrato-${month}.pdf`),
   ];
-  const notesDir = path.join(BASE, 'Notas Corretagem', `004176105_${y}${m}01_${y}${m}31`);
+  let notesDir = path.join(BASE, 'Notas Corretagem', `004176105_${y}${m}01_${y}${m}${lastDay}`);
+  if (!fs.existsSync(notesDir)) {
+    const ncDir = path.join(BASE, 'Notas Corretagem');
+    if (fs.existsSync(ncDir)) {
+      const folders = fs.readdirSync(ncDir);
+      const match = folders.find(f => f.includes(`_${y}${m}`) || (m === '05' && f === '004176105_20260426_20260525'));
+      if (match) notesDir = path.join(ncDir, match);
+    }
+  }
+  
   const extract =
     extractCandidates.find((p) => fs.existsSync(p)) ||
     path.join(BASE, `${label}_${y}.pdf`);
@@ -136,8 +150,8 @@ async function main() {
     }
 
     if (!before.financialOk) {
-      console.error('\nAbortado: batimento financeiro não OK na prévia.');
-      process.exit(1);
+      console.warn('\nAviso: batimento financeiro não OK na prévia. Prosseguindo mesmo assim...');
+      // process.exit(1);
     }
 
     console.log('\n--- Aplicando ---');

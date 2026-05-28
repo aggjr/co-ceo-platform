@@ -213,12 +213,8 @@ export class InvestController {
       );
     }
 
-    const threeByUnderlying = optionsOnly
-      ? new Map<string, { strict: number; b3: number; managerial: number }>()
-      : buildThreeAvgPricesByUnderlying(ledgerEvents);
-    const engineSnapshots = optionsOnly
-      ? new Map()
-      : computeThreePricesByUnderlying(ledgerEvents);
+    const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
+    const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents);
     const ledgerStrikeByTicker = buildOptionStrikeMapFromLedgerEvents(ledgerEvents);
     const marketCatalog = await loadOptionMarketCatalog(
       this.gateway,

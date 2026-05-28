@@ -522,7 +522,7 @@ export function buildInvestOptionsColumns() {
     },
     {
       key: 'premiumReceived',
-      label: 'Prêmio total',
+      label: 'PRÊMIO TOTAL',
       type: 'currency',
       align: 'right',
       width: '112px',
@@ -557,7 +557,7 @@ export function buildInvestOptionsColumns() {
     },
     {
       key: 'underlyingPmStrict',
-      label: 'PM estrito ação',
+      label: 'PREÇO ESTRITO',
       type: 'currency',
       align: 'right',
       width: '112px',
