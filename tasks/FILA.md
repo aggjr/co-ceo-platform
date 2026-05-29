@@ -26,13 +26,19 @@ Criterio de aceite, arquivos, banco remoto, etc.
 
 ## CONC-00
 
+prioridade: 0
+status: claimed
+agente: antigravity-gamer
+spec: 
+assumida: 2026-05-29T22:59:21.958Z
+concluida: 
+release: 
+
+titulo: prioridade: 90
+
 prioridade: 90
 status: pending
-agente:
 spec: tasks/wave-conciliacao/00-patrimony-daily-rebuild.md
-assumida:
-concluida:
-release:
 
 titulo: Rebuild patrimônio diário + gráfico Resultado histórico
 
@@ -41,113 +47,40 @@ Doc: docs/architecture/invest_conciliacao.md. Bloqueia correção do gráfico ap
 
 ---
 
-## CONC-10
-
-prioridade: 88
-status: pending
-agente:
-spec: tasks/wave-conciliacao/10-reconciliation-session-schema.md
-assumida:
-concluida:
-release:
-
-titulo: Schema sessão de conciliação (MySQL + store)
-
-Doc: docs/architecture/invest_reconciliacao_sessao.md. Paralelo com CONC-00/11.
-
----
-
-## CONC-11
-
-prioridade: 88
-status: pending
-agente:
-spec: tasks/wave-conciliacao/11-reconciliation-audit-sweep.md
-assumida:
-concluida:
-release:
-
-titulo: Varredura completa ReconciliationAuditService
-
-17 dimensões; issues viram pendingDecisions (sem auto-fix). Gate antes de fechar dia.
-
----
-
-## CONC-12
-
-prioridade: 92
-status: pending
-agente:
-spec: tasks/wave-conciliacao/12-reconciliation-session-service.md
-assumida:
-concluida:
-release:
-
-titulo: Sessão conciliação — API dia a dia + materialize
-
-resolve/close estrito; decisão humana obrigatória (§J). Depende CONC-00,10,11.
-
----
-
-## CONC-13
-
-prioridade: 90
-status: pending
-agente:
-spec: tasks/wave-conciliacao/13-reconciliation-wizard-ui.md
-assumida:
-concluida:
-release:
-
-titulo: UI wizard conciliação (pasta notas, dia a dia)
-
-Painel Pendências do dia + ações explícitas. Depende CONC-12.
-
----
-
-## CONC-14
-
-prioridade: 82
-status: pending
-agente:
-spec: tasks/wave-conciliacao/14-reconciliation-cash-phase.md
-assumida:
-concluida:
-release:
-
-titulo: Fase extrato na sessão (após notas 100%)
-
-Bloqueado até notes_complete. Depende CONC-13.
-
----
-
-## CONC-15
-
-prioridade: 70
-status: pending
-agente:
-spec: tasks/wave-conciliacao/05-catalog-deploy.md
-assumida:
-concluida:
-release:
-
-titulo: Menu e catálogo UI conciliação + deploy
-
-Item único Conciliação no menu. Depende CONC-13.
-
 ---
 
 ## CONC-01
 
 prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
 status: cancelled
-agente:
 spec: tasks/wave-conciliacao/01-reconcile-cash-api.md
 titulo: (cancelada — absorvida por CONC-12/14)
 
 ---
 
+---
+
 ## CONC-02
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 0
 
 prioridade: 0
 status: cancelled
@@ -156,7 +89,19 @@ titulo: (cancelada — absorvida por CONC-13/14)
 
 ---
 
+---
+
 ## CONC-03
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 0
 
 prioridade: 0
 status: cancelled
@@ -165,7 +110,19 @@ titulo: (cancelada — absorvida por CONC-12/13)
 
 ---
 
+---
+
 ## CONC-04
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 0
 
 prioridade: 0
 status: cancelled
@@ -174,7 +131,163 @@ titulo: (cancelada — absorvida por CONC-13)
 
 ---
 
+---
+
+## CONC-10
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 88
+
+prioridade: 88
+status: pending
+spec: tasks/wave-conciliacao/10-reconciliation-session-schema.md
+
+titulo: Schema sessão de conciliação (MySQL + store)
+
+Doc: docs/architecture/invest_reconciliacao_sessao.md. Paralelo com CONC-00/11.
+
+---
+
+---
+
+## CONC-11
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 88
+
+prioridade: 88
+status: pending
+spec: tasks/wave-conciliacao/11-reconciliation-audit-sweep.md
+
+titulo: Varredura completa ReconciliationAuditService
+
+17 dimensões; issues viram pendingDecisions (sem auto-fix). Gate antes de fechar dia.
+
+---
+
+---
+
+## CONC-12
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 92
+
+prioridade: 92
+status: pending
+spec: tasks/wave-conciliacao/12-reconciliation-session-service.md
+
+titulo: Sessão conciliação — API dia a dia + materialize
+
+resolve/close estrito; decisão humana obrigatória (§J). Depende CONC-00,10,11.
+
+---
+
+---
+
+## CONC-13
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 90
+
+prioridade: 90
+status: pending
+spec: tasks/wave-conciliacao/13-reconciliation-wizard-ui.md
+
+titulo: UI wizard conciliação (pasta notas, dia a dia)
+
+Painel Pendências do dia + ações explícitas. Depende CONC-12.
+
+---
+
+---
+
+## CONC-14
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 82
+
+prioridade: 82
+status: pending
+spec: tasks/wave-conciliacao/14-reconciliation-cash-phase.md
+
+titulo: Fase extrato na sessão (após notas 100%)
+
+Bloqueado até notes_complete. Depende CONC-13.
+
+---
+
+---
+
+## CONC-15
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 70
+
+prioridade: 70
+status: pending
+spec: tasks/wave-conciliacao/05-catalog-deploy.md
+
+titulo: Menu e catálogo UI conciliação + deploy
+
+Item único Conciliação no menu. Depende CONC-13.
+
+---
+
+---
+
 ## W3-02
+
+prioridade: 0
+status: pending
+agente: 
+spec: 
+assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 80
 
 prioridade: 80
 status: done
