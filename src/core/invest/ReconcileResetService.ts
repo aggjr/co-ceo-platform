@@ -41,7 +41,7 @@ export class ReconcileResetService {
       // ── Etapa 1: Identificar IDs de opening_balance a preservar ────────────
       const [openingPatrimonyRows] = await conn.query<any[]>(
         `SELECT id FROM patrimony_ledger_entries
-         WHERE organization_id = ? AND transaction_type = 'opening_balance'`,
+         WHERE organization_id = ? AND movement_type = 'opening_balance'`,
         [orgId]
       );
       const preservedPatrimonyIds = openingPatrimonyRows.map((r: any) => r.id);
