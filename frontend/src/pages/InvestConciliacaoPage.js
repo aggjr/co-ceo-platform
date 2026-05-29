@@ -79,17 +79,20 @@ function renderExtractResult(data) {
       <td>${escapeHtml(r.month || '—')}</td>
       <td>${statusBadge(r.parseOk)}</td>
       <td>${statusBadge(r.importOk)}</td>
-      <td class="recon-detail">${escapeHtml(r.parseError || r.importError || (r.monthAlreadyImported ? 'Já importado' : ''))}</td>
+      <td class="recon-detail">${escapeHtml(r.parseError || r.importBlockReason || r.importError || (r.monthAlreadyImported ? 'Já importado' : ''))}</td>
     </tr>
   `).join('');
   const total = data.totals
     ? `<p class="recon-totals">Gravados: ${data.totals.inserted ?? 0} | Pulados: ${data.totals.skipped ?? 0}</p>`
     : '';
+  const blocked = data.blockedMessage
+    ? `<div class="invest-conciliacao__blocked" style="margin-top: 0.5rem">🛑 ${escapeHtml(data.blockedMessage)}</div>`
+    : '';
   return `
     <table class="recon-table">
       <thead><tr><th>Arquivo</th><th>Mês</th><th>Leitura</th><th>Importação</th><th>Detalhe</th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>${total}
+    </table>${total}${blocked}
   `;
 }
 
