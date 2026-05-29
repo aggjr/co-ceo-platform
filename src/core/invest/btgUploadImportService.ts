@@ -383,6 +383,10 @@ export async function applyBtgExtractBatchUpload(
   fileResults: BtgExtractFileResult[];
   chainOk: boolean;
   totals: BtgImportApplyResult;
+  blockedMessage?: string;
+}> {
+  const preview = await previewBtgExtractBatchUpload(ctx, ledger, files);
+
   const today = new Date().toISOString().slice(0, 10);
   let ledgerEvents = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
   const sorted = sortParsedExtracts(
