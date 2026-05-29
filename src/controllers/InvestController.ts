@@ -81,6 +81,7 @@ import {
 } from '../core/invest/portfolioMapper';
 import {
   buildThreeAvgPricesByUnderlying,
+  resolveEquityThreePricesForPortfolioRow,
   resolveThreePricesForAsset,
 } from '../core/invest/portfolioThreePrices';
 import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
@@ -223,12 +224,8 @@ export class InvestController {
       );
     }
 
-    const threeByUnderlying = optionsOnly
-      ? new Map<string, { strict: number; b3: number; managerial: number }>()
-      : buildThreeAvgPricesByUnderlying(ledgerEvents);
-    const engineSnapshots = optionsOnly
-      ? new Map()
-      : computeThreePricesByUnderlying(ledgerEvents);
+    const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
+    const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents);
     const ledgerStrikeByTicker = buildOptionStrikeMapFromLedgerEvents(ledgerEvents);
     const marketCatalog = await loadOptionMarketCatalog(
       this.gateway,
@@ -330,18 +327,33 @@ export class InvestController {
               }
             })()
           : (filtered.metadata as { underlying_ticker?: string }) || {};
-      const three = resolveThreePricesForAsset(
-        String(filtered.asset_ticker ?? ''),
-        String(filtered.asset_type ?? ''),
-        meta.underlying_ticker,
-        threeByUnderlying,
-        Number(filtered.managerial_avg_price ?? 0)
-      );
+      const assetTypeForPm = String(filtered.asset_type ?? '');
+      const three =
+        assetTypeForPm === 'stock' || assetTypeForPm === 'fii'
+          ? resolveEquityThreePricesForPortfolioRow(
+              filtered,
+              threeByUnderlying,
+              engineSnapshots
+            )
+          : resolveThreePricesForAsset(
+              String(filtered.asset_ticker ?? ''),
+              assetTypeForPm,
+              meta.underlying_ticker,
+              threeByUnderlying,
+              Number(filtered.managerial_avg_price ?? 0)
+            );
       const ticker = String(filtered.asset_ticker ?? '').toUpperCase();
       const mq = marketQuoteMap.get(ticker);
       const marketQuote = mq
         ? { price: mq.price, asOf: mq.date }
         : null;
+
+      if ((assetTypeForPm === 'stock' || assetTypeForPm === 'fii') && three.strict <= 0 && marketQuote && marketQuote.price > 0) {
+        three.strict = marketQuote.price;
+        three.b3 = marketQuote.price;
+        three.managerial = marketQuote.price;
+      }
+
       const item = enrichPortfolioRow(filtered, three, strikeHints, marketQuote);
       const assetType = String(item.assetType ?? '');
       if (
@@ -885,7 +897,9 @@ export class InvestController {
     const toRaw = String(req.query.to || bounds.today).slice(0, 10);
     const to = toRaw > bounds.today ? bounds.today : toRaw;
 
-    const events = await this.ledger.listLedgerEvents(ctx, from, to);
+    // Reconstrói custódia desde periodMin para evitar "lote nascendo" no meio do período.
+    // O engine usa `from..to` apenas para colunas do período.
+    const events = await this.ledger.listLedgerEvents(ctx, bounds.periodMin, to);
     let pivot = buildStockUnderlyingPivot(events, from, to);
 
     const underlyings = [

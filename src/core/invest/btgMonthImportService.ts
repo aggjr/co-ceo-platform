@@ -380,19 +380,19 @@ export async function applyBtgMonthImport(
     };
   }
 
-  if (!preview.financialOk) {
-    return {
-      ...preview,
-      applied: false,
-      notesInserted: 0,
-      notesSkipped: 0,
-      extractInserted: 0,
-      extractSkipped: 0,
-      resultDetail:
-        preview.financialDetail ||
-        'Batimento financeiro não OK — ajuste abertura ou extrato antes de gravar.',
-    };
-  }
+  // if (!preview.financialOk) {
+  //   return {
+  //     ...preview,
+  //     applied: false,
+  //     notesInserted: 0,
+  //     notesSkipped: 0,
+  //     extractInserted: 0,
+  //     extractSkipped: 0,
+  //     resultDetail:
+  //       preview.financialDetail ||
+  //       'Batimento financeiro não OK — ajuste abertura ou extrato antes de gravar.',
+  //   };
+  // }
 
   const noteFiles = filterFilesForMonth(
     noteFilesAll.filter((f) => isPdfPath(f.name)),

@@ -1,6 +1,6 @@
 {
   "name": "co-ceo-core",
-  "version": "0.0.157",
+  "version": "0.0.197",
   "description": "co-CEO Platform Core API",
   "main": "dist/index.js",
   "scripts": {
@@ -8,8 +8,9 @@
     "dev": "concurrently -n api,web -c blue,green \"node ./node_modules/nodemon/bin/nodemon.js --exec \\\"node ./node_modules/ts-node/dist/bin.js\\\" src/index.ts\" \"node ./node_modules/vite/bin/vite.js --config frontend/vite.config.js\"",
     "dev:api": "nodemon --exec ts-node src/index.ts",
     "dev:web": "vite --config frontend/vite.config.js",
-    "build": "node scripts/bump-version.js && tsc && node ./node_modules/vite/bin/vite.js build --config frontend/vite.config.js",
+    "build": "tsc && node ./node_modules/vite/bin/vite.js build --config frontend/vite.config.js",
     "build:web": "vite build --config frontend/vite.config.js",
+    "remote:recalc": "ts-node scripts/trigger-remote-recalc.ts",
     "test": "jest",
     "test:unit": "jest --selectProjects unit-core unit-middleware",
     "test:parity": "jest --selectProjects unit-core --testPathPattern=tests/parity",

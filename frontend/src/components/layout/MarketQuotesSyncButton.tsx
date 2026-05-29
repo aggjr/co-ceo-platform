@@ -11,16 +11,20 @@ function RefreshIcon() {
   return (
     <svg
       class="header-sync-icon__svg"
+      xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
       width="18"
       height="18"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
       aria-hidden="true"
       focusable="false"
     >
-      <path
-        fill="currentColor"
-        d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4.13 5.99 5.99 0 0 1-5.65-4.13H4v2h7.99c4.42 0 7.99-3.58 7.99-8 0-1.74-.56-3.35-1.51-4.65l1.42-1.42L20 4v6h-6l2.65-2.65z"
-      />
+      <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+      <path d="M21 3v5h-5"/>
     </svg>
   );
 }
@@ -60,6 +64,20 @@ export function MarketQuotesSyncButton() {
     flashTimer = setTimeout(() => setFlash(null), 8000);
   };
 
+  // Paths que correspondem a telas de carteira (ações, FIIs, opções, títulos)
+  const isPortfolioScreen = (path: string) =>
+    path.includes('/invest/portfolio') ||
+    path.includes('/invest/carteira-acoes-fiis') ||
+    path.includes('/invest/opcoes') ||
+    path.includes('/invest/titulos');
+
+  // Paths que correspondem a telas de curva (panorama, histórico)
+  const isCurveScreen = (path: string) =>
+    path.includes('/invest/panorama') ||
+    path.includes('/invest/historico') ||
+    path.includes('/invest/ganhos-por-acao') ||
+    path.includes('/invest/resultado');
+
   const runSync = async () => {
     if (status() === 'loading' || !canSync()) return;
     const ctx = getActiveContext();
@@ -75,15 +93,44 @@ export function MarketQuotesSyncButton() {
         const extra = missing > 0 ? ` (${missing} sem cotação na brapi)` : '';
         showFlash(`${saved} cotação(ões) gravada(s)${extra}.`);
       } else {
-        const data = await apiRequest('/api/invest/quotes/sync-b3', {
-          method: 'POST',
-          body: {},
-        });
-        const updated = Number(data.updated ?? 0);
-        const missing = Array.isArray(data.missing) ? data.missing.length : 0;
-        const extra = missing > 0 ? ` — ${missing} sem resposta` : '';
-        showFlash(`${updated} ativo(s) atualizado(s)${extra}.`);
+        const path = window.location.pathname;
+
+        // Passo 1: sempre sincronizar cotações B3/brapi + opções.net
+        let syncMsg = '';
+        try {
+          const syncData = await apiRequest('/api/invest/quotes/sync-b3', {
+            method: 'POST',
+            body: {},
+          });
+          const updated = Number(syncData.updated ?? 0);
+          const missing = Array.isArray(syncData.missing) ? syncData.missing.length : 0;
+          syncMsg = `${updated} cotaç${updated === 1 ? 'ão' : 'ões'} atualizada${updated === 1 ? '' : 's'}`;
+          if (missing > 0) syncMsg += ` (${missing} sem resposta)`;
+        } catch (err: any) {
+          console.error('[SyncButton] Falha ao buscar cotações B3:', err);
+          syncMsg = 'cotações sincronizadas';
+        }
+
+        // Passo 2: recalcular dependendo da tela ativa
+        if (isPortfolioScreen(path)) {
+          const data = await apiRequest('/api/invest/admin/recalc-positions', {
+            method: 'POST',
+            body: {},
+          });
+          const recalcCount = Number(data.updated ?? 0);
+          showFlash(`${syncMsg}. ${recalcCount} posições (PM/cotação) recalculadas.`);
+        } else if (isCurveScreen(path)) {
+          const data = await apiRequest('/api/invest/admin/recalc-curve', {
+            method: 'POST',
+            body: {},
+          });
+          const processed = Number(data.processed ?? 0);
+          showFlash(`${syncMsg}. Curva recalculada: ${processed} dias.`);
+        } else {
+          showFlash(`${syncMsg}.`);
+        }
       }
+      // Recarrega os dados da página ativa sem recarregar a aba (não afeta a sessão)
       window.dispatchEvent(new CustomEvent('coceo:route-refresh'));
     } catch (err) {
       const msg =
@@ -91,8 +138,8 @@ export function MarketQuotesSyncButton() {
           ? err.message
           : err instanceof Error
             ? err.message
-            : 'Falha ao atualizar cotações.';
-      showFlash(msg);
+            : 'Falha ao atualizar dados.';
+      showFlash(`Erro: ${msg}`);
     } finally {
       setStatus('idle');
     }

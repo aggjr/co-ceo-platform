@@ -164,13 +164,6 @@ export function renderHoldingPatrimonySummary(
             · vs CDI: <strong class="${cdiComparison.excessReturn >= 0 ? 'is-positive' : 'is-negative'}">${cdiComparison.excessReturn >= 0 ? '+' : ''}${formatPct(cdiComparison.excessReturn)}</strong>
           </span>`
         : '';
-    const stockLine =
-      stockBenchmark?.available && stockBenchmark.periodReturn != null
-        ? `<span class="muted" style="font-size:12px;display:block;margin-top:2px">
-            ${stockBenchmark.ticker} buy &amp; hold: <strong>${formatPct(stockBenchmark.periodReturn)}</strong>
-            <span class="muted"> (${stockBenchmark.observationDays} pregões)</span>
-          </span>`
-        : '';
     return `
     <div class="holding-summary">
       <div class="holding-summary-main">
@@ -179,26 +172,11 @@ export function renderHoldingPatrimonySummary(
         <span class="holding-summary-change ${positive ? 'is-positive' : 'is-negative'}">
           Ganho ${positive ? '+' : ''}${formatBrl(gain)} · rentab. ${formatPct(twr)} (TWR)
         </span>
-        <span class="muted" style="font-size:12px;display:block;margin-top:4px">
-          TWR diário (TEDs descontados) — ${flowsNote}. Proventos e operações entram no rendimento.
-        </span>
-        ${
-          performance.periodReturnTwrDaily != null &&
-          Math.abs(performance.periodReturnTwrDaily - twr) > 0.005
-            ? `<span class="muted" style="font-size:11px;display:block;margin-top:2px">
-                TWR série diária (diagnóstico): ${formatPct(performance.periodReturnTwrDaily)}
-              </span>`
-            : ''
-        }
-        ${anchorLine}
-        ${cdiLine}
-        ${stockLine}
         ${btgLine}
       </div>
       <div class="holding-summary-side muted">
         <span>${formatDateBr(first.date)} → ${formatDateBr(last.date)}</span>
         <span>${series.length} dias</span>
-        ${renderCashTransitBlock(cashInTransit)}
       </div>
     </div>
   `;

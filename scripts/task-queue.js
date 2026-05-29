@@ -260,7 +260,15 @@ function ensureCleanForPublish() {
     .split('\n')
     .filter(Boolean)
     .every((line) => {
-      const file = line.slice(3).trim();
+      const trimmed = String(line || '').trim();
+      if (trimmed.startsWith('??')) return true;
+      // git porcelain is typically: "XY path". Be robust across environments
+      // that may render variable spacing or collapse the 2nd status column.
+      const parts = trimmed.split(/\s+/);
+      parts.shift(); // status
+      let file = parts.join(' ').trim();
+      if (!file) file = trimmed.slice(3).trim();
+      if (file.includes('->')) file = file.split('->').pop().trim();
       return QUEUE_FILES.includes(file);
     });
   if (!onlyQueue) {

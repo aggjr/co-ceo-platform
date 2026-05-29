@@ -7,7 +7,8 @@ import { dataGateway } from '../config/gateway';
 export class AuthController {
   static async login(req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
+      const email = String(req.body?.email ?? '').trim().toLowerCase();
+      const password = String(req.body?.password ?? '');
       if (!email || !password) {
         return res.status(400).json({ success: false, error: 'E-mail e senha obrigatórios.' });
       }

@@ -35,7 +35,8 @@ if (-not (git status --porcelain)) {
   Write-Host "Nada a commitar (working tree limpa)." -ForegroundColor Yellow
 } else {
   Write-Host "=== 2/4 Commit em $machine ===" -ForegroundColor Cyan
-  git add -A
+  # Apenas arquivos rastreados — evita subir scripts de diagnostico locais (??).
+  git add -u
   git commit -m $Message
   if ($LASTEXITCODE -ne 0) {
     Write-Error "Falha no commit"

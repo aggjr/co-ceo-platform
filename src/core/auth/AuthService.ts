@@ -71,6 +71,9 @@ export class AuthService {
     if (!user) {
       throw Object.assign(new Error('Credenciais inválidas.'), { httpStatus: 401 });
     }
+    if (!user.is_active) {
+      throw Object.assign(new Error('Usuário desativado. Contate o administrador.'), { httpStatus: 403 });
+    }
     const valid = await PasswordService.verify(password, user.password_hash);
     if (!valid) {
       throw Object.assign(new Error('Credenciais inválidas.'), { httpStatus: 401 });

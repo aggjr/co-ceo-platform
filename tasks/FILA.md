@@ -174,3 +174,17 @@ titulo: (cancelada — absorvida por CONC-13)
 
 ---
 
+## W3-02
+
+prioridade: 80
+status: done
+agente: antigravity-gamer
+spec: tasks/wave-3/02.md
+assumida: 2026-05-28T02:46:53.398Z
+concluida: 2026-05-28T12:32:01.022Z
+release: V0.0.165
+
+titulo: INVEST: recalcular resultados por ação desde 2026
+
+INVEST: recalcular resultados por ação desde 2026
+

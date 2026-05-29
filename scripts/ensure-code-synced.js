@@ -79,9 +79,14 @@ function main() {
   }
 
   const porcelain = runQuiet('git status --porcelain');
-  if (porcelain) {
+  const dirtyTracked = porcelain
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .filter((l) => !l.startsWith('??'));
+  if (dirtyTracked.length) {
     console.error('[git:ensure-sync] Working tree suja. Commit ou descarte mudancas antes de puxar main.');
-    console.error(porcelain.split('\n').slice(0, 15).join('\n'));
+    console.error(dirtyTracked.slice(0, 15).join('\n'));
     process.exit(1);
   }
 

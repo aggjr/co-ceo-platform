@@ -1,0 +1,422 @@
+[
+  {
+    "identifier": "PRIOE745",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "PRION415",
+    "initialQuantity": 5000
+  },
+  {
+    "identifier": "PRIOF800",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRIOM385",
+    "initialQuantity": 2500
+  },
+  {
+    "identifier": "PRIOQ625",
+    "initialQuantity": 800
+  },
+  {
+    "identifier": "PRIOE725",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "WEGER417",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRION470",
+    "initialQuantity": 5000
+  },
+  {
+    "identifier": "PRIOE740",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "PRIOO497",
+    "initialQuantity": 1000
+  },
+  {
+    "identifier": "BBASQ215",
+    "initialQuantity": 1200
+  },
+  {
+    "identifier": "ITUBR424",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRIOO490",
+    "initialQuantity": 4000
+  },
+  {
+    "identifier": "PRION45",
+    "initialQuantity": 5000
+  },
+  {
+    "identifier": "WEGEF476",
+    "initialQuantity": 1000
+  },
+  {
+    "identifier": "PRIOR580",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRIOF750",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOR407",
+    "initialQuantity": 6500
+  },
+  {
+    "identifier": "PRIOQ630",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRIOO520",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "BBASQ210",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRIOD600",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOF820",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOQ640",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOE735",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRIOO540",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "PRIOP640",
+    "initialQuantity": 3000
+  },
+  {
+    "identifier": "PRIOF775",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "WEGEQ480",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "PRIOE710",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRIOE720",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "ITUBQ1",
+    "initialQuantity": 600
+  },
+  {
+    "identifier": "ITUBF422",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "PRION410",
+    "initialQuantity": 5000
+  },
+  {
+    "identifier": "PRIOP470",
+    "initialQuantity": 5100
+  },
+  {
+    "identifier": "PRIOP555",
+    "initialQuantity": 1000
+  },
+  {
+    "identifier": "PRIOR560",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "PRIOO500",
+    "initialQuantity": 9000
+  },
+  {
+    "identifier": "PRIOQ570",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "PRIOM405",
+    "initialQuantity": 5000
+  },
+  {
+    "identifier": "PRIOF760",
+    "initialQuantity": 1200
+  },
+  {
+    "identifier": "LFT-20310301",
+    "initialQuantity": 896220.12
+  },
+  {
+    "identifier": "ITUBQ413",
+    "initialQuantity": 1200
+  },
+  {
+    "identifier": "PRIOP650",
+    "initialQuantity": 4000
+  },
+  {
+    "identifier": "ITUBR431",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "ITUBQ434",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "BBASF231",
+    "initialQuantity": 1500
+  },
+  {
+    "identifier": "PRIOO472",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "ITUBR436",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "PRIOO550",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "ITUBQ42",
+    "initialQuantity": 1200
+  },
+  {
+    "identifier": "ITUBF435",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "BBASQ218",
+    "initialQuantity": 1400
+  },
+  {
+    "identifier": "BBASF229",
+    "initialQuantity": 600
+  },
+  {
+    "identifier": "PRIOO570",
+    "initialQuantity": 10000
+  },
+  {
+    "identifier": "PRION44",
+    "initialQuantity": 5000
+  },
+  {
+    "identifier": "BBASQ220",
+    "initialQuantity": 600
+  },
+  {
+    "identifier": "PRIOE755",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "BBASQ208",
+    "initialQuantity": 1000
+  },
+  {
+    "identifier": "PRIOQ610",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "PRIOF770",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "ITUBF445",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "ITUBQ445",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "WEGEQ465",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "PRIOO480",
+    "initialQuantity": 4000
+  },
+  {
+    "identifier": "PRIOQ605",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOF780",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "ITUBP436",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "BBASQ223",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "PRIOP660",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "PRION460",
+    "initialQuantity": 5000
+  },
+  {
+    "identifier": "PRIOA407",
+    "initialQuantity": 5400
+  },
+  {
+    "identifier": "PRIOP670",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "PRIOO530",
+    "initialQuantity": 1000
+  },
+  {
+    "identifier": "PRIOQ600",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "PRIOD635",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "WEGER435",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "PRIOQ615",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "ITUBP426",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "PRIOE730",
+    "initialQuantity": 1800
+  },
+  {
+    "identifier": "ITUBF432",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOR590",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOO510",
+    "initialQuantity": 5000
+  },
+  {
+    "identifier": "PRIOO470",
+    "initialQuantity": 2000
+  },
+  {
+    "identifier": "PRIOQ650",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "ITUBQ425",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOP620",
+    "initialQuantity": 1000
+  },
+  {
+    "identifier": "PRION462",
+    "initialQuantity": 10000
+  },
+  {
+    "identifier": "PRIOF785",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "PRIOQ565",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "BBASF224",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "PRIOR605",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "WEGEQ455",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRIOF740",
+    "initialQuantity": 600
+  },
+  {
+    "identifier": "BBASQ213",
+    "initialQuantity": 1600
+  },
+  {
+    "identifier": "PRIOF755",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOQ580",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "ITUBQ415",
+    "initialQuantity": 300
+  },
+  {
+    "identifier": "WEGER41",
+    "initialQuantity": 500
+  },
+  {
+    "identifier": "WEGER448",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "PRIOQ590",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "ITUBF437",
+    "initialQuantity": 900
+  },
+  {
+    "identifier": "PRIOE715",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "ITUBR416",
+    "initialQuantity": 700
+  },
+  {
+    "identifier": "WEGEQ447",
+    "initialQuantity": 500
+  }
+]
