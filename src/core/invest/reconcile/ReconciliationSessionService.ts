@@ -28,6 +28,7 @@ import {
   type ReconcileActivityStep,
 } from './reconcileActivity';
 import type { BtgBrokerageFileResult } from '../btgUploadImportService';
+import { DailyCloseMaterializeService } from './DailyCloseMaterializeService';
 
 export type ReconcileDataMode = 'recover' | 'reset_from_opening';
 
@@ -124,6 +125,7 @@ export class ReconciliationSessionService {
   private readonly patrimonyRecorder: PatrimonyDailyRecorder;
   private readonly patrimonyStore: PatrimonyDailyStore;
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
+  private readonly dailyClose: DailyCloseMaterializeService;
 
   private readonly holdingPurge: HoldingPurgeKeepOpeningService | null;
 
@@ -137,6 +139,7 @@ export class ReconciliationSessionService {
     this.patrimonyRecorder = new PatrimonyDailyRecorder(gateway);
     this.patrimonyStore = new PatrimonyDailyStore(gateway);
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
+    this.dailyClose = new DailyCloseMaterializeService(gateway);
     this.holdingPurge = pool ? new HoldingPurgeKeepOpeningService(gateway, pool) : null;
   }
 
@@ -553,20 +556,7 @@ export class ReconciliationSessionService {
   }
 
   private async materializeThroughDate(ctx: UserContext, throughDate: string) {
-    const today = new Date().toISOString().slice(0, 10);
-    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
-    const bounds = resolveInvestPeriodBounds(events);
-    const from = throughDate < bounds.periodMin ? bounds.periodMin : throughDate;
-    await this.patrimonyStore.invalidateFromDate(ctx, from);
-    const d = from;
-    if (d <= throughDate) {
-      try {
-        await this.patrimonyRecorder.recordDay(ctx, throughDate, { economicOnly: true });
-      } catch {
-        await this.patrimonyRebuild.rebuild(ctx, { from, to: throughDate });
-      }
-    }
-    await this.ledger.reconcileCustody(ctx);
+    await this.dailyClose.materializeDay(ctx, throughDate);
   }
 
   private async requireSession(ctx: UserContext, sessionId: string) {

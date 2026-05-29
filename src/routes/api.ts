@@ -206,6 +206,25 @@ router.post(
 );
 
 router.post(
+  '/invest/reconcile/option-c/start',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.optionCStart.bind(reconcile)
+);
+router.post(
+  '/invest/reconcile/option-c/next-day',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.optionCNextDay.bind(reconcile)
+);
+router.get(
+  '/invest/reconcile/option-c/status/:runId',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  reconcile.optionCStatus.bind(reconcile)
+);
+
+router.post(
   '/invest/admin/recalc-curve',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:write'),

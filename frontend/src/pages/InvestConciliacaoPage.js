@@ -190,14 +190,62 @@ export async function InvestConciliacaoPage(container) {
         <div class="conciliacao-hero__content">
           <h1 class="conciliacao-hero__title">Conciliação e Reimportação Completa</h1>
           <p class="conciliacao-hero__subtitle">
-            Fluxo canônico: reset (preserva abertura) → <strong>notas de corretagem</strong> →
-            <strong>extratos BTG</strong> → materialização (custódia, 3 preços, patrimônio diário gravado).
-            Divergências continuam visíveis nos previews de importação — resolva antes de recalcular.
+            Três modos: <strong>Opção C</strong> (recomendado) fecha cada pregão com cotações da web e patrimônio gravado;
+            fluxo rápido em 4 passos; ou wizard manual dia a dia.
           </p>
         </div>
       </div>
 
-      <!-- Wizard dia a dia (notas) -->
+      <!-- Opção C — fechamento calmo dia a dia (recomendado) -->
+      <div class="conciliacao-action-panel invest-conciliacao__option-c" id="option-c-panel">
+        <h2>Opção C — Fechamento calmo dia a dia (recomendado)</h2>
+        <p class="muted">
+          Reset → indique <strong>as duas pastas</strong> (notas + extratos) → o sistema fecha cada pregão com
+          cotações brapi/opcoes.net, grava patrimônio diário, recalcula custódia e os 3 preços (zeram quando a posição zera).
+          Para em divergências — resolva e continue.
+        </p>
+        <div class="conciliacao-import-grid">
+          <div class="conciliacao-import-panel">
+            <h3>📋 Pasta das notas (PDF)</h3>
+            <div class="invest-conciliacao__folder-row" style="border:none;padding:0;margin-bottom:0.5rem">
+              <button id="btn-pick-optc-notas" class="invest-conciliacao__folder-picker" title="Notas">📂</button>
+              <div class="invest-conciliacao__folder-body">
+                <input id="input-path-optc-notas" class="invest-conciliacao__folder-path-input" placeholder="Pasta notas" readonly />
+                <span id="label-optc-notas" class="invest-conciliacao__folder-count"></span>
+              </div>
+            </div>
+          </div>
+          <div class="conciliacao-import-panel">
+            <h3>📄 Pasta dos extratos (PDF/CSV)</h3>
+            <div class="invest-conciliacao__folder-row" style="border:none;padding:0;margin-bottom:0.5rem">
+              <button id="btn-pick-optc-extratos" class="invest-conciliacao__folder-picker" title="Extratos">📂</button>
+              <div class="invest-conciliacao__folder-body">
+                <input id="input-path-optc-extratos" class="invest-conciliacao__folder-path-input" placeholder="Pasta extratos" readonly />
+                <span id="label-optc-extratos" class="invest-conciliacao__folder-count"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="conciliacao-btn-row">
+          <label class="invest-conciliacao__check-row">
+            <input type="checkbox" id="optc-reset-first" class="invest-conciliacao__checkbox" checked />
+            Reset antes de iniciar (preserva abertura)
+          </label>
+        </div>
+        <div class="conciliacao-btn-row">
+          <button id="btn-optc-start" class="btn btn-primary" disabled>Iniciar Opção C</button>
+          <button id="btn-optc-next-day" class="btn btn-secondary" disabled>Fechamento do próximo dia</button>
+          <button id="btn-optc-run-all" class="btn btn-secondary" disabled>Fechar todos (calmo)</button>
+          <span id="optc-status" class="muted" style="font-size:0.85rem"></span>
+        </div>
+        <div id="optc-progress" class="invest-conciliacao__progress-wrap" hidden>
+          <div class="invest-conciliacao__progress-label" id="optc-progress-label"></div>
+          <div class="invest-conciliacao__progress-track"><div class="invest-conciliacao__progress-bar" id="optc-progress-bar"></div></div>
+        </div>
+        <div id="optc-pending" class="invest-conciliacao__pending" style="margin-top:1rem"></div>
+      </div>
+
+      <!-- Wizard dia a dia (manual) -->
       <div class="conciliacao-action-panel invest-conciliacao__wizard-setup" id="wizard-setup">
         <h2>Modo preciso — conciliação dia a dia</h2>
         <p class="muted">
@@ -713,6 +761,185 @@ export async function InvestConciliacaoPage(container) {
       appendLog(logEl, `❌ Fechar dia: ${err.message}`, 'err');
     } finally {
       btnWizardCloseDay.disabled = false;
+    }
+  });
+
+  /* ─── Opção C ─── */
+  const btnPickOptcNotas = container.querySelector('#btn-pick-optc-notas');
+  const btnPickOptcExtratos = container.querySelector('#btn-pick-optc-extratos');
+  const inputOptcNotas = container.querySelector('#input-path-optc-notas');
+  const inputOptcExtratos = container.querySelector('#input-path-optc-extratos');
+  const labelOptcNotas = container.querySelector('#label-optc-notas');
+  const labelOptcExtratos = container.querySelector('#label-optc-extratos');
+  const btnOptcStart = container.querySelector('#btn-optc-start');
+  const btnOptcNextDay = container.querySelector('#btn-optc-next-day');
+  const btnOptcRunAll = container.querySelector('#btn-optc-run-all');
+  const optcStatus = container.querySelector('#optc-status');
+  const optcPending = container.querySelector('#optc-pending');
+  const optcProgress = container.querySelector('#optc-progress');
+  const optcProgressLabel = container.querySelector('#optc-progress-label');
+  const optcProgressBar = container.querySelector('#optc-progress-bar');
+  const optcResetFirst = container.querySelector('#optc-reset-first');
+
+  let optcNotesFiles = [];
+  let optcExtractFiles = [];
+  let optcRunId = null;
+  let optcState = null;
+  let optcSessionId = null;
+
+  function refreshOptcStartButton() {
+    const ready = optcNotesFiles.length > 0 && optcExtractFiles.length > 0;
+    if (btnOptcStart) btnOptcStart.disabled = !ready;
+  }
+
+  function updateOptcProgress(state) {
+    if (!state || !optcProgress) return;
+    optcProgress.hidden = false;
+    const total = state.phase === 'notes' ? state.calendar.length : state.extractFilesCount || 1;
+    const done = state.phase === 'notes' ? state.dayIndex : state.phase === 'done' ? total : 0;
+    const pct = total > 0 ? Math.round((100 * done) / total) : 0;
+    if (optcProgressBar) optcProgressBar.style.width = `${pct}%`;
+    if (optcProgressLabel) {
+      optcProgressLabel.textContent = `Fase ${state.phase} · ${done}/${total} · horizonte ${state.horizonTrustedThrough || '—'}`;
+    }
+  }
+
+  async function renderOptcPending(pending, sessionId, day) {
+    if (!optcPending) return;
+    optcPending.innerHTML = renderPendingDecisions(pending);
+    optcPending.querySelectorAll('.wizard-resolve').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const decisionId = btn.getAttribute('data-decision-id');
+        const action = btn.getAttribute('data-action');
+        try {
+          await apiRequest(
+            `/api/invest/reconcile/session/${encodeURIComponent(sessionId)}/day/${encodeURIComponent(day)}/resolve`,
+            { method: 'POST', body: { decisionId, action } }
+          );
+          appendLog(logEl, `✅ Opção C: pendência resolvida (${action})`, 'ok');
+          optcPending.innerHTML = '<p class="muted">Pendência resolvida — clique em Fechamento do próximo dia.</p>';
+        } catch (err) {
+          appendLog(logEl, `❌ Opção C resolver: ${err.message}`, 'err');
+        }
+      });
+    });
+  }
+
+  async function runOptcNextDay() {
+    if (!optcRunId) return null;
+    const data = await apiRequest('/api/invest/reconcile/option-c/next-day', {
+      method: 'POST',
+      body: { runId: optcRunId },
+    });
+    optcState = data.state;
+    updateOptcProgress(optcState);
+    for (const line of optcState?.activityLog?.slice(-5) || []) {
+      appendLog(logEl, line);
+    }
+    if (data.status === 'blocked') {
+      if (optcStatus) optcStatus.textContent = `⚠️ Bloqueado em ${data.day}`;
+      await renderOptcPending(data.pendingDecisions || [], optcSessionId, data.day);
+      return data;
+    }
+    if (optcPending) optcPending.innerHTML = '';
+    if (data.status === 'closed' && data.day) {
+      if (optcStatus) optcStatus.textContent = `✅ ${data.day} fechado`;
+      appendLog(logEl, `✅ Opção C: ${data.day} fechado com cotações + patrimônio gravado.`, 'ok');
+    }
+    if (data.status === 'phase_complete') {
+      appendLog(logEl, '─── Fase notas OK — importando extratos…', 'section');
+    }
+    if (data.status === 'done') {
+      if (optcStatus) optcStatus.textContent = '🎉 Opção C concluída';
+      appendLog(logEl, '🎉 Opção C concluída — confira Resultado histórico e Ações/FIIs.', 'ok');
+      if (btnOptcNextDay) btnOptcNextDay.disabled = true;
+      if (btnOptcRunAll) btnOptcRunAll.disabled = true;
+    }
+    return data;
+  }
+
+  btnPickOptcNotas?.addEventListener('click', async () => {
+    try {
+      const result = await pickPdfFilesFromFolder();
+      optcNotesFiles = result.files;
+      if (inputOptcNotas) inputOptcNotas.value = result.folderPath || 'Pasta selecionada';
+      if (labelOptcNotas) labelOptcNotas.textContent = result.fileCountLabel;
+      refreshOptcStartButton();
+    } catch (err) {
+      appendLog(logEl, `⚠️ Opção C notas: ${err.message}`, 'warn');
+    }
+  });
+
+  btnPickOptcExtratos?.addEventListener('click', async () => {
+    try {
+      const result = await pickExtractFilesFromFolder();
+      optcExtractFiles = result.files;
+      if (inputOptcExtratos) inputOptcExtratos.value = result.folderPath || 'Pasta selecionada';
+      if (labelOptcExtratos) labelOptcExtratos.textContent = result.fileCountLabel;
+      refreshOptcStartButton();
+    } catch (err) {
+      appendLog(logEl, `⚠️ Opção C extratos: ${err.message}`, 'warn');
+    }
+  });
+
+  btnOptcStart?.addEventListener('click', async () => {
+    if (!optcNotesFiles.length || !optcExtractFiles.length) return;
+    btnOptcStart.disabled = true;
+    if (optcStatus) optcStatus.textContent = 'Iniciando Opção C…';
+    appendLog(logEl, '─── Opção C: reset + indexação + calendário ───', 'section');
+    try {
+      const data = await apiRequest('/api/invest/reconcile/option-c/start', {
+        method: 'POST',
+        body: {
+          notesFiles: optcNotesFiles,
+          extractFiles: optcExtractFiles,
+          resetFirst: optcResetFirst?.checked === true,
+        },
+      });
+      optcRunId = data.state.runId;
+      optcState = data.state;
+      optcSessionId = data.state.sessionId;
+      updateOptcProgress(optcState);
+      if (btnOptcNextDay) btnOptcNextDay.disabled = false;
+      if (btnOptcRunAll) btnOptcRunAll.disabled = false;
+      if (optcStatus) optcStatus.textContent = `Run ${optcRunId} — ${optcState.calendar.length} pregão(ões)`;
+      appendLog(logEl, `✅ Opção C iniciada: ${optcState.calendar.length} dia(s) de notas.`, 'ok');
+      setStepState(container, 'reset', 'done', '✅ Via Opção C');
+    } catch (err) {
+      appendLog(logEl, `❌ Opção C: ${err.message}`, 'err');
+      if (optcStatus) optcStatus.textContent = '❌ ' + err.message;
+      btnOptcStart.disabled = false;
+    }
+  });
+
+  btnOptcNextDay?.addEventListener('click', async () => {
+    btnOptcNextDay.disabled = true;
+    try {
+      await runOptcNextDay();
+    } catch (err) {
+      appendLog(logEl, `❌ Opção C next-day: ${err.message}`, 'err');
+    } finally {
+      if (optcState?.phase !== 'done') btnOptcNextDay.disabled = false;
+    }
+  });
+
+  btnOptcRunAll?.addEventListener('click', async () => {
+    btnOptcRunAll.disabled = true;
+    btnOptcNextDay.disabled = true;
+    appendLog(logEl, '─── Opção C: fechamento automático (calmo) ───', 'section');
+    try {
+      for (let guard = 0; guard < 5000; guard += 1) {
+        const data = await runOptcNextDay();
+        if (!data || data.status === 'done' || data.status === 'blocked') break;
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+    } catch (err) {
+      appendLog(logEl, `❌ Opção C run-all: ${err.message}`, 'err');
+    } finally {
+      if (optcState?.phase !== 'done' && optcState?.phase !== 'extracts') {
+        btnOptcNextDay.disabled = false;
+      }
+      if (optcState?.phase !== 'done') btnOptcRunAll.disabled = false;
     }
   });
 }

@@ -6,12 +6,14 @@ import { HoldingPurgeKeepOpeningService } from '../core/invest/HoldingPurgeKeepO
 import { LedgerImportService } from '../core/invest/LedgerImportService';
 import { PatrimonyDailyRebuildService } from '../core/invest/PatrimonyDailyRebuildService';
 import { RemoteRecalcController } from './RemoteRecalcController';
+import { OptionCDailyCloseOrchestrator } from '../core/invest/reconcile/OptionCDailyCloseOrchestrator';
 
 export class ReconcileController {
   private readonly holdingPurge: HoldingPurgeKeepOpeningService;
   private readonly ledger: LedgerImportService;
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly recalcController: RemoteRecalcController;
+  private readonly optionC: OptionCDailyCloseOrchestrator;
 
   constructor(
     private readonly gateway: CoCeoDataGateway,
@@ -21,6 +23,7 @@ export class ReconcileController {
     this.ledger = new LedgerImportService(gateway);
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.recalcController = new RemoteRecalcController(gateway);
+    this.optionC = new OptionCDailyCloseOrchestrator(gateway, pool);
   }
 
   /**
@@ -120,6 +123,67 @@ export class ReconcileController {
     } catch (error: unknown) {
       console.error('[ReconcileRecalc] Erro no recálculo:', error);
       const message = error instanceof Error ? error.message : 'Erro interno no recálculo.';
+      return res.status(500).json({ success: false, error: message });
+    }
+  };
+
+  /** POST /api/invest/reconcile/option-c/start — Opção C: reset + 2 pastas + calendário de pregões */
+  optionCStart = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const ctx = req.userContext!;
+      if (!ctx.organizationId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const notesFiles = Array.isArray(req.body?.notesFiles) ? req.body.notesFiles : [];
+      const extractFiles = Array.isArray(req.body?.extractFiles) ? req.body.extractFiles : [];
+      const resetFirst = req.body?.resetFirst === true;
+      const dataMode = req.body?.dataMode as 'recover' | 'reset_from_opening' | undefined;
+      const state = await this.optionC.start(ctx, {
+        notesFiles,
+        extractFiles,
+        resetFirst,
+        dataMode,
+      });
+      return res.json({
+        success: true,
+        message:
+          'Opção C iniciada. Use option-c/next-day para fechar cada pregão (cotações web + patrimônio gravado).',
+        state,
+      });
+    } catch (error: unknown) {
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      const message = error instanceof Error ? error.message : 'Falha ao iniciar Opção C.';
+      return res.status(status).json({ success: false, error: message });
+    }
+  };
+
+  /** POST /api/invest/reconcile/option-c/next-day — fecha o próximo pregão ou avança fase extratos */
+  optionCNextDay = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const ctx = req.userContext!;
+      const runId = String(req.body?.runId || '');
+      if (!runId) {
+        return res.status(400).json({ success: false, error: 'runId obrigatório.' });
+      }
+      const result = await this.optionC.closeNextDay(ctx, runId);
+      return res.json({ success: true, ...result });
+    } catch (error: unknown) {
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      const message = error instanceof Error ? error.message : 'Falha no fechamento diário.';
+      return res.status(status).json({ success: false, error: message });
+    }
+  };
+
+  /** GET /api/invest/reconcile/option-c/status/:runId */
+  optionCStatus = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const state = this.optionC.getRun(String(req.params.runId));
+      if (!state) {
+        return res.status(404).json({ success: false, error: 'Execução não encontrada.' });
+      }
+      return res.json({ success: true, state });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Falha ao consultar status.';
       return res.status(500).json({ success: false, error: message });
     }
   };
