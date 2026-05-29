@@ -3,6 +3,9 @@ import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import { LedgerImportService } from '../core/invest/LedgerImportService';
 import { rebuildCustodyFromLedger } from '../core/invest/CustodyEngine';
 import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
+import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
+import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
+import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 
 export class RemoteRecalcController {
   constructor(private gateway: any) {}
@@ -61,12 +64,34 @@ export class RemoteRecalcController {
       const { assets } = rebuildCustodyFromLedger(events);
       const pricesMap = computeThreePricesByUnderlying(events);
 
+      // Carrega cotações de mercado para todos os tickers da carteira
+      // (fallback para ações importadas via opening_balance sem custo)
+      const marketQuoteRepo = new MarketQuoteRepository(this.gateway);
+      const stockTickers = assets
+        .filter((a) => (a.assetType === 'stock' || a.assetType === 'fii') && a.ticker)
+        .map((a) => String(a.ticker).trim().toUpperCase());
+      const marketCtx = authBootstrapContext();
+      const marketQuoteMap = stockTickers.length
+        ? await marketQuoteRepo.loadLatestQuoteMap(marketCtx, stockTickers)
+        : new Map<string, { price: number; date: string }>();
+
+      // Lê invest_position_ext atual (para preservar last_price e outros campos)
+      const assetProjection = new InvestAssetProjection(this.gateway);
+      const activeRows = await assetProjection.listActiveAssets(ctx);
+      const currentExtByTicker = new Map<string, Record<string, unknown>>();
+      for (const row of activeRows) {
+        const t = String(row.asset_ticker ?? '').trim().toUpperCase();
+        if (t) currentExtByTicker.set(t, row as unknown as Record<string, unknown>);
+      }
+
       let updatedCount = 0;
       for (const asset of assets) {
         if (!asset.assetId) continue;
         if (asset.assetType === 'cash') continue;
 
-        // Verifica se existe registro em invest_position_ext (usa ctx do tenant)
+        const ticker = String(asset.ticker ?? '').trim().toUpperCase();
+
+        // Verifica se existe registro em invest_position_ext
         const extRows = await this.gateway.findWhere(
           ctx,
           'invest_position_ext',
@@ -74,24 +99,47 @@ export class RemoteRecalcController {
           { limit: 1 }
         );
 
-        // PM inicial: avgPrice da custody engine (fallback para opening_balance sem custo)
-        let pmA: number | null = asset.avgPrice > 0 ? asset.avgPrice : null;
-        let pmB: number | null = pmA;
-        let pmC: number | null = pmA;
+        // Ordem de prioridade para PM:
+        // 1. Engine de três preços (estrito/B3/gerencial) — mais preciso
+        // 2. avgPrice da custody engine (custo médio ponderado do livro)
+        // 3. Cotação atual de mercado — fallback para opening_balance sem custo
+        // 4. null — sem dados disponíveis
+        let pmA: number | null = null;
+        let pmB: number | null = null;
+        let pmC: number | null = null;
 
-        // Para ações/FIIs: tenta usar os três preços da engine (estrito/B3/gerencial)
         if (asset.assetType === 'stock' || asset.assetType === 'fii') {
-          const ticker = String(asset.ticker ?? '').trim().toUpperCase();
           const tp = pricesMap.get(ticker);
           if (tp && tp.estrito > 0) {
+            // Fonte 1: engine de três preços com custo real
             pmA = tp.estrito;
             pmB = tp.b3 > 0 ? tp.b3 : tp.estrito;
             pmC = tp.gerencial > 0 ? tp.gerencial : tp.estrito;
+          } else if (asset.avgPrice > 0) {
+            // Fonte 2: custo médio ponderado da custody engine
+            pmA = asset.avgPrice;
+            pmB = asset.avgPrice;
+            pmC = asset.avgPrice;
+          } else {
+            // Fonte 3: cotação atual de mercado (caso opening_balance sem custo)
+            const mq = marketQuoteMap.get(ticker);
+            if (mq && mq.price > 0) {
+              pmA = mq.price;
+              pmB = mq.price;
+              pmC = mq.price;
+              console.log(`[RecalcPositions] ${ticker}: sem custo no ledger — usando cotação de mercado R$ ${mq.price} como PM`);
+            }
           }
-          // Se engine retornou 0 mas avgPrice > 0, mantém avgPrice (já inicializado acima)
+        } else {
+          // Opções e outros: usa avgPrice da custody
+          if (asset.avgPrice > 0) {
+            pmA = asset.avgPrice;
+            pmB = asset.avgPrice;
+            pmC = asset.avgPrice;
+          }
         }
 
-        console.log(`[RecalcPositions] ${asset.ticker}: pmA=${pmA} pmB=${pmB} pmC=${pmC} avgPrice=${asset.avgPrice}`);
+        console.log(`[RecalcPositions] ${ticker}: pm_estrito=${pmA} pm_b3=${pmB} pm_gerencial=${pmC}`);
 
         if (extRows.length > 0) {
           await this.gateway.update(
