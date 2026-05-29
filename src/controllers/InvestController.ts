@@ -553,7 +553,7 @@ export class InvestController {
     const to = toRaw > today ? today : toRaw;
     const riskFreeAnnual = Number(req.query.risk_free ?? 0);
 
-    const events = await this.ledger.listLedgerEvents(ctx, from, to);
+    const events = await this.ledger.listLedgerEvents(ctx, bounds.periodMin, to);
     const method = String(req.query.method || 'mtm_btg').toLowerCase();
 
     // Cotações estáticas por cliente (invest_position_ext) — usadas como fallback e para
@@ -589,6 +589,9 @@ export class InvestController {
       quoteMap.size > 0
         ? this.marketQuoteRepo.buildQuoteForDateFn(quoteMap)
         : undefined;
+    if (method === 'mtm_economic' && quoteForDate) {
+      stockQuotes = {};
+    }
 
     const anchors = await this.patrimonyAnchorsRepo.loadForOrganization(ctx);
     const useBtgAnchorCurve = method === 'mtm_btg' && anchors.month_ends.length > 0;

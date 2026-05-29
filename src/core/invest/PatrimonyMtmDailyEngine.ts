@@ -99,6 +99,23 @@ function groupByDate(entries: LedgerEvent[]): Map<string, LedgerEvent[]> {
   return map;
 }
 
+function resolvePositionMark(
+  p: DayPosition,
+  date: string,
+  quoteForDate: PatrimonyMtmOptions['quoteForDate'],
+  stockQuotes: StockQuoteMap
+): number | undefined {
+  const historicalMode = quoteForDate != null;
+  const daily = quoteForDate?.(p.ticker, date);
+  if (daily != null && Number.isFinite(daily) && daily > 0) return daily;
+  if (!historicalMode) {
+    const cur = stockQuotes[p.ticker];
+    if (cur != null && Number.isFinite(cur) && cur > 0) return cur;
+  }
+  if (p.unitCost > 0) return p.unitCost;
+  return undefined;
+}
+
 function applyQty(pos: DayPosition, type: string, qty: number): void {
   if (type === 'opening_balance' || type === 'buy' || type === 'bonus') {
     pos.qty += Math.abs(qty);
@@ -229,19 +246,17 @@ export function buildDailyPatrimonyMtmSeries(
 
     for (const p of positions.values()) {
       if (Math.abs(p.qty) < 0.0001) continue;
-      // Prioridade: market_quotes_daily (por dia) > stockQuotes (atual) > custo/decaimento
-      const dailyMark = quoteForDate?.(p.ticker, date);
+      const dailyMark = resolvePositionMark(p, date, quoteForDate, stockQuotes);
       if (isOptionType(p.assetType)) {
-        const mark = dailyMark ?? stockQuotes[p.ticker];
-        if (mark != null && Number.isFinite(mark)) {
-          optionsFromMarket += p.qty * mark;
+        if (dailyMark != null) {
+          optionsFromMarket += p.qty * dailyMark;
         } else {
           optionsStructural += optionTimeMark(p, date);
         }
         continue;
       }
       if (p.assetType === 'stock' || p.assetType === 'fii') {
-        const mark = dailyMark ?? stockQuotes[p.ticker] ?? p.unitCost;
+        const mark = dailyMark ?? 0;
         stocksValue += p.qty * mark;
       }
     }

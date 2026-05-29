@@ -83,4 +83,18 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(r.meta.method).toBe('mtm_btg_calibrated');
     expect(r.series.length).toBeGreaterThan(0);
   });
+
+  it('nao usa cotação atual quando quoteForDate está definido', () => {
+    const entries: LedgerEvent[] = [stockOpen(100, 10, '2026-01-01')];
+    const quoteForDate = (_ticker: string, date: string) =>
+      date === '2026-01-02' ? 20 : 10;
+
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-02', {
+      stockQuotes: { PRIO3: 999 },
+      quoteForDate,
+      fixedIncomeTotal: 0,
+    });
+    const day2 = r.series.find((p) => p.date === '2026-01-02');
+    expect(day2?.patrimony).toBeCloseTo(2000, 0);
+  });
 });

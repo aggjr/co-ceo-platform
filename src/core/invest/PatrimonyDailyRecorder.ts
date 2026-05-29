@@ -5,6 +5,7 @@ import { buildDailyPatrimonyMtmSeries } from './PatrimonyMtmDailyEngine';
 import { interpolatePatrimonyTarget } from './patrimonyAnchors';
 import { PatrimonyMonthlyAnchorsRepository } from './PatrimonyMonthlyAnchorsRepository';
 import { fixedIncomeTotalFromLedger, shouldUseBtgAnchorCalibration } from './patrimonyLedgerGates';
+import { resolveInvestPeriodBounds } from './investPeriodBounds';
 import { PatrimonyDailyStore, type StoredPortfolioDay } from './PatrimonyDailyStore';
 import { aggregateExternalFlowsByDate } from './portfolioPerformance';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
@@ -100,16 +101,19 @@ export class PatrimonyDailyRecorder {
     const date = (snapshotDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const anchors = await this.anchorsRepo.loadForOrganization(ctx);
     const hasAnchors = anchors.month_ends.length > 0;
-    const { quotes: stockQuotes, quotesAsOf } = await this.loadStockQuotes(ctx, date);
-
-    const quoteMap = await this.marketQuotes.loadQuoteMapForRange(ctx, date, date);
-    const quoteForDate = this.marketQuotes.buildQuoteForDateFn(quoteMap);
 
     const events = await this.ledger.listLedgerEvents(ctx, '2020-01-01', date);
-    const ledgerFrom =
-      events.length > 0
-        ? String(events[0]!.transaction_date).slice(0, 10)
-        : date;
+    const bounds = resolveInvestPeriodBounds(events);
+    const ledgerFrom = bounds.periodMin || date;
+
+    const quoteMap = await this.marketQuotes.loadQuoteMapForRange(ctx, ledgerFrom, date);
+    const quoteForDate =
+      quoteMap.size > 0 ? this.marketQuotes.buildQuoteForDateFn(quoteMap) : undefined;
+    const { quotes: stockQuotesLatest, quotesAsOf } = await this.loadStockQuotes(ctx, date);
+    const stockQuotes =
+      quoteForDate != null
+        ? {}
+        : stockQuotesLatest;
 
     const rfLedger = fixedIncomeTotalFromLedger(events);
     const rfAnchor = Number(anchors.fixed_income_total ?? 0);

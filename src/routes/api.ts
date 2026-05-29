@@ -7,6 +7,7 @@ import { AuthMiddleware } from '../middlewares/AuthMiddleware';
 import { requirePermission } from '../middlewares/RequirePermission';
 import { requireAnyPermission } from '../middlewares/RequireAnyPermission';
 import { dataGateway } from '../config/gateway';
+import pool from '../config/database';
 import { QualityController } from '../controllers/QualityController';
 import { InvestController } from '../controllers/InvestController';
 import { UiManifestController } from '../controllers/UiManifestController';
@@ -26,7 +27,7 @@ const telemetry = createTelemetryController(gateway);
 const uiManifest = new UiManifestController(gateway);
 const remoteMigration = new RemoteMigrationController(gateway);
 const remoteRecalc = new RemoteRecalcController(gateway);
-const reconcile = new ReconcileController(gateway);
+const reconcile = new ReconcileController(gateway, pool);
 
 // --- Auth ---
 router.post('/auth/login', AuthController.login);

@@ -150,9 +150,9 @@ export async function InvestConciliacaoPage(container) {
         <div class="conciliacao-hero__content">
           <h1 class="conciliacao-hero__title">Conciliação e Reimportação Completa</h1>
           <p class="conciliacao-hero__subtitle">
-            Limpa todos os dados operacionais da holding (preservando os lançamentos de inicialização),
-            zera o odômetro e recalcula tudo a partir dos arquivos que você importar.
-            Use quando quiser partir do zero após corrigir extratos ou notas.
+            Fluxo canônico: reset (preserva abertura) → <strong>notas de corretagem</strong> →
+            <strong>extratos BTG</strong> → materialização (custódia, 3 preços, patrimônio diário gravado).
+            Divergências continuam visíveis nos previews de importação — resolva antes de recalcular.
           </p>
         </div>
       </div>
@@ -164,19 +164,19 @@ export async function InvestConciliacaoPage(container) {
           <span class="step-card__title">🗑️ Reset da Base</span>
           <span class="step-card__status">Aguardando execução</span>
         </div>
-        <div class="step-card" data-step="import-extratos">
+        <div class="step-card" data-step="import-notas">
           <span class="step-card__number">Passo 2</span>
-          <span class="step-card__title">📄 Importar Extratos</span>
+          <span class="step-card__title">📋 Importar Notas</span>
           <span class="step-card__status">Aguardando reset</span>
         </div>
-        <div class="step-card" data-step="import-notas">
+        <div class="step-card" data-step="import-extratos">
           <span class="step-card__number">Passo 3</span>
-          <span class="step-card__title">📋 Importar Notas</span>
-          <span class="step-card__status">Aguardando extratos</span>
+          <span class="step-card__title">📄 Importar Extratos</span>
+          <span class="step-card__status">Aguardando notas</span>
         </div>
         <div class="step-card" data-step="recalc">
           <span class="step-card__number">Passo 4</span>
-          <span class="step-card__title">⚙️ Recalcular Tudo</span>
+          <span class="step-card__title">⚙️ Materializar Tudo</span>
           <span class="step-card__status">Aguardando importação</span>
         </div>
       </div>
@@ -199,32 +199,13 @@ export async function InvestConciliacaoPage(container) {
 
       <!-- Passo 2+3: Reimportar -->
       <div class="conciliacao-import-section">
-        <h2>Passos 2 e 3 — Reimportar Arquivos</h2>
+        <h2>Passos 2 e 3 — Reimportar (notas primeiro, extratos depois)</h2>
         <div class="conciliacao-import-grid">
 
-          <!-- Extratos -->
+          <!-- Notas de corretagem (obrigatório primeiro) -->
           <div class="conciliacao-import-panel">
-            <h3>📄 Extratos Mensais (PDF / CSV)</h3>
-            <p class="muted" style="font-size:0.8rem;margin:0 0 0.75rem">Selecione a pasta com os extratos mensais.</p>
-            
-            <div class="invest-conciliacao__folder-row" style="border:none; padding:0; margin-bottom: 0.75rem;">
-              <button id="btn-pick-extratos" class="invest-conciliacao__folder-picker" title="Escolher pasta" disabled>📂</button>
-              <div class="invest-conciliacao__folder-body">
-                <input type="text" id="input-path-extratos" class="invest-conciliacao__folder-path-input" placeholder="Nenhuma pasta selecionada" readonly disabled />
-                <span id="label-extratos" class="invest-conciliacao__folder-count"></span>
-              </div>
-            </div>
-
-            <div class="conciliacao-import-actions">
-              <button id="btn-import-extratos" class="btn btn-primary" disabled>Importar Extratos</button>
-            </div>
-            <div id="recon-extract-result" class="conciliacao-file-result"></div>
-          </div>
-
-          <!-- Notas de corretagem -->
-          <div class="conciliacao-import-panel">
-            <h3>📋 Notas de Corretagem (PDF)</h3>
-            <p class="muted" style="font-size:0.8rem;margin:0 0 0.75rem">Selecione a pasta com os PDFs das notas.</p>
+            <h3>📋 Notas de Corretagem (PDF) — Passo 2</h3>
+            <p class="muted" style="font-size:0.8rem;margin:0 0 0.75rem">Pasta com PDFs das notas. Importe todas antes do extrato.</p>
             
             <div class="invest-conciliacao__folder-row" style="border:none; padding:0; margin-bottom: 0.75rem;">
               <button id="btn-pick-notas" class="invest-conciliacao__folder-picker" title="Escolher pasta" disabled>📂</button>
@@ -240,22 +221,38 @@ export async function InvestConciliacaoPage(container) {
             <div id="recon-notes-result" class="conciliacao-file-result"></div>
           </div>
 
+          <!-- Extratos -->
+          <div class="conciliacao-import-panel">
+            <h3>📄 Extratos Mensais (PDF / CSV) — Passo 3</h3>
+            <p class="muted" style="font-size:0.8rem;margin:0 0 0.75rem">Pasta com extratos mensais BTG (após as notas).</p>
+            
+            <div class="invest-conciliacao__folder-row" style="border:none; padding:0; margin-bottom: 0.75rem;">
+              <button id="btn-pick-extratos" class="invest-conciliacao__folder-picker" title="Escolher pasta" disabled>📂</button>
+              <div class="invest-conciliacao__folder-body">
+                <input type="text" id="input-path-extratos" class="invest-conciliacao__folder-path-input" placeholder="Nenhuma pasta selecionada" readonly disabled />
+                <span id="label-extratos" class="invest-conciliacao__folder-count"></span>
+              </div>
+            </div>
+
+            <div class="conciliacao-import-actions">
+              <button id="btn-import-extratos" class="btn btn-primary" disabled>Importar Extratos</button>
+            </div>
+            <div id="recon-extract-result" class="conciliacao-file-result"></div>
+          </div>
+
         </div>
       </div>
 
       <!-- Passo 4: Recalcular -->
       <div class="conciliacao-action-panel">
-        <h2>
-          Passo 4 — Recalcular Posições, 3 Preços e Patrimônio 
-          <button id="btn-unlock-recalc" class="btn btn-ghost btn-sm" style="font-size: 0.7rem; padding: 2px 5px; margin-left: 10px;" title="Forçar liberação do botão">🔓 Liberar</button>
-        </h2>
+        <h2>Passo 4 — Materializar (custódia, 3 preços, patrimônio diário)</h2>
         <p class="muted">
-          Executa o recálculo completo: custódia, preços médios (estrito / B3 / gerencial)
-          e curva de patrimônio diário. Execute após importar os arquivos.
+          Grava fechamentos em <code>invest_portfolio_daily</code> (mtm_economic), recalcula custódia e
+          os três preços (estrito / B3 / gerencial). Use após notas e extratos sem erro bloqueante.
         </p>
         <div class="conciliacao-btn-row">
           <button id="btn-recalc" class="btn-recalc-all" disabled>
-            ⚙️ Recalcular Tudo
+            ⚙️ Materializar Tudo
           </button>
           <span id="recalc-status" class="muted" style="font-size:0.85rem"></span>
         </div>
@@ -294,17 +291,17 @@ export async function InvestConciliacaoPage(container) {
   let extractFiles = [];
   let notesFiles = [];
 
-  /* ─── Sequenciamento ─── */
+  /* ─── Sequenciamento (notas → extratos → materializar) ─── */
   function enableStep2() {
-    setStepState(container, 'import-extratos', 'active', 'Aguardando arquivos');
-    btnPickExtract.disabled = false;
-    inputPathExtract.disabled = false;
-  }
-
-  function enableStep3() {
     setStepState(container, 'import-notas', 'active', 'Aguardando arquivos');
     btnPickNotes.disabled = false;
     inputPathNotes.disabled = false;
+  }
+
+  function enableStep3() {
+    setStepState(container, 'import-extratos', 'active', 'Aguardando arquivos');
+    btnPickExtract.disabled = false;
+    inputPathExtract.disabled = false;
   }
 
   function enableStep4() {
@@ -356,13 +353,23 @@ export async function InvestConciliacaoPage(container) {
 
           if (data.success) {
             appendLog(logEl, '✅ Reset concluído com sucesso.', 'ok');
-            for (const step of (data.report?.steps || [])) {
-              appendLog(logEl, `  ${step.step}: ${step.detail}`);
+            const report = data.report || {};
+            if (report.openingDate) {
+              appendLog(logEl, `  Abertura preservada: ${report.openingDate} (${report.openingLegCount ?? '?'} perna(s))`);
+            }
+            if (report.patrimonyLegsRemoved != null) {
+              appendLog(logEl, `  Lançamentos removidos: patrimônio ${report.patrimonyLegsRemoved}, financeiros ${report.financialLegsRemoved ?? 0}`);
+            }
+            if (report.auxRowsRemoved != null) {
+              appendLog(logEl, `  Linhas auxiliares removidas: ${report.auxRowsRemoved}`);
+            }
+            for (const line of report.activityLog || []) {
+              appendLog(logEl, `  ${line}`);
             }
             setStepState(container, 'reset', 'done', '✅ Concluído');
-            if (resetStatus) resetStatus.textContent = '✅ Base limpa. Siga para o Passo 2.';
-            
-            enableStep2(); // Habilita extratos
+            if (resetStatus) resetStatus.textContent = '✅ Base limpa. Importe as NOTAS (Passo 2).';
+
+            enableStep2();
 
           } else {
             throw new Error(data.error || 'Falha no reset.');
@@ -377,42 +384,7 @@ export async function InvestConciliacaoPage(container) {
     );
   });
 
-  /* ─── IMPORTAR EXTRATOS ─── */
-  btnImportExtract?.addEventListener('click', async () => {
-    if (!extractFiles.length) return;
-    btnImportExtract.disabled = true;
-    btnPickExtract.disabled = true;
-    setStepState(container, 'import-extratos', 'active', `Importando ${extractFiles.length} arquivo(s)...`);
-    appendLog(logEl, `─── Importando ${extractFiles.length} extrato(s) ───`, 'section');
-
-    try {
-      const data = await apiRequest('/api/invest/import/btg-extract', {
-        method: 'POST',
-        body: { files: extractFiles, dryRun: false },
-      });
-
-      const fileResults = data.preview?.fileResults || data.fileResults || [];
-      const ok = fileResults.filter((r) => r.importOk).length;
-      const err = fileResults.filter((r) => r.importOk === false).length;
-
-      appendLog(logEl, `✅ Extratos: ${ok} importados, ${err} com erro.`, ok > 0 ? 'ok' : 'warn');
-      setStepState(container, 'import-extratos', err === 0 ? 'done' : 'error',
-        err === 0 ? `✅ ${ok} extrato(s)` : `⚠️ ${err} erro(s)`);
-
-      const resultEl = container.querySelector('#recon-extract-result');
-      if (resultEl) resultEl.innerHTML = renderExtractResult(data);
-
-      enableStep3(); // Habilita notas após importar extratos
-
-    } catch (err) {
-      appendLog(logEl, `❌ Erro nos extratos: ${err.message}`, 'err');
-      setStepState(container, 'import-extratos', 'error', '❌ ' + err.message);
-      btnImportExtract.disabled = false;
-      btnPickExtract.disabled = false;
-    }
-  });
-
-  /* ─── IMPORTAR NOTAS ─── */
+  /* ─── IMPORTAR NOTAS (Passo 2) ─── */
   btnImportNotes?.addEventListener('click', async () => {
     if (!notesFiles.length) return;
     btnImportNotes.disabled = true;
@@ -437,8 +409,12 @@ export async function InvestConciliacaoPage(container) {
       const resultEl = container.querySelector('#recon-notes-result');
       if (resultEl) resultEl.innerHTML = renderNotesResult(data);
 
-      enableStep4(); // Habilita recálculo após importar notas
-
+      if (err === 0) {
+        enableStep3();
+      } else {
+        btnImportNotes.disabled = false;
+        btnPickNotes.disabled = false;
+      }
     } catch (err) {
       appendLog(logEl, `❌ Erro nas notas: ${err.message}`, 'err');
       setStepState(container, 'import-notas', 'error', '❌ ' + err.message);
@@ -447,47 +423,78 @@ export async function InvestConciliacaoPage(container) {
     }
   });
 
-  /* ─── RECALCULAR TUDO ─── */
-  const btnUnlockRecalc = container.querySelector('#btn-unlock-recalc');
-  btnUnlockRecalc?.addEventListener('click', () => {
-    if (btnRecalc) btnRecalc.disabled = false;
-    btnUnlockRecalc.style.display = 'none';
-  });
-
-  btnRecalc?.addEventListener('click', async () => {
-    btnRecalc.disabled = true;
-    if (recalcStatus) recalcStatus.textContent = 'Recalculando...';
-    setStepState(container, 'recalc', 'active', 'Recalculando...');
-    appendLog(logEl, '─── Recalculando posições, 3 preços e patrimônio ───', 'section');
+  /* ─── IMPORTAR EXTRATOS (Passo 3) ─── */
+  btnImportExtract?.addEventListener('click', async () => {
+    if (!extractFiles.length) return;
+    btnImportExtract.disabled = true;
+    btnPickExtract.disabled = true;
+    setStepState(container, 'import-extratos', 'active', `Importando ${extractFiles.length} arquivo(s)...`);
+    appendLog(logEl, `─── Importando ${extractFiles.length} extrato(s) ───`, 'section');
 
     try {
-      appendLog(logEl, 'Recalculando posições e preços médios...', 'info');
-      const posData = await apiRequest('/api/invest/admin/recalc-positions', {
+      const data = await apiRequest('/api/invest/import/btg-extract', {
         method: 'POST',
-        body: {},
+        body: { files: extractFiles, dryRun: false },
       });
-      if (posData.success) {
-        appendLog(logEl, `✅ Posições: ${posData.updated ?? posData.processed ?? '?'} ativos atualizados.`, 'ok');
-      } else {
-        appendLog(logEl, `⚠️ Posições: ${posData.error || 'Resposta inesperada'}`, 'warn');
-      }
 
-      appendLog(logEl, 'Recalculando curva de patrimônio diário...', 'info');
-      const curveData = await apiRequest('/api/invest/admin/recalc-curve', {
-        method: 'POST',
-        body: {},
-      });
-      if (curveData.success) {
-        appendLog(logEl, `✅ Curva: ${curveData.processed ?? '?'} dias calculados.`, 'ok');
-      } else {
-        appendLog(logEl, `⚠️ Curva: ${curveData.error || 'Resposta inesperada'}`, 'warn');
-      }
+      const fileResults = data.preview?.fileResults || data.fileResults || [];
+      const ok = fileResults.filter((r) => r.importOk).length;
+      const err = fileResults.filter((r) => r.importOk === false).length;
 
-      setStepState(container, 'recalc', 'done', '✅ Recálculo concluído');
-      if (recalcStatus) recalcStatus.textContent = '✅ Tudo recalculado!';
-      appendLog(logEl, '🎉 Processo completo! Verifique os saldos nas telas de Ações/FIIs e Panorama.', 'ok');
+      appendLog(logEl, `✅ Extratos: ${ok} importados, ${err} com erro.`, ok > 0 ? 'ok' : 'warn');
+      setStepState(container, 'import-extratos', err === 0 ? 'done' : 'error',
+        err === 0 ? `✅ ${ok} extrato(s)` : `⚠️ ${err} erro(s)`);
+
+      const resultEl = container.querySelector('#recon-extract-result');
+      if (resultEl) resultEl.innerHTML = renderExtractResult(data);
+
+      if (err === 0) {
+        enableStep4();
+      } else {
+        btnImportExtract.disabled = false;
+        btnPickExtract.disabled = false;
+      }
     } catch (err) {
-      appendLog(logEl, `❌ Erro no recálculo: ${err.message}`, 'err');
+      appendLog(logEl, `❌ Erro nos extratos: ${err.message}`, 'err');
+      setStepState(container, 'import-extratos', 'error', '❌ ' + err.message);
+      btnImportExtract.disabled = false;
+      btnPickExtract.disabled = false;
+    }
+  });
+
+  /* ─── MATERIALIZAR (Passo 4) ─── */
+  btnRecalc?.addEventListener('click', async () => {
+    btnRecalc.disabled = true;
+    if (recalcStatus) recalcStatus.textContent = 'Materializando...';
+    setStepState(container, 'recalc', 'active', 'Materializando...');
+    appendLog(logEl, '─── Materialização: custódia, 3 preços, patrimônio diário ───', 'section');
+
+    try {
+      const data = await apiRequest('/api/invest/reconcile/recalc-all', {
+        method: 'POST',
+        body: {},
+      });
+
+      if (!data.success) {
+        throw new Error(data.error || 'Falha na materialização.');
+      }
+
+      const pos = data.positions || {};
+      const rebuild = data.patrimonyRebuild || {};
+      appendLog(logEl, `✅ Custódia reconciliada.`, 'ok');
+      appendLog(logEl, `✅ Posições: ${pos.updated ?? pos.processed ?? '?'} ativo(s) com 3 preços.`, 'ok');
+      appendLog(logEl, `✅ Patrimônio diário: ${rebuild.daysWritten ?? '?'} dia(s) gravados (${rebuild.daysSkipped ?? 0} pulados).`, 'ok');
+      if (Array.isArray(rebuild.warnings) && rebuild.warnings.length) {
+        for (const w of rebuild.warnings) {
+          appendLog(logEl, `⚠️ ${w}`, 'warn');
+        }
+      }
+
+      setStepState(container, 'recalc', 'done', '✅ Materialização concluída');
+      if (recalcStatus) recalcStatus.textContent = '✅ Concluído — confira Resultado histórico e Ações/FIIs.';
+      appendLog(logEl, '🎉 Processo completo! Verifique TWR em Resultado histórico e os 3 preços em Ações/FIIs.', 'ok');
+    } catch (err) {
+      appendLog(logEl, `❌ Erro na materialização: ${err.message}`, 'err');
       setStepState(container, 'recalc', 'error', '❌ ' + err.message);
       if (recalcStatus) recalcStatus.textContent = '❌ ' + err.message;
       btnRecalc.disabled = false;
