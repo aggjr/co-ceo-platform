@@ -1,4 +1,5 @@
 import '../styles/invest-conciliacao.css';
+import '../styles/invest-conciliacao-modal.css';
 import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
@@ -48,8 +49,8 @@ function showConfirmDialog(message, onConfirm) {
       <h3>⚠️ Atenção: ação irreversível</h3>
       <p>${escapeHtml(message)}</p>
       <div class="btn-row">
-        <button id="confirm-cancel" class="btn">Cancelar</button>
-        <button id="confirm-ok" class="btn-reset-holding">Sim, executar reset</button>
+        <button id="confirm-cancel" class="btn btn-secondary">Cancelar</button>
+        <button id="confirm-ok" class="btn-reset-holding">🗑️ Sim, apagar dados</button>
       </div>
     </div>
   `;
@@ -148,7 +149,7 @@ export async function InvestConciliacaoPage(container) {
 
       <!-- Workflow steps -->
       <div class="conciliacao-steps">
-        <div class="step-card" data-step="reset">
+        <div class="step-card step-card--active" data-step="reset">
           <span class="step-card__number">Passo 1</span>
           <span class="step-card__title">🗑️ Reset da Base</span>
           <span class="step-card__status">Aguardando execução</span>
@@ -161,7 +162,7 @@ export async function InvestConciliacaoPage(container) {
         <div class="step-card" data-step="import-notas">
           <span class="step-card__number">Passo 3</span>
           <span class="step-card__title">📋 Importar Notas</span>
-          <span class="step-card__status">Aguardando reset</span>
+          <span class="step-card__status">Aguardando extratos</span>
         </div>
         <div class="step-card" data-step="recalc">
           <span class="step-card__number">Passo 4</span>
@@ -180,7 +181,7 @@ export async function InvestConciliacaoPage(container) {
         </p>
         <div class="conciliacao-btn-row">
           <button id="btn-reset" class="btn-reset-holding">
-            🗑️ Executar Reset
+            🗑️ Limpar Base de Dados
           </button>
           <span id="reset-status" class="muted" style="font-size:0.85rem"></span>
         </div>
@@ -195,11 +196,16 @@ export async function InvestConciliacaoPage(container) {
           <div class="conciliacao-import-panel">
             <h3>📄 Extratos Mensais (PDF / CSV)</h3>
             <p class="muted" style="font-size:0.8rem;margin:0 0 0.75rem">Selecione a pasta com os extratos mensais.</p>
-            <div class="conciliacao-import-actions">
-              <button id="btn-pick-extratos" class="btn btn-secondary">📂 Escolher pasta</button>
-              <span id="label-extratos" class="muted" style="font-size:0.8rem">Nenhuma pasta selecionada</span>
+            
+            <div class="invest-conciliacao__folder-row" style="border:none; padding:0; margin-bottom: 0.75rem;">
+              <button id="btn-pick-extratos" class="invest-conciliacao__folder-picker" title="Escolher pasta" disabled>📂</button>
+              <div class="invest-conciliacao__folder-body">
+                <input type="text" id="input-path-extratos" class="invest-conciliacao__folder-path-input" placeholder="Nenhuma pasta selecionada" readonly disabled />
+                <span id="label-extratos" class="invest-conciliacao__folder-count"></span>
+              </div>
             </div>
-            <div class="conciliacao-import-actions" style="margin-top:0.5rem">
+
+            <div class="conciliacao-import-actions">
               <button id="btn-import-extratos" class="btn btn-primary" disabled>Importar Extratos</button>
             </div>
             <div id="recon-extract-result" class="conciliacao-file-result"></div>
@@ -209,11 +215,16 @@ export async function InvestConciliacaoPage(container) {
           <div class="conciliacao-import-panel">
             <h3>📋 Notas de Corretagem (PDF)</h3>
             <p class="muted" style="font-size:0.8rem;margin:0 0 0.75rem">Selecione a pasta com os PDFs das notas.</p>
-            <div class="conciliacao-import-actions">
-              <button id="btn-pick-notas" class="btn btn-secondary">📂 Escolher pasta</button>
-              <span id="label-notas" class="muted" style="font-size:0.8rem">Nenhuma pasta selecionada</span>
+            
+            <div class="invest-conciliacao__folder-row" style="border:none; padding:0; margin-bottom: 0.75rem;">
+              <button id="btn-pick-notas" class="invest-conciliacao__folder-picker" title="Escolher pasta" disabled>📂</button>
+              <div class="invest-conciliacao__folder-body">
+                <input type="text" id="input-path-notas" class="invest-conciliacao__folder-path-input" placeholder="Nenhuma pasta selecionada" readonly disabled />
+                <span id="label-notas" class="invest-conciliacao__folder-count"></span>
+              </div>
             </div>
-            <div class="conciliacao-import-actions" style="margin-top:0.5rem">
+
+            <div class="conciliacao-import-actions">
               <button id="btn-import-notas" class="btn btn-primary" disabled>Importar Notas</button>
             </div>
             <div id="recon-notes-result" class="conciliacao-file-result"></div>
@@ -251,12 +262,17 @@ export async function InvestConciliacaoPage(container) {
   /* ─── DOM refs ─── */
   const logEl = container.querySelector('#conciliacao-log');
   const btnReset = container.querySelector('#btn-reset');
+  
   const btnPickExtract = container.querySelector('#btn-pick-extratos');
+  const inputPathExtract = container.querySelector('#input-path-extratos');
   const btnImportExtract = container.querySelector('#btn-import-extratos');
   const labelExtract = container.querySelector('#label-extratos');
+  
   const btnPickNotes = container.querySelector('#btn-pick-notas');
+  const inputPathNotes = container.querySelector('#input-path-notas');
   const btnImportNotes = container.querySelector('#btn-import-notas');
   const labelNotes = container.querySelector('#label-notas');
+  
   const btnRecalc = container.querySelector('#btn-recalc');
   const resetStatus = container.querySelector('#reset-status');
   const recalcStatus = container.querySelector('#recalc-status');
@@ -265,11 +281,30 @@ export async function InvestConciliacaoPage(container) {
   let extractFiles = [];
   let notesFiles = [];
 
+  /* ─── Sequenciamento ─── */
+  function enableStep2() {
+    setStepState(container, 'import-extratos', 'active', 'Aguardando arquivos');
+    btnPickExtract.disabled = false;
+    inputPathExtract.disabled = false;
+  }
+
+  function enableStep3() {
+    setStepState(container, 'import-notas', 'active', 'Aguardando arquivos');
+    btnPickNotes.disabled = false;
+    inputPathNotes.disabled = false;
+  }
+
+  function enableStep4() {
+    setStepState(container, 'recalc', 'active', 'Aguardando recálculo');
+    btnRecalc.disabled = false;
+  }
+
   /* ─── PICK EXTRATOS ─── */
   btnPickExtract?.addEventListener('click', async () => {
     try {
       const result = await pickExtractFilesFromFolder();
       extractFiles = result.files;
+      if (inputPathExtract) inputPathExtract.value = result.folderPath || 'Pasta selecionada';
       if (labelExtract) labelExtract.textContent = result.fileCountLabel;
       if (btnImportExtract) btnImportExtract.disabled = extractFiles.length === 0;
     } catch (err) {
@@ -282,6 +317,7 @@ export async function InvestConciliacaoPage(container) {
     try {
       const result = await pickPdfFilesFromFolder();
       notesFiles = result.files;
+      if (inputPathNotes) inputPathNotes.value = result.folderPath || 'Pasta selecionada';
       if (labelNotes) labelNotes.textContent = result.fileCountLabel;
       if (btnImportNotes) btnImportNotes.disabled = notesFiles.length === 0;
     } catch (err) {
@@ -292,9 +328,7 @@ export async function InvestConciliacaoPage(container) {
   /* ─── RESET ─── */
   btnReset?.addEventListener('click', () => {
     showConfirmDialog(
-      'Isso apagará TODOS os lançamentos do livro razão, posições, curva de patrimônio e snapshots BTG desta holding. ' +
-      'Apenas os lançamentos de inicialização (opening_balance) serão preservados. ' +
-      'Esta operação NÃO pode ser desfeita.',
+      'Isso apagará TODOS os lançamentos do livro razão, posições, curva de patrimônio e snapshots BTG desta holding. Apenas os lançamentos de inicialização (opening_balance) serão preservados. Esta operação NÃO pode ser desfeita.',
       async () => {
         btnReset.disabled = true;
         if (resetStatus) resetStatus.textContent = 'Executando reset...';
@@ -313,11 +347,10 @@ export async function InvestConciliacaoPage(container) {
               appendLog(logEl, `  ${step.step}: ${step.detail}`);
             }
             setStepState(container, 'reset', 'done', '✅ Concluído');
-            if (resetStatus) resetStatus.textContent = '✅ Base limpa. Agora importe os arquivos.';
-            if (btnRecalc) btnRecalc.disabled = false;
-            // Re-enable import buttons if files were already selected
-            if (btnImportExtract) btnImportExtract.disabled = extractFiles.length === 0;
-            if (btnImportNotes) btnImportNotes.disabled = notesFiles.length === 0;
+            if (resetStatus) resetStatus.textContent = '✅ Base limpa. Siga para o Passo 2.';
+            
+            enableStep2(); // Habilita extratos
+
           } else {
             throw new Error(data.error || 'Falha no reset.');
           }
@@ -335,6 +368,7 @@ export async function InvestConciliacaoPage(container) {
   btnImportExtract?.addEventListener('click', async () => {
     if (!extractFiles.length) return;
     btnImportExtract.disabled = true;
+    btnPickExtract.disabled = true;
     setStepState(container, 'import-extratos', 'active', `Importando ${extractFiles.length} arquivo(s)...`);
     appendLog(logEl, `─── Importando ${extractFiles.length} extrato(s) ───`, 'section');
 
@@ -354,11 +388,14 @@ export async function InvestConciliacaoPage(container) {
 
       const resultEl = container.querySelector('#recon-extract-result');
       if (resultEl) resultEl.innerHTML = renderExtractResult(data);
+
+      enableStep3(); // Habilita notas após importar extratos
+
     } catch (err) {
       appendLog(logEl, `❌ Erro nos extratos: ${err.message}`, 'err');
       setStepState(container, 'import-extratos', 'error', '❌ ' + err.message);
-    } finally {
       btnImportExtract.disabled = false;
+      btnPickExtract.disabled = false;
     }
   });
 
@@ -366,6 +403,7 @@ export async function InvestConciliacaoPage(container) {
   btnImportNotes?.addEventListener('click', async () => {
     if (!notesFiles.length) return;
     btnImportNotes.disabled = true;
+    btnPickNotes.disabled = true;
     setStepState(container, 'import-notas', 'active', `Importando ${notesFiles.length} nota(s)...`);
     appendLog(logEl, `─── Importando ${notesFiles.length} nota(s) de corretagem ───`, 'section');
 
@@ -385,11 +423,14 @@ export async function InvestConciliacaoPage(container) {
 
       const resultEl = container.querySelector('#recon-notes-result');
       if (resultEl) resultEl.innerHTML = renderNotesResult(data);
+
+      enableStep4(); // Habilita recálculo após importar notas
+
     } catch (err) {
       appendLog(logEl, `❌ Erro nas notas: ${err.message}`, 'err');
       setStepState(container, 'import-notas', 'error', '❌ ' + err.message);
-    } finally {
       btnImportNotes.disabled = false;
+      btnPickNotes.disabled = false;
     }
   });
 
