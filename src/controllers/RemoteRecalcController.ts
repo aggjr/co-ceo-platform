@@ -120,15 +120,6 @@ export class RemoteRecalcController {
             pmA = asset.avgPrice;
             pmB = asset.avgPrice;
             pmC = asset.avgPrice;
-          } else {
-            // Fonte 3: cotação atual de mercado (caso opening_balance sem custo)
-            const mq = marketQuoteMap.get(ticker);
-            if (mq && mq.price > 0) {
-              pmA = mq.price;
-              pmB = mq.price;
-              pmC = mq.price;
-              console.log(`[RecalcPositions] ${ticker}: sem custo no ledger — usando cotação de mercado R$ ${mq.price} como PM`);
-            }
           }
         } else {
           // Opções e outros: usa avgPrice da custody

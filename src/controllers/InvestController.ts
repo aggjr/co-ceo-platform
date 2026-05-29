@@ -336,6 +336,13 @@ export class InvestController {
       const marketQuote = mq
         ? { price: mq.price, asOf: mq.date }
         : null;
+
+      if ((assetTypeForPm === 'stock' || assetTypeForPm === 'fii') && three.strict <= 0 && marketQuote && marketQuote.price > 0) {
+        three.strict = marketQuote.price;
+        three.b3 = marketQuote.price;
+        three.managerial = marketQuote.price;
+      }
+
       const item = enrichPortfolioRow(filtered, three, strikeHints, marketQuote);
       const assetType = String(item.assetType ?? '');
       if (
