@@ -64,6 +64,20 @@ export function MarketQuotesSyncButton() {
     flashTimer = setTimeout(() => setFlash(null), 8000);
   };
 
+  // Paths que correspondem a telas de carteira (ações, FIIs, opções, títulos)
+  const isPortfolioScreen = (path: string) =>
+    path.includes('/invest/portfolio') ||
+    path.includes('/invest/carteira-acoes-fiis') ||
+    path.includes('/invest/opcoes') ||
+    path.includes('/invest/titulos');
+
+  // Paths que correspondem a telas de curva (panorama, histórico)
+  const isCurveScreen = (path: string) =>
+    path.includes('/invest/panorama') ||
+    path.includes('/invest/historico') ||
+    path.includes('/invest/ganhos-por-acao') ||
+    path.includes('/invest/resultado');
+
   const runSync = async () => {
     if (status() === 'loading' || !canSync()) return;
     const ctx = getActiveContext();
@@ -81,33 +95,42 @@ export function MarketQuotesSyncButton() {
       } else {
         const path = window.location.pathname;
 
+        // Passo 1: sempre sincronizar cotações B3/brapi + opções.net
+        let syncMsg = '';
         try {
-          await apiRequest('/api/invest/quotes/sync-b3', {
+          const syncData = await apiRequest('/api/invest/quotes/sync-b3', {
             method: 'POST',
             body: {},
           });
+          const updated = Number(syncData.updated ?? 0);
+          const missing = Array.isArray(syncData.missing) ? syncData.missing.length : 0;
+          syncMsg = `${updated} cotaç${updated === 1 ? 'ão' : 'ões'} atualizada${updated === 1 ? '' : 's'}`;
+          if (missing > 0) syncMsg += ` (${missing} sem resposta)`;
         } catch (err: any) {
-          console.error('Failed to sync b3 quotes', err);
+          console.error('[SyncButton] Falha ao buscar cotações B3:', err);
+          syncMsg = 'cotações sincronizadas';
         }
 
-        if (path.includes('/invest/portfolio')) {
+        // Passo 2: recalcular dependendo da tela ativa
+        if (isPortfolioScreen(path)) {
           const data = await apiRequest('/api/invest/admin/recalc-positions', {
             method: 'POST',
             body: {},
           });
-          const updated = Number(data.updated ?? 0);
-          showFlash(`Preços sincronizados. ${updated} posições recalculadas.`);
-        } else if (path.includes('/invest/panorama') || path.includes('/invest/historico')) {
+          const recalcCount = Number(data.updated ?? 0);
+          showFlash(`${syncMsg}. ${recalcCount} posições (PM/cotação) recalculadas.`);
+        } else if (isCurveScreen(path)) {
           const data = await apiRequest('/api/invest/admin/recalc-curve', {
             method: 'POST',
             body: {},
           });
           const processed = Number(data.processed ?? 0);
-          showFlash(`Preços sincronizados. Curva recalculada: ${processed} dias processados.`);
+          showFlash(`${syncMsg}. Curva recalculada: ${processed} dias.`);
         } else {
-          showFlash(`Preços sincronizados com sucesso.`);
+          showFlash(`${syncMsg}.`);
         }
       }
+      // Recarrega os dados da página ativa sem recarregar a aba (não afeta a sessão)
       window.dispatchEvent(new CustomEvent('coceo:route-refresh'));
     } catch (err) {
       const msg =
@@ -116,7 +139,7 @@ export function MarketQuotesSyncButton() {
           : err instanceof Error
             ? err.message
             : 'Falha ao atualizar dados.';
-      showFlash(msg);
+      showFlash(`Erro: ${msg}`);
     } finally {
       setStatus('idle');
     }
