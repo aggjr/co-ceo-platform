@@ -1,10 +1,12 @@
 import '../styles/invest-conciliacao.css';
-import '../styles/invest-importacao.css';
 import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
-import { bindImportFilePicker } from '../lib/importFilePicker.js';
+import {
+  pickPdfFilesFromFolder,
+  pickExtractFilesFromFolder,
+} from '../lib/importFilePicker.js';
 
 /* ─────────────────────────── helpers ─────────────────────────── */
 
@@ -13,25 +15,6 @@ function escapeHtml(s) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
-}
-
-function readFilesAsPayload(fileList) {
-  return Promise.all(
-    [...fileList].map(
-      (file) =>
-        new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const raw = String(reader.result || '');
-            const base64 = raw.includes(',') ? raw.split(',')[1] : raw;
-            const rel = file.webkitRelativePath || file.name;
-            resolve({ name: rel, contentBase64: base64 });
-          };
-          reader.onerror = () => reject(reader.error || new Error('Falha ao ler arquivo.'));
-          reader.readAsDataURL(file);
-        })
-    )
-  );
 }
 
 /* ─────────────────────────── log panel ─────────────────────────── */
@@ -86,31 +69,33 @@ function statusBadge(ok) {
   return '<span class="import-status import-status--muted">—</span>';
 }
 
-function renderExtractResult(result) {
-  if (!result) return '';
-  const rows = (result.fileResults || []).map((r) => `
+function renderExtractResult(data) {
+  if (!data) return '';
+  const fileResults = data.preview?.fileResults || data.fileResults || [];
+  const rows = fileResults.map((r) => `
     <tr>
       <td>${escapeHtml(r.fileName || r.path)}</td>
       <td>${escapeHtml(r.month || '—')}</td>
       <td>${statusBadge(r.parseOk)}</td>
       <td>${statusBadge(r.importOk)}</td>
-      <td class="import-detail-cell">${escapeHtml(r.parseError || r.importError || (r.monthAlreadyImported ? 'Já importado' : ''))}</td>
+      <td class="recon-detail">${escapeHtml(r.parseError || r.importError || (r.monthAlreadyImported ? 'Já importado' : ''))}</td>
     </tr>
   `).join('');
-  const total = result.totals
-    ? `<p class="muted" style="font-size:0.78rem;margin-top:0.5rem">Gravados: ${result.totals.inserted ?? 0} | Pulados: ${result.totals.skipped ?? 0}</p>`
+  const total = data.totals
+    ? `<p class="recon-totals">Gravados: ${data.totals.inserted ?? 0} | Pulados: ${data.totals.skipped ?? 0}</p>`
     : '';
   return `
-    <table class="import-status-table" style="font-size:0.78rem">
+    <table class="recon-table">
       <thead><tr><th>Arquivo</th><th>Mês</th><th>Leitura</th><th>Importação</th><th>Detalhe</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>${total}
   `;
 }
 
-function renderNotesResult(result) {
-  if (!result) return '';
-  const rows = (result.fileResults || []).map((r) => `
+function renderNotesResult(data) {
+  if (!data) return '';
+  const fileResults = data.preview?.fileResults || data.fileResults || [];
+  const rows = fileResults.map((r) => `
     <tr>
       <td>${escapeHtml(r.path)}</td>
       <td>${statusBadge(r.parseOk)}</td>
@@ -118,11 +103,11 @@ function renderNotesResult(result) {
       <td>${escapeHtml(r.parseError || r.importError || (r.parseOk ? `${r.notesCount ?? 0} nota(s)` : ''))}</td>
     </tr>
   `).join('');
-  const total = result.totals
-    ? `<p class="muted" style="font-size:0.78rem;margin-top:0.5rem">Gravados: ${result.totals.inserted ?? 0} | Pulados: ${result.totals.skipped ?? 0}</p>`
+  const total = data.totals
+    ? `<p class="recon-totals">Gravados: ${data.totals.inserted ?? 0} | Pulados: ${data.totals.skipped ?? 0}</p>`
     : '';
   return `
-    <table class="import-status-table" style="font-size:0.78rem">
+    <table class="recon-table">
       <thead><tr><th>Arquivo</th><th>Leitura</th><th>Importação</th><th>Detalhe</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>${total}
@@ -209,25 +194,12 @@ export async function InvestConciliacaoPage(container) {
           <!-- Extratos -->
           <div class="conciliacao-import-panel">
             <h3>📄 Extratos Mensais (PDF / CSV)</h3>
-            <div class="import-picker">
-              <div class="import-picker-row">
-                <input type="file" id="recon-extract-dir" class="import-picker-input" webkitdirectory directory multiple />
-                <button type="button" class="import-picker-btn" id="recon-extract-dir-btn">
-                  <span>📂</span><span>Escolher pasta</span>
-                </button>
-                <span class="import-picker-name" id="recon-extract-dir-label">Nenhuma pasta</span>
-              </div>
-            </div>
-            <div class="import-picker" style="margin-top:0.5rem">
-              <div class="import-picker-row">
-                <input type="file" id="recon-extract-files" class="import-picker-input" accept=".pdf,.csv,.txt" multiple />
-                <button type="button" class="import-picker-btn" id="recon-extract-files-btn">
-                  <span>📄</span><span>Arquivos avulsos</span>
-                </button>
-                <span class="import-picker-name" id="recon-extract-files-label">Nenhum arquivo</span>
-              </div>
-            </div>
+            <p class="muted" style="font-size:0.8rem;margin:0 0 0.75rem">Selecione a pasta com os extratos mensais.</p>
             <div class="conciliacao-import-actions">
+              <button id="btn-pick-extratos" class="btn btn-secondary">📂 Escolher pasta</button>
+              <span id="label-extratos" class="muted" style="font-size:0.8rem">Nenhuma pasta selecionada</span>
+            </div>
+            <div class="conciliacao-import-actions" style="margin-top:0.5rem">
               <button id="btn-import-extratos" class="btn btn-primary" disabled>Importar Extratos</button>
             </div>
             <div id="recon-extract-result" class="conciliacao-file-result"></div>
@@ -236,25 +208,12 @@ export async function InvestConciliacaoPage(container) {
           <!-- Notas de corretagem -->
           <div class="conciliacao-import-panel">
             <h3>📋 Notas de Corretagem (PDF)</h3>
-            <div class="import-picker">
-              <div class="import-picker-row">
-                <input type="file" id="recon-notes-dir" class="import-picker-input" webkitdirectory directory multiple />
-                <button type="button" class="import-picker-btn" id="recon-notes-dir-btn">
-                  <span>📂</span><span>Escolher pasta</span>
-                </button>
-                <span class="import-picker-name" id="recon-notes-dir-label">Nenhuma pasta</span>
-              </div>
-            </div>
-            <div class="import-picker" style="margin-top:0.5rem">
-              <div class="import-picker-row">
-                <input type="file" id="recon-notes-files" class="import-picker-input" accept=".pdf" multiple />
-                <button type="button" class="import-picker-btn" id="recon-notes-files-btn">
-                  <span>📄</span><span>Arquivos avulsos</span>
-                </button>
-                <span class="import-picker-name" id="recon-notes-files-label">Nenhum arquivo</span>
-              </div>
-            </div>
+            <p class="muted" style="font-size:0.8rem;margin:0 0 0.75rem">Selecione a pasta com os PDFs das notas.</p>
             <div class="conciliacao-import-actions">
+              <button id="btn-pick-notas" class="btn btn-secondary">📂 Escolher pasta</button>
+              <span id="label-notas" class="muted" style="font-size:0.8rem">Nenhuma pasta selecionada</span>
+            </div>
+            <div class="conciliacao-import-actions" style="margin-top:0.5rem">
               <button id="btn-import-notas" class="btn btn-primary" disabled>Importar Notas</button>
             </div>
             <div id="recon-notes-result" class="conciliacao-file-result"></div>
@@ -292,40 +251,42 @@ export async function InvestConciliacaoPage(container) {
   /* ─── DOM refs ─── */
   const logEl = container.querySelector('#conciliacao-log');
   const btnReset = container.querySelector('#btn-reset');
+  const btnPickExtract = container.querySelector('#btn-pick-extratos');
   const btnImportExtract = container.querySelector('#btn-import-extratos');
+  const labelExtract = container.querySelector('#label-extratos');
+  const btnPickNotes = container.querySelector('#btn-pick-notas');
   const btnImportNotes = container.querySelector('#btn-import-notas');
+  const labelNotes = container.querySelector('#label-notas');
   const btnRecalc = container.querySelector('#btn-recalc');
   const resetStatus = container.querySelector('#reset-status');
   const recalcStatus = container.querySelector('#recalc-status');
 
-  /* ─── File pickers ─── */
-  bindImportFilePicker(container, {
-    inputSelector: '#recon-extract-dir',
-    buttonSelector: '#recon-extract-dir-btn',
-    labelSelector: '#recon-extract-dir-label',
-    emptyLabel: 'Nenhuma pasta',
-    onChange: () => {},
+  /* State */
+  let extractFiles = [];
+  let notesFiles = [];
+
+  /* ─── PICK EXTRATOS ─── */
+  btnPickExtract?.addEventListener('click', async () => {
+    try {
+      const result = await pickExtractFilesFromFolder();
+      extractFiles = result.files;
+      if (labelExtract) labelExtract.textContent = result.fileCountLabel;
+      if (btnImportExtract) btnImportExtract.disabled = extractFiles.length === 0;
+    } catch (err) {
+      appendLog(logEl, `⚠️ Seleção cancelada: ${err.message}`, 'warn');
+    }
   });
-  bindImportFilePicker(container, {
-    inputSelector: '#recon-extract-files',
-    buttonSelector: '#recon-extract-files-btn',
-    labelSelector: '#recon-extract-files-label',
-    emptyLabel: 'Nenhum arquivo',
-    onChange: () => {},
-  });
-  bindImportFilePicker(container, {
-    inputSelector: '#recon-notes-dir',
-    buttonSelector: '#recon-notes-dir-btn',
-    labelSelector: '#recon-notes-dir-label',
-    emptyLabel: 'Nenhuma pasta',
-    onChange: () => {},
-  });
-  bindImportFilePicker(container, {
-    inputSelector: '#recon-notes-files',
-    buttonSelector: '#recon-notes-files-btn',
-    labelSelector: '#recon-notes-files-label',
-    emptyLabel: 'Nenhum arquivo',
-    onChange: () => {},
+
+  /* ─── PICK NOTAS ─── */
+  btnPickNotes?.addEventListener('click', async () => {
+    try {
+      const result = await pickPdfFilesFromFolder();
+      notesFiles = result.files;
+      if (labelNotes) labelNotes.textContent = result.fileCountLabel;
+      if (btnImportNotes) btnImportNotes.disabled = notesFiles.length === 0;
+    } catch (err) {
+      appendLog(logEl, `⚠️ Seleção cancelada: ${err.message}`, 'warn');
+    }
   });
 
   /* ─── RESET ─── */
@@ -353,9 +314,10 @@ export async function InvestConciliacaoPage(container) {
             }
             setStepState(container, 'reset', 'done', '✅ Concluído');
             if (resetStatus) resetStatus.textContent = '✅ Base limpa. Agora importe os arquivos.';
-            if (btnImportExtract) btnImportExtract.disabled = false;
-            if (btnImportNotes) btnImportNotes.disabled = false;
             if (btnRecalc) btnRecalc.disabled = false;
+            // Re-enable import buttons if files were already selected
+            if (btnImportExtract) btnImportExtract.disabled = extractFiles.length === 0;
+            if (btnImportNotes) btnImportNotes.disabled = notesFiles.length === 0;
           } else {
             throw new Error(data.error || 'Falha no reset.');
           }
@@ -371,25 +333,15 @@ export async function InvestConciliacaoPage(container) {
 
   /* ─── IMPORTAR EXTRATOS ─── */
   btnImportExtract?.addEventListener('click', async () => {
-    const dirInput = container.querySelector('#recon-extract-dir');
-    const fileInput = container.querySelector('#recon-extract-files');
-    const allFiles = [...(dirInput?.files || []), ...(fileInput?.files || [])];
-    const extracts = allFiles.filter((f) => /\.(pdf|csv|txt)$/i.test(f.name));
-
-    if (!extracts.length) {
-      appendLog(logEl, '⚠️ Selecione uma pasta ou arquivos de extratos.', 'warn');
-      return;
-    }
-
+    if (!extractFiles.length) return;
     btnImportExtract.disabled = true;
-    setStepState(container, 'import-extratos', 'active', `Importando ${extracts.length} arquivo(s)...`);
-    appendLog(logEl, `─── Importando ${extracts.length} extrato(s) ───`, 'section');
+    setStepState(container, 'import-extratos', 'active', `Importando ${extractFiles.length} arquivo(s)...`);
+    appendLog(logEl, `─── Importando ${extractFiles.length} extrato(s) ───`, 'section');
 
     try {
-      const files = await readFilesAsPayload(extracts);
       const data = await apiRequest('/api/invest/import/btg-extract', {
         method: 'POST',
-        body: { files, dryRun: false },
+        body: { files: extractFiles, dryRun: false },
       });
 
       const fileResults = data.preview?.fileResults || data.fileResults || [];
@@ -398,10 +350,10 @@ export async function InvestConciliacaoPage(container) {
 
       appendLog(logEl, `✅ Extratos: ${ok} importados, ${err} com erro.`, ok > 0 ? 'ok' : 'warn');
       setStepState(container, 'import-extratos', err === 0 ? 'done' : 'error',
-        err === 0 ? `✅ ${ok} extrato(s) importados` : `⚠️ ${err} erro(s)`);
+        err === 0 ? `✅ ${ok} extrato(s)` : `⚠️ ${err} erro(s)`);
 
       const resultEl = container.querySelector('#recon-extract-result');
-      if (resultEl) resultEl.innerHTML = renderExtractResult({ ...data, fileResults });
+      if (resultEl) resultEl.innerHTML = renderExtractResult(data);
     } catch (err) {
       appendLog(logEl, `❌ Erro nos extratos: ${err.message}`, 'err');
       setStepState(container, 'import-extratos', 'error', '❌ ' + err.message);
@@ -412,25 +364,15 @@ export async function InvestConciliacaoPage(container) {
 
   /* ─── IMPORTAR NOTAS ─── */
   btnImportNotes?.addEventListener('click', async () => {
-    const dirInput = container.querySelector('#recon-notes-dir');
-    const fileInput = container.querySelector('#recon-notes-files');
-    const allFiles = [...(dirInput?.files || []), ...(fileInput?.files || [])];
-    const pdfs = allFiles.filter((f) => /\.pdf$/i.test(f.name));
-
-    if (!pdfs.length) {
-      appendLog(logEl, '⚠️ Selecione uma pasta ou arquivos PDF de notas.', 'warn');
-      return;
-    }
-
+    if (!notesFiles.length) return;
     btnImportNotes.disabled = true;
-    setStepState(container, 'import-notas', 'active', `Importando ${pdfs.length} nota(s)...`);
-    appendLog(logEl, `─── Importando ${pdfs.length} nota(s) de corretagem ───`, 'section');
+    setStepState(container, 'import-notas', 'active', `Importando ${notesFiles.length} nota(s)...`);
+    appendLog(logEl, `─── Importando ${notesFiles.length} nota(s) de corretagem ───`, 'section');
 
     try {
-      const files = await readFilesAsPayload(pdfs);
       const data = await apiRequest('/api/invest/import/btg-brokerage-notes', {
         method: 'POST',
-        body: { files, dryRun: false },
+        body: { files: notesFiles, dryRun: false },
       });
 
       const fileResults = data.preview?.fileResults || data.fileResults || [];
@@ -439,10 +381,10 @@ export async function InvestConciliacaoPage(container) {
 
       appendLog(logEl, `✅ Notas: ${ok} importadas, ${err} com erro.`, ok > 0 ? 'ok' : 'warn');
       setStepState(container, 'import-notas', err === 0 ? 'done' : 'error',
-        err === 0 ? `✅ ${ok} nota(s) importadas` : `⚠️ ${err} erro(s)`);
+        err === 0 ? `✅ ${ok} nota(s)` : `⚠️ ${err} erro(s)`);
 
       const resultEl = container.querySelector('#recon-notes-result');
-      if (resultEl) resultEl.innerHTML = renderNotesResult({ ...data, fileResults });
+      if (resultEl) resultEl.innerHTML = renderNotesResult(data);
     } catch (err) {
       appendLog(logEl, `❌ Erro nas notas: ${err.message}`, 'err');
       setStepState(container, 'import-notas', 'error', '❌ ' + err.message);
