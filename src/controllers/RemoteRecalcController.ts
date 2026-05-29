@@ -3,8 +3,6 @@ import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import { LedgerImportService } from '../core/invest/LedgerImportService';
 import { rebuildCustodyFromLedger } from '../core/invest/CustodyEngine';
 import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
-import { CoCeoDataGateway } from '../core/dal/CoCeoDataGateway';
-import { SYSTEM_INSTALLER_USER_ID } from '../core/dal/types';
 
 export class RemoteRecalcController {
   constructor(private gateway: any) {}
@@ -22,7 +20,7 @@ export class RemoteRecalcController {
 
       const start = new Date('2026-01-01');
       const end = new Date();
-      
+
       const results = [];
       let current = new Date(start);
 
@@ -67,31 +65,37 @@ export class RemoteRecalcController {
       for (const asset of assets) {
         if (!asset.assetId) continue;
         if (asset.assetType === 'cash') continue;
-        
-        // Verifica se existe invest_position_ext
+
+        // Verifica se existe registro em invest_position_ext (usa ctx do tenant)
         const extRows = await this.gateway.findWhere(
-          { userId: SYSTEM_INSTALLER_USER_ID, organizationId: orgId, impersonatorId: null, scope: 'global' },
+          ctx,
           'invest_position_ext',
           { patrimony_item_id: asset.assetId },
           { limit: 1 }
         );
 
-        let pmA = asset.avgPrice;
-        let pmB = asset.avgPrice;
-        let pmC = asset.avgPrice;
+        // PM inicial: avgPrice da custody engine (fallback para opening_balance sem custo)
+        let pmA: number | null = asset.avgPrice > 0 ? asset.avgPrice : null;
+        let pmB: number | null = pmA;
+        let pmC: number | null = pmA;
 
+        // Para ações/FIIs: tenta usar os três preços da engine (estrito/B3/gerencial)
         if (asset.assetType === 'stock' || asset.assetType === 'fii') {
-          const tp = pricesMap.get(asset.ticker);
-          if (tp) {
+          const ticker = String(asset.ticker ?? '').trim().toUpperCase();
+          const tp = pricesMap.get(ticker);
+          if (tp && tp.estrito > 0) {
             pmA = tp.estrito;
-            pmB = tp.b3;
-            pmC = tp.gerencial;
+            pmB = tp.b3 > 0 ? tp.b3 : tp.estrito;
+            pmC = tp.gerencial > 0 ? tp.gerencial : tp.estrito;
           }
+          // Se engine retornou 0 mas avgPrice > 0, mantém avgPrice (já inicializado acima)
         }
+
+        console.log(`[RecalcPositions] ${asset.ticker}: pmA=${pmA} pmB=${pmB} pmC=${pmC} avgPrice=${asset.avgPrice}`);
 
         if (extRows.length > 0) {
           await this.gateway.update(
-            { userId: SYSTEM_INSTALLER_USER_ID, organizationId: orgId, impersonatorId: null, scope: 'global' },
+            ctx,
             'invest_position_ext',
             asset.assetId,
             { pm_estrito: pmA, pm_b3: pmB, pm_gerencial: pmC }
@@ -99,14 +103,15 @@ export class RemoteRecalcController {
           updatedCount++;
         } else {
           await this.gateway.insert(
-            { userId: SYSTEM_INSTALLER_USER_ID, organizationId: orgId, impersonatorId: null, scope: 'global' },
+            ctx,
             'invest_position_ext',
-            { 
+            {
               patrimony_item_id: asset.assetId,
+              organization_id: orgId,
               asset_class: asset.assetType,
               pm_estrito: pmA,
               pm_b3: pmB,
-              pm_gerencial: pmC
+              pm_gerencial: pmC,
             }
           );
           updatedCount++;
@@ -122,4 +127,3 @@ export class RemoteRecalcController {
     }
   };
 }
-
