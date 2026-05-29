@@ -146,7 +146,6 @@ export class RemoteRecalcController {
             'invest_position_ext',
             {
               patrimony_item_id: asset.assetId,
-              organization_id: orgId,
               asset_class: asset.assetType,
               pm_estrito: pmA,
               pm_b3: pmB,
