@@ -1,10 +1,10 @@
 # Quadro resumo (gerado)
 
-> De `tasks/FILA.md` em **2026-05-29T23:14:44.728Z**. Edite a fila em **FILA.md**, nao aqui.
+> De `tasks/FILA.md` em **2026-05-29T23:32:46.808Z**. Edite a fila em **FILA.md**, nao aqui.
 
 | ID | P | Titulo | Spec | Status | Agente | Assumida | Concluida | Release |
 |----|---|--------|------|--------|--------|----------|-----------|---------|
-| CONC-00 | 0 | prioridade: 0 | — | done | — | — | 2026-05-29 23:14 | V0.0.222 |
+| CONC-00 | 0 | prioridade: 0 | — | claimed | antigravity-gamer | 2026-05-29 23:32 | — | — |
 | CONC-01 | 0 | prioridade: 0 | — | pending | — | — | — | — |
 | CONC-02 | 0 | prioridade: 0 | — | pending | — | — | — | — |
 | CONC-03 | 0 | prioridade: 0 | — | pending | — | — | — | — |
