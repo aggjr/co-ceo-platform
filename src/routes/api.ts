@@ -350,12 +350,7 @@ router.get(
   requirePermission('invest:ledger:read'),
   invest.reconcilePreflight.bind(invest)
 );
-router.post(
-  '/invest/reconcile/reset-holding',
-  AuthMiddleware.protect,
-  requirePermission('invest:ledger:write'),
-  invest.reconcileResetHolding.bind(invest)
-);
+
 router.post(
   '/invest/reconcile/session/start',
   AuthMiddleware.protect,
