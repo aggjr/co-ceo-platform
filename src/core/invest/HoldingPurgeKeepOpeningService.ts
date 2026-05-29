@@ -1,6 +1,7 @@
 import type { Pool, PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import { GatewayError } from '../dal/errors';
+import { StorageMeter } from '../dal/StorageMeter';
 import { LedgerImportService } from './LedgerImportService';
 import { resolveInvestPeriodBounds } from './investPeriodBounds';
 
@@ -36,6 +37,8 @@ export type HoldingPurgeResult = HoldingPurgePreview & {
   patrimonyLegsRemoved: number;
   financialLegsRemoved: number;
   businessEventsRemoved: number;
+  storageBytesBefore: number;
+  storageBytesAfter: 0;
   reconcileCustody: unknown;
 };
 
@@ -99,6 +102,7 @@ export class HoldingPurgeKeepOpeningService {
         bounds.openingRef,
         preview.openingEventIds
       );
+      const storageReset = await StorageMeter.resetOrganizationUsage(conn, orgId);
       await conn.commit();
 
       const reconcileCustody = await this.ledger.reconcileCustody(ctx);
@@ -107,6 +111,8 @@ export class HoldingPurgeKeepOpeningService {
         ...preview,
         executed: true,
         ...executed,
+        storageBytesBefore: storageReset.previousBytes,
+        storageBytesAfter: 0,
         reconcileCustody,
       };
     } catch (e) {
