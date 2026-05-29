@@ -76,18 +76,18 @@ function renderExtractResult(data) {
   const rows = fileResults.map((r) => {
     let detail = escapeHtml(r.parseError || r.importBlockReason || r.importError || (r.monthAlreadyImported ? 'Já importado' : ''));
     if (r.openingChainDelta && r.openingChainDelta !== 0) {
-      const adjText = \`<span style="color: #fca5a5; font-weight: 600;">⚠️ Ajuste injetado: R$ \${r.openingChainDelta.toFixed(2).replace('.', ',')}</span>\`;
-      detail = detail ? \`\${adjText}<br>\${detail}\` : adjText;
+      const adjText = `<span style="color: #fca5a5; font-weight: 600;">⚠️ Ajuste injetado: R$ ${r.openingChainDelta.toFixed(2).replace('.', ',')}</span>`;
+      detail = detail ? `${adjText}<br>${detail}` : adjText;
     }
-    return \`
+    return `
       <tr>
-        <td>\${escapeHtml(r.fileName || r.path)}</td>
-        <td>\${escapeHtml(r.month || '—')}</td>
-        <td>\${statusBadge(r.parseOk)}</td>
-        <td>\${statusBadge(r.importOk)}</td>
-        <td class="recon-detail">\${detail || ''}</td>
+        <td>${escapeHtml(r.fileName || r.path)}</td>
+        <td>${escapeHtml(r.month || '—')}</td>
+        <td>${statusBadge(r.parseOk)}</td>
+        <td>${statusBadge(r.importOk)}</td>
+        <td class="recon-detail">${detail || ''}</td>
       </tr>
-    \`;
+    `;
   }).join('');
   const total = data.totals
     ? `<p class="recon-totals">Gravados: ${data.totals.inserted ?? 0} | Pulados: ${data.totals.skipped ?? 0}</p>`
