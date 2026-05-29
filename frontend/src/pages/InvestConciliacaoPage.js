@@ -353,6 +353,11 @@ export async function InvestConciliacaoPage(container) {
     }
   }
 
-  await renderShell(container, { title, content: host });
+  await renderShell(container, {
+    title: `INVEST — ${title}`,
+    contentHtml: '<div id="invest-conciliacao-root"></div>',
+  });
+  const root = container.querySelector('#invest-conciliacao-root');
+  (root || container).replaceChildren(host);
   await loadPreflight();
 }
