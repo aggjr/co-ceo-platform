@@ -35,6 +35,14 @@ export type CashInTransitSummary = {
   lines: CashInTransitLine[];
 };
 
+function tradeCashFlowForTransit(txType: string, net: number): number {
+  const abs = Math.abs(net);
+  if (abs < 0.005) return 0;
+  if (txType === 'buy' || txType === 'put_buy' || txType === 'call_buy') return -abs;
+  if (txType === 'sell' || txType === 'put_sell' || txType === 'call_sell') return abs;
+  return net;
+}
+
 function isPendingSettlement(e: LedgerEvent): boolean {
   return String(e.transaction_type) === 'pending_settlement';
 }
@@ -132,7 +140,6 @@ function collectTradeForecastLines(
   const lines: CashInTransitLine[] = [];
 
   for (const e of entries) {
-    if (!e.id || coveredTradeIds.has(String(e.id))) continue;
     const ticker = String(e.asset_ticker || '').toUpperCase();
     if (isCashInvestTicker(ticker)) continue;
 
@@ -143,6 +150,11 @@ function collectTradeForecastLines(
     const tradeDate = String(e.transaction_date || '').slice(0, 10);
     if (!tradeDate || tradeDate > asOfDate) continue;
 
+    const entryKey = e.id
+      ? String(e.id)
+      : `${ticker}:${tradeDate}:${txType}:${String(e.broker_note_ref || '')}`;
+    if (coveredTradeIds.has(entryKey)) continue;
+
     const settleDate = cashSettlementDate(tradeDate, assetType, txType, ticker);
     if (settleDate <= asOfDate) continue;
 
@@ -152,14 +164,14 @@ function collectTradeForecastLines(
     lines.push({
       tradeDate,
       settleDate,
-      amount: Math.round(net * 100) / 100,
+      amount: Math.round(tradeCashFlowForTransit(txType, net) * 100) / 100,
       ticker,
       transactionType: txType,
       assetType,
       rule: cashSettlementRuleLabel(assetType, txType, ticker),
       notes: `Previsão — conferir extrato BTG em ${settleDate}`,
       brokerNoteRef: e.broker_note_ref ? String(e.broker_note_ref) : null,
-      ledgerEntryId: String(e.id),
+      ledgerEntryId: e.id ? String(e.id) : entryKey,
       source: 'trade_forecast',
     });
   }

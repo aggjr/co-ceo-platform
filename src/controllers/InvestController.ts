@@ -699,6 +699,9 @@ export class InvestController {
       storedTwrChart
     );
     const portfolioPeriodReturn =
+      (storedTwrChart.length >= 2
+        ? storedTwrChart[storedTwrChart.length - 1]!.periodReturnToDate
+        : null) ??
       result.performance?.periodReturnTwr ??
       (portfolioIndexed.length >= 2
         ? portfolioIndexed[portfolioIndexed.length - 1]!.periodReturnToDate

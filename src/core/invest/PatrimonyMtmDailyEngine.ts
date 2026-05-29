@@ -5,6 +5,8 @@ import {
   computePortfolioPerformance,
   computeTwrFromMonthEndAnchors,
 } from './portfolioPerformance';
+import { buildCashInTransitSummary } from './cashInTransit';
+import { B3_STOCK_PAYMENT_BUSINESS_DAYS } from './settlementCalendar';
 import { computeSharpeRatio, dailyReturnsFromPatrimony } from './sharpeRatio';
 import { inferOptionExpiryDate } from './optionExpiry';
 import {
@@ -116,6 +118,31 @@ function resolvePositionMark(
   return undefined;
 }
 
+function ledgerThroughDate(entries: LedgerEvent[], date: string): LedgerEvent[] {
+  return entries.filter((e) => String(e.transaction_date || '').slice(0, 10) <= date);
+}
+
+function entriesForEconomicCash(entries: LedgerEvent[]): LedgerEvent[] {
+  return entries.filter((e) => {
+    const ticker = String(e.asset_ticker || '').toUpperCase();
+    const assetType = String(e.asset_type || '');
+    if (isCash(assetType, ticker) && isPatrimonyCashAdjustment(e)) return false;
+    return true;
+  });
+}
+
+function economicCashAtDate(
+  entries: LedgerEvent[],
+  date: string
+): { cash: number; scheduledCashPending: number } {
+  const slice = entriesForEconomicCash(ledgerThroughDate(entries, date));
+  const summary = buildCashInTransitSummary(slice, date);
+  return {
+    cash: summary.cashIncludingTransit,
+    scheduledCashPending: summary.inTransitNet,
+  };
+}
+
 function applyQty(pos: DayPosition, type: string, qty: number): void {
   if (type === 'opening_balance' || type === 'buy' || type === 'bonus') {
     pos.qty += Math.abs(qty);
@@ -172,7 +199,6 @@ export function buildDailyPatrimonyMtmSeries(
   );
   const byDay = groupByDate(sorted);
   const positions = new Map<string, DayPosition>();
-  let cash = 0;
   let pendingSettlements = 0;
 
   const calendar = enumerateDates(from, to);
@@ -184,6 +210,7 @@ export function buildDailyPatrimonyMtmSeries(
     cash: number;
     fixedIncome: number;
     pendingSettlements: number;
+    scheduledCashPending: number;
     patrimonyGross: number;
     patrimony: number;
     target: number;
@@ -201,12 +228,10 @@ export function buildDailyPatrimonyMtmSeries(
       }
 
       if (isCash(assetType, ticker)) {
-        if (isPatrimonyCashAdjustment(e)) continue;
-        const net = Number(e.total_net_value ?? 0);
-        if (net !== 0) cash += net;
-        else if (type === 'opening_balance') {
-          cash += Math.abs(Number(e.quantity)) * Number(e.unit_price || 1);
-        }
+        continue;
+      }
+
+      if (e.impacts_managerial_price === false || e.impacts_managerial_price === 0) {
         continue;
       }
 
@@ -239,6 +264,8 @@ export function buildDailyPatrimonyMtmSeries(
 
       applyQty(pos, type, Number(e.quantity));
     }
+
+    const { cash, scheduledCashPending } = economicCashAtDate(sorted, date);
 
     let stocksValue = 0;
     let optionsFromMarket = 0;
@@ -289,6 +316,7 @@ export function buildDailyPatrimonyMtmSeries(
       cash: Math.round(cash * 100) / 100,
       fixedIncome,
       pendingSettlements: pending,
+      scheduledCashPending: Math.round(scheduledCashPending * 100) / 100,
       patrimonyGross,
       patrimony,
       target: calibrate ? Math.round(target * 100) / 100 : patrimony,
@@ -308,7 +336,7 @@ export function buildDailyPatrimonyMtmSeries(
       date: p.date,
       patrimonyGross: p.patrimonyGross,
       pendingSettlements: p.pendingSettlements,
-      scheduledCashPending: 0,
+      scheduledCashPending: p.scheduledCashPending,
       patrimony: p.patrimony,
       cash: p.cash,
       positionsValue: Math.round((p.stocksValue + p.optionsValue) * 100) / 100,
@@ -356,12 +384,11 @@ export function buildDailyPatrimonyMtmSeries(
     positionSnapshots,
     meta: {
       method: calibrate ? 'mtm_btg_calibrated' : 'mtm_economic',
-      stock_cash_settlement_days: 0,
+      stock_cash_settlement_days: B3_STOCK_PAYMENT_BUSINESS_DAYS,
       note: calibrate
-        ? 'Patrimônio econômico: posições × cotação atual + caixa (sem ajustes CASH-RECON). ' +
-          'TWR diário: só capital_deposit/withdrawal como fluxo externo. ' +
-          'Cotações históricas diárias ainda não importadas — rentab. pode divergir do BTG.'
-        : 'Patrimônio econômico do dia (cotações do fechamento, sem calibração BTG).',
+        ? 'Patrimônio econômico: posições × cotação atual + caixa liquidado e trânsito (D+2 ações). ' +
+          'TWR diário: só capital_deposit/withdrawal como fluxo externo.'
+        : 'Patrimônio econômico do dia (cotações do fechamento, caixa liquidado + trânsito D+2/D+1).',
     },
   };
 }

@@ -125,6 +125,46 @@ function renderNotesResult(data) {
   `;
 }
 
+const RECON_ACTION_LABELS = {
+  insert_from_file: 'Inserir do arquivo',
+  void_ledger: 'Anular no livro',
+  pair_rows: 'Parear linhas',
+  keep_ledger_row: 'Manter livro',
+  confirm_skipped: 'Confirmar ignorado',
+  defer: 'Adiar',
+};
+
+function renderPendingDecisions(pending) {
+  if (!pending?.length) {
+    return '<p class="muted">Nenhuma pendência — pode fechar o dia.</p>';
+  }
+  return pending.map((d) => {
+    const ctx = d.context || {};
+    const actions = (d.allowedActions || [])
+      .map((a) => `<button type="button" class="btn btn-sm btn-secondary wizard-resolve" data-decision-id="${escapeHtml(d.decisionId)}" data-action="${escapeHtml(a)}">${escapeHtml(RECON_ACTION_LABELS[a] || a)}</button>`)
+      .join(' ');
+    return `
+      <div class="invest-conciliacao__pending-item" data-decision-id="${escapeHtml(d.decisionId)}">
+        <strong>${escapeHtml(d.kind || d.summaryKey || 'pendência')}</strong>
+        <span class="muted">${escapeHtml(ctx.ticker || '')} · qtd ${escapeHtml(String(ctx.quantity ?? '—'))} · R$ ${escapeHtml(String(ctx.unitPrice ?? '—'))}</span>
+        <div class="conciliacao-btn-row" style="margin-top:0.5rem">${actions}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderDayPreviewRows(rows) {
+  if (!rows?.length) return '<tr><td colspan="5" class="muted">Sem linhas</td></tr>';
+  return rows.map((r) => `
+    <tr data-row-key="${escapeHtml(r.rowKey)}">
+      <td>${escapeHtml(r.source || '—')}</td>
+      <td>${escapeHtml(r.ticker || '—')}</td>
+      <td>${escapeHtml(String(r.quantity ?? '—'))}</td>
+      <td>${escapeHtml(String(r.unitPrice ?? '—'))}</td>
+      <td>${escapeHtml(r.status || '—')}</td>
+    </tr>
+  `).join('');
+}
+
 /* ─────────────────────────── main page ─────────────────────────── */
 
 export async function InvestConciliacaoPage(container) {
@@ -154,6 +194,48 @@ export async function InvestConciliacaoPage(container) {
             <strong>extratos BTG</strong> → materialização (custódia, 3 preços, patrimônio diário gravado).
             Divergências continuam visíveis nos previews de importação — resolva antes de recalcular.
           </p>
+        </div>
+      </div>
+
+      <!-- Wizard dia a dia (notas) -->
+      <div class="conciliacao-action-panel invest-conciliacao__wizard-setup" id="wizard-setup">
+        <h2>Modo preciso — conciliação dia a dia</h2>
+        <p class="muted">
+          Para bater centavo a centavo: selecione a pasta de notas, inicie a sessão e resolva cada
+          pendência antes de fechar o pregão. Depois continue com extratos (Passo 3) e materialização.
+        </p>
+        <div class="invest-conciliacao__folder-row" style="margin-bottom: 0.75rem;">
+          <button id="btn-pick-wizard-notas" class="invest-conciliacao__folder-picker" title="Escolher pasta de notas">📂</button>
+          <div class="invest-conciliacao__folder-body">
+            <input type="text" id="input-path-wizard-notas" class="invest-conciliacao__folder-path-input" placeholder="Pasta de PDFs das notas" readonly />
+            <span id="label-wizard-notas" class="invest-conciliacao__folder-count"></span>
+          </div>
+        </div>
+        <div class="conciliacao-btn-row">
+          <button id="btn-wizard-start" class="btn btn-primary" disabled>Iniciar sessão (notas)</button>
+          <span id="wizard-start-status" class="muted" style="font-size:0.85rem"></span>
+        </div>
+        <div id="wizard-workflow" class="invest-conciliacao__workflow" hidden>
+          <div class="invest-conciliacao__toolbar">
+            <label>Dia:</label>
+            <select id="wizard-day-select"></select>
+            <button id="btn-wizard-load-day" class="btn btn-secondary btn-sm">Carregar dia</button>
+            <button id="btn-wizard-close-day" class="btn btn-primary btn-sm" disabled>Fechar dia</button>
+            <span id="wizard-day-status" class="muted"></span>
+          </div>
+          <div class="conciliacao-action-panel" style="margin-top:1rem">
+            <h3>Pendências do dia</h3>
+            <div id="wizard-pending" class="invest-conciliacao__pending"></div>
+          </div>
+          <div class="invest-conciliacao__tables">
+            <div class="invest-conciliacao__table-wrap">
+              <h4>Livro × arquivo</h4>
+              <table class="invest-conciliacao__table">
+                <thead><tr><th>Origem</th><th>Ticker</th><th>Qtd</th><th>Preço</th><th>Status</th></tr></thead>
+                <tbody id="wizard-preview-rows"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -462,7 +544,6 @@ export async function InvestConciliacaoPage(container) {
     }
   });
 
-  /* ─── MATERIALIZAR (Passo 4) ─── */
   btnRecalc?.addEventListener('click', async () => {
     btnRecalc.disabled = true;
     if (recalcStatus) recalcStatus.textContent = 'Materializando...';
@@ -498,6 +579,140 @@ export async function InvestConciliacaoPage(container) {
       setStepState(container, 'recalc', 'error', '❌ ' + err.message);
       if (recalcStatus) recalcStatus.textContent = '❌ ' + err.message;
       btnRecalc.disabled = false;
+    }
+  });
+
+  /* ─── Wizard dia a dia ─── */
+  const btnPickWizardNotes = container.querySelector('#btn-pick-wizard-notas');
+  const inputPathWizardNotes = container.querySelector('#input-path-wizard-notas');
+  const labelWizardNotes = container.querySelector('#label-wizard-notas');
+  const btnWizardStart = container.querySelector('#btn-wizard-start');
+  const wizardStartStatus = container.querySelector('#wizard-start-status');
+  const wizardWorkflow = container.querySelector('#wizard-workflow');
+  const wizardDaySelect = container.querySelector('#wizard-day-select');
+  const btnWizardLoadDay = container.querySelector('#btn-wizard-load-day');
+  const btnWizardCloseDay = container.querySelector('#btn-wizard-close-day');
+  const wizardDayStatus = container.querySelector('#wizard-day-status');
+  const wizardPending = container.querySelector('#wizard-pending');
+  const wizardPreviewRows = container.querySelector('#wizard-preview-rows');
+
+  let wizardNotesFiles = [];
+  let wizardSessionId = null;
+  let wizardCalendar = [];
+  let wizardCurrentDay = null;
+
+  btnPickWizardNotes?.addEventListener('click', async () => {
+    try {
+      const result = await pickPdfFilesFromFolder();
+      wizardNotesFiles = result.files;
+      if (inputPathWizardNotes) inputPathWizardNotes.value = result.folderPath || 'Pasta selecionada';
+      if (labelWizardNotes) labelWizardNotes.textContent = result.fileCountLabel;
+      if (btnWizardStart) btnWizardStart.disabled = wizardNotesFiles.length === 0;
+    } catch (err) {
+      appendLog(logEl, `⚠️ Wizard: ${err.message}`, 'warn');
+    }
+  });
+
+  async function loadWizardDay(date) {
+    if (!wizardSessionId || !date) return;
+    wizardCurrentDay = date;
+    if (wizardDayStatus) wizardDayStatus.textContent = 'Carregando...';
+    try {
+      const data = await apiRequest(
+        `/api/invest/reconcile/session/${encodeURIComponent(wizardSessionId)}/day/${encodeURIComponent(date)}`
+      );
+      if (wizardPending) {
+        wizardPending.innerHTML = renderPendingDecisions(data.pendingDecisions || []);
+        wizardPending.querySelectorAll('.wizard-resolve').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            const decisionId = btn.getAttribute('data-decision-id');
+            const action = btn.getAttribute('data-action');
+            try {
+              await apiRequest(
+                `/api/invest/reconcile/session/${encodeURIComponent(wizardSessionId)}/day/${encodeURIComponent(date)}/resolve`,
+                { method: 'POST', body: { decisionId, action } }
+              );
+              appendLog(logEl, `✅ Pendência resolvida (${action})`, 'ok');
+              await loadWizardDay(date);
+            } catch (err) {
+              appendLog(logEl, `❌ Resolver: ${err.message}`, 'err');
+            }
+          });
+        });
+      }
+      if (wizardPreviewRows) {
+        const rows = data.preview?.rows || [];
+        wizardPreviewRows.innerHTML = renderDayPreviewRows(rows);
+      }
+      if (btnWizardCloseDay) btnWizardCloseDay.disabled = !data.canClose;
+      if (wizardDayStatus) {
+        wizardDayStatus.textContent = data.canClose
+          ? '✅ Sem pendências — pode fechar'
+          : `⚠️ ${(data.pendingDecisions || []).length} pendência(s)`;
+      }
+    } catch (err) {
+      if (wizardDayStatus) wizardDayStatus.textContent = '❌ ' + err.message;
+      appendLog(logEl, `❌ Dia ${date}: ${err.message}`, 'err');
+    }
+  }
+
+  btnWizardStart?.addEventListener('click', async () => {
+    if (!wizardNotesFiles.length) return;
+    btnWizardStart.disabled = true;
+    if (wizardStartStatus) wizardStartStatus.textContent = 'Iniciando sessão...';
+    try {
+      let dataMode;
+      const pf = await apiRequest('/api/invest/reconcile/preflight');
+      if (pf.needsDataModeChoice) {
+        const recover = window.confirm(
+          'Há dados operacionais na holding.\n\nOK = recuperar (preservar)\nCancelar = reset (refazer do zero, preserva abertura)'
+        );
+        dataMode = recover ? 'recover' : 'reset_from_opening';
+      }
+      const data = await apiRequest('/api/invest/reconcile/session/start', {
+        method: 'POST',
+        body: { phase: 'notes', files: wizardNotesFiles, dataMode },
+      });
+      wizardSessionId = data.sessionId;
+      wizardCalendar = data.calendar || [];
+      if (wizardWorkflow) wizardWorkflow.hidden = false;
+      if (wizardDaySelect) {
+        wizardDaySelect.innerHTML = wizardCalendar
+          .map((d) => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`)
+          .join('');
+      }
+      appendLog(logEl, `✅ Sessão ${wizardSessionId} — ${wizardCalendar.length} dia(s)`, 'ok');
+      if (wizardStartStatus) wizardStartStatus.textContent = 'Sessão ativa';
+      enableStep2();
+      enableStep3();
+      if (wizardCalendar.length) await loadWizardDay(wizardCalendar[0]);
+    } catch (err) {
+      appendLog(logEl, `❌ Sessão: ${err.message}`, 'err');
+      if (wizardStartStatus) wizardStartStatus.textContent = '❌ ' + err.message;
+      btnWizardStart.disabled = false;
+    }
+  });
+
+  btnWizardLoadDay?.addEventListener('click', () => {
+    const date = wizardDaySelect?.value;
+    if (date) void loadWizardDay(date);
+  });
+
+  btnWizardCloseDay?.addEventListener('click', async () => {
+    const date = wizardCurrentDay || wizardDaySelect?.value;
+    if (!wizardSessionId || !date) return;
+    btnWizardCloseDay.disabled = true;
+    try {
+      await apiRequest(
+        `/api/invest/reconcile/session/${encodeURIComponent(wizardSessionId)}/day/${encodeURIComponent(date)}/close`,
+        { method: 'POST', body: {} }
+      );
+      appendLog(logEl, `✅ Dia ${date} fechado — patrimônio materializado até aqui`, 'ok');
+      await loadWizardDay(date);
+    } catch (err) {
+      appendLog(logEl, `❌ Fechar dia: ${err.message}`, 'err');
+    } finally {
+      btnWizardCloseDay.disabled = false;
     }
   });
 }

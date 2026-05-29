@@ -78,8 +78,8 @@ export function buildStoredTwrChartSeries(
 }
 
 /**
- * Série da carteira no gráfico: TWR da série mesclada (patrimônio exibido) tem prioridade;
- * fechamentos gravados só se variarem; senão índice simples do patrimônio.
+ * Série da carteira no gráfico: fechamentos gravados (TWR real) têm prioridade;
+ * depois TWR da série mesclada; senão índice simples do patrimônio.
  */
 export function resolvePortfolioIndexedForChart(
   mergedSeries: Array<{ date: string; patrimony: number }>,
@@ -94,10 +94,10 @@ export function resolvePortfolioIndexedForChart(
     storedTwrChart.length >= 2 ? storedTwrChart : [];
   const fromPatrimony = buildPatrimonyIndexedSeries(mergedSeries);
 
-  if (chartSeriesHasVariation(fromPerformance)) return fromPerformance;
   if (chartSeriesHasVariation(fromStored)) return fromStored;
-  if (fromPerformance.length >= 2) return fromPerformance;
+  if (chartSeriesHasVariation(fromPerformance)) return fromPerformance;
   if (fromStored.length >= 2) return fromStored;
+  if (fromPerformance.length >= 2) return fromPerformance;
   return fromPatrimony;
 }
 

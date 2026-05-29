@@ -203,7 +203,7 @@ export class ReconciliationSessionService {
     const previewSummary =
       input.phase === 'notes' ? await previewBtgBrokerageUpload(input.files) : null;
     if (previewSummary) {
-      fileResults = previewSummary.fileResults;
+      fileResults = previewSummary.fileResults ?? [];
       log(
         `Preview notas: ${previewSummary.filesOk}/${previewSummary.filesTotal} PDF(s) OK, ${previewSummary.notesKept} nota(s)`,
         'notes.preview',
