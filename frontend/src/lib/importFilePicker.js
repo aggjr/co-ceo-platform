@@ -14,21 +14,28 @@ function readFileAsBase64(file) {
   });
 }
 
-function folderLabelFromFiles(files) {
+function folderPathFromRelativeNames(files) {
   if (!files.length) return '';
-  const dirs = new Set();
-  for (const f of files) {
-    const p = String(f.name || '');
-    const parts = p.replace(/\\/g, '/').split('/');
-    if (parts.length > 1) dirs.add(parts[0]);
+  const paths = files.map((f) => String(f.name || '').replace(/\\/g, '/'));
+  const roots = new Set(paths.map((p) => p.split('/')[0]).filter(Boolean));
+  if (roots.size === 1) {
+    const root = [...roots][0];
+    const underRoot = paths.every((p) => p === root || p.startsWith(`${root}/`));
+    if (underRoot) return root;
   }
-  const dirHint = dirs.size === 1 ? [...dirs][0] : `${dirs.size} pastas`;
-  return `${files.length} arquivo(s) — ${dirHint}`;
+  if (roots.size > 1) return [...roots].join(' · ');
+  return paths[0].includes('/') ? paths[0].split('/').slice(0, -1).join('/') : '';
+}
+
+function fileCountLabel(fileCount, folderPath) {
+  if (!fileCount) return 'Nenhum arquivo selecionado';
+  const hint = folderPath || 'pasta';
+  return `${fileCount} arquivo(s) — ${hint}`;
 }
 
 /**
  * @param {{ extensions?: string[] }} opts — ex. ['.pdf'] ou ['.pdf', '.csv', '.txt']
- * @returns {Promise<{ files: Array<{ name: string, contentBase64: string }>, label: string }>}
+ * @returns {Promise<{ files: Array<{ name: string, contentBase64: string }>, folderPath: string, fileCountLabel: string }>}
  */
 export async function pickFilesFromFolder(opts = {}) {
   const exts = (opts.extensions || ['.pdf']).map((e) =>
@@ -57,7 +64,12 @@ export async function pickFilesFromFolder(opts = {}) {
           }))
         );
         document.body.removeChild(input);
-        resolve({ files, label: folderLabelFromFiles(files) });
+        const folderPath = folderPathFromRelativeNames(files);
+        resolve({
+          files,
+          folderPath,
+          fileCountLabel: fileCountLabel(files.length, folderPath),
+        });
       } catch (e) {
         document.body.removeChild(input);
         reject(e);
@@ -67,7 +79,7 @@ export async function pickFilesFromFolder(opts = {}) {
   });
 }
 
-/** @returns {Promise<{ files: Array<{ name: string, contentBase64: string }>, label: string }>} */
+/** @returns {Promise<{ files: Array<{ name: string, contentBase64: string }>, folderPath: string, fileCountLabel: string }>} */
 export async function pickPdfFilesFromFolder() {
   return pickFilesFromFolder({ extensions: ['.pdf'] });
 }

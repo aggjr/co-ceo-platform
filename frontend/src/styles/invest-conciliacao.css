@@ -116,8 +116,8 @@
 .invest-conciliacao__folder-row {
   display: flex;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem 0;
+  gap: 0.65rem;
+  padding: 0.85rem 0;
   border-bottom: 1px solid var(--border, #2a3544);
 }
 
@@ -125,10 +125,33 @@
   border-bottom: none;
 }
 
-.invest-conciliacao__folder-icon {
-  font-size: 1.5rem;
+.invest-conciliacao__folder-picker {
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin-top: 1.35rem;
+  padding: 0;
+  border: 1px solid var(--border, #3d4d63);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 1.45rem;
   line-height: 1;
-  margin-top: 0.15rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.invest-conciliacao__folder-picker:hover {
+  background: rgba(13, 148, 136, 0.15);
+  border-color: var(--accent, #0d9488);
+}
+
+.invest-conciliacao__folder-picker:focus-visible {
+  outline: 2px solid var(--accent, #0d9488);
+  outline-offset: 2px;
+}
+
+.invest-conciliacao__folder-picker:active {
+  transform: scale(0.96);
 }
 
 .invest-conciliacao__folder-body {
@@ -139,14 +162,38 @@
 .invest-conciliacao__folder-label {
   display: block;
   font-weight: 600;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.95rem;
 }
 
-.invest-conciliacao__folder-path {
+.invest-conciliacao__folder-path-input {
   display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.65rem;
   font-size: 0.88rem;
-  color: var(--text-muted, #9aa3b2);
+  color: var(--text, #e8eaed);
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border, #3a4556);
+  border-radius: 6px;
+  cursor: pointer;
   word-break: break-all;
+}
+
+.invest-conciliacao__folder-path-input::placeholder {
+  color: var(--text-muted, #7a8494);
+}
+
+.invest-conciliacao__folder-path-input:focus {
+  outline: none;
+  border-color: var(--accent, #0d9488);
+}
+
+.invest-conciliacao__folder-count {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--text-muted, #9aa3b2);
 }
 
 .invest-conciliacao__check-row {

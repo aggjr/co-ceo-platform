@@ -26,6 +26,52 @@ function btn(label, onClick, disabled = false, className = 'btn btn-secondary') 
   return b;
 }
 
+/** Ícone de pasta clicável + título + campo de caminho + contagem abaixo. */
+function buildFolderPickerRow(title, placeholder, onSelected) {
+  const row = el('div', 'invest-conciliacao__folder-row');
+  const folderBtn = document.createElement('button');
+  folderBtn.type = 'button';
+  folderBtn.className = 'invest-conciliacao__folder-picker';
+  folderBtn.title = 'Escolher pasta';
+  folderBtn.setAttribute('aria-label', `Escolher pasta — ${title}`);
+  folderBtn.textContent = '📁';
+
+  const body = el('div', 'invest-conciliacao__folder-body');
+  body.appendChild(el('label', 'invest-conciliacao__folder-label', title));
+
+  const pathInput = document.createElement('input');
+  pathInput.type = 'text';
+  pathInput.readOnly = true;
+  pathInput.className = 'invest-conciliacao__folder-path-input';
+  pathInput.placeholder = placeholder;
+  pathInput.value = '';
+
+  const countEl = el('span', 'invest-conciliacao__folder-count', 'Nenhum arquivo selecionado');
+
+  const openPicker = async () => {
+    const result = await onSelected();
+    if (!result) return;
+    pathInput.value = result.folderPath || '';
+    countEl.textContent = result.fileCountLabel || 'Nenhum arquivo selecionado';
+  };
+
+  folderBtn.addEventListener('click', () => void openPicker());
+  pathInput.addEventListener('click', () => void openPicker());
+
+  body.appendChild(pathInput);
+  body.appendChild(countEl);
+  row.appendChild(folderBtn);
+  row.appendChild(body);
+
+  return {
+    row,
+    setSelection(folderPath, fileCountLabel) {
+      pathInput.value = folderPath || '';
+      countEl.textContent = fileCountLabel || 'Nenhum arquivo selecionado';
+    },
+  };
+}
+
 function formatOpeningDate(iso) {
   if (!iso || iso.length < 10) return iso || '—';
   const [y, m, d] = iso.slice(0, 10).split('-');
@@ -99,9 +145,9 @@ export async function InvestConciliacaoPage(container) {
 
   const state = {
     notesFiles: [],
-    notesFolderLabel: 'Nenhuma pasta selecionada',
+    notesFolderPath: '',
     extractFiles: [],
-    extractFolderLabel: 'Nenhuma pasta selecionada (após fase notas)',
+    extractFolderPath: '',
     resetBase: false,
     dataMode: 'recover',
     preflight: null,
@@ -139,8 +185,6 @@ export async function InvestConciliacaoPage(container) {
   filesWrap.appendChild(filesTable);
 
   const statusEl = el('p', 'invest-conciliacao__status muted', '');
-  const notesPathEl = el('span', 'invest-conciliacao__folder-path', state.notesFolderLabel);
-  const extractPathEl = el('span', 'invest-conciliacao__folder-path', state.extractFolderLabel);
   const resetCheck = document.createElement('input');
   resetCheck.type = 'checkbox';
   resetCheck.id = 'conciliacao-reset-base';
@@ -153,39 +197,29 @@ export async function InvestConciliacaoPage(container) {
 
   setupPanel.appendChild(el('h2', 'invest-conciliacao__setup-title', 'Configuração'));
 
-  const notesRow = el('div', 'invest-conciliacao__folder-row');
-  notesRow.appendChild(el('span', 'invest-conciliacao__folder-icon', '📁'));
-  const notesBody = el('div', 'invest-conciliacao__folder-body');
-  notesBody.appendChild(el('label', 'invest-conciliacao__folder-label', 'Notas de corretagem (PDF)'));
-  notesBody.appendChild(notesPathEl);
-  notesRow.appendChild(notesBody);
-  notesRow.appendChild(
-    btn('Escolher pasta', async () => {
-      const { files, label } = await pickPdfFilesFromFolder();
-      state.notesFiles = files;
-      state.notesFolderLabel = files.length ? label : 'Nenhuma pasta selecionada';
-      notesPathEl.textContent = state.notesFolderLabel;
-    })
+  const notesPicker = buildFolderPickerRow(
+    'Notas de corretagem (PDF)',
+    'Clique na pasta para escolher o diretório…',
+    async () => {
+      const result = await pickPdfFilesFromFolder();
+      state.notesFiles = result.files;
+      state.notesFolderPath = result.folderPath;
+      return result;
+    }
   );
-  setupPanel.appendChild(notesRow);
+  setupPanel.appendChild(notesPicker.row);
 
-  const extractRow = el('div', 'invest-conciliacao__folder-row');
-  extractRow.appendChild(el('span', 'invest-conciliacao__folder-icon', '📁'));
-  const extractBody = el('div', 'invest-conciliacao__folder-body');
-  extractBody.appendChild(
-    el('label', 'invest-conciliacao__folder-label', 'Extrato / financeiro (PDF, CSV ou TXT)')
+  const extractPicker = buildFolderPickerRow(
+    'Extrato / financeiro (PDF, CSV ou TXT)',
+    'Clique na pasta para escolher o diretório…',
+    async () => {
+      const result = await pickExtractFilesFromFolder();
+      state.extractFiles = result.files;
+      state.extractFolderPath = result.folderPath;
+      return result;
+    }
   );
-  extractBody.appendChild(extractPathEl);
-  extractRow.appendChild(extractBody);
-  extractRow.appendChild(
-    btn('Escolher pasta', async () => {
-      const { files, label } = await pickExtractFilesFromFolder();
-      state.extractFiles = files;
-      state.extractFolderLabel = files.length ? label : 'Nenhuma pasta selecionada';
-      extractPathEl.textContent = state.extractFolderLabel;
-    })
-  );
-  setupPanel.appendChild(extractRow);
+  setupPanel.appendChild(extractPicker.row);
 
   const checkRow = el('label', 'invest-conciliacao__check-row');
   checkRow.htmlFor = 'conciliacao-reset-base';
