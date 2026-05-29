@@ -16,6 +16,11 @@ const globalCatalogCtx = {
   scope: 'global' as const,
 };
 
+function toIsoDate(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value ?? '').slice(0, 10);
+}
+
 function rowToMarketEntry(row: Record<string, unknown>): OptionMarketRow | null {
   const ticker = String(row.ticker ?? '').toUpperCase();
   if (!ticker) return null;
@@ -27,7 +32,7 @@ function rowToMarketEntry(row: Record<string, unknown>): OptionMarketRow | null 
     optionType:
       String(row.option_type ?? row.type ?? 'PUT').toUpperCase() === 'CALL' ? 'CALL' : 'PUT',
     strikePrice: strike,
-    expirationDate: String(row.expiration_date ?? '').slice(0, 10),
+    expirationDate: toIsoDate(row.expiration_date),
   };
 }
 

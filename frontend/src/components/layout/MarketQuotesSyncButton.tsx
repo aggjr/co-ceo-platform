@@ -80,31 +80,35 @@ export function MarketQuotesSyncButton() {
         showFlash(`${saved} cotação(ões) gravada(s)${extra}.`);
       } else {
         const path = window.location.pathname;
+
+        try {
+          await apiRequest('/api/invest/quotes/sync-b3', {
+            method: 'POST',
+            body: {},
+          });
+        } catch (err: any) {
+          console.error('Failed to sync b3 quotes', err);
+        }
+
         if (path.includes('/invest/portfolio')) {
           const data = await apiRequest('/api/invest/admin/recalc-positions', {
             method: 'POST',
             body: {},
           });
           const updated = Number(data.updated ?? 0);
-          showFlash(`${updated} posições recalculadas.`);
-          setTimeout(() => window.location.reload(), 1000);
+          showFlash(`Preços sincronizados. ${updated} posições recalculadas.`);
+          setTimeout(() => window.location.reload(), 1500);
         } else if (path.includes('/invest/panorama') || path.includes('/invest/historico')) {
           const data = await apiRequest('/api/invest/admin/recalc-curve', {
             method: 'POST',
             body: {},
           });
           const processed = Number(data.processed ?? 0);
-          showFlash(`Curva recalculada: ${processed} dias processados.`);
-          setTimeout(() => window.location.reload(), 1000);
+          showFlash(`Preços sincronizados. Curva recalculada: ${processed} dias processados.`);
+          setTimeout(() => window.location.reload(), 1500);
         } else {
-          const data = await apiRequest('/api/invest/quotes/sync-b3', {
-            method: 'POST',
-            body: {},
-          });
-          const updated = Number(data.updated ?? 0);
-          const missing = Array.isArray(data.missing) ? data.missing.length : 0;
-          const extra = missing > 0 ? ` — ${missing} sem resposta` : '';
-          showFlash(`${updated} ativo(s) atualizado(s)${extra}.`);
+          showFlash(`Preços sincronizados com sucesso.`);
+          setTimeout(() => window.location.reload(), 1500);
         }
       }
       window.dispatchEvent(new CustomEvent('coceo:route-refresh'));

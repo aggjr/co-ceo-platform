@@ -30,6 +30,11 @@ function parseMetadata(raw: unknown): Record<string, unknown> {
   }
 }
 
+function toIsoDate(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value ?? '').slice(0, 10);
+}
+
 /**
  * Projeta patrimony_items + invest_position_ext + invest_option_ext +
  * financial_accounts no shape que os consumers antigos esperavam de
@@ -106,13 +111,13 @@ export class InvestAssetProjection {
 
       if (ext) {
         if (ext.last_price != null) meta.last_price = Number(ext.last_price);
-        if (ext.last_price_as_of) meta.quote_as_of = String(ext.last_price_as_of).slice(0, 10);
+        if (ext.last_price_as_of) meta.quote_as_of = toIsoDate(ext.last_price_as_of);
         if (ext.sector) meta.sector = String(ext.sector);
         if (ext.issuer_name) meta.name = String(ext.issuer_name);
       }
       if (optionExt) {
         if (optionExt.strike_price != null) meta.option_strike = Number(optionExt.strike_price);
-        if (optionExt.expiration_date) meta.option_expiration = String(optionExt.expiration_date).slice(0, 10);
+        if (optionExt.expiration_date) meta.option_expiration = toIsoDate(optionExt.expiration_date);
       }
       if (
         (isOptionTicker(ticker) || subcategory === 'option_call' || subcategory === 'option_put') &&
