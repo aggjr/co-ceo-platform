@@ -281,6 +281,14 @@ const ACCESS_RESOURCES = [
     label: 'Resultado (pivot)',
     description: 'Lucros, dividendos, opções e despesas',
   },
+  {
+    id: '00000000-0000-4002-8000-000000000012',
+    resource_key: 'screen.invest.conciliacao',
+    resource_type: 'screen',
+    module_code: 'invest',
+    label: 'Conciliação',
+    description: 'Wizard notas e extrato dia a dia',
+  },
 ] as const;
 
 function perm(map: Map<string, string>, code: string): string {
@@ -494,6 +502,7 @@ async function run() {
     'screen.invest.dashboard',
     'screen.invest.portfolio',
     'screen.invest.results',
+    'screen.invest.conciliacao',
   ] as const;
   for (const key of viewerScreenKeys) {
     await ensureLink(
@@ -530,6 +539,7 @@ async function run() {
     'screen.invest.dashboard',
     'screen.invest.portfolio',
     'screen.invest.results',
+    'screen.invest.conciliacao',
   ] as const;
   for (const key of managerScreenKeys) {
     await ensureLink(

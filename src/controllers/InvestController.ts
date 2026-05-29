@@ -23,6 +23,10 @@ import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonth
 import { fixedIncomeTotalFromLedger } from '../core/invest/patrimonyLedgerGates';
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
+import { PatrimonyDailyRebuildService } from '../core/invest/PatrimonyDailyRebuildService';
+import { ReconciliationSessionService } from '../core/invest/reconcile/ReconciliationSessionService';
+import { ReconciliationAuditService } from '../core/invest/reconcile/ReconciliationAuditService';
+import type { ReconcileAction } from '../core/invest/reconcile/auditTypes';
 import { fetchB3Quotes } from '../core/invest/B3QuoteProvider';
 import { fetchOpcoesNetOptionQuotes } from '../core/invest/opcoesNetQuotes';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
@@ -101,6 +105,7 @@ import {
   previewBtgMonthImport,
 } from '../core/invest/btgMonthImportService';
 import type { UserContext } from '../core/dal';
+import { GatewayError } from '../core/dal/errors';
 import { SYSTEM_INSTALLER_USER_ID } from '../core/dal/types';
 import pool from '../config/database';
 import { isMissingSchemaError } from '../core/dal/mysqlErrors';
@@ -128,6 +133,9 @@ export class InvestController {
   private readonly ledger: LedgerImportService;
   private readonly patrimonyStore: PatrimonyDailyStore;
   private readonly patrimonyRecorder: PatrimonyDailyRecorder;
+  private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
+  private readonly reconcileSession: ReconciliationSessionService;
+  private readonly reconcileAudit: ReconciliationAuditService;
   private readonly quoteSync: InvestQuoteSyncService;
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuoteRepo: MarketQuoteRepository;
@@ -137,6 +145,9 @@ export class InvestController {
     this.ledger = new LedgerImportService(gateway);
     this.patrimonyStore = new PatrimonyDailyStore(gateway);
     this.patrimonyRecorder = new PatrimonyDailyRecorder(gateway);
+    this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
+    this.reconcileSession = new ReconciliationSessionService(gateway, pool);
+    this.reconcileAudit = new ReconciliationAuditService(gateway);
     this.quoteSync = new InvestQuoteSyncService(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuoteRepo = new MarketQuoteRepository(gateway);
@@ -803,6 +814,41 @@ export class InvestController {
     }
   };
 
+  rebuildPatrimonyDaily = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selecione uma organização (personifique a holding).',
+      });
+    }
+
+    const from = req.body?.from ? String(req.body.from).slice(0, 10) : undefined;
+    const to = req.body?.to ? String(req.body.to).slice(0, 10) : undefined;
+
+    try {
+      const result = await this.patrimonyRebuild.rebuild(ctx, { from, to });
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      console.error('[rebuildPatrimonyDaily]', err);
+      return res.status(500).json({
+        success: false,
+        error: err instanceof Error ? err.message : 'Falha ao reconstruir patrimônio diário.',
+      });
+    }
+  };
+
+  getPatrimonyDailyRebuildStatus = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selecione uma organização (personifique a holding).',
+      });
+    }
+    return res.json({ success: true, ...this.patrimonyRebuild.getStatus(ctx) });
+  };
+
   recordPatrimonyDaily = async (req: Request, res: Response) => {
     const ctx = req.userContext!;
     if (!ctx.organizationId) {
@@ -1414,5 +1460,155 @@ export class InvestController {
       return res.status(500).json({ success: false, error: message });
     }
   };
+
+  reconcilePreflight = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({ success: false, error: 'Selecione uma organização.' });
+    }
+    try {
+      const result = await this.reconcileSession.preflight(ctx);
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  reconcileResetHolding = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({ success: false, error: 'Selecione uma organização.' });
+    }
+    try {
+      const result = await this.reconcileSession.resetHoldingFromOpening(ctx);
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  reconcileSessionStart = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({ success: false, error: 'Selecione uma organização.' });
+    }
+    try {
+      const phase = String(req.body?.phase || 'notes') as 'notes' | 'cash';
+      const files = Array.isArray(req.body?.files) ? req.body.files : [];
+      const dataMode = req.body?.dataMode as 'recover' | 'reset_from_opening' | undefined;
+      const result = await this.reconcileSession.startSession(ctx, { phase, files, dataMode });
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  reconcileSessionGet = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    try {
+      const result = await this.reconcileSession.getSession(ctx, String(req.params.id));
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  reconcileSessionCompletePhase = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    try {
+      const result = await this.reconcileSession.completePhase(ctx, String(req.params.id));
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  reconcileDayGet = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    try {
+      const result = await this.reconcileSession.getDay(
+        ctx,
+        String(req.params.id),
+        String(req.params.date).slice(0, 10)
+      );
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  reconcileDayResolve = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    try {
+      const result = await this.reconcileSession.resolveDecision(
+        ctx,
+        String(req.params.id),
+        String(req.params.date).slice(0, 10),
+        {
+          decisionId: String(req.body?.decisionId || ''),
+          action: String(req.body?.action || '') as ReconcileAction,
+        }
+      );
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  reconcileDayClose = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    try {
+      const result = await this.reconcileSession.closeDay(
+        ctx,
+        String(req.params.id),
+        String(req.params.date).slice(0, 10)
+      );
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  reconcileAuditRun = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    try {
+      const through = req.body?.through ? String(req.body.through).slice(0, 10) : undefined;
+      const report = await this.reconcileAudit.run(ctx, {
+        throughDate: through,
+        scope: through ? 'through' : 'full',
+      });
+      return res.json({ success: true, ...report });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  reconcileAsOf = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    const date = String(req.query.date || '').slice(0, 10);
+    if (!date) {
+      return res.status(400).json({ success: false, error: 'Informe date=YYYY-MM-DD.' });
+    }
+    try {
+      const result = await this.reconcileSession.getAsOf(ctx, date);
+      return res.json({ success: true, ...result });
+    } catch (err) {
+      return this.reconcileError(res, err);
+    }
+  };
+
+  private reconcileError(res: Response, err: unknown) {
+    if (err instanceof GatewayError) {
+      const body: Record<string, unknown> = { success: false, error: err.message, code: err.code };
+      const details = (err as GatewayError & { details?: unknown }).details;
+      if (details) body.details = details;
+      return res.status(err.httpStatus).json(body);
+    }
+    console.error('[reconcile]', err);
+    return res.status(500).json({
+      success: false,
+      error: err instanceof Error ? err.message : 'Falha na conciliação.',
+    });
+  }
 
 }

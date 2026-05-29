@@ -115,19 +115,9 @@ export const MENU_CATALOG = [
         resourceKey: 'screen.invest.results',
       },
       {
-        label: 'Extratos de conta',
-        path: '/invest/extratos',
-        resourceKey: 'screen.invest.results',
-      },
-      {
-        label: 'Importar mês BTG',
-        path: '/invest/importacao-mes',
-        resourceKey: 'screen.invest.results',
-      },
-      {
-        label: 'Importar fontes BTG (lote)',
-        path: '/invest/importacao',
-        resourceKey: 'screen.invest.results',
+        label: 'Conciliação',
+        path: '/invest/conciliacao',
+        resourceKey: 'screen.invest.conciliacao',
       },
     ],
   },

@@ -1,49 +1,48 @@
 /**
- * Input file/pasta oculto + botão estilizado (ícone pasta).
+ * Seleção de pasta/arquivos PDF no navegador (não persiste no servidor).
  */
-export function bindImportFilePicker(container, options) {
-  const {
-    inputSelector,
-    buttonSelector,
-    labelSelector,
-    emptyLabel = 'Nenhum arquivo selecionado',
-    onChange,
-  } = options;
-
-  const input = container.querySelector(inputSelector);
-  const button = container.querySelector(buttonSelector);
-  const labelEl = labelSelector ? container.querySelector(labelSelector) : null;
-
-  const refreshLabel = () => {
-    if (!labelEl || !input) return;
-    const files = input.files ? [...input.files] : [];
-    if (!files.length) {
-      labelEl.textContent = emptyLabel;
-      labelEl.classList.remove('import-picker-name--ok');
-      return;
-    }
-    if (files.length === 1) {
-      const f = files[0];
-      labelEl.textContent = f.webkitRelativePath || f.name || emptyLabel;
-    } else {
-      const pdfs = files.filter((f) => /\.pdf$/i.test(f.name));
-      const first = files[0]?.webkitRelativePath || files[0]?.name || '';
-      const root = first.includes('/') ? first.split('/')[0] : 'pasta';
-      labelEl.textContent = `${root} · ${files.length} arquivo(s)${pdfs.length ? ` (${pdfs.length} PDF)` : ''}`;
-    }
-    labelEl.classList.add('import-picker-name--ok');
-  };
-
-  button?.addEventListener('click', (e) => {
-    e.preventDefault();
-    input?.click();
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(reader.error || new Error('Falha ao ler arquivo.'));
+    reader.readAsDataURL(file);
   });
+}
 
-  input?.addEventListener('change', () => {
-    refreshLabel();
-    onChange?.(input);
+/**
+ * @returns {Promise<Array<{ name: string, contentBase64: string }>>}
+ */
+export async function pickPdfFilesFromFolder() {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'application/pdf,.pdf';
+    input.setAttribute('webkitdirectory', '');
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.addEventListener('change', async () => {
+      try {
+        const raw = [...(input.files || [])];
+        const pdfs = raw.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
+        const files = await Promise.all(
+          pdfs.map(async (f) => ({
+            name: f.webkitRelativePath || f.name,
+            contentBase64: await readFileAsBase64(f),
+          }))
+        );
+        document.body.removeChild(input);
+        resolve(files);
+      } catch (e) {
+        document.body.removeChild(input);
+        reject(e);
+      }
+    });
+    input.click();
   });
-
-  refreshLabel();
-  return { input, refreshLabel };
 }
