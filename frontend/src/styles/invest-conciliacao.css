@@ -2,7 +2,103 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  max-width: 960px;
+  max-width: 1100px;
+}
+
+.invest-conciliacao__import {
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border, #3a4556);
+  border-radius: 10px;
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.03));
+}
+
+.invest-conciliacao__import[hidden] {
+  display: none;
+}
+
+.invest-conciliacao__progress-wrap {
+  margin: 1rem 0;
+}
+
+.invest-conciliacao__progress-label {
+  font-size: 0.88rem;
+  color: var(--text-muted, #9aa3b2);
+  margin-bottom: 0.35rem;
+}
+
+.invest-conciliacao__progress-track {
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.invest-conciliacao__progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent, #0d9488);
+  transition: width 0.25s ease;
+}
+
+.invest-conciliacao__log {
+  margin: 1rem 0;
+  max-height: 200px;
+  overflow: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border, #2a3544);
+}
+
+.invest-conciliacao__log-line {
+  margin: 0.15rem 0;
+  word-break: break-word;
+}
+
+.invest-conciliacao__log-line--ok {
+  color: #6ee7b7;
+}
+
+.invest-conciliacao__log-line--error {
+  color: #fca5a5;
+}
+
+.invest-conciliacao__log-line--warn {
+  color: #fcd34d;
+}
+
+.invest-conciliacao__files-table-wrap {
+  overflow: auto;
+  max-height: 280px;
+  border: 1px solid var(--border, #2a3544);
+  border-radius: 8px;
+}
+
+.invest-conciliacao__status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.invest-conciliacao__status-badge--ok {
+  background: rgba(16, 185, 129, 0.25);
+  color: #6ee7b7;
+}
+
+.invest-conciliacao__status-badge--pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fcd34d;
+}
+
+.invest-conciliacao__status-badge--err {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
 }
 
 .invest-conciliacao__setup {

@@ -2,6 +2,10 @@ import type { Pool, PoolConnection, RowDataPacket, ResultSetHeader } from 'mysql
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import { GatewayError } from '../dal/errors';
 import { StorageMeter } from '../dal/StorageMeter';
+import {
+  reconcileActivity,
+  type ReconcileActivityStep,
+} from './reconcile/reconcileActivity';
 import { LedgerImportService } from './LedgerImportService';
 import { resolveInvestPeriodBounds } from './investPeriodBounds';
 
@@ -39,6 +43,7 @@ export type HoldingPurgeResult = HoldingPurgePreview & {
   businessEventsRemoved: number;
   storageBytesBefore: number;
   storageBytesAfter: 0;
+  activityLog: ReconcileActivityStep[];
   reconcileCustody: unknown;
 };
 
@@ -92,6 +97,12 @@ export class HoldingPurgeKeepOpeningService {
       );
     }
 
+    const activityLog: ReconcileActivityStep[] = [];
+    const log = (message: string, command: string, level?: ReconcileActivityStep['level']) => {
+      activityLog.push(reconcileActivity(orgId, message, { command, level }));
+    };
+
+    log(`Início purge — abertura ${bounds.openingDate}`, 'purge.start');
     const conn = await this.pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -100,12 +111,19 @@ export class HoldingPurgeKeepOpeningService {
         orgId,
         bounds.openingDate,
         bounds.openingRef,
-        preview.openingEventIds
+        preview.openingEventIds,
+        log
       );
       const storageReset = await StorageMeter.resetOrganizationUsage(conn, orgId);
       await conn.commit();
+      log(
+        `Purge concluído — storage ${storageReset.previousBytes} → 0 bytes`,
+        'purge.done',
+        'ok'
+      );
 
       const reconcileCustody = await this.ledger.reconcileCustody(ctx);
+      log('Custódia reconciliada após purge', 'custody.reconcile', 'ok');
 
       return {
         ...preview,
@@ -113,6 +131,7 @@ export class HoldingPurgeKeepOpeningService {
         ...executed,
         storageBytesBefore: storageReset.previousBytes,
         storageBytesAfter: 0,
+        activityLog,
         reconcileCustody,
       };
     } catch (e) {
@@ -222,7 +241,8 @@ export class HoldingPurgeKeepOpeningService {
     orgId: string,
     openingDate: string,
     openingRef: string,
-    openingEventIds: string[]
+    openingEventIds: string[],
+    log?: (message: string, command: string, level?: ReconcileActivityStep['level']) => void
   ): Promise<{
     patrimonyLegsRemoved: number;
     financialLegsRemoved: number;
@@ -247,12 +267,14 @@ export class HoldingPurgeKeepOpeningService {
        WHERE organization_id = ? AND NOT ${preservePle}`,
       [orgId, openingInSql, openingDate]
     );
+    log?.(`DELETE patrimony_ledger_entries: ${ple.affectedRows}`, 'purge.patrimony_ledger');
 
     const [fle] = await conn.query<ResultSetHeader>(
       `DELETE FROM financial_ledger_entries
        WHERE organization_id = ? AND NOT ${preserveFle}`,
       [orgId, openingInSql, openingDate]
     );
+    log?.(`DELETE financial_ledger_entries: ${fle.affectedRows}`, 'purge.financial_ledger');
 
     const [be] = await conn.query<ResultSetHeader>(
       `DELETE be FROM business_events be
@@ -269,6 +291,7 @@ export class HoldingPurgeKeepOpeningService {
          )`,
       [orgId, openingRef, orgId, orgId]
     );
+    log?.(`DELETE business_events: ${be.affectedRows}`, 'purge.business_events');
 
     await conn.query<ResultSetHeader>(
       `DELETE pi FROM patrimony_items pi
@@ -309,7 +332,8 @@ export class HoldingPurgeKeepOpeningService {
     );
 
     for (const table of AUX_ORG_TABLES) {
-      await this.deleteOrgTable(conn, orgId, table);
+      const n = await this.deleteOrgTable(conn, orgId, table);
+      log?.(`DELETE ${table}: ${n} linha(s)`, `purge.${table}`);
     }
 
     await conn.query<ResultSetHeader>(

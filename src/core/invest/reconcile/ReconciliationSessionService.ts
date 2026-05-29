@@ -23,6 +23,11 @@ import {
   type ReconcilePreflightResult,
 } from '../HoldingPurgeKeepOpeningService';
 import type { Pool } from 'mysql2/promise';
+import {
+  reconcileActivity,
+  type ReconcileActivityStep,
+} from './reconcileActivity';
+import type { BtgBrokerageFileResult } from '../btgUploadImportService';
 
 export type ReconcileDataMode = 'recover' | 'reset_from_opening';
 
@@ -161,6 +166,14 @@ export class ReconciliationSessionService {
       dataMode?: ReconcileDataMode;
     }
   ) {
+    const orgId = ctx.organizationId ?? undefined;
+    const activityLog: ReconcileActivityStep[] = [];
+    const log = (message: string, command: string, level?: ReconcileActivityStep['level']) => {
+      activityLog.push(reconcileActivity(orgId, message, { command, level }));
+    };
+
+    log(`Início sessão fase=${input.phase}`, 'session.start');
+
     if (input.phase === 'cash') {
       await this.assertNotesPhaseComplete(ctx);
     }
@@ -178,16 +191,39 @@ export class ReconciliationSessionService {
         );
       }
       if (input.dataMode === 'reset_from_opening') {
-        await this.holdingPurge.purgeKeepOpening(ctx);
+        log('Purge da holding (reset_from_opening)', 'purge.start', 'warn');
+        const purgeResult = await this.holdingPurge.purgeKeepOpening(ctx);
+        activityLog.push(...(purgeResult.activityLog ?? []));
+      } else {
+        log('Modo recover — livro atual preservado', 'session.recover', 'info');
       }
     }
 
+    let fileResults: BtgBrokerageFileResult[] = [];
     const previewSummary =
       input.phase === 'notes' ? await previewBtgBrokerageUpload(input.files) : null;
+    if (previewSummary) {
+      fileResults = previewSummary.fileResults;
+      log(
+        `Preview notas: ${previewSummary.filesOk}/${previewSummary.filesTotal} PDF(s) OK, ${previewSummary.notesKept} nota(s)`,
+        'notes.preview',
+        'ok'
+      );
+      for (const f of fileResults) {
+        log(
+          `${f.fileName}: ${f.parseOk ? `${f.notesCount} nota(s), ${f.ledgerLines} linha(s)` : f.parseError || 'erro'}`,
+          'notes.file',
+          f.parseOk ? 'ok' : 'error'
+        );
+      }
+    }
+
     const index =
       input.phase === 'notes'
         ? await buildNotesFileIndex(input.files)
         : { calendar: [], noteLinesByDate: {}, linesByRowKey: new Map() };
+
+    log(`Calendário: ${index.calendar.length} dia(s) de pregão`, 'notes.calendar', 'ok');
 
     const baselineAudit = await this.audit.run(ctx);
 
@@ -209,11 +245,26 @@ export class ReconciliationSessionService {
       resolvedByDay: new Map(),
     });
 
+    log(`Sessão ${session.id} criada`, 'session.created', 'ok');
+
     return {
       sessionId: session.id,
       calendar: index.calendar,
       baselineAudit,
       session,
+      activityLog,
+      fileResults,
+      importProgress: {
+        filesTotal: fileResults.length,
+        filesProcessed: fileResults.filter((f) => f.parseOk).length,
+        filesFailed: fileResults.filter((f) => !f.parseOk).length,
+        percent:
+          fileResults.length > 0
+            ? Math.round(
+                (100 * fileResults.filter((f) => f.parseOk).length) / fileResults.length
+              )
+            : 0,
+      },
     };
   }
 

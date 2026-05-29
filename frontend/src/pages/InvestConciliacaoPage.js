@@ -32,6 +32,59 @@ function formatOpeningDate(iso) {
   return `${d}/${m}/${y}`;
 }
 
+function fileDisplayName(path) {
+  const p = String(path || '').replace(/\\/g, '/');
+  const parts = p.split('/');
+  return parts[parts.length - 1] || path;
+}
+
+function appendActivityLog(logEl, steps) {
+  if (!logEl || !steps?.length) return;
+  for (const s of steps) {
+    const line = el('div', `invest-conciliacao__log-line invest-conciliacao__log-line--${s.level || 'info'}`);
+    const cmd = s.command ? `[${s.command}] ` : '';
+    line.textContent = `${s.at?.slice(11, 19) || ''} ${cmd}${s.message}`;
+    logEl.appendChild(line);
+  }
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function setProgress(progressBar, progressLabel, percent, labelText) {
+  if (progressBar) progressBar.style.width = `${Math.min(100, Math.max(0, percent))}%`;
+  if (progressLabel) progressLabel.textContent = labelText;
+}
+
+function renderFileStatusTable(tbody, files, pendingNames) {
+  tbody.replaceChildren();
+  const pendingSet = pendingNames ? new Set(pendingNames) : null;
+  for (const f of files) {
+    const tr = document.createElement('tr');
+    const name = fileDisplayName(f.path || f.fileName);
+    let status = 'PROCESSADO';
+    let badgeClass = 'invest-conciliacao__status-badge--ok';
+    if (pendingSet?.has(name) || pendingSet?.has(f.path)) {
+      status = 'PROCESSANDO';
+      badgeClass = 'invest-conciliacao__status-badge--pending';
+    } else if (!f.parseOk) {
+      status = 'ERRO';
+      badgeClass = 'invest-conciliacao__status-badge--err';
+    }
+    const tdName = document.createElement('td');
+    tdName.textContent = name;
+    const tdDetail = document.createElement('td');
+    tdDetail.textContent = f.parseOk
+      ? `${f.notesCount ?? 0} nota(s) · ${f.ledgerLines ?? 0} linha(s)`
+      : f.parseError || 'Falha na leitura';
+    const tdStatus = document.createElement('td');
+    const badge = el('span', `invest-conciliacao__status-badge ${badgeClass}`, status);
+    tdStatus.appendChild(badge);
+    tr.appendChild(tdName);
+    tr.appendChild(tdDetail);
+    tr.appendChild(tdStatus);
+    tbody.appendChild(tr);
+  }
+}
+
 export async function InvestConciliacaoPage(container) {
   if (!isAuthenticated()) {
     navigate('/login');
@@ -60,8 +113,30 @@ export async function InvestConciliacaoPage(container) {
 
   const host = el('div', 'invest-conciliacao');
   const setupPanel = el('section', 'invest-conciliacao__setup');
+  const importPanel = el('section', 'invest-conciliacao__import');
+  importPanel.hidden = true;
   const workflowPanel = el('section', 'invest-conciliacao__workflow');
   workflowPanel.hidden = true;
+
+  const progressLabel = el('p', 'invest-conciliacao__progress-label', '');
+  const progressTrack = el('div', 'invest-conciliacao__progress-track');
+  const progressBar = el('div', 'invest-conciliacao__progress-bar');
+  progressTrack.appendChild(progressBar);
+  const activityLogEl = el('div', 'invest-conciliacao__log');
+  const filesTableBody = document.createElement('tbody');
+  const filesTable = el('table', 'invest-conciliacao__table');
+  const filesHead = document.createElement('thead');
+  const headTr = document.createElement('tr');
+  ['Arquivo', 'Detalhe', 'Status'].forEach((h) => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    headTr.appendChild(th);
+  });
+  filesHead.appendChild(headTr);
+  filesTable.appendChild(filesHead);
+  filesTable.appendChild(filesTableBody);
+  const filesWrap = el('div', 'invest-conciliacao__files-table-wrap');
+  filesWrap.appendChild(filesTable);
 
   const statusEl = el('p', 'invest-conciliacao__status muted', '');
   const notesPathEl = el('span', 'invest-conciliacao__folder-path', state.notesFolderLabel);
@@ -133,7 +208,18 @@ export async function InvestConciliacaoPage(container) {
   setupPanel.appendChild(startBtn);
   setupPanel.appendChild(statusEl);
 
+  importPanel.appendChild(el('h2', 'invest-conciliacao__setup-title', 'Importação'));
+  const progressWrap = el('div', 'invest-conciliacao__progress-wrap');
+  progressWrap.appendChild(progressLabel);
+  progressWrap.appendChild(progressTrack);
+  importPanel.appendChild(progressWrap);
+  importPanel.appendChild(el('h3', '', 'Comandos (também no log do servidor)'));
+  importPanel.appendChild(activityLogEl);
+  importPanel.appendChild(el('h3', '', 'Arquivos'));
+  importPanel.appendChild(filesWrap);
+
   host.appendChild(setupPanel);
+  host.appendChild(importPanel);
   host.appendChild(workflowPanel);
 
   async function loadPreflight() {
@@ -167,16 +253,6 @@ export async function InvestConciliacaoPage(container) {
         `Isso apaga movimentações, fechamentos e snapshots desta holding.\n` +
         `Permanecem usuários e a abertura (${open || 'data do livro'}).\n\nContinuar?`;
       if (!window.confirm(msg)) return;
-      statusEl.textContent = 'Zerando base…';
-      startBtn.disabled = true;
-      try {
-        await apiRequest('/api/invest/reconcile/reset-holding', { method: 'POST', body: '{}' });
-        statusEl.textContent = 'Base zerada. Iniciando sessão de notas…';
-      } catch (e) {
-        statusEl.textContent = e?.message || 'Falha ao zerar base.';
-        startBtn.disabled = false;
-        return;
-      }
     } else if (state.preflight?.needsDataModeChoice) {
       const ok = window.confirm(
         'O livro já tem movimentações além da abertura.\n' +
@@ -185,17 +261,60 @@ export async function InvestConciliacaoPage(container) {
       if (!ok) return;
     }
 
-    statusEl.textContent = 'Lendo notas e abrindo sessão…';
+    importPanel.hidden = false;
+    activityLogEl.replaceChildren();
+    filesTableBody.replaceChildren();
+    const pendingNames = state.notesFiles.map((f) => fileDisplayName(f.name));
+    renderFileStatusTable(
+      filesTableBody,
+      pendingNames.map((name) => ({ path: name, parseOk: false })),
+      pendingNames
+    );
+
     startBtn.disabled = true;
+    statusEl.textContent = '';
     try {
+      if (state.resetBase) {
+        setProgress(progressBar, progressLabel, 10, 'Zerando base da holding…');
+        activityLogEl.appendChild(
+          el('div', 'invest-conciliacao__log-line', 'POST /api/invest/reconcile/reset-holding')
+        );
+        const purge = await apiRequest('/api/invest/reconcile/reset-holding', {
+          method: 'POST',
+          body: {},
+        });
+        appendActivityLog(activityLogEl, purge.activityLog);
+        setProgress(progressBar, progressLabel, 35, 'Base zerada — lendo PDFs…');
+      } else {
+        setProgress(progressBar, progressLabel, 15, 'Preparando leitura das notas…');
+      }
+
+      setProgress(progressBar, progressLabel, 45, 'Enviando notas e criando sessão…');
+      activityLogEl.appendChild(
+        el('div', 'invest-conciliacao__log-line', 'POST /api/invest/reconcile/session/start')
+      );
+
       const res = await apiRequest('/api/invest/reconcile/session/start', {
         method: 'POST',
-        body: JSON.stringify({
+        body: {
           phase: 'notes',
           files: state.notesFiles,
-          dataMode: state.dataMode,
-        }),
+          dataMode: state.resetBase ? 'recover' : state.dataMode,
+        },
       });
+
+      appendActivityLog(activityLogEl, res.activityLog);
+
+      const fileResults = res.fileResults || [];
+      const prog = res.importProgress || {};
+      setProgress(
+        progressBar,
+        progressLabel,
+        prog.percent ?? 100,
+        `${prog.filesProcessed ?? fileResults.length}/${prog.filesTotal ?? state.notesFiles.length} arquivo(s) lidos`
+      );
+      renderFileStatusTable(filesTableBody, fileResults);
+
       state.sessionId = res.sessionId;
       state.calendar = res.calendar || [];
       state.dayIndex = 0;
@@ -204,9 +323,14 @@ export async function InvestConciliacaoPage(container) {
       buildWorkflowUi();
       await loadDay();
       statusEl.textContent = `Sessão iniciada — ${state.calendar.length} dia(s) de pregão nas notas.`;
+      setProgress(progressBar, progressLabel, 100, 'Leitura concluída — concilie dia a dia abaixo');
     } catch (e) {
+      const errLine = el('div', 'invest-conciliacao__log-line invest-conciliacao__log-line--error');
+      errLine.textContent = e?.message || 'Falha na importação.';
+      activityLogEl.appendChild(errLine);
       statusEl.textContent = e?.message || 'Falha ao iniciar sessão.';
       startBtn.disabled = false;
+      setProgress(progressBar, progressLabel, 0, 'Erro — veja o log acima');
     }
   }
 
@@ -321,7 +445,7 @@ export async function InvestConciliacaoPage(container) {
     const date = state.calendar[state.dayIndex];
     await apiRequest(
       `/api/invest/reconcile/session/${state.sessionId}/day/${date}/resolve`,
-      { method: 'POST', body: JSON.stringify({ decisionId, action }) }
+      { method: 'POST', body: { decisionId, action } }
     );
     await loadDay();
   }
@@ -330,7 +454,7 @@ export async function InvestConciliacaoPage(container) {
     const date = state.calendar[state.dayIndex];
     await apiRequest(
       `/api/invest/reconcile/session/${state.sessionId}/day/${date}/close`,
-      { method: 'POST', body: '{}' }
+      { method: 'POST', body: {} }
     );
     if (state.dayIndex < state.calendar.length - 1) {
       state.dayIndex += 1;
@@ -339,7 +463,7 @@ export async function InvestConciliacaoPage(container) {
     }
     await apiRequest(`/api/invest/reconcile/session/${state.sessionId}/complete-phase`, {
       method: 'POST',
-      body: '{}',
+      body: {},
     });
     state.notesPhaseDone = true;
     const progress = workflowPanel.querySelector('.invest-conciliacao__progress');
