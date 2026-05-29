@@ -14,6 +14,7 @@ import { PlatformAlertsController } from '../controllers/PlatformAlertsControlle
 import { PlatformDeployController } from '../controllers/PlatformDeployController';
 import { RemoteMigrationController } from '../controllers/RemoteMigrationController';
 import { RemoteRecalcController } from '../controllers/RemoteRecalcController';
+import { ReconcileController } from '../controllers/ReconcileController';
 
 const router = Router();
 const gateway = dataGateway;
@@ -25,6 +26,7 @@ const telemetry = createTelemetryController(gateway);
 const uiManifest = new UiManifestController(gateway);
 const remoteMigration = new RemoteMigrationController(gateway);
 const remoteRecalc = new RemoteRecalcController(gateway);
+const reconcile = new ReconcileController(gateway);
 
 // --- Auth ---
 router.post('/auth/login', AuthController.login);
@@ -185,6 +187,21 @@ router.post(
   AuthMiddleware.protect,
   AuthMiddleware.requireGlobalScope,
   remoteMigration.runMigration.bind(remoteMigration)
+);
+
+// --- Conciliação / Reset ---
+router.post(
+  '/invest/reconcile/reset-holding',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.resetHolding.bind(reconcile)
+);
+
+router.post(
+  '/invest/reconcile/recalc-all',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.recalcAll.bind(reconcile)
 );
 
 router.post(

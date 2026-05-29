@@ -26,6 +26,7 @@ import { InvestHistoricoOperacoesPage } from '../pages/InvestHistoricoOperacoesP
 import { InvestExtratosPage } from '../pages/InvestExtratosPage.js';
 import { InvestImportacaoPage } from '../pages/InvestImportacaoPage.js';
 import { InvestImportacaoMesPage } from '../pages/InvestImportacaoMesPage.js';
+import { InvestConciliacaoPage } from '../pages/InvestConciliacaoPage.js';
 import { QualityRegressionPage } from '../pages/QualityRegressionPage.js';
 
 export type LegacyRouteDef = {
@@ -59,5 +60,6 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/invest/extratos', loader: InvestExtratosPage },
   { path: '/invest/importacao', loader: InvestImportacaoPage },
   { path: '/invest/importacao-mes', loader: InvestImportacaoMesPage },
+  { path: '/invest/conciliacao', loader: InvestConciliacaoPage },
   { path: '/invest/transacoes-finalizadas', loader: InvestClosedTradesPage },
 ];

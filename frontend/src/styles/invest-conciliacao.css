@@ -1,0 +1,356 @@
+/* ─── Conciliação / Reset ─── */
+
+.conciliacao-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.conciliacao-hero {
+  background: linear-gradient(135deg, #1a1f35 0%, #0d1226 100%);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 2rem 2.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.conciliacao-hero__icon {
+  font-size: 2.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.conciliacao-hero__content {
+  flex: 1;
+}
+
+.conciliacao-hero__title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #e8ecf5;
+  margin: 0 0 0.4rem;
+}
+
+.conciliacao-hero__subtitle {
+  font-size: 0.875rem;
+  color: rgba(200,210,240,0.65);
+  margin: 0;
+  line-height: 1.55;
+  max-width: 600px;
+}
+
+/* ─── Workflow steps ─── */
+.conciliacao-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.step-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: border-color 0.2s;
+}
+
+.step-card--active {
+  border-color: rgba(100, 180, 255, 0.35);
+  background: rgba(100, 180, 255, 0.05);
+}
+
+.step-card--done {
+  border-color: rgba(80, 200, 120, 0.35);
+  background: rgba(80, 200, 120, 0.04);
+}
+
+.step-card--error {
+  border-color: rgba(255, 80, 80, 0.35);
+  background: rgba(255, 80, 80, 0.04);
+}
+
+.step-card__number {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(200,210,240,0.4);
+}
+
+.step-card__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #d0daf0;
+}
+
+.step-card__status {
+  font-size: 0.8rem;
+  color: rgba(200,210,240,0.55);
+  margin-top: 0.25rem;
+}
+
+.step-card--done .step-card__status { color: #50c878; }
+.step-card--error .step-card__status { color: #ff6060; }
+.step-card--active .step-card__status { color: #64b4ff; }
+
+/* ─── Action area ─── */
+.conciliacao-action-panel {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.conciliacao-action-panel h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #c8d2f0;
+  margin: 0;
+}
+
+.conciliacao-action-panel .muted {
+  font-size: 0.85rem;
+  color: rgba(200,210,240,0.55);
+  margin: 0;
+}
+
+.conciliacao-btn-row {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+/* ─── Big reset button ─── */
+.btn-reset-holding {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: linear-gradient(135deg, #b71c1c 0%, #7f1010 100%);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(183,28,28,0.35);
+}
+
+.btn-reset-holding:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d32f2f 0%, #9a1c1c 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 18px rgba(183,28,28,0.5);
+}
+
+.btn-reset-holding:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-recalc-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.5rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: linear-gradient(135deg, #1565c0 0%, #0d3d82 100%);
+  color: #fff;
+  box-shadow: 0 2px 12px rgba(21,101,192,0.3);
+}
+
+.btn-recalc-all:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1976d2 0%, #14519e 100%);
+  transform: translateY(-1px);
+}
+
+.btn-recalc-all:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ─── Log output ─── */
+.conciliacao-log {
+  font-family: 'Fira Mono', 'Courier New', monospace;
+  font-size: 0.78rem;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 1rem;
+  max-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.conciliacao-log:empty::before {
+  content: 'Nenhuma operação executada ainda.';
+  color: rgba(200,210,240,0.3);
+}
+
+.log-line {
+  line-height: 1.5;
+  color: rgba(200,210,240,0.7);
+}
+
+.log-line--ok { color: #50c878; }
+.log-line--err { color: #ff6060; }
+.log-line--info { color: #64b4ff; }
+.log-line--warn { color: #ffb74d; }
+.log-line--section {
+  color: #c8d2f0;
+  font-weight: 700;
+  margin-top: 0.4rem;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding-top: 0.4rem;
+}
+
+/* ─── Confirm dialog ─── */
+.conciliacao-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.conciliacao-confirm-dialog {
+  background: #151b2e;
+  border: 1px solid rgba(255,80,80,0.35);
+  border-radius: 14px;
+  padding: 2rem;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 8px 48px rgba(0,0,0,0.6);
+}
+
+.conciliacao-confirm-dialog h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ff8080;
+  margin: 0 0 0.75rem;
+}
+
+.conciliacao-confirm-dialog p {
+  font-size: 0.875rem;
+  color: rgba(200,210,240,0.75);
+  margin: 0 0 1.5rem;
+  line-height: 1.6;
+}
+
+.conciliacao-confirm-dialog .btn-row {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+/* ─── Summary cards ─── */
+.conciliacao-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.summary-kpi {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+}
+
+.summary-kpi__label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(200,210,240,0.4);
+  margin-bottom: 0.3rem;
+}
+
+.summary-kpi__value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #c8d2f0;
+}
+
+.summary-kpi__value--ok { color: #50c878; }
+.summary-kpi__value--err { color: #ff6060; }
+
+/* ─── Import area within conciliacao ─── */
+.conciliacao-import-section {
+  background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding: 1.5rem;
+}
+
+.conciliacao-import-section h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #c8d2f0;
+  margin: 0 0 0.75rem;
+}
+
+.conciliacao-import-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .conciliacao-import-grid { grid-template-columns: 1fr; }
+}
+
+.conciliacao-import-panel {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.conciliacao-import-panel h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #b0bcd8;
+  margin: 0 0 0.75rem;
+}
+
+.conciliacao-import-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.conciliacao-file-label {
+  font-size: 0.78rem;
+  color: rgba(200,210,240,0.5);
+  margin-top: 0.35rem;
+}
+
+.conciliacao-file-result {
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
+}
