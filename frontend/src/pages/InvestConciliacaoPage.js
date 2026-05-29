@@ -245,7 +245,10 @@ export async function InvestConciliacaoPage(container) {
 
       <!-- Passo 4: Recalcular -->
       <div class="conciliacao-action-panel">
-        <h2>Passo 4 — Recalcular Posições, 3 Preços e Patrimônio</h2>
+        <h2>
+          Passo 4 — Recalcular Posições, 3 Preços e Patrimônio 
+          <button id="btn-unlock-recalc" class="btn btn-ghost btn-sm" style="font-size: 0.7rem; padding: 2px 5px; margin-left: 10px;" title="Forçar liberação do botão">🔓 Liberar</button>
+        </h2>
         <p class="muted">
           Executa o recálculo completo: custódia, preços médios (estrito / B3 / gerencial)
           e curva de patrimônio diário. Execute após importar os arquivos.
@@ -445,6 +448,12 @@ export async function InvestConciliacaoPage(container) {
   });
 
   /* ─── RECALCULAR TUDO ─── */
+  const btnUnlockRecalc = container.querySelector('#btn-unlock-recalc');
+  btnUnlockRecalc?.addEventListener('click', () => {
+    if (btnRecalc) btnRecalc.disabled = false;
+    btnUnlockRecalc.style.display = 'none';
+  });
+
   btnRecalc?.addEventListener('click', async () => {
     btnRecalc.disabled = true;
     if (recalcStatus) recalcStatus.textContent = 'Recalculando...';
