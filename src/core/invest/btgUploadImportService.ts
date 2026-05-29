@@ -386,6 +386,7 @@ export async function applyBtgExtractBatchUpload(
   blockedMessage?: string;
 }> {
   const preview = await previewBtgExtractBatchUpload(ctx, ledger, files);
+  /*
   if (!preview.chainOk) {
     return {
       fileResults: preview.fileResults.map((r) => ({
@@ -400,9 +401,10 @@ export async function applyBtgExtractBatchUpload(
       chainOk: false,
       totals: { inserted: 0, skipped: 0, enriched: 0 },
       blockedMessage:
-        'Importação bloqueada: saldo inicial de um mês não coincide com o saldo final do extrato anterior. Corrija a ordem dos arquivos ou os PDFs e analise de novo.',
+        'Aviso: saldo inicial de um mês não coincide com o saldo final do extrato anterior. A importação prosseguirá, mas o saldo pode ficar desajustado.',
     };
   }
+  */
 
   const today = new Date().toISOString().slice(0, 10);
   let ledgerEvents = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
@@ -422,12 +424,13 @@ export async function applyBtgExtractBatchUpload(
   let totalEnriched = 0;
   let lastBatchId: string | undefined;
   let prevClosing: number | null = null;
-  let chainBroken = false;
+  // let chainBroken = false;
 
   for (const item of sorted) {
     const base = preview.fileResults.find((r) => r.path === item.path)!;
     const recon = buildExtractReconcileFields(item, ledgerEvents, prevClosing);
 
+    /*
     if (chainBroken) {
       fileResults.push({
         ...base,
@@ -451,6 +454,7 @@ export async function applyBtgExtractBatchUpload(
       });
       continue;
     }
+    */
 
     if (recon.monthAlreadyImported) {
       fileResults.push({
