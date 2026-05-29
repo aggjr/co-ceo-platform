@@ -15,11 +15,6 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
-function fmtBrl(n) {
-  if (n == null || Number.isNaN(Number(n))) return '—';
-  return Number(n).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
 function readFilesAsPayload(fileList) {
   return Promise.all(
     [...fileList].map(
@@ -83,7 +78,7 @@ function showConfirmDialog(message, onConfirm) {
   });
 }
 
-/* ─────────────────────────── import helpers ─────────────────────── */
+/* ─────────────────────────── import results ─────────────────────── */
 
 function statusBadge(ok) {
   if (ok === true) return '<span class="import-status import-status--ok">OK</span>';
@@ -109,8 +104,7 @@ function renderExtractResult(result) {
     <table class="import-status-table" style="font-size:0.78rem">
       <thead><tr><th>Arquivo</th><th>Mês</th><th>Leitura</th><th>Importação</th><th>Detalhe</th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>
-    ${total}
+    </table>${total}
   `;
 }
 
@@ -131,8 +125,7 @@ function renderNotesResult(result) {
     <table class="import-status-table" style="font-size:0.78rem">
       <thead><tr><th>Arquivo</th><th>Leitura</th><th>Importação</th><th>Detalhe</th></tr></thead>
       <tbody>${rows}</tbody>
-    </table>
-    ${total}
+    </table>${total}
   `;
 }
 
@@ -196,8 +189,8 @@ export async function InvestConciliacaoPage(container) {
       <div class="conciliacao-action-panel">
         <h2>Passo 1 — Reset da Base de Dados</h2>
         <p class="muted">
-          Apaga lançamentos do livro razão, posições calculadas, curvas de patrimônio,
-          snapshots BTG e zera o odômetro.
+          Apaga lançamentos do livro razão, posições calculadas, curvas de patrimônio e snapshots BTG.
+          Zera também o odômetro de armazenamento.
           <strong style="color:#ff9090"> Os lançamentos de inicialização (opening_balance) são preservados.</strong>
         </p>
         <div class="conciliacao-btn-row">
@@ -305,8 +298,6 @@ export async function InvestConciliacaoPage(container) {
   const resetStatus = container.querySelector('#reset-status');
   const recalcStatus = container.querySelector('#recalc-status');
 
-  let resetDone = false;
-
   /* ─── File pickers ─── */
   bindImportFilePicker(container, {
     inputSelector: '#recon-extract-dir',
@@ -337,12 +328,6 @@ export async function InvestConciliacaoPage(container) {
     onChange: () => {},
   });
 
-  /* ─── Helper: enable/disable import buttons after reset ─── */
-  function unlockImportButtons() {
-    if (btnImportExtract) btnImportExtract.disabled = false;
-    if (btnImportNotes) btnImportNotes.disabled = false;
-  }
-
   /* ─── RESET ─── */
   btnReset?.addEventListener('click', () => {
     showConfirmDialog(
@@ -368,8 +353,8 @@ export async function InvestConciliacaoPage(container) {
             }
             setStepState(container, 'reset', 'done', '✅ Concluído');
             if (resetStatus) resetStatus.textContent = '✅ Base limpa. Agora importe os arquivos.';
-            resetDone = true;
-            unlockImportButtons();
+            if (btnImportExtract) btnImportExtract.disabled = false;
+            if (btnImportNotes) btnImportNotes.disabled = false;
             if (btnRecalc) btnRecalc.disabled = false;
           } else {
             throw new Error(data.error || 'Falha no reset.');
@@ -474,7 +459,6 @@ export async function InvestConciliacaoPage(container) {
     appendLog(logEl, '─── Recalculando posições, 3 preços e patrimônio ───', 'section');
 
     try {
-      // Fase A: recalc positions (3 preços)
       appendLog(logEl, 'Recalculando posições e preços médios...', 'info');
       const posData = await apiRequest('/api/invest/admin/recalc-positions', {
         method: 'POST',
@@ -486,7 +470,6 @@ export async function InvestConciliacaoPage(container) {
         appendLog(logEl, `⚠️ Posições: ${posData.error || 'Resposta inesperada'}`, 'warn');
       }
 
-      // Fase B: recalc curve (patrimônio diário)
       appendLog(logEl, 'Recalculando curva de patrimônio diário...', 'info');
       const curveData = await apiRequest('/api/invest/admin/recalc-curve', {
         method: 'POST',

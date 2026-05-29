@@ -92,7 +92,11 @@ export class PatrimonyDailyRecorder {
    * Grava fechamento diário: patrimônio principal alinhado à custódia BTG quando há âncoras;
    * mantém série econômica em metadata para auditoria e evolução futura.
    */
-  async recordDay(ctx: UserContext, snapshotDate?: string): Promise<RecordDailyPatrimonyResult> {
+  async recordDay(
+    ctx: UserContext,
+    snapshotDate?: string,
+    opts?: { economicOnly?: boolean }
+  ): Promise<RecordDailyPatrimonyResult> {
     const date = (snapshotDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const anchors = await this.anchorsRepo.loadForOrganization(ctx);
     const hasAnchors = anchors.month_ends.length > 0;
@@ -128,7 +132,7 @@ export class PatrimonyDailyRecorder {
     let source = 'mtm_economic';
     let btgPatrimony: number | null = null;
 
-    if (hasAnchors && shouldUseBtgAnchorCalibration(events)) {
+    if (!opts?.economicOnly && hasAnchors && shouldUseBtgAnchorCalibration(events)) {
       btgPatrimony = Math.round(interpolatePatrimonyTarget(date, anchors) * 100) / 100;
       const pending = economicPoint.pendingSettlements;
       recordPoint = {

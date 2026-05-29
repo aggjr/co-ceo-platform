@@ -261,6 +261,18 @@ router.post(
   invest.recordPatrimonyDaily.bind(invest)
 );
 router.post(
+  '/invest/patrimony-daily/rebuild',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.rebuildPatrimonyDaily.bind(invest)
+);
+router.get(
+  '/invest/patrimony-daily/rebuild-status',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.getPatrimonyDailyRebuildStatus.bind(invest)
+);
+router.post(
   '/invest/quotes/sync-b3',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:write'),
@@ -331,6 +343,66 @@ router.get(
   AuthMiddleware.protect,
   requirePermission('invest:ledger:read'),
   invest.getExtract.bind(invest)
+);
+router.get(
+  '/invest/reconcile/preflight',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcilePreflight.bind(invest)
+);
+router.post(
+  '/invest/reconcile/reset-holding',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.reconcileResetHolding.bind(invest)
+);
+router.post(
+  '/invest/reconcile/session/start',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.reconcileSessionStart.bind(invest)
+);
+router.get(
+  '/invest/reconcile/session/:id',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcileSessionGet.bind(invest)
+);
+router.post(
+  '/invest/reconcile/session/:id/complete-phase',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.reconcileSessionCompletePhase.bind(invest)
+);
+router.get(
+  '/invest/reconcile/session/:id/day/:date',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcileDayGet.bind(invest)
+);
+router.post(
+  '/invest/reconcile/session/:id/day/:date/resolve',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.reconcileDayResolve.bind(invest)
+);
+router.post(
+  '/invest/reconcile/session/:id/day/:date/close',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.reconcileDayClose.bind(invest)
+);
+router.post(
+  '/invest/reconcile/audit/run',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcileAuditRun.bind(invest)
+);
+router.get(
+  '/invest/reconcile/as-of',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcileAsOf.bind(invest)
 );
 
 // --- Core ---
