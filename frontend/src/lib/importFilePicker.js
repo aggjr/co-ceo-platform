@@ -1,5 +1,5 @@
 /**
- * Seleção de pasta/arquivos PDF no navegador (não persiste no servidor).
+ * Seleção de pasta/arquivos no navegador (não persiste no servidor).
  */
 function readFileAsBase64(file) {
   return new Promise((resolve, reject) => {
@@ -14,30 +14,50 @@ function readFileAsBase64(file) {
   });
 }
 
+function folderLabelFromFiles(files) {
+  if (!files.length) return '';
+  const dirs = new Set();
+  for (const f of files) {
+    const p = String(f.name || '');
+    const parts = p.replace(/\\/g, '/').split('/');
+    if (parts.length > 1) dirs.add(parts[0]);
+  }
+  const dirHint = dirs.size === 1 ? [...dirs][0] : `${dirs.size} pastas`;
+  return `${files.length} arquivo(s) — ${dirHint}`;
+}
+
 /**
- * @returns {Promise<Array<{ name: string, contentBase64: string }>>}
+ * @param {{ extensions?: string[] }} opts — ex. ['.pdf'] ou ['.pdf', '.csv', '.txt']
+ * @returns {Promise<{ files: Array<{ name: string, contentBase64: string }>, label: string }>}
  */
-export async function pickPdfFilesFromFolder() {
+export async function pickFilesFromFolder(opts = {}) {
+  const exts = (opts.extensions || ['.pdf']).map((e) =>
+    e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`
+  );
+
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.multiple = true;
-    input.accept = 'application/pdf,.pdf';
+    input.accept = exts.join(',');
     input.setAttribute('webkitdirectory', '');
     input.style.display = 'none';
     document.body.appendChild(input);
     input.addEventListener('change', async () => {
       try {
         const raw = [...(input.files || [])];
-        const pdfs = raw.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
+        const matched = raw.filter((f) => {
+          const n = f.name.toLowerCase();
+          return exts.some((ext) => n.endsWith(ext));
+        });
         const files = await Promise.all(
-          pdfs.map(async (f) => ({
+          matched.map(async (f) => ({
             name: f.webkitRelativePath || f.name,
             contentBase64: await readFileAsBase64(f),
           }))
         );
         document.body.removeChild(input);
-        resolve(files);
+        resolve({ files, label: folderLabelFromFiles(files) });
       } catch (e) {
         document.body.removeChild(input);
         reject(e);
@@ -45,4 +65,14 @@ export async function pickPdfFilesFromFolder() {
     });
     input.click();
   });
+}
+
+/** @returns {Promise<{ files: Array<{ name: string, contentBase64: string }>, label: string }>} */
+export async function pickPdfFilesFromFolder() {
+  return pickFilesFromFolder({ extensions: ['.pdf'] });
+}
+
+/** Extrato BTG: PDF ou CSV */
+export async function pickExtractFilesFromFolder() {
+  return pickFilesFromFolder({ extensions: ['.pdf', '.csv', '.txt'] });
 }

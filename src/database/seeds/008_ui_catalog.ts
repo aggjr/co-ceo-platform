@@ -1253,7 +1253,7 @@ export const MENU: MenuSeed[] = [
     icon: null,
     order_index: 65,
     text_key: 'menu.invest.conciliacao',
-    access_resource_key: 'screen.invest.conciliacao',
+    access_resource_key: 'screen.invest.results',
     visibility: 'all',
   },
 ];

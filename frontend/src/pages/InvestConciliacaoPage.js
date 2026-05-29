@@ -3,7 +3,10 @@ import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { isAuthenticated } from '../auth/session.js';
 import { getPageTexts } from '../navigation/pageTexts.js';
-import { pickPdfFilesFromFolder } from '../lib/importFilePicker.js';
+import {
+  pickPdfFilesFromFolder,
+  pickExtractFilesFromFolder,
+} from '../lib/importFilePicker.js';
 import { navigate } from '../router.js';
 
 function el(tag, className, text) {
@@ -40,162 +43,212 @@ export async function InvestConciliacaoPage(container) {
     { 'screen.invest.conciliacao.title': 'Conciliação' }
   );
   const title = texts['screen.invest.conciliacao.title'];
-  const copy = {
-    pendingTitle: 'Pendências do dia',
-    noPending: 'Nenhuma pendência.',
-    closeDay: 'Fechar dia',
-    pickFolder: 'Pasta de notas (PDF)',
-    viewChart: 'Resultado histórico',
-    ledgerCol: 'Livro',
-    fileCol: 'Notas',
-    blockedHint: 'Resolva todas as pendências antes de fechar o dia.',
-    notesComplete: 'Fase notas concluída.',
-    modalTitle: 'Como deseja iniciar a conciliação?',
-    modalRecover:
-      'Recuperar — mantém o livro atual e concilia em cima dos dados existentes.',
-    modalReset:
-      'Refazer do zero — apaga movimentações, snapshots e sessões desta holding. Permanecem usuários, saldo inicial e posições de abertura.',
-    modalResetBtn: 'Refazer do zero (só abertura)',
-    modalRecoverBtn: 'Recuperar dados atuais',
-    modalCancel: 'Cancelar',
-    modalConfirmReset: 'Confirma apagar tudo exceto a abertura e recomeçar?',
-    preflightLoading: 'Verificando dados da holding…',
-    resetDone: 'Holding resetada. Escolha a pasta de notas.',
-    pickFolderBlocked: 'Escolha primeiro recuperar ou refazer do zero.',
-  };
 
-  const host = el('div', 'invest-conciliacao');
   const state = {
+    notesFiles: [],
+    notesFolderLabel: 'Nenhuma pasta selecionada',
+    extractFiles: [],
+    extractFolderLabel: 'Nenhuma pasta selecionada (após fase notas)',
+    resetBase: false,
+    dataMode: 'recover',
+    preflight: null,
     sessionId: null,
     calendar: [],
     dayIndex: 0,
-    day: null,
-    copy,
-    dataMode: null,
-    preflight: null,
-    modeChosen: false,
+    notesPhaseDone: false,
   };
 
-  const statusEl = el('p', 'invest-conciliacao__progress', copy.preflightLoading);
+  const host = el('div', 'invest-conciliacao');
+  const setupPanel = el('section', 'invest-conciliacao__setup');
+  const workflowPanel = el('section', 'invest-conciliacao__workflow');
+  workflowPanel.hidden = true;
+
+  const statusEl = el('p', 'invest-conciliacao__status muted', '');
+  const notesPathEl = el('span', 'invest-conciliacao__folder-path', state.notesFolderLabel);
+  const extractPathEl = el('span', 'invest-conciliacao__folder-path', state.extractFolderLabel);
+  const resetCheck = document.createElement('input');
+  resetCheck.type = 'checkbox';
+  resetCheck.id = 'conciliacao-reset-base';
+  resetCheck.className = 'invest-conciliacao__checkbox';
+
   const pendingHost = el('div', 'invest-conciliacao__pending');
   const ledgerTable = el('table', 'invest-conciliacao__table');
   const fileTable = el('table', 'invest-conciliacao__table');
   const blockEl = el('p', 'invest-conciliacao__blocked', '');
-  const modeBanner = el('p', 'invest-conciliacao__mode-banner', '');
 
-  const modalBackdrop = el('div', 'invest-conciliacao__modal-backdrop');
-  modalBackdrop.hidden = true;
-  const modal = el('div', 'invest-conciliacao__modal');
-  const modalBody = el('div', 'invest-conciliacao__modal-body', '');
-  modal.appendChild(el('h2', 'invest-conciliacao__modal-title', copy.modalTitle));
-  modal.appendChild(modalBody);
-  const modalActions = el('div', 'invest-conciliacao__modal-actions');
-  modal.appendChild(modalActions);
-  modalBackdrop.appendChild(modal);
+  setupPanel.appendChild(el('h2', 'invest-conciliacao__setup-title', 'Configuração'));
 
-  function setModeBanner() {
-    if (!state.dataMode) {
-      modeBanner.textContent = '';
-      return;
-    }
-    const open = state.preflight?.openingDate;
-    const openBr = formatOpeningDate(open);
-    modeBanner.textContent =
-      state.dataMode === 'reset_from_opening'
-        ? `Modo: refazer do zero (abertura preservada em ${openBr}).`
-        : 'Modo: recuperar livro existente.';
-  }
+  const notesRow = el('div', 'invest-conciliacao__folder-row');
+  notesRow.appendChild(el('span', 'invest-conciliacao__folder-icon', '📁'));
+  const notesBody = el('div', 'invest-conciliacao__folder-body');
+  notesBody.appendChild(el('label', 'invest-conciliacao__folder-label', 'Notas de corretagem (PDF)'));
+  notesBody.appendChild(notesPathEl);
+  notesRow.appendChild(notesBody);
+  notesRow.appendChild(
+    btn('Escolher pasta', async () => {
+      const { files, label } = await pickPdfFilesFromFolder();
+      state.notesFiles = files;
+      state.notesFolderLabel = files.length ? label : 'Nenhuma pasta selecionada';
+      notesPathEl.textContent = state.notesFolderLabel;
+    })
+  );
+  setupPanel.appendChild(notesRow);
 
-  function closeModal() {
-    modalBackdrop.hidden = true;
-  }
+  const extractRow = el('div', 'invest-conciliacao__folder-row');
+  extractRow.appendChild(el('span', 'invest-conciliacao__folder-icon', '📁'));
+  const extractBody = el('div', 'invest-conciliacao__folder-body');
+  extractBody.appendChild(
+    el('label', 'invest-conciliacao__folder-label', 'Extrato / financeiro (PDF, CSV ou TXT)')
+  );
+  extractBody.appendChild(extractPathEl);
+  extractRow.appendChild(extractBody);
+  extractRow.appendChild(
+    btn('Escolher pasta', async () => {
+      const { files, label } = await pickExtractFilesFromFolder();
+      state.extractFiles = files;
+      state.extractFolderLabel = files.length ? label : 'Nenhuma pasta selecionada';
+      extractPathEl.textContent = state.extractFolderLabel;
+    })
+  );
+  setupPanel.appendChild(extractRow);
 
-  function showDataModeModal(preflight) {
-    const pv = preflight.purgePreview;
-    const openBr = formatOpeningDate(preflight.openingDate);
-    modalBody.replaceChildren();
-    modalBody.appendChild(
-      el(
-        'p',
-        '',
-        `A holding já tem movimentações além da abertura (${openBr}). Escolha uma opção:`
-      )
-    );
-    if (pv) {
-      const stats = el('ul', 'invest-conciliacao__modal-stats');
-      stats.appendChild(
-        el('li', '', `Pernas patrimoniais a remover: ${pv.patrimonyLegsToRemove}`)
-      );
-      stats.appendChild(
-        el('li', '', `Pernas financeiras a remover: ${pv.financialLegsToRemove}`)
-      );
-      stats.appendChild(el('li', '', `Referência de abertura: ${pv.openingRef}`));
-      modalBody.appendChild(stats);
-    }
-    modalBody.appendChild(el('p', '', copy.modalRecover));
-    modalBody.appendChild(el('p', 'invest-conciliacao__modal-warn', copy.modalReset));
+  const checkRow = el('label', 'invest-conciliacao__check-row');
+  checkRow.htmlFor = 'conciliacao-reset-base';
+  checkRow.appendChild(resetCheck);
+  checkRow.appendChild(
+    el(
+      'span',
+      '',
+      'Zerar base e refazer todos os dados (mantém usuários e abertura do inventário inicial)'
+    )
+  );
+  setupPanel.appendChild(checkRow);
 
-    modalActions.replaceChildren();
-    modalActions.appendChild(
-      btn(copy.modalRecoverBtn, () => {
-        state.dataMode = 'recover';
-        state.modeChosen = true;
-        closeModal();
-        setModeBanner();
-        statusEl.textContent = 'Modo recuperar — escolha a pasta de notas.';
-        pickBtn.disabled = false;
-      })
-    );
-    modalActions.appendChild(
-      btn(
-        copy.modalResetBtn,
-        async () => {
-          if (!window.confirm(copy.modalConfirmReset)) return;
-          closeModal();
-          statusEl.textContent = 'Resetando holding (preservando abertura)…';
-          pickBtn.disabled = true;
-          try {
-            await apiRequest('/api/invest/reconcile/reset-holding', {
-              method: 'POST',
-              body: '{}',
-            });
-            state.dataMode = 'reset_from_opening';
-            state.modeChosen = true;
-            setModeBanner();
-            statusEl.textContent = copy.resetDone;
-            pickBtn.disabled = false;
-          } catch (e) {
-            statusEl.textContent = e?.message || 'Falha ao resetar holding.';
-            pickBtn.disabled = false;
-            showDataModeModal(preflight);
-          }
-        },
-        false,
-        'btn btn-danger'
-      )
-    );
-    modalActions.appendChild(btn(copy.modalCancel, closeModal));
-    modalBackdrop.hidden = false;
-  }
+  const startBtn = btn(
+    'Iniciar conciliação',
+    () => startConciliation(),
+    false,
+    'btn btn-primary invest-conciliacao__start-btn'
+  );
+  setupPanel.appendChild(startBtn);
+  setupPanel.appendChild(statusEl);
+
+  host.appendChild(setupPanel);
+  host.appendChild(workflowPanel);
 
   async function loadPreflight() {
     try {
-      const preflight = await apiRequest('/api/invest/reconcile/preflight');
-      state.preflight = preflight;
-      if (preflight.needsDataModeChoice) {
-        showDataModeModal(preflight);
-        statusEl.textContent = copy.pickFolderBlocked;
-        pickBtn.disabled = true;
-      } else {
-        state.dataMode = 'recover';
-        state.modeChosen = true;
-        statusEl.textContent = 'Sem movimentações além da abertura — escolha a pasta de notas.';
-        pickBtn.disabled = false;
+      state.preflight = await apiRequest('/api/invest/reconcile/preflight');
+      const open = formatOpeningDate(state.preflight.openingDate);
+      if (state.preflight.openingDate) {
+        statusEl.textContent = `Abertura no livro: ${open}. ${
+          state.preflight.needsDataModeChoice
+            ? 'Marque o checkbox para zerar ou deixe desmarcado para recuperar o livro atual.'
+            : 'Poucos dados além da abertura — pode iniciar sem zerar.'
+        }`;
       }
     } catch (e) {
-      statusEl.textContent = e?.message || 'Falha no pré-voo.';
-      pickBtn.disabled = true;
+      statusEl.textContent = e?.message || 'Falha ao consultar estado da holding.';
     }
+  }
+
+  async function startConciliation() {
+    if (!state.notesFiles.length) {
+      statusEl.textContent = 'Selecione a pasta das notas de corretagem (PDF).';
+      return;
+    }
+
+    state.resetBase = resetCheck.checked;
+    state.dataMode = state.resetBase ? 'reset_from_opening' : 'recover';
+
+    if (state.resetBase) {
+      const open = formatOpeningDate(state.preflight?.openingDate);
+      const msg =
+        `Isso apaga movimentações, fechamentos e snapshots desta holding.\n` +
+        `Permanecem usuários e a abertura (${open || 'data do livro'}).\n\nContinuar?`;
+      if (!window.confirm(msg)) return;
+      statusEl.textContent = 'Zerando base…';
+      startBtn.disabled = true;
+      try {
+        await apiRequest('/api/invest/reconcile/reset-holding', { method: 'POST', body: '{}' });
+        statusEl.textContent = 'Base zerada. Iniciando sessão de notas…';
+      } catch (e) {
+        statusEl.textContent = e?.message || 'Falha ao zerar base.';
+        startBtn.disabled = false;
+        return;
+      }
+    } else if (state.preflight?.needsDataModeChoice) {
+      const ok = window.confirm(
+        'O livro já tem movimentações além da abertura.\n' +
+          'Sem zerar, a conciliação tentará recuperar/corrigir em cima do que existe.\n\nContinuar em modo recuperar?'
+      );
+      if (!ok) return;
+    }
+
+    statusEl.textContent = 'Lendo notas e abrindo sessão…';
+    startBtn.disabled = true;
+    try {
+      const res = await apiRequest('/api/invest/reconcile/session/start', {
+        method: 'POST',
+        body: JSON.stringify({
+          phase: 'notes',
+          files: state.notesFiles,
+          dataMode: state.dataMode,
+        }),
+      });
+      state.sessionId = res.sessionId;
+      state.calendar = res.calendar || [];
+      state.dayIndex = 0;
+      workflowPanel.hidden = false;
+      workflowPanel.replaceChildren();
+      buildWorkflowUi();
+      await loadDay();
+      statusEl.textContent = `Sessão iniciada — ${state.calendar.length} dia(s) de pregão nas notas.`;
+    } catch (e) {
+      statusEl.textContent = e?.message || 'Falha ao iniciar sessão.';
+      startBtn.disabled = false;
+    }
+  }
+
+  function buildWorkflowUi() {
+    workflowPanel.appendChild(el('h2', '', 'Conciliação — notas (dia a dia)'));
+
+    const toolbar = el('div', 'invest-conciliacao__toolbar');
+    const closeDayBtn = btn('Fechar dia', () => closeDay(), true);
+    toolbar.appendChild(
+      btn('◀', () => {
+        if (state.dayIndex > 0) {
+          state.dayIndex -= 1;
+          loadDay();
+        }
+      })
+    );
+    toolbar.appendChild(
+      btn('▶', () => {
+        if (state.dayIndex < state.calendar.length - 1) {
+          state.dayIndex += 1;
+          loadDay();
+        }
+      })
+    );
+    toolbar.appendChild(closeDayBtn);
+    toolbar.appendChild(btn('Resultado histórico', () => navigate('/invest')));
+    workflowPanel.appendChild(toolbar);
+
+    workflowPanel.appendChild(el('p', 'invest-conciliacao__progress', ''));
+    workflowPanel.appendChild(blockEl);
+    workflowPanel.appendChild(pendingHost);
+
+    const tables = el('div', 'invest-conciliacao__tables');
+    const lw = el('div', 'invest-conciliacao__table-wrap');
+    lw.appendChild(el('h4', '', 'Livro'));
+    lw.appendChild(ledgerTable);
+    const fw = el('div', 'invest-conciliacao__table-wrap');
+    fw.appendChild(el('h4', '', 'Notas'));
+    fw.appendChild(fileTable);
+    tables.appendChild(lw);
+    tables.appendChild(fw);
+    workflowPanel.appendChild(tables);
   }
 
   async function loadDay() {
@@ -204,29 +257,33 @@ export async function InvestConciliacaoPage(container) {
     const res = await apiRequest(
       `/api/invest/reconcile/session/${state.sessionId}/day/${date}`
     );
-    state.day = res;
-    statusEl.textContent =
-      `Dia ${state.dayIndex + 1}/${state.calendar.length}: ${date}` +
-      (res.horizonTrustedThrough ? ` | Horizonte: ${res.horizonTrustedThrough}` : '');
+    const progress = workflowPanel.querySelector('.invest-conciliacao__progress');
+    if (progress) {
+      progress.textContent = `Dia ${state.dayIndex + 1}/${state.calendar.length}: ${date}`;
+    }
     renderPending(res.pendingDecisions || []);
     renderTables(res.preview?.rows || []);
-    blockEl.textContent = res.canClose ? '' : state.copy.blockedHint;
-    closeBtn.disabled = !res.canClose;
+    blockEl.textContent = res.canClose ? '' : 'Resolva todas as pendências antes de fechar o dia.';
+    for (const b of workflowPanel.querySelectorAll('.invest-conciliacao__toolbar button')) {
+      if (b.textContent === 'Fechar dia') b.disabled = !res.canClose;
+    }
   }
 
   function renderPending(decisions) {
     pendingHost.replaceChildren();
-    pendingHost.appendChild(el('h3', '', state.copy.pendingTitle));
+    pendingHost.appendChild(el('h3', '', 'Pendências do dia'));
     if (!decisions.length) {
-      pendingHost.appendChild(el('p', '', state.copy.noPending));
+      pendingHost.appendChild(el('p', 'muted', 'Nenhuma pendência.'));
       return;
     }
     for (const d of decisions) {
       const row = el('div', 'invest-conciliacao__pending-item');
-      row.appendChild(el('span', '', `${d.kind} — ${d.decisionId}`));
+      row.appendChild(el('span', '', `${d.kind}`));
       for (const action of d.allowedActions || []) {
         if (action === 'defer') continue;
-        row.appendChild(btn(action, () => resolveDecision(d.decisionId, action)));
+        row.appendChild(
+          btn(action, () => resolveDecision(d.decisionId, action))
+        );
       }
       pendingHost.appendChild(row);
     }
@@ -269,28 +326,7 @@ export async function InvestConciliacaoPage(container) {
     await loadDay();
   }
 
-  async function startNotesSession() {
-    if (!state.modeChosen || !state.dataMode) {
-      if (state.preflight?.needsDataModeChoice) showDataModeModal(state.preflight);
-      return;
-    }
-    const files = await pickPdfFilesFromFolder();
-    if (!files.length) return;
-    const res = await apiRequest('/api/invest/reconcile/session/start', {
-      method: 'POST',
-      body: JSON.stringify({
-        phase: 'notes',
-        files,
-        dataMode: state.dataMode,
-      }),
-    });
-    state.sessionId = res.sessionId;
-    state.calendar = res.calendar || [];
-    state.dayIndex = 0;
-    await loadDay();
-  }
-
-  const closeBtn = btn(state.copy.closeDay, async () => {
+  async function closeDay() {
     const date = state.calendar[state.dayIndex];
     await apiRequest(
       `/api/invest/reconcile/session/${state.sessionId}/day/${date}/close`,
@@ -299,58 +335,23 @@ export async function InvestConciliacaoPage(container) {
     if (state.dayIndex < state.calendar.length - 1) {
       state.dayIndex += 1;
       await loadDay();
-    } else {
-      await apiRequest(`/api/invest/reconcile/session/${state.sessionId}/complete-phase`, {
-        method: 'POST',
-        body: '{}',
-      });
-      statusEl.textContent = state.copy.notesComplete;
+      return;
     }
-  }, true);
-
-  const pickBtn = btn(state.copy.pickFolder, startNotesSession, true);
-  const toolbar = el('div', 'invest-conciliacao__toolbar');
-  toolbar.appendChild(pickBtn);
-  toolbar.appendChild(
-    btn('◀', async () => {
-      if (state.dayIndex > 0) {
-        state.dayIndex -= 1;
-        await loadDay();
-      }
-    })
-  );
-  toolbar.appendChild(
-    btn('▶', async () => {
-      if (state.dayIndex < state.calendar.length - 1) {
-        state.dayIndex += 1;
-        await loadDay();
-      }
-    })
-  );
-  toolbar.appendChild(closeBtn);
-  toolbar.appendChild(btn(state.copy.viewChart, () => navigate('/invest')));
-  toolbar.appendChild(
-    btn('Alterar modo', () => {
-      if (state.preflight) showDataModeModal(state.preflight);
-    })
-  );
-
-  host.appendChild(modalBackdrop);
-  host.appendChild(toolbar);
-  host.appendChild(modeBanner);
-  host.appendChild(statusEl);
-  host.appendChild(blockEl);
-  host.appendChild(pendingHost);
-  const tables = el('div', 'invest-conciliacao__tables');
-  const lw = el('div', 'invest-conciliacao__table-wrap');
-  lw.appendChild(el('h4', '', state.copy.ledgerCol));
-  lw.appendChild(ledgerTable);
-  const fw = el('div', 'invest-conciliacao__table-wrap');
-  fw.appendChild(el('h4', '', state.copy.fileCol));
-  fw.appendChild(fileTable);
-  tables.appendChild(lw);
-  tables.appendChild(fw);
-  host.appendChild(tables);
+    await apiRequest(`/api/invest/reconcile/session/${state.sessionId}/complete-phase`, {
+      method: 'POST',
+      body: '{}',
+    });
+    state.notesPhaseDone = true;
+    const progress = workflowPanel.querySelector('.invest-conciliacao__progress');
+    if (progress) {
+      progress.textContent =
+        'Fase notas concluída. Selecionou extrato na configuração — fase extrato em breve nesta tela.';
+    }
+    if (state.extractFiles.length) {
+      statusEl.textContent =
+        'Notas concluídas. Próximo passo: conciliação do extrato (use a mesma tela após atualização).';
+    }
+  }
 
   await renderShell(container, { title, content: host });
   await loadPreflight();

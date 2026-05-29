@@ -117,7 +117,7 @@ export const MENU_CATALOG = [
       {
         label: 'Conciliação',
         path: '/invest/conciliacao',
-        resourceKey: 'screen.invest.conciliacao',
+        resourceKey: 'screen.invest.results',
       },
     ],
   },
