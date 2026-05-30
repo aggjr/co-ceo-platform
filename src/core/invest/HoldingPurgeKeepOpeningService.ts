@@ -376,12 +376,16 @@ export class HoldingPurgeKeepOpeningService {
       log?.(`DELETE ${table}: ${n} linha(s)`, `purge.${table}`);
     }
 
-    await conn.query<ResultSetHeader>(
-      `DELETE fa FROM financial_accounts fa
-       LEFT JOIN financial_ledger_entries fle ON fle.financial_account_id = fa.id
-       WHERE fa.organization_id = ? AND fle.id IS NULL`,
-      [orgId]
+    const [faDel] = await conn.query<ResultSetHeader>(
+      `DELETE FROM financial_accounts
+       WHERE organization_id = ?
+         AND id NOT IN (
+           SELECT DISTINCT account_id FROM financial_ledger_entries
+           WHERE organization_id = ? AND account_id IS NOT NULL
+         )`,
+      [orgId, orgId]
     );
+    log?.(`DELETE financial_accounts (órfãs): ${faDel.affectedRows}`, 'purge.financial_accounts');
 
     return {
       patrimonyLegsRemoved: ple.affectedRows,
