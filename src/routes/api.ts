@@ -223,6 +223,18 @@ router.get(
   requirePermission('invest:ledger:read'),
   reconcile.optionCStatus.bind(reconcile)
 );
+router.post(
+  '/invest/reconcile/patrimony-anchors/seed-btg',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.seedBtgPatrimonyAnchors.bind(reconcile)
+);
+router.get(
+  '/invest/reconcile/patrimony-anchors',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  reconcile.listPatrimonyAnchors.bind(reconcile)
+);
 
 router.post(
   '/invest/admin/recalc-curve',

@@ -119,34 +119,36 @@ export class PatrimonyDailyRecorder {
     const rfAnchor = Number(anchors.fixed_income_total ?? 0);
     const rfForEconomic = hasAnchors && rfAnchor > 0 ? rfAnchor : rfLedger;
 
-    const economicMtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
+    const useCalibration =
+      !opts?.economicOnly && hasAnchors && shouldUseBtgAnchorCalibration(events);
+
+    const mtmOpts = {
       anchors,
       stockQuotes,
       fixedIncomeTotal: rfForEconomic,
-      calibrateToAnchors: false,
+      calibrateToAnchors: useCalibration,
       quoteForDate,
-    });
+    };
 
-    const economicPoint = economicMtm.series[economicMtm.series.length - 1];
-    if (!economicPoint || economicPoint.date !== date) {
+    const mtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, mtmOpts);
+    const recordPoint = mtm.series[mtm.series.length - 1];
+    if (!recordPoint || recordPoint.date !== date) {
       throw new Error(`Sem patrimônio econômico calculado para ${date}.`);
     }
 
-    let recordPoint = economicPoint;
-    let source = 'mtm_economic';
-    let btgPatrimony: number | null = null;
-
-    if (!opts?.economicOnly && hasAnchors && shouldUseBtgAnchorCalibration(events)) {
-      btgPatrimony = Math.round(interpolatePatrimonyTarget(date, anchors) * 100) / 100;
-      const pending = economicPoint.pendingSettlements;
-      recordPoint = {
-        ...economicPoint,
-        patrimony: btgPatrimony,
-        patrimonyGross: Math.round((btgPatrimony - pending) * 100) / 100,
-        positionsValue: economicPoint.positionsValue,
-      };
-      source = 'mtm_btg_calibrated';
+    let economicPoint = recordPoint;
+    if (useCalibration) {
+      const economicMtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
+        ...mtmOpts,
+        calibrateToAnchors: false,
+      });
+      economicPoint = economicMtm.series[economicMtm.series.length - 1] ?? recordPoint;
     }
+
+    const source = useCalibration ? 'mtm_btg_calibrated' : 'mtm_economic';
+    const btgPatrimony = useCalibration
+      ? Math.round(interpolatePatrimonyTarget(date, anchors) * 100) / 100
+      : null;
 
     const patrimonyGross = recordPoint.patrimonyGross;
 
@@ -171,7 +173,7 @@ export class PatrimonyDailyRecorder {
       cumulativeTwr = 0;
     }
 
-    const positions = economicMtm.positionSnapshots ?? [];
+    const positions = mtm.positionSnapshots ?? [];
     const recorded = await this.store.upsertPortfolioDay(ctx, {
       snapshotDate: date,
       point: recordPoint,

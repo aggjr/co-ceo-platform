@@ -14,7 +14,6 @@ const AUX_ORG_TABLES = [
   'financial_closings',
   'invest_broker_custody_snapshot_lines',
   'invest_broker_custody_snapshots',
-  'invest_patrimony_monthly_anchors',
   'invest_portfolio_daily',
   'invest_daily_snapshots',
   'invest_ledger_entries',

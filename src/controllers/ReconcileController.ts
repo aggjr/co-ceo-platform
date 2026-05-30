@@ -7,6 +7,8 @@ import { LedgerImportService } from '../core/invest/LedgerImportService';
 import { PatrimonyDailyRebuildService } from '../core/invest/PatrimonyDailyRebuildService';
 import { RemoteRecalcController } from './RemoteRecalcController';
 import { OptionCDailyCloseOrchestrator } from '../core/invest/reconcile/OptionCDailyCloseOrchestrator';
+import { PatrimonyMonthlyAnchorsSeedService } from '../core/invest/PatrimonyMonthlyAnchorsSeedService';
+import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
 
 export class ReconcileController {
   private readonly holdingPurge: HoldingPurgeKeepOpeningService;
@@ -14,6 +16,8 @@ export class ReconcileController {
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly recalcController: RemoteRecalcController;
   private readonly optionC: OptionCDailyCloseOrchestrator;
+  private readonly anchorSeed: PatrimonyMonthlyAnchorsSeedService;
+  private readonly anchorsRepo: PatrimonyMonthlyAnchorsRepository;
 
   constructor(
     private readonly gateway: CoCeoDataGateway,
@@ -24,6 +28,8 @@ export class ReconcileController {
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.recalcController = new RemoteRecalcController(gateway);
     this.optionC = new OptionCDailyCloseOrchestrator(gateway, pool);
+    this.anchorSeed = new PatrimonyMonthlyAnchorsSeedService(gateway);
+    this.anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
   }
 
   /**
@@ -138,6 +144,14 @@ export class ReconcileController {
       const extractFiles = Array.isArray(req.body?.extractFiles) ? req.body.extractFiles : [];
       const resetFirst = req.body?.resetFirst === true;
       const dataMode = req.body?.dataMode as 'recover' | 'reset_from_opening' | undefined;
+
+      const existingAnchors = await this.anchorsRepo.loadForOrganization(ctx);
+      let anchorsSeeded = false;
+      if (existingAnchors.month_ends.length === 0 && this.anchorSeed.resolveReference(ctx)) {
+        await this.anchorSeed.seedFromHomebrokerReference(ctx);
+        anchorsSeeded = true;
+      }
+
       const state = await this.optionC.start(ctx, {
         notesFiles,
         extractFiles,
@@ -148,6 +162,7 @@ export class ReconcileController {
         success: true,
         message:
           'Opção C iniciada. Use option-c/next-day para fechar cada pregão (cotações web + patrimônio gravado).',
+        anchorsSeeded,
         state,
       });
     } catch (error: unknown) {
@@ -184,6 +199,40 @@ export class ReconcileController {
       return res.json({ success: true, state });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Falha ao consultar status.';
+      return res.status(500).json({ success: false, error: message });
+    }
+  };
+
+  /** POST /api/invest/reconcile/patrimony-anchors/seed-btg — grava âncoras homebroker (sem migration SQL) */
+  seedBtgPatrimonyAnchors = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const ctx = req.userContext!;
+      if (!ctx.organizationId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const result = await this.anchorSeed.seedFromHomebrokerReference(ctx);
+      const loaded = await this.anchorsRepo.loadForOrganization(ctx);
+      return res.json({
+        success: true,
+        message: `${result.upserted} âncora(s) BTG gravada(s) — calibração ativa no fechamento diário.`,
+        seed: result,
+        anchors: loaded,
+      });
+    } catch (error: unknown) {
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      const message = error instanceof Error ? error.message : 'Falha ao gravar âncoras BTG.';
+      return res.status(status).json({ success: false, error: message });
+    }
+  };
+
+  /** GET /api/invest/reconcile/patrimony-anchors — lista âncoras da org */
+  listPatrimonyAnchors = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const ctx = req.userContext!;
+      const anchors = await this.anchorsRepo.loadForOrganization(ctx);
+      return res.json({ success: true, anchors });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Falha ao listar âncoras.';
       return res.status(500).json({ success: false, error: message });
     }
   };

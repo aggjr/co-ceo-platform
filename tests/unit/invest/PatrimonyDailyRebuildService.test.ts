@@ -84,14 +84,14 @@ describe('PatrimonyDailyRebuildService', () => {
     invalidateFromDate.mockResolvedValue(undefined);
   });
 
-  it('invalida, grava dias úteis (economicOnly) e reconcilia custódia', async () => {
+  it('invalida, grava dias úteis com calibração BTG quando houver âncoras e reconcilia custódia', async () => {
     const svc = new PatrimonyDailyRebuildService(mockGateway());
     const result = await svc.rebuild(ctx, { from: '2026-01-01', to: '2026-01-05' });
 
     expect(invalidateFromDate).toHaveBeenCalledWith(ctx, '2026-01-02');
     expect(recordDay).toHaveBeenCalled();
     for (const call of recordDay.mock.calls) {
-      expect(call[2]).toEqual({ economicOnly: true });
+      expect(call[2]).toBeUndefined();
     }
     expect(result.daysWritten).toBeGreaterThan(0);
     expect(reconcileCustody).toHaveBeenCalledWith(ctx);

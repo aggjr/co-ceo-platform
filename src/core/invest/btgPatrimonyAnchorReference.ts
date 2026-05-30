@@ -1,21 +1,24 @@
 import type { PatrimonyAnchorFile } from './patrimonyAnchors';
 
 /**
- * Referência estrutural BTG/Necton (capturas 18–19/05/2026).
- * Espelha a migration 26 para org-holding-001; usada em seeds/scripts até o banco estar migrado.
+ * Referência BTG homebroker (capturas jan–mai/2026).
+ * Espelha migrations 27/33 para org-holding-001; fallback após reset até o banco estar migrado.
  */
 export const HOLDING_ORG_ID = 'org-holding-001';
 
 export const HOLDING_BTG_PATRIMONY_ANCHORS: PatrimonyAnchorFile = {
   month_ends: [
-    { date: '2025-12-31', patrimony: 1_224_319 },
-    { date: '2026-01-31', patrimony: 1_324_490 },
-    { date: '2026-02-28', patrimony: 1_346_751 },
-    { date: '2026-03-31', patrimony: 1_413_532 },
-    { date: '2026-04-30', patrimony: 1_513_703 },
-    { date: '2026-05-18', patrimony: 1_509_811.26 },
-    { date: '2026-05-19', patrimony: 1_509_811.26 },
-    { date: '2026-05-31', patrimony: 1_509_811.26 },
+    { date: '2025-12-31', patrimony: 1_212_435.41 },
+    { date: '2026-01-01', patrimony: 1_212_435.41 },
+    { date: '2026-01-31', patrimony: 1_320_481.6 },
+    { date: '2026-02-01', patrimony: 1_320_481.6 },
+    { date: '2026-02-28', patrimony: 1_333_604.43 },
+    { date: '2026-03-01', patrimony: 1_333_604.43 },
+    { date: '2026-03-31', patrimony: 1_392_272.86 },
+    { date: '2026-04-01', patrimony: 1_392_272.86 },
+    { date: '2026-04-30', patrimony: 1_478_734.38 },
+    { date: '2026-05-01', patrimony: 1_478_734.38 },
+    { date: '2026-05-29', patrimony: 1_450_578.2 },
   ],
   fixed_income_total: 208_292.9,
 };

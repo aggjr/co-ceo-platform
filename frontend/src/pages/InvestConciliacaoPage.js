@@ -227,6 +227,12 @@ export async function InvestConciliacaoPage(container) {
           </div>
         </div>
         <div class="conciliacao-btn-row">
+          <button id="btn-optc-seed-anchors" class="btn btn-secondary" type="button">
+            Carregar âncoras BTG (homebroker)
+          </button>
+          <span id="optc-anchors-status" class="muted" style="font-size:0.85rem"></span>
+        </div>
+        <div class="conciliacao-btn-row">
           <label class="invest-conciliacao__check-row">
             <input type="checkbox" id="optc-reset-first" class="invest-conciliacao__checkbox" checked />
             Reset antes de iniciar (preserva abertura)
@@ -774,6 +780,8 @@ export async function InvestConciliacaoPage(container) {
   const btnOptcStart = container.querySelector('#btn-optc-start');
   const btnOptcNextDay = container.querySelector('#btn-optc-next-day');
   const btnOptcRunAll = container.querySelector('#btn-optc-run-all');
+  const btnOptcSeedAnchors = container.querySelector('#btn-optc-seed-anchors');
+  const optcAnchorsStatus = container.querySelector('#optc-anchors-status');
   const optcStatus = container.querySelector('#optc-status');
   const optcPending = container.querySelector('#optc-pending');
   const optcProgress = container.querySelector('#optc-progress');
@@ -882,6 +890,42 @@ export async function InvestConciliacaoPage(container) {
     }
   });
 
+  function formatOptcAnchorsSummary(anchors) {
+    const n = anchors?.month_ends?.length ?? 0;
+    if (!n) return 'Nenhuma âncora gravada — clique em Carregar âncoras BTG';
+    const last = [...anchors.month_ends].sort((a, b) => a.date.localeCompare(b.date)).pop();
+    return `${n} ponto(s) — último ${last?.date ?? '?'}`;
+  }
+
+  async function refreshOptcAnchorsStatus() {
+    try {
+      const data = await apiRequest('/api/invest/reconcile/patrimony-anchors');
+      if (optcAnchorsStatus) optcAnchorsStatus.textContent = formatOptcAnchorsSummary(data.anchors);
+    } catch {
+      if (optcAnchorsStatus) optcAnchorsStatus.textContent = 'Âncoras: indisponível';
+    }
+  }
+
+  btnOptcSeedAnchors?.addEventListener('click', async () => {
+    btnOptcSeedAnchors.disabled = true;
+    if (optcAnchorsStatus) optcAnchorsStatus.textContent = 'Gravando âncoras BTG…';
+    try {
+      const data = await apiRequest('/api/invest/reconcile/patrimony-anchors/seed-btg', {
+        method: 'POST',
+        body: {},
+      });
+      if (optcAnchorsStatus) optcAnchorsStatus.textContent = formatOptcAnchorsSummary(data.anchors);
+      appendLog(logEl, `✅ ${data.message}`, 'ok');
+    } catch (err) {
+      appendLog(logEl, `❌ Âncoras BTG: ${err.message}`, 'err');
+      if (optcAnchorsStatus) optcAnchorsStatus.textContent = '❌ ' + err.message;
+    } finally {
+      btnOptcSeedAnchors.disabled = false;
+    }
+  });
+
+  void refreshOptcAnchorsStatus();
+
   btnOptcStart?.addEventListener('click', async () => {
     if (!optcNotesFiles.length || !optcExtractFiles.length) return;
     btnOptcStart.disabled = true;
@@ -903,6 +947,10 @@ export async function InvestConciliacaoPage(container) {
       if (btnOptcNextDay) btnOptcNextDay.disabled = false;
       if (btnOptcRunAll) btnOptcRunAll.disabled = false;
       if (optcStatus) optcStatus.textContent = `Run ${optcRunId} — ${optcState.calendar.length} pregão(ões)`;
+      if (data.anchorsSeeded) {
+        appendLog(logEl, '✅ Âncoras BTG homebroker gravadas automaticamente (tabela vazia).', 'ok');
+        await refreshOptcAnchorsStatus();
+      }
       appendLog(logEl, `✅ Opção C iniciada: ${optcState.calendar.length} dia(s) de notas.`, 'ok');
       setStepState(container, 'reset', 'done', '✅ Via Opção C');
     } catch (err) {

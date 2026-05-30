@@ -78,8 +78,7 @@ export class ReconcileResetService {
       await this.deleteByOrg(conn, report, 'invest_daily_snapshots',
         `organization_id = ?`, [orgId]);
 
-      await this.deleteByOrg(conn, report, 'invest_patrimony_monthly_anchors',
-        `organization_id = ?`, [orgId]);
+      // Âncoras BTG (invest_patrimony_monthly_anchors) são referência de calibração — não apagar no reset.
 
       // invest_position_ext e invest_option_ext vinculados via patrimony_item_id
       await this.deleteByOrg(conn, report, 'invest_position_ext',

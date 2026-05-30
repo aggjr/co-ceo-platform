@@ -125,7 +125,7 @@ export class PatrimonyDailyRebuildService {
           continue;
         }
         try {
-          await this.recorder.recordDay(ctx, day, { economicOnly: true });
+          await this.recorder.recordDay(ctx, day);
           daysWritten += 1;
         } catch (err) {
           daysSkipped += 1;
