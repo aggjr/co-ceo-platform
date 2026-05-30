@@ -1,4 +1,4 @@
-import type { PoolConnection, ResultSetHeader } from 'mysql2/promise';
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 
 const DUMMY_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -23,6 +23,7 @@ export async function clearLedgerCrossLinksByPreservedIds(
        ON fle.id = ple.related_financial_entry_id AND fle.organization_id = ple.organization_id
      SET ple.related_financial_entry_id = NULL
      WHERE ple.organization_id = ?
+       AND ple.related_financial_entry_id IS NOT NULL
        AND fle.id NOT IN (${finPh})`,
     [orgId, ...finIds]
   );
@@ -33,6 +34,7 @@ export async function clearLedgerCrossLinksByPreservedIds(
        ON ple.id = fle.related_patrimony_ledger_id AND ple.organization_id = fle.organization_id
      SET fle.related_patrimony_ledger_id = NULL
      WHERE fle.organization_id = ?
+       AND fle.related_patrimony_ledger_id IS NOT NULL
        AND ple.id NOT IN (${patPh})`,
     [orgId, ...patIds]
   );
@@ -43,7 +45,7 @@ export async function clearLedgerCrossLinksByPreservedIds(
   };
 }
 
-/** Purge canônico (abertura por evento/data) — mesma regra de preserve do HoldingPurgeKeepOpeningService. */
+/** Purge canônico (abertura) — carrega IDs preservados e desvincula o restante. */
 export async function clearLedgerCrossLinksForOpeningPurge(
   conn: PoolConnection,
   orgId: string,
@@ -52,42 +54,38 @@ export async function clearLedgerCrossLinksForOpeningPurge(
 ): Promise<{ pleUnlinked: number; fleUnlinked: number }> {
   const openingInSql = openingEventIds.length ? openingEventIds : [DUMMY_ID];
 
+  const preservePle = `(business_event_id IN (?) OR (movement_type = 'opening_balance' AND transaction_date = ?))`;
   const preserveFle = `(
-    fle.business_event_id IN (?)
+    business_event_id IN (?)
     OR (
-      fle.transaction_date = ?
+      transaction_date = ?
       AND (
-        fle.description LIKE '%Saldo inicial%'
-        OR JSON_UNQUOTE(JSON_EXTRACT(fle.metadata, '$.legacy_op')) = 'opening_balance'
+        description LIKE '%Saldo inicial%'
+        OR JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.legacy_op')) = 'opening_balance'
       )
     )
   )`;
-  const preservePle = `(ple.business_event_id IN (?) OR (ple.movement_type = 'opening_balance' AND ple.transaction_date = ?))`;
 
-  const [pleRes] = await conn.query<ResultSetHeader>(
-    `UPDATE patrimony_ledger_entries ple
-     INNER JOIN financial_ledger_entries fle
-       ON fle.id = ple.related_financial_entry_id AND fle.organization_id = ple.organization_id
-     SET ple.related_financial_entry_id = NULL
-     WHERE ple.organization_id = ?
-       AND NOT ${preserveFle}`,
+  const [pleRows] = await conn.query<RowDataPacket[]>(
+    `SELECT id FROM patrimony_ledger_entries
+     WHERE organization_id = ? AND deleted_at IS NULL AND ${preservePle}`,
+    [orgId, openingInSql, openingDate]
+  );
+  const [fleRows] = await conn.query<RowDataPacket[]>(
+    `SELECT id FROM financial_ledger_entries
+     WHERE organization_id = ? AND deleted_at IS NULL AND ${preserveFle}`,
     [orgId, openingInSql, openingDate]
   );
 
-  const [fleRes] = await conn.query<ResultSetHeader>(
-    `UPDATE financial_ledger_entries fle
-     INNER JOIN patrimony_ledger_entries ple
-       ON ple.id = fle.related_patrimony_ledger_id AND ple.organization_id = fle.organization_id
-     SET fle.related_patrimony_ledger_id = NULL
-     WHERE fle.organization_id = ?
-       AND NOT ${preservePle}`,
-    [orgId, openingInSql, openingDate]
-  );
+  const preservedPatrimonyIds = pleRows.map((r) => String(r.id));
+  const preservedFinancialIds = fleRows.map((r) => String(r.id));
 
-  return {
-    pleUnlinked: pleRes.affectedRows,
-    fleUnlinked: fleRes.affectedRows,
-  };
+  return clearLedgerCrossLinksByPreservedIds(
+    conn,
+    orgId,
+    preservedFinancialIds,
+    preservedPatrimonyIds
+  );
 }
 
 /** Extensões INVEST e locais de itens sem lançamento patrimonial restante (purge parcial). */

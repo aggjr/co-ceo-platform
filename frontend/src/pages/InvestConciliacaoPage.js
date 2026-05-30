@@ -497,6 +497,17 @@ export async function InvestConciliacaoPage(container) {
         appendLog(logEl, '─── Iniciando Reset da Base ───', 'section');
 
         try {
+          const preflight = await apiRequest('/api/invest/reconcile/preflight');
+          if (!preflight.openingDate) {
+            throw new Error(
+              'Nenhuma abertura (opening_balance) no livro. Importe o inventário inicial antes do reset.'
+            );
+          }
+          appendLog(
+            logEl,
+            `Abertura detectada: ${preflight.openingDate} (${preflight.openingLegCount ?? 0} perna(s))`
+          );
+
           const data = await apiRequest('/api/invest/reconcile/reset-holding', {
             method: 'POST',
             body: {},
@@ -514,8 +525,12 @@ export async function InvestConciliacaoPage(container) {
             if (report.auxRowsRemoved != null) {
               appendLog(logEl, `  Linhas auxiliares removidas: ${report.auxRowsRemoved}`);
             }
-            for (const line of report.activityLog || []) {
-              appendLog(logEl, `  ${line}`);
+            for (const step of report.activityLog || []) {
+              const msg =
+                typeof step === 'string'
+                  ? step
+                  : `[${step.command || 'log'}] ${step.message || ''}`;
+              appendLog(logEl, `  ${msg}`, step.level === 'error' ? 'err' : step.level === 'ok' ? 'ok' : '');
             }
             setStepState(container, 'reset', 'done', '✅ Concluído');
             if (resetStatus) resetStatus.textContent = '✅ Base limpa. Importe as NOTAS (Passo 2).';
@@ -526,9 +541,10 @@ export async function InvestConciliacaoPage(container) {
             throw new Error(data.error || 'Falha no reset.');
           }
         } catch (err) {
-          appendLog(logEl, `❌ Erro no reset: ${err.message}`, 'err');
-          setStepState(container, 'reset', 'error', '❌ ' + err.message);
-          if (resetStatus) resetStatus.textContent = '❌ ' + err.message;
+          const msg = formatReconcileApiError(err);
+          appendLog(logEl, `❌ Erro no reset: ${msg}`, 'err');
+          setStepState(container, 'reset', 'error', '❌ Falha no reset');
+          if (resetStatus) resetStatus.textContent = '❌ ' + msg;
           btnReset.disabled = false;
         }
       }
@@ -567,8 +583,9 @@ export async function InvestConciliacaoPage(container) {
         btnPickNotes.disabled = false;
       }
     } catch (err) {
-      appendLog(logEl, `❌ Erro nas notas: ${err.message}`, 'err');
-      setStepState(container, 'import-notas', 'error', '❌ ' + err.message);
+      const msg = formatReconcileApiError(err);
+      appendLog(logEl, `❌ Erro nas notas: ${msg}`, 'err');
+      setStepState(container, 'import-notas', 'error', '❌ Falha nas notas');
       btnImportNotes.disabled = false;
       btnPickNotes.disabled = false;
     }
@@ -606,8 +623,9 @@ export async function InvestConciliacaoPage(container) {
         btnPickExtract.disabled = false;
       }
     } catch (err) {
-      appendLog(logEl, `❌ Erro nos extratos: ${err.message}`, 'err');
-      setStepState(container, 'import-extratos', 'error', '❌ ' + err.message);
+      const msg = formatReconcileApiError(err);
+      appendLog(logEl, `❌ Erro nos extratos: ${msg}`, 'err');
+      setStepState(container, 'import-extratos', 'error', '❌ Falha nos extratos');
       btnImportExtract.disabled = false;
       btnPickExtract.disabled = false;
     }
