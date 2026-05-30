@@ -127,6 +127,13 @@ export class DailyCloseMaterializeService {
     };
   }
 
+  async recalcThreePricesPublic(
+    ctx: UserContext,
+    asOfDate: string
+  ): Promise<{ positionsUpdated: number; positionsZeroed: number }> {
+    return this.recalcThreePrices(ctx, asOfDate);
+  }
+
   private async recalcThreePrices(
     ctx: UserContext,
     asOfDate: string

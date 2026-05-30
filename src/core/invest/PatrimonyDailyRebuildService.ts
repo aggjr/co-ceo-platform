@@ -5,6 +5,7 @@ import { LedgerImportService } from './LedgerImportService';
 import { PatrimonyDailyRecorder } from './PatrimonyDailyRecorder';
 import { PatrimonyDailyStore } from './PatrimonyDailyStore';
 import { logReconcileFailure } from './reconcile/reconcileErrorDetail';
+import { DailyCloseMaterializeService } from './reconcile/DailyCloseMaterializeService';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
@@ -15,6 +16,7 @@ export type PatrimonyRebuildResult = {
   daysSkipped: number;
   quotesCoverage: { tickers: number; daysWithQuotes: number };
   warnings: string[];
+  threePricesUpdated?: number;
 };
 
 export type PatrimonyRebuildStatus = {
@@ -53,6 +55,7 @@ export class PatrimonyDailyRebuildService {
   private readonly recorder: PatrimonyDailyRecorder;
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly assetProjection: InvestAssetProjection;
+  private readonly dailyClose: DailyCloseMaterializeService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -60,6 +63,7 @@ export class PatrimonyDailyRebuildService {
     this.recorder = new PatrimonyDailyRecorder(gateway);
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
+    this.dailyClose = new DailyCloseMaterializeService(gateway);
   }
 
   getStatus(ctx: UserContext): PatrimonyRebuildStatus {
@@ -139,6 +143,7 @@ export class PatrimonyDailyRebuildService {
       }
 
       await this.ledger.reconcileCustody(ctx);
+      const threePrices = await this.dailyClose.recalcThreePricesPublic(ctx, today);
 
       const finishedAt = new Date().toISOString();
       statusByOrg.set(orgId, {
@@ -155,6 +160,7 @@ export class PatrimonyDailyRebuildService {
         daysSkipped,
         quotesCoverage: { tickers: tickers.length, daysWithQuotes },
         warnings,
+        threePricesUpdated: threePrices.positionsUpdated,
       };
     } catch (err) {
       statusByOrg.set(orgId, {

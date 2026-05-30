@@ -85,6 +85,8 @@ import {
   resolveThreePricesForAsset,
 } from '../core/invest/portfolioThreePrices';
 import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
+import { computeSharpeRatio } from '../core/invest/sharpeRatio';
+import { PnLReportService } from '../core/invest/PnLReportService';
 import { validateEquityThreePrices } from '../core/invest/threePricesValidation';
 import {
   buildCostAdjustmentIndex,
@@ -112,6 +114,44 @@ import pool from '../config/database';
 import { isMissingSchemaError } from '../core/dal/mysqlErrors';
 import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
 import { StockMarketSyncService } from '../core/market/StockMarketSyncService';
+
+type ThreePricesRow = {
+  ticker: string;
+  qty: number;
+  pmEstrito: number;
+  pmB3: number;
+  pmGerencial: number;
+  lotStart: string | null;
+  premiumBenefit: number;
+};
+
+type CustodyDetailRow = {
+  assetId: string;
+  ticker: string;
+  assetType: string;
+  underlying: string;
+  quantity: number;
+  avgPriceGerencial: number;
+  avgPriceEstrito: number;
+  avgPriceB3: number;
+  lastPrice: number | null;
+  bookValue: number;
+  marketValue: number | null;
+  latentPnL: number | null;
+  latentPnLPct: number | null;
+};
+
+type PatrimonyChartPoint = {
+  date: string;
+  patrimony: number;
+  cash: number;
+  positionsValue: number;
+  fixedIncome: number;
+  dailyReturnTwr: number | null;
+  cumulativeTwr: number | null;
+  externalFlow: number;
+  source: string;
+};
 
 function portfolioRowMatchesAssetClass(
   row: Record<string, unknown>,
@@ -1624,6 +1664,239 @@ export class InvestController {
       return res.json({ success: true, ...result });
     } catch (err) {
       return this.reconcileError(res, err);
+    }
+  };
+
+  getThreePrices = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    try {
+      if (!ctx.organizationId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+      const priceMap = computeThreePricesByUnderlying(events);
+
+      const rows: ThreePricesRow[] = [];
+      for (const [ticker, p] of priceMap) {
+        if (p.qty <= 0) continue;
+        rows.push({
+          ticker,
+          qty: p.qty,
+          pmEstrito: p.estrito,
+          pmB3: p.b3,
+          pmGerencial: p.gerencial,
+          lotStart: p.lotStart,
+          premiumBenefit:
+            p.qty > 0 ? Math.round((p.estrito - p.gerencial) * p.qty * 100) / 100 : 0,
+        });
+      }
+
+      return res.json({ success: true, data: rows });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: String(err) });
+    }
+  };
+
+  getCustodyDetail = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    try {
+      if (!ctx.organizationId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+      const { assets } = rebuildCustodyFromLedger(events);
+      const priceMap = computeThreePricesByUnderlying(events);
+
+      const extRows = await this.gateway.findWhere(ctx, 'invest_position_ext', {});
+      const lastPriceByAssetId = new Map(
+        extRows.map((r) => [String(r.patrimony_item_id), Number(r.last_price ?? 0)])
+      );
+
+      const rows: CustodyDetailRow[] = assets
+        .filter((a) => a.assetType !== 'cash' && Math.abs(a.quantity) > 1e-9)
+        .map((a) => {
+          const tp = priceMap.get(a.underlying ?? a.ticker);
+          const pmGerencial = tp?.gerencial ?? a.avgPrice;
+          const lastPrice = lastPriceByAssetId.get(a.assetId) ?? 0;
+          const marketValue = lastPrice > 0 ? a.quantity * lastPrice : null;
+          const bookValue = a.quantity * pmGerencial;
+          const latentPnL =
+            marketValue != null
+              ? Math.round((marketValue - bookValue) * 100) / 100
+              : null;
+
+          return {
+            assetId: a.assetId,
+            ticker: a.ticker,
+            assetType: a.assetType,
+            underlying: a.underlying,
+            quantity: a.quantity,
+            avgPriceGerencial: Math.round(pmGerencial * 10000) / 10000,
+            avgPriceEstrito: tp ? Math.round(tp.estrito * 10000) / 10000 : pmGerencial,
+            avgPriceB3: tp ? Math.round(tp.b3 * 10000) / 10000 : pmGerencial,
+            lastPrice: lastPrice > 0 ? lastPrice : null,
+            bookValue: Math.round(bookValue * 100) / 100,
+            marketValue,
+            latentPnL,
+            latentPnLPct:
+              marketValue != null && bookValue !== 0
+                ? Math.round(((marketValue - bookValue) / Math.abs(bookValue)) * 10000) / 10000
+                : null,
+          };
+        });
+
+      const totalBook = rows.reduce((s, r) => s + r.bookValue, 0);
+      const totalMarket = rows.every((r) => r.marketValue != null)
+        ? rows.reduce((s, r) => s + (r.marketValue ?? 0), 0)
+        : null;
+
+      return res.json({
+        success: true,
+        data: { rows, totals: { totalBook, totalMarket } },
+      });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: String(err) });
+    }
+  };
+
+  getPatrimonyChart = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    try {
+      if (!ctx.organizationId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const from = String(req.query.from ?? '').slice(0, 10) || '2024-01-01';
+      const to = String(req.query.to ?? '').slice(0, 10) || today;
+
+      const storedRows = await this.patrimonyStore.loadRange(ctx, from, to);
+      const series: PatrimonyChartPoint[] = storedRows.map((r) => ({
+        date: r.snapshot_date,
+        patrimony: r.patrimony,
+        cash: r.cash,
+        positionsValue: r.positions_value,
+        fixedIncome: r.fixed_income_total,
+        dailyReturnTwr: r.daily_return_twr,
+        cumulativeTwr: r.cumulative_twr,
+        externalFlow: r.external_flow,
+        source: r.source,
+      }));
+
+      if (series.length === 0) {
+        const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', to);
+        const mtm = buildDailyPatrimonyMtmSeries(events, from, to, {});
+        return res.json({
+          success: true,
+          data: { series: mtm.series, source: 'mtm_realtime', sharpe: mtm.sharpe },
+        });
+      }
+
+      return res.json({ success: true, data: { series, source: 'stored' } });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: String(err) });
+    }
+  };
+
+  getCashInTransit = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    try {
+      if (!ctx.organizationId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const asOf = String(req.query.asOf ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
+      const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', asOf);
+      const summary = buildCashInTransitSummary(events, asOf);
+      return res.json({ success: true, data: summary });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: String(err) });
+    }
+  };
+
+  getPerformance = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    try {
+      if (!ctx.organizationId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const from = String(req.query.from ?? '').slice(0, 10) || `${today.slice(0, 4)}-01-01`;
+      const to = String(req.query.to ?? '').slice(0, 10) || today;
+
+      const storedRows = await this.patrimonyStore.loadRange(ctx, from, to);
+      const storedSeries = storedRows.map((r) => ({
+        date: r.snapshot_date,
+        patrimony: r.patrimony,
+        dailyReturnTwr: r.daily_return_twr,
+        cumulativeTwr: r.cumulative_twr,
+        externalFlow: r.external_flow,
+      }));
+
+      let periodReturnTwr: number | null = null;
+      let totalExternalFlows = 0;
+      let startPatrimony: number | null = null;
+      let endPatrimony: number | null = null;
+
+      if (storedSeries.length >= 2) {
+        const first = storedSeries[0]!;
+        const last = storedSeries[storedSeries.length - 1]!;
+        startPatrimony = first.patrimony;
+        endPatrimony = last.patrimony;
+        periodReturnTwr = last.cumulativeTwr ?? null;
+        totalExternalFlows = storedSeries.reduce((s, r) => s + r.externalFlow, 0);
+      }
+
+      const dailyReturns = storedSeries
+        .map((r) => r.dailyReturnTwr)
+        .filter((r): r is number => r != null && r !== 0);
+      const sharpe = computeSharpeRatio(dailyReturns, { riskFreeAnnual: 0.115 });
+
+      return res.json({
+        success: true,
+        data: {
+          from,
+          to,
+          startPatrimony,
+          endPatrimony,
+          totalExternalFlows: Math.round(totalExternalFlows * 100) / 100,
+          periodReturnTwr,
+          periodGainBrl:
+            startPatrimony != null && endPatrimony != null
+              ? Math.round((endPatrimony - startPatrimony - totalExternalFlows) * 100) / 100
+              : null,
+          sharpe,
+          daysInPeriod: storedSeries.length,
+        },
+      });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: String(err) });
+    }
+  };
+
+  getPnLReport = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    try {
+      if (!ctx.organizationId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      const from = String(req.query.from ?? `${today.slice(0, 4)}-01-01`).slice(0, 10);
+      const to = String(req.query.to ?? today).slice(0, 10);
+
+      const service = new PnLReportService(this.gateway);
+      const rows = await service.buildReport(ctx, from, to);
+
+      const totals = {
+        totalRealizedPnL: rows.reduce((s, r) => s + r.realizedPnL, 0),
+        totalDividends: rows.reduce((s, r) => s + r.dividends + r.jcp, 0),
+        totalOptionPremiumNet: rows.reduce((s, r) => s + r.optionPremiumNet, 0),
+        grandTotalPnL: rows.reduce((s, r) => s + r.totalPnL, 0),
+      };
+
+      return res.json({ success: true, data: { from, to, rows, totals } });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: String(err) });
     }
   };
 

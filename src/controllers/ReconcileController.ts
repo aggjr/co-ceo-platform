@@ -5,7 +5,7 @@ import { GatewayError } from '../core/dal/errors';
 import { HoldingPurgeKeepOpeningService } from '../core/invest/HoldingPurgeKeepOpeningService';
 import { LedgerImportService } from '../core/invest/LedgerImportService';
 import { PatrimonyDailyRebuildService } from '../core/invest/PatrimonyDailyRebuildService';
-import { RemoteRecalcController } from './RemoteRecalcController';
+import { DailyCloseMaterializeService } from '../core/invest/reconcile/DailyCloseMaterializeService';
 import { OptionCDailyCloseOrchestrator } from '../core/invest/reconcile/OptionCDailyCloseOrchestrator';
 import { PatrimonyMonthlyAnchorsSeedService } from '../core/invest/PatrimonyMonthlyAnchorsSeedService';
 import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
@@ -15,7 +15,7 @@ export class ReconcileController {
   private readonly holdingPurge: HoldingPurgeKeepOpeningService;
   private readonly ledger: LedgerImportService;
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
-  private readonly recalcController: RemoteRecalcController;
+  private readonly dailyClose: DailyCloseMaterializeService;
   private readonly optionC: OptionCDailyCloseOrchestrator;
   private readonly anchorSeed: PatrimonyMonthlyAnchorsSeedService;
   private readonly anchorsRepo: PatrimonyMonthlyAnchorsRepository;
@@ -27,7 +27,7 @@ export class ReconcileController {
     this.holdingPurge = new HoldingPurgeKeepOpeningService(gateway, pool);
     this.ledger = new LedgerImportService(gateway);
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
-    this.recalcController = new RemoteRecalcController(gateway);
+    this.dailyClose = new DailyCloseMaterializeService(gateway);
     this.optionC = new OptionCDailyCloseOrchestrator(gateway, pool);
     this.anchorSeed = new PatrimonyMonthlyAnchorsSeedService(gateway);
     this.anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
@@ -105,18 +105,9 @@ export class ReconcileController {
 
       const custody = await this.ledger.reconcileCustody(ctx);
 
-      const posResult = await new Promise<Record<string, unknown>>((resolve) => {
-        void this.recalcController.recalcPositions(req, { json: resolve } as Response);
-      });
-
-      if (posResult.success === false) {
-        return res.status(500).json({
-          success: false,
-          error: String(posResult.error || 'Falha ao recalcular posições.'),
-          custody,
-          positions: posResult,
-        });
-      }
+      const today = new Date().toISOString().slice(0, 10);
+      const { positionsUpdated, positionsZeroed } =
+        await this.dailyClose.recalcThreePricesPublic(ctx, today);
 
       const from = req.body?.from ? String(req.body.from).slice(0, 10) : undefined;
       const to = req.body?.to ? String(req.body.to).slice(0, 10) : undefined;
@@ -127,7 +118,7 @@ export class ReconcileController {
         message:
           'Recálculo concluído. Confira o gráfico em Resultado histórico e a carteira em Ações/FIIs.',
         custody,
-        positions: posResult,
+        positions: { positionsUpdated, positionsZeroed },
         patrimonyRebuild: rebuild,
       });
     } catch (error: unknown) {
