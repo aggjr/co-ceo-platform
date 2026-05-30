@@ -211,6 +211,81 @@ export class ReconcileController {
     }
   };
 
+  /**
+   * POST /api/invest/reconcile/option-c/run-all
+   *
+   * Loop completo da Opção C no servidor (responde ao terminar ou bloquear).
+   */
+  optionCRunAll = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
+    try {
+      if (!orgId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+
+      const notesFiles = Array.isArray(req.body?.notesFiles) ? req.body.notesFiles : [];
+      const extractFiles = Array.isArray(req.body?.extractFiles) ? req.body.extractFiles : [];
+      const resetFirst = req.body?.resetFirst === true;
+      const dataMode = req.body?.dataMode as 'recover' | 'reset_from_opening' | undefined;
+      const delayMs = req.body?.delayMs != null ? Number(req.body.delayMs) : 1200;
+
+      if (!notesFiles.length) {
+        return res.status(400).json({ success: false, error: 'Envie ao menos um arquivo de notas.' });
+      }
+      if (!extractFiles.length) {
+        return res.status(400).json({ success: false, error: 'Envie ao menos um arquivo de extrato.' });
+      }
+
+      req.socket.setTimeout(0);
+      res.setTimeout(0);
+
+      console.log(
+        `[OptionC/run-all] org=${orgId} notas=${notesFiles.length} extratos=${extractFiles.length} delay=${delayMs}ms`
+      );
+
+      const existingAnchors = await this.anchorsRepo.loadForOrganization(ctx);
+      if (existingAnchors.month_ends.length === 0 && this.anchorSeed.resolveReference(ctx)) {
+        await this.anchorSeed.seedFromHomebrokerReference(ctx);
+        console.log(`[OptionC/run-all] org=${orgId} âncoras BTG gravadas`);
+      }
+
+      const finalState = await this.optionC.runAll(
+        ctx,
+        { notesFiles, extractFiles, resetFirst, dataMode, delayMs },
+        (state) => {
+          if (state.lastDay) {
+            console.log(
+              `[OptionC/run-all] org=${orgId} dia=${state.lastDay} ` +
+                `(${state.dayIndex}/${state.calendar.length}) fase=${state.phase}`
+            );
+          }
+        }
+      );
+
+      const blocked = finalState.phase !== 'done';
+      return res.json({
+        success: !blocked,
+        message: blocked
+          ? `Processo pausado — pendência no pregão ${finalState.lastDay ?? '?'}. Resolva na UI e use option-c/next-day para continuar.`
+          : 'Importação completa. Confira Resultado histórico e Ações/FIIs.',
+        state: finalState,
+      });
+    } catch (error: unknown) {
+      const detail = logReconcileFailure('option-c.run-all', orgId ?? undefined, error, {
+        resetFirst: req.body?.resetFirst === true,
+        notesFiles: Array.isArray(req.body?.notesFiles) ? req.body.notesFiles.length : 0,
+        extractFiles: Array.isArray(req.body?.extractFiles) ? req.body.extractFiles.length : 0,
+      });
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      return res.status(status).json({
+        success: false,
+        error: detail.message,
+        errorDetail: detail,
+      });
+    }
+  };
+
   /** GET /api/invest/reconcile/option-c/status/:runId */
   optionCStatus = async (req: Request, res: Response): Promise<Response> => {
     try {
