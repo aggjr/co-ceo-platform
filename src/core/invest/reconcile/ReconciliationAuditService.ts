@@ -88,11 +88,10 @@ export class ReconciliationAuditService {
     to: string
   ): Promise<AuditIssue[]> {
     const issues: AuditIssue[] = [];
-    if (!ctx.organizationId) return issues;
     const rows = await this.gateway.findWhere(
       ctx,
       'business_events',
-      { organization_id: ctx.organizationId },
+      {},
       { limit: 500 }
     );
     for (const row of rows) {
@@ -219,13 +218,7 @@ export class ReconciliationAuditService {
   private async checkCustodyQty(ctx: UserContext, events: LedgerEvent[]): Promise<AuditIssue[]> {
     const issues: AuditIssue[] = [];
     const projected = rebuildCustodyFromLedger(events);
-    if (!ctx.organizationId) return issues;
-    const assets = await this.gateway.findWhere(
-      ctx,
-      'patrimony_items',
-      { organization_id: ctx.organizationId },
-      { limit: 500 }
-    );
+    const assets = await this.gateway.findWhere(ctx, 'patrimony_items', {}, { limit: 500 });
     const qtyByTicker = new Map<string, number>();
     for (const row of projected.assets) {
       const t = String(row.ticker ?? '').toUpperCase();
