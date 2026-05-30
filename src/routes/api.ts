@@ -217,6 +217,12 @@ router.post(
   requirePermission('invest:ledger:write'),
   reconcile.optionCNextDay.bind(reconcile)
 );
+router.post(
+  '/invest/reconcile/option-c/run-all',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.optionCRunAll.bind(reconcile)
+);
 router.get(
   '/invest/reconcile/option-c/status/:runId',
   AuthMiddleware.protect,

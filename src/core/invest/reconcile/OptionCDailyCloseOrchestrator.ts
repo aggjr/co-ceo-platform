@@ -184,6 +184,63 @@ export class OptionCDailyCloseOrchestrator {
     return { status: 'done', state: rt.state };
   }
 
+  /**
+   * Executa o loop completo da Opção C no servidor:
+   * inicia sessão → fecha cada pregão com delay → importa extratos → rebuild.
+   */
+  async runAll(
+    ctx: UserContext,
+    input: {
+      notesFiles: BtgUploadFileInput[];
+      extractFiles: BtgUploadFileInput[];
+      resetFirst?: boolean;
+      dataMode?: 'recover' | 'reset_from_opening';
+      delayMs?: number;
+    },
+    onProgress?: (state: OptionCRunState) => void
+  ): Promise<OptionCRunState> {
+    const delay = input.delayMs ?? 1200;
+
+    const state = await this.start(ctx, {
+      notesFiles: input.notesFiles,
+      extractFiles: input.extractFiles,
+      resetFirst: input.resetFirst,
+      dataMode: input.dataMode,
+    });
+
+    const runId = state.runId;
+    logStep(runsById.get(runId)!, `run-all iniciado — ${state.calendar.length} pregão(ões), delay=${delay}ms`);
+
+    let iterations = 0;
+    const maxIterations = state.calendar.length + 10;
+
+    while (iterations < maxIterations) {
+      iterations++;
+      const rt = runsById.get(runId);
+      if (!rt || rt.state.phase === 'done') break;
+
+      const result = await this.closeNextDay(ctx, runId);
+      onProgress?.(result.state);
+
+      if (result.status === 'blocked') {
+        logStep(
+          rt,
+          `run-all bloqueado em ${result.day ?? '?'} — pendências não resolvidas automaticamente.`
+        );
+        break;
+      }
+
+      if (result.status === 'done') break;
+
+      if (delay > 0 && result.status !== 'phase_complete') {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    const finalRt = runsById.get(runId);
+    return finalRt?.state ?? state;
+  }
+
   private async closeNextNotesDay(ctx: UserContext, rt: OptionCRuntime) {
     const { calendar, dayIndex, sessionId } = rt.state;
     if (dayIndex >= calendar.length) {
