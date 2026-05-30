@@ -16,6 +16,8 @@ import { loadInvestUiContext, periodDefaults } from '../lib/investUiContext.js';
 
 const TABLE_ID = 'stock-gain-pivot';
 
+const REFRESH_ICON_SVG = `<svg class="header-sync-icon__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4.13 5.99 5.99 0 0 1-5.65-4.13H4v2h7.99c4.42 0 7.99-3.58 7.99-8 0-1.74-.56-3.35-1.51-4.65l1.42-1.42L20 4v6h-6l2.65-2.65z"/></svg>`;
+
 function numCell(v) {
   const n = Number(v ?? 0);
   const cls = n > 0 ? 'sgp-up' : n < 0 ? 'sgp-down' : '';
@@ -144,19 +146,33 @@ function bindPage(container, initialBounds, uiTexts) {
   const fromInput = container.querySelector('#sgp-from');
   const toInput = container.querySelector('#sgp-to');
   const reloadBtn = container.querySelector('#sgp-reload');
+  const recalcBtn = container.querySelector('#sgp-recalc');
   const host = container.querySelector('#sgp-table-host');
   const summaryHost = container.querySelector('#sgp-summary');
 
-  const load = async () => {
+  const setRecalcLoading = (loading) => {
+    recalcBtn?.classList.toggle('btn-header-icon-sync--loading', loading);
+    if (loading) {
+      recalcBtn?.setAttribute('aria-busy', 'true');
+      recalcBtn?.setAttribute('disabled', 'disabled');
+    } else {
+      recalcBtn?.removeAttribute('aria-busy');
+      recalcBtn?.removeAttribute('disabled');
+    }
+  };
+
+  const load = async ({ recalculate = false } = {}) => {
     if (!host) return;
+    if (recalculate) setRecalcLoading(true);
     host.innerHTML = '<p class="muted">Calculando pivot por ação…</p>';
     clearExcelTableRegistry();
 
     try {
       const from = (fromInput?.value || bounds.defaultFrom).slice(0, 10);
       const toClamped = (toInput?.value || bounds.today).slice(0, 10);
+      const recalcQ = recalculate ? '&recalculate=1' : '';
       const data = await apiRequest(
-        `/api/invest/stock-gain-pivot?from=${encodeURIComponent(from)}&to=${encodeURIComponent(toClamped)}`
+        `/api/invest/stock-gain-pivot?from=${encodeURIComponent(from)}&to=${encodeURIComponent(toClamped)}${recalcQ}`
       );
       if (data?.periodBounds) bounds = periodDefaults(data.periodBounds);
       const pivot = data.pivot;
@@ -166,7 +182,11 @@ function bindPage(container, initialBounds, uiTexts) {
       if (summaryHost && pivot?.totals) {
         const net = Number(pivot.totals.ganho_aproximado ?? 0);
         const netCls = net > 0 ? 'sgp-up' : net < 0 ? 'sgp-down' : '';
-        summaryHost.innerHTML = `<p class="muted">Período <strong>${pivot.from}</strong> a <strong>${pivot.to}</strong> — resultado total: <strong class="${netCls}">${formatBrl(net)}</strong> · taxas: <strong>${formatBrl(pivot.totals.taxas)}</strong></p>`;
+        const recalcNote =
+          data.recalculated && data.recalculatedAt
+            ? ` · recalculado ${new Date(data.recalculatedAt).toLocaleString('pt-BR')}`
+            : '';
+        summaryHost.innerHTML = `<p class="muted">Período <strong>${pivot.from}</strong> a <strong>${pivot.to}</strong> — resultado total: <strong class="${netCls}">${formatBrl(net)}</strong> · taxas: <strong>${formatBrl(pivot.totals.taxas)}</strong>${recalcNote}</p>`;
       }
 
       const rows = [...(pivot?.rows || [])];
@@ -188,11 +208,14 @@ function bindPage(container, initialBounds, uiTexts) {
       mountExcelTables(host);
     } catch (err) {
       host.innerHTML = `<div class="error-banner">${err.message || 'Erro ao carregar pivot.'}</div>`;
+    } finally {
+      if (recalculate) setRecalcLoading(false);
     }
   };
 
-  reloadBtn?.addEventListener('click', load);
-  load();
+  reloadBtn?.addEventListener('click', () => load({ recalculate: false }));
+  recalcBtn?.addEventListener('click', () => load({ recalculate: true }));
+  load({ recalculate: false });
 }
 
 export async function InvestStockGainPivotPage(container) {
@@ -228,10 +251,18 @@ export async function InvestStockGainPivotPage(container) {
 
   const content = `
     <div class="card sgp-page invest-table-card">
-      <div class="table-period-toolbar">
+      <div class="table-period-toolbar sgp-toolbar">
         <label>${t['label.common.period_from']} <input type="date" id="sgp-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
         <label>${t['label.common.period_to']} <input type="date" id="sgp-to" value="${bounds.today}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
-        <button type="button" id="sgp-reload" class="btn-entrar">Atualizar Rentabilidade</button>
+        <button type="button" id="sgp-reload" class="btn btn-secondary btn-sm">Aplicar período</button>
+        <button
+          type="button"
+          id="sgp-recalc"
+          class="btn-header-icon-sync sgp-recalc-btn"
+          title="Recalcular lucros e prejuízos por ação (após conciliação)"
+          aria-label="Recalcular lucros e prejuízos por ação"
+        >${REFRESH_ICON_SVG}</button>
+        <span class="muted sgp-recalc-hint">Use após conciliar notas — relê o livro e atualiza o pivot.</span>
       </div>
       <div id="sgp-summary" class="table-period-summary"></div>
       <div id="sgp-table-host"><p class="muted">Carregando…</p></div>

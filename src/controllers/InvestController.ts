@@ -903,6 +903,14 @@ export class InvestController {
     const toRaw = String(req.query.to || bounds.today).slice(0, 10);
     const to = toRaw > bounds.today ? bounds.today : toRaw;
 
+    const shouldRecalculate =
+      req.query.recalculate === '1' || String(req.query.recalculate).toLowerCase() === 'true';
+    let custodyReconciled = false;
+    if (shouldRecalculate) {
+      await this.ledger.reconcileCustody(ctx);
+      custodyReconciled = true;
+    }
+
     // Reconstrói custódia desde periodMin para evitar "lote nascendo" no meio do período.
     // O engine usa `from..to` apenas para colunas do período.
     const events = await this.ledger.listLedgerEvents(ctx, bounds.periodMin, to);
@@ -929,6 +937,8 @@ export class InvestController {
       columnOrder,
       pivot,
       periodBounds: bounds,
+      recalculated: custodyReconciled,
+      recalculatedAt: custodyReconciled ? new Date().toISOString() : null,
     });
   };
 
