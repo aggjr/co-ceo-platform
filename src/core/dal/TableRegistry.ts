@@ -262,7 +262,8 @@ export class TableRegistry {
         throw new GatewayError('COLUMN_NOT_ALLOWED', `Coluna inválida: ${key}`, 400);
       }
       if (table.blockedWritableColumns.has(key)) {
-        if (key === 'organization_id' && context.isInstaller) {
+        if (key === 'organization_id') {
+          // Strip — buildSecureInsertPayload / resolveOrganizationId injetam do contexto (ou installer).
           continue;
         }
         throw new GatewayError(

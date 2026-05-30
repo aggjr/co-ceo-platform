@@ -86,7 +86,6 @@ export class ReconciliationSessionStore {
     const id = randomUUID();
     await this.gateway.insert(ctx, 'invest_reconciliation_sessions', {
       id,
-      organization_id: ctx.organizationId,
       phase: input.phase,
       status: 'in_progress',
       horizon_trusted_through: null,
@@ -156,7 +155,6 @@ export class ReconciliationSessionStore {
     await this.gateway.insert(ctx, 'invest_reconciliation_day_log', {
       id,
       session_id: input.sessionId,
-      organization_id: ctx.organizationId,
       business_date: input.businessDate.slice(0, 10),
       action: input.action,
       inserted: input.inserted ?? 0,
