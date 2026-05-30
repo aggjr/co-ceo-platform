@@ -966,6 +966,13 @@ export async function InvestConciliacaoPage(container) {
         appendLog(logEl, '✅ Âncoras BTG homebroker gravadas automaticamente (tabela vazia).', 'ok');
         await refreshOptcAnchorsStatus();
       }
+      if (data.schemaApplied) {
+        appendLog(
+          logEl,
+          '✅ Banco atualizado automaticamente (tabelas sessão de conciliação).',
+          'ok'
+        );
+      }
       appendLog(logEl, `✅ Opção C iniciada: ${optcState.calendar.length} dia(s) de notas.`, 'ok');
       setStepState(container, 'reset', 'done', '✅ Via Opção C');
     } catch (err) {

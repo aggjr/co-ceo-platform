@@ -179,6 +179,7 @@ export class ReconcileController {
         message:
           'Opção C iniciada. Use option-c/next-day para fechar cada pregão (cotações web + patrimônio gravado).',
         anchorsSeeded,
+        schemaApplied: state.schemaApplied === true,
         state,
       });
     } catch (error: unknown) {

@@ -1,11 +1,13 @@
 import type { Pool } from 'mysql2/promise';
 import { runSqlFile, tableExists } from './sqlMigrationRunner';
+import { ensureInvestReconciliationSchema } from './ensureInvestReconciliationSchema';
 
 const MARKET_TABLES = ['market_instruments', 'market_quotes_daily', 'market_index_daily'] as const;
 
 export type EnsureCoreSchemaResult = {
   marketMigrationApplied: boolean;
   platformJobMigrationApplied: boolean;
+  reconciliationMigrationApplied: boolean;
 };
 
 /**
@@ -29,5 +31,11 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
     platformJobMigrationApplied = true;
   }
 
-  return { marketMigrationApplied, platformJobMigrationApplied };
+  const reconciliation = await ensureInvestReconciliationSchema(pool);
+
+  return {
+    marketMigrationApplied,
+    platformJobMigrationApplied,
+    reconciliationMigrationApplied: reconciliation.applied,
+  };
 }

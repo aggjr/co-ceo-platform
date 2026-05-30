@@ -29,6 +29,7 @@ import {
 } from './reconcileActivity';
 import type { BtgBrokerageFileResult } from '../btgUploadImportService';
 import { DailyCloseMaterializeService } from './DailyCloseMaterializeService';
+import { ensureInvestReconciliationSchema } from '../../db/ensureInvestReconciliationSchema';
 
 export type ReconcileDataMode = 'recover' | 'reset_from_opening';
 
@@ -128,11 +129,13 @@ export class ReconciliationSessionService {
   private readonly dailyClose: DailyCloseMaterializeService;
 
   private readonly holdingPurge: HoldingPurgeKeepOpeningService | null;
+  private readonly dbPool: Pool | null;
 
   constructor(
     private readonly gateway: CoCeoDataGateway,
     pool?: Pool
   ) {
+    this.dbPool = pool ?? null;
     this.store = new ReconciliationSessionStore(gateway);
     this.ledger = new LedgerImportService(gateway);
     this.audit = new ReconciliationAuditService(gateway);
@@ -176,6 +179,22 @@ export class ReconciliationSessionService {
     };
 
     log(`Início sessão fase=${input.phase}`, 'session.start');
+
+    let schemaApplied = false;
+    if (this.dbPool) {
+      const schema = await ensureInvestReconciliationSchema(this.dbPool);
+      schemaApplied = schema.applied;
+      if (schema.applied) {
+        log(
+          `Schema conciliação aplicado (${schema.migrationFile})`,
+          'schema.ensure',
+          'ok'
+        );
+        console.log(
+          `[invest:reconcile] org=${orgId ?? '?'} [schema.ensure] Migration ${schema.migrationFile} aplicada`
+        );
+      }
+    }
 
     if (input.phase === 'cash') {
       await this.assertNotesPhaseComplete(ctx);
@@ -257,6 +276,7 @@ export class ReconciliationSessionService {
       session,
       activityLog,
       fileResults,
+      schemaApplied,
       importProgress: {
         filesTotal: fileResults.length,
         filesProcessed: fileResults.filter((f) => f.parseOk).length,
