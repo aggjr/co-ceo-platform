@@ -89,3 +89,39 @@ export async function clearLedgerCrossLinksForOpeningPurge(
     fleUnlinked: fleRes.affectedRows,
   };
 }
+
+/** Extensões INVEST e locais de itens sem lançamento patrimonial restante (purge parcial). */
+export async function deleteOrphanPatrimonyItemDependents(
+  conn: PoolConnection,
+  orgId: string
+): Promise<{ optionExt: number; positionExt: number; itemLocations: number }> {
+  const [ioe] = await conn.query<ResultSetHeader>(
+    `DELETE ioe FROM invest_option_ext ioe
+     INNER JOIN patrimony_items pi ON pi.id = ioe.patrimony_item_id
+     LEFT JOIN patrimony_ledger_entries ple ON ple.patrimony_item_id = pi.id
+     WHERE pi.organization_id = ? AND ple.id IS NULL`,
+    [orgId]
+  );
+
+  const [ipe] = await conn.query<ResultSetHeader>(
+    `DELETE ipe FROM invest_position_ext ipe
+     INNER JOIN patrimony_items pi ON pi.id = ipe.patrimony_item_id
+     LEFT JOIN patrimony_ledger_entries ple ON ple.patrimony_item_id = pi.id
+     WHERE pi.organization_id = ? AND ple.id IS NULL`,
+    [orgId]
+  );
+
+  const [pil] = await conn.query<ResultSetHeader>(
+    `DELETE pil FROM patrimony_item_locations pil
+     INNER JOIN patrimony_items pi ON pi.id = pil.patrimony_item_id
+     LEFT JOIN patrimony_ledger_entries ple ON ple.patrimony_item_id = pi.id
+     WHERE pi.organization_id = ? AND ple.id IS NULL`,
+    [orgId]
+  );
+
+  return {
+    optionExt: ioe.affectedRows,
+    positionExt: ipe.affectedRows,
+    itemLocations: pil.affectedRows,
+  };
+}

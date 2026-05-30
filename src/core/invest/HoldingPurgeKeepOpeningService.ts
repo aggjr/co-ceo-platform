@@ -9,7 +9,10 @@ import {
 import { logReconcileFailure } from './reconcile/reconcileErrorDetail';
 import { LedgerImportService } from './LedgerImportService';
 import { resolveInvestPeriodBounds } from './investPeriodBounds';
-import { clearLedgerCrossLinksForOpeningPurge } from './ledgerPurgeCrossLinks';
+import {
+  clearLedgerCrossLinksForOpeningPurge,
+  deleteOrphanPatrimonyItemDependents,
+} from './ledgerPurgeCrossLinks';
 
 const AUX_ORG_TABLES = [
   'patrimony_closings',
@@ -309,12 +312,33 @@ export class HoldingPurgeKeepOpeningService {
     );
     log?.(`DELETE business_events: ${be.affectedRows}`, 'purge.business_events');
 
-    await conn.query<ResultSetHeader>(
+    const orphanDeps = await deleteOrphanPatrimonyItemDependents(conn, orgId);
+    if (orphanDeps.optionExt > 0) {
+      log?.(
+        `DELETE invest_option_ext (órfãos): ${orphanDeps.optionExt}`,
+        'purge.option_ext'
+      );
+    }
+    if (orphanDeps.positionExt > 0) {
+      log?.(
+        `DELETE invest_position_ext (órfãos): ${orphanDeps.positionExt}`,
+        'purge.position_ext'
+      );
+    }
+    if (orphanDeps.itemLocations > 0) {
+      log?.(
+        `DELETE patrimony_item_locations (órfãos): ${orphanDeps.itemLocations}`,
+        'purge.item_locations'
+      );
+    }
+
+    const [piDel] = await conn.query<ResultSetHeader>(
       `DELETE pi FROM patrimony_items pi
        LEFT JOIN patrimony_ledger_entries ple ON ple.patrimony_item_id = pi.id
        WHERE pi.organization_id = ? AND ple.id IS NULL`,
       [orgId]
     );
+    log?.(`DELETE patrimony_items (órfãos): ${piDel.affectedRows}`, 'purge.patrimony_items');
 
     await conn.query(
       `UPDATE patrimony_items pi
