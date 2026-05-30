@@ -44,4 +44,22 @@ describe('cashInTransit', () => {
     expect(s.lines.length).toBeGreaterThan(0);
     expect(s.lines[0]!.settleDate).toBe('2026-05-14');
   });
+
+  it('previsão de compra com total_net positivo gera payable negativo', () => {
+    const entries: LedgerEvent[] = [
+      {
+        id: 't1',
+        asset_id: 'a-prio',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        transaction_date: '2026-05-12',
+        quantity: 100,
+        unit_price: 40,
+        total_net_value: 4000,
+      },
+    ];
+    const s = buildCashInTransitSummary(entries, '2026-05-12');
+    expect(s.inTransitNet).toBe(-4000);
+  });
 });

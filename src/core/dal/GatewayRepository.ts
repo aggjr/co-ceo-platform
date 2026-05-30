@@ -11,6 +11,7 @@ import {
 import type {
   AuditAction,
   InsertResult,
+  PayloadValue,
   SecurePayload,
   UserContext,
 } from './types';
@@ -615,23 +616,32 @@ export class GatewayRepository {
       if (table.kind === 'system' || table.kind === 'telemetry') {
         throw new GatewayError('TABLE_NOT_ALLOWED', 'Leitura não permitida nesta tabela.', 403);
       }
-      if (!Object.keys(filters).length) {
-        throw new GatewayError('EMPTY_PAYLOAD', 'Filtros vazios.', 400);
+
+      const effectiveFilters = TableRegistry.filterReadFilters(
+        table,
+        filters as Record<string, PayloadValue>
+      );
+      const scope = table.kind === 'tenant' ? await this.tenantScope() : { sql: '1=1', params: [] };
+      if (!Object.keys(effectiveFilters).length) {
+        if (table.kind !== 'tenant' || !this.context.organizationId) {
+          throw new GatewayError('EMPTY_PAYLOAD', 'Filtros vazios.', 400);
+        }
       }
 
-      const scope = table.kind === 'tenant' ? await this.tenantScope() : { sql: '1=1', params: [] };
       const softClause = table.softDelete ? ' AND deleted_at IS NULL' : '';
-      const filterKeys = Object.keys(filters);
-      const filterClause = filterKeys.map((k) => `\`${k}\` = ?`).join(' AND ');
+      const filterKeys = Object.keys(effectiveFilters);
+      const filterClause = filterKeys.length
+        ? `${filterKeys.map((k) => `\`${k}\` = ?`).join(' AND ')} AND `
+        : '';
       const cols =
         options?.columns?.map((c) => `\`${c}\``).join(', ') ?? '*';
       const limit = options?.limit ?? 500;
 
       const [rows] = await this.connection.query<mysql.RowDataPacket[]>(
         `SELECT ${cols} FROM \`${table.name}\`
-         WHERE ${filterClause} AND ${scope.sql}${softClause}
+         WHERE ${filterClause}${scope.sql}${softClause}
          LIMIT ?`,
-        [...this.sanitizeValues(filters), ...scope.params, limit] as (
+        [...this.sanitizeValues(effectiveFilters as SecurePayload), ...scope.params, limit] as (
           | string
           | number
           | boolean

@@ -83,4 +83,52 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(r.meta.method).toBe('mtm_btg_calibrated');
     expect(r.series.length).toBeGreaterThan(0);
   });
+
+  it('nao usa cotação atual quando quoteForDate está definido', () => {
+    const entries: LedgerEvent[] = [stockOpen(100, 10, '2026-01-01')];
+    const quoteForDate = (_ticker: string, date: string) =>
+      date === '2026-01-02' ? 20 : 10;
+
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-02', {
+      stockQuotes: { PRIO3: 999 },
+      quoteForDate,
+      fixedIncomeTotal: 0,
+    });
+    const day2 = r.series.find((p) => p.date === '2026-01-02');
+    expect(day2?.patrimony).toBeCloseTo(2000, 0);
+  });
+
+  it('desconta compra D+2 do caixa em trânsito no dia do negócio', () => {
+    const entries: LedgerEvent[] = [
+      {
+        asset_id: 'c1',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-02',
+        quantity: 5000,
+        unit_price: 1,
+        total_net_value: 5000,
+        impacts_managerial_price: false,
+      },
+      {
+        asset_id: 's1',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        transaction_date: '2026-01-02',
+        quantity: 100,
+        unit_price: 40,
+        total_net_value: 4000,
+        impacts_managerial_price: true,
+      },
+    ];
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-02', '2026-01-02', {
+      stockQuotes: { PRIO3: 40 },
+      fixedIncomeTotal: 0,
+    });
+    const day = r.series[0]!;
+    expect(day.patrimony).toBeCloseTo(5000, 0);
+    expect(day.scheduledCashPending).toBeCloseTo(-4000, 0);
+  });
 });

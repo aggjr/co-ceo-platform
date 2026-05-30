@@ -1,5 +1,20 @@
 /* Período: ver invest-table-layout.css */
 
+.sgp-toolbar {
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.sgp-recalc-btn {
+  margin-left: 4px;
+}
+
+.sgp-recalc-hint {
+  font-size: 0.82rem;
+  max-width: 280px;
+  line-height: 1.35;
+}
+
 .sgp-up {
   color: #4ade80;
 }

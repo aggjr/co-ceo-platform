@@ -98,7 +98,7 @@ function bindPatrimonyChart(container, initialBounds) {
       if (fromInput) fromInput.min = bounds.periodMin;
 
       const data = await apiRequest(
-        `/api/invest/patrimony-daily?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&method=mtm_btg`
+        `/api/invest/patrimony-daily?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&method=mtm_economic`
       );
       if (data?.periodBounds) bounds = periodDefaults(data.periodBounds);
       const today = todayIso();
@@ -211,6 +211,12 @@ export async function InvestDashboardPage(container) {
           <p class="muted">Carregando...</p>
         </${D}>
       </${D}>
+      <nav class="invest-patrimony-links" aria-label="Atalhos INVEST">
+        <a href="/invest/portfolio" data-link>Portfólio →</a>
+        · <a href="/invest/historico-operacoes" data-link>Notas / operações →</a>
+        · <a href="/invest/ganhos-por-acao" data-link>Resultados por ação →</a>
+        · <a href="/invest/conciliacao" data-link>Conciliação →</a>
+      </nav>
     </${D}>
   </${D}>`;
 

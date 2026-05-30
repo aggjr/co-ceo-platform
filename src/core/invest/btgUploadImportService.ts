@@ -386,23 +386,6 @@ export async function applyBtgExtractBatchUpload(
   blockedMessage?: string;
 }> {
   const preview = await previewBtgExtractBatchUpload(ctx, ledger, files);
-  if (!preview.chainOk) {
-    return {
-      fileResults: preview.fileResults.map((r) => ({
-        ...r,
-        importBlocked: true,
-        importBlockReason:
-          r.openingChainOk === false
-            ? 'Cadeia de saldos quebrada: saldo inicial não bate com o final do mês anterior no lote.'
-            : undefined,
-        importOk: false,
-      })),
-      chainOk: false,
-      totals: { inserted: 0, skipped: 0, enriched: 0 },
-      blockedMessage:
-        'Importação bloqueada: saldo inicial de um mês não coincide com o saldo final do extrato anterior. Corrija a ordem dos arquivos ou os PDFs e analise de novo.',
-    };
-  }
 
   const today = new Date().toISOString().slice(0, 10);
   let ledgerEvents = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
@@ -422,34 +405,16 @@ export async function applyBtgExtractBatchUpload(
   let totalEnriched = 0;
   let lastBatchId: string | undefined;
   let prevClosing: number | null = null;
-  let chainBroken = false;
+  let hasInjectedAdjustments = false;
 
   for (const item of sorted) {
     const base = preview.fileResults.find((r) => r.path === item.path)!;
     const recon = buildExtractReconcileFields(item, ledgerEvents, prevClosing);
 
-    if (chainBroken) {
-      fileResults.push({
-        ...base,
-        ...recon,
-        importBlocked: true,
-        importBlockReason: 'Importação interrompida após falha na cadeia de saldos.',
-        importOk: false,
-      });
-      continue;
-    }
-
-    if (recon.openingChainOk === false) {
-      chainBroken = true;
-      fileResults.push({
-        ...base,
-        ...recon,
-        importBlocked: true,
-        importBlockReason:
-          'Saldo inicial não coincide com o saldo final do extrato anterior no lote.',
-        importOk: false,
-      });
-      continue;
+    let injectCashAdjustment = 0;
+    if (recon.openingChainOk === false && recon.openingChainDelta != null && recon.openingChainDelta !== 0) {
+      injectCashAdjustment = recon.openingChainDelta;
+      hasInjectedAdjustments = true;
     }
 
     if (recon.monthAlreadyImported) {
@@ -466,7 +431,7 @@ export async function applyBtgExtractBatchUpload(
     const applied = await applyBtgExtractUpload(ctx, ledger, {
       name: item.path,
       contentBase64: files.find((f) => f.name === item.path)!.contentBase64,
-    });
+    }, { injectCashAdjustment });
 
     ledgerEvents = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
     const afterRecon = buildExtractReconcileFields(item, ledgerEvents, prevClosing);
@@ -514,6 +479,9 @@ export async function applyBtgExtractBatchUpload(
       enriched: totalEnriched,
       reconcile: { positions: reconcile.positions },
     },
+    blockedMessage: hasInjectedAdjustments 
+      ? 'Atenção: Houve quebra na cadeia de saldos e ajustes automáticos foram injetados no livro de caixa para restabelecer a precisão matemática. Revise os itens em vermelho.'
+      : undefined,
   };
 }
 
@@ -548,7 +516,10 @@ export async function applyBtgExtractUpload(
   ctx: UserContext,
   ledger: LedgerImportService,
   file: BtgUploadFileInput,
-  options?: { parseOptions?: import('./BtgExtractLineParser').BtgExtractParseOptions }
+  options?: { 
+    parseOptions?: import('./BtgExtractLineParser').BtgExtractParseOptions;
+    injectCashAdjustment?: number;
+  }
 ): Promise<BtgExtractFileResult> {
   const previewResult = await previewBtgExtractUpload(file);
   if (!previewResult.parseOk || !previewResult.preview) {
@@ -561,6 +532,20 @@ export async function applyBtgExtractUpload(
 
   try {
     const entries = await parseExtractUploadImportLines(file, options?.parseOptions);
+
+    if (options?.injectCashAdjustment) {
+      const adj = options.injectCashAdjustment;
+      entries.unshift({
+        date: entries[0]?.date || previewResult.preview.firstDate || new Date().toISOString().slice(0, 10),
+        ticker: 'CAIXA-BTG',
+        operation: adj > 0 ? 'cash_yield' : 'fee',
+        quantity: 1,
+        unit_price: Math.abs(adj),
+        total_net_value: adj,
+        notes: '⚠️ AJUSTE DE DIVERGÊNCIA BTG (Cadeia Quebrada)',
+        source_system: 'invest.extract_adjustment'
+      } as any);
+    }
 
     const result = await ledger.importEntriesOnly(ctx, entries, {
       sourceLabel: `Extrato BTG upload ${previewResult.preview.firstDate ?? ''}->${previewResult.preview.lastDate ?? ''}`,

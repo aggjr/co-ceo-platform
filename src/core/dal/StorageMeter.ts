@@ -95,4 +95,33 @@ export class StorageMeter {
       [deltaBytes, organizationId]
     );
   }
+
+  /**
+   * Zera o hodômetro da organização após purge em massa (DELETE direto, fora do gateway).
+   * Remove o ledger da org para o próximo mapeamento recontar só via applyDelta.
+   */
+  static async resetOrganizationUsage(
+    connection: mysql.Connection | mysql.PoolConnection,
+    organizationId: string
+  ): Promise<{ previousBytes: number }> {
+    const [rows] = await connection.query<mysql.RowDataPacket[]>(
+      `SELECT storage_bytes_used FROM organizations WHERE id = ? AND deleted_at IS NULL`,
+      [organizationId]
+    );
+    if (!rows.length) {
+      throw new GatewayError('ORG_NOT_FOUND', 'Organização não encontrada para cobrança.', 404);
+    }
+    const previousBytes = Number(rows[0].storage_bytes_used ?? 0);
+
+    await connection.execute(
+      `DELETE FROM organization_storage_ledger WHERE organization_id = ?`,
+      [organizationId]
+    );
+    await connection.execute(
+      `UPDATE organizations SET storage_bytes_used = 0 WHERE id = ?`,
+      [organizationId]
+    );
+
+    return { previousBytes };
+  }
 }

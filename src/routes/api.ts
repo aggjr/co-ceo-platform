@@ -7,6 +7,7 @@ import { AuthMiddleware } from '../middlewares/AuthMiddleware';
 import { requirePermission } from '../middlewares/RequirePermission';
 import { requireAnyPermission } from '../middlewares/RequireAnyPermission';
 import { dataGateway } from '../config/gateway';
+import pool from '../config/database';
 import { QualityController } from '../controllers/QualityController';
 import { InvestController } from '../controllers/InvestController';
 import { UiManifestController } from '../controllers/UiManifestController';
@@ -14,6 +15,7 @@ import { PlatformAlertsController } from '../controllers/PlatformAlertsControlle
 import { PlatformDeployController } from '../controllers/PlatformDeployController';
 import { RemoteMigrationController } from '../controllers/RemoteMigrationController';
 import { RemoteRecalcController } from '../controllers/RemoteRecalcController';
+import { ReconcileController } from '../controllers/ReconcileController';
 
 const router = Router();
 const gateway = dataGateway;
@@ -25,6 +27,7 @@ const telemetry = createTelemetryController(gateway);
 const uiManifest = new UiManifestController(gateway);
 const remoteMigration = new RemoteMigrationController(gateway);
 const remoteRecalc = new RemoteRecalcController(gateway);
+const reconcile = new ReconcileController(gateway, pool);
 
 // --- Auth ---
 router.post('/auth/login', AuthController.login);
@@ -187,6 +190,52 @@ router.post(
   remoteMigration.runMigration.bind(remoteMigration)
 );
 
+// --- Conciliação / Reset ---
+router.post(
+  '/invest/reconcile/reset-holding',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.resetHolding.bind(reconcile)
+);
+
+router.post(
+  '/invest/reconcile/recalc-all',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.recalcAll.bind(reconcile)
+);
+
+router.post(
+  '/invest/reconcile/option-c/start',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.optionCStart.bind(reconcile)
+);
+router.post(
+  '/invest/reconcile/option-c/next-day',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.optionCNextDay.bind(reconcile)
+);
+router.get(
+  '/invest/reconcile/option-c/status/:runId',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  reconcile.optionCStatus.bind(reconcile)
+);
+router.post(
+  '/invest/reconcile/patrimony-anchors/seed-btg',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.seedBtgPatrimonyAnchors.bind(reconcile)
+);
+router.get(
+  '/invest/reconcile/patrimony-anchors',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  reconcile.listPatrimonyAnchors.bind(reconcile)
+);
+
 router.post(
   '/invest/admin/recalc-curve',
   AuthMiddleware.protect,
@@ -242,6 +291,18 @@ router.post(
   AuthMiddleware.protect,
   requirePermission('invest:ledger:write'),
   invest.recordPatrimonyDaily.bind(invest)
+);
+router.post(
+  '/invest/patrimony-daily/rebuild',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.rebuildPatrimonyDaily.bind(invest)
+);
+router.get(
+  '/invest/patrimony-daily/rebuild-status',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.getPatrimonyDailyRebuildStatus.bind(invest)
 );
 router.post(
   '/invest/quotes/sync-b3',
@@ -314,6 +375,61 @@ router.get(
   AuthMiddleware.protect,
   requirePermission('invest:ledger:read'),
   invest.getExtract.bind(invest)
+);
+router.get(
+  '/invest/reconcile/preflight',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcilePreflight.bind(invest)
+);
+
+router.post(
+  '/invest/reconcile/session/start',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.reconcileSessionStart.bind(invest)
+);
+router.get(
+  '/invest/reconcile/session/:id',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcileSessionGet.bind(invest)
+);
+router.post(
+  '/invest/reconcile/session/:id/complete-phase',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.reconcileSessionCompletePhase.bind(invest)
+);
+router.get(
+  '/invest/reconcile/session/:id/day/:date',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcileDayGet.bind(invest)
+);
+router.post(
+  '/invest/reconcile/session/:id/day/:date/resolve',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.reconcileDayResolve.bind(invest)
+);
+router.post(
+  '/invest/reconcile/session/:id/day/:date/close',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.reconcileDayClose.bind(invest)
+);
+router.post(
+  '/invest/reconcile/audit/run',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcileAuditRun.bind(invest)
+);
+router.get(
+  '/invest/reconcile/as-of',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.reconcileAsOf.bind(invest)
 );
 
 // --- Core ---

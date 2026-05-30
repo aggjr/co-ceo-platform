@@ -83,6 +83,12 @@ const TABLES: TableDefinition[] = [
   // financial_accounts + financial_ledger_entries.
   def('invest_daily_snapshots', 'tenant', { softDelete: false }),
   def('invest_portfolio_daily', 'tenant', { softDelete: false }),
+  def('invest_reconciliation_sessions', 'tenant', { softDelete: false }),
+  def('invest_reconciliation_day_log', 'tenant', {
+    softDelete: false,
+    allowHardDelete: true,
+    countsTowardStorage: false,
+  }),
   def('invest_patrimony_monthly_anchors', 'tenant', { softDelete: false }),
   def('invest_broker_custody_snapshots', 'tenant', { softDelete: false }),
   def('invest_broker_custody_snapshot_lines', 'tenant', {
@@ -256,7 +262,8 @@ export class TableRegistry {
         throw new GatewayError('COLUMN_NOT_ALLOWED', `Coluna inválida: ${key}`, 400);
       }
       if (table.blockedWritableColumns.has(key)) {
-        if (key === 'organization_id' && context.isInstaller) {
+        if (key === 'organization_id') {
+          // Strip — buildSecureInsertPayload / resolveOrganizationId injetam do contexto (ou installer).
           continue;
         }
         throw new GatewayError(
@@ -264,6 +271,24 @@ export class TableRegistry {
           `Coluna protegida não pode ser enviada no payload: ${key}`,
           400
         );
+      }
+      out[key] = value;
+    }
+    return out;
+  }
+
+  /** Remove colunas injetadas pelo gateway (ex.: organization_id) de filtros de leitura. */
+  static filterReadFilters(
+    table: TableDefinition,
+    filters: Record<string, PayloadValue>
+  ): Record<string, PayloadValue> {
+    const out: Record<string, PayloadValue> = {};
+    for (const [key, value] of Object.entries(filters)) {
+      if (!/^[a-z][a-z0-9_]*$/i.test(key)) {
+        throw new GatewayError('COLUMN_NOT_ALLOWED', `Coluna inválida: ${key}`, 400);
+      }
+      if (table.blockedWritableColumns.has(key)) {
+        continue;
       }
       out[key] = value;
     }

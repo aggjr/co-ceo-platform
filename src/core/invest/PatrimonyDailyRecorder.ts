@@ -5,6 +5,7 @@ import { buildDailyPatrimonyMtmSeries } from './PatrimonyMtmDailyEngine';
 import { interpolatePatrimonyTarget } from './patrimonyAnchors';
 import { PatrimonyMonthlyAnchorsRepository } from './PatrimonyMonthlyAnchorsRepository';
 import { fixedIncomeTotalFromLedger, shouldUseBtgAnchorCalibration } from './patrimonyLedgerGates';
+import { resolveInvestPeriodBounds } from './investPeriodBounds';
 import { PatrimonyDailyStore, type StoredPortfolioDay } from './PatrimonyDailyStore';
 import { aggregateExternalFlowsByDate } from './portfolioPerformance';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
@@ -92,53 +93,62 @@ export class PatrimonyDailyRecorder {
    * Grava fechamento diário: patrimônio principal alinhado à custódia BTG quando há âncoras;
    * mantém série econômica em metadata para auditoria e evolução futura.
    */
-  async recordDay(ctx: UserContext, snapshotDate?: string): Promise<RecordDailyPatrimonyResult> {
+  async recordDay(
+    ctx: UserContext,
+    snapshotDate?: string,
+    opts?: { economicOnly?: boolean }
+  ): Promise<RecordDailyPatrimonyResult> {
     const date = (snapshotDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const anchors = await this.anchorsRepo.loadForOrganization(ctx);
     const hasAnchors = anchors.month_ends.length > 0;
-    const { quotes: stockQuotes, quotesAsOf } = await this.loadStockQuotes(ctx, date);
-
-    const quoteMap = await this.marketQuotes.loadQuoteMapForRange(ctx, date, date);
-    const quoteForDate = this.marketQuotes.buildQuoteForDateFn(quoteMap);
 
     const events = await this.ledger.listLedgerEvents(ctx, '2020-01-01', date);
-    const ledgerFrom =
-      events.length > 0
-        ? String(events[0]!.transaction_date).slice(0, 10)
-        : date;
+    const bounds = resolveInvestPeriodBounds(events);
+    const ledgerFrom = bounds.periodMin || date;
+
+    const quoteMap = await this.marketQuotes.loadQuoteMapForRange(ctx, ledgerFrom, date);
+    const quoteForDate =
+      quoteMap.size > 0 ? this.marketQuotes.buildQuoteForDateFn(quoteMap) : undefined;
+    const { quotes: stockQuotesLatest, quotesAsOf } = await this.loadStockQuotes(ctx, date);
+    const stockQuotes =
+      quoteForDate != null
+        ? {}
+        : stockQuotesLatest;
 
     const rfLedger = fixedIncomeTotalFromLedger(events);
     const rfAnchor = Number(anchors.fixed_income_total ?? 0);
     const rfForEconomic = hasAnchors && rfAnchor > 0 ? rfAnchor : rfLedger;
 
-    const economicMtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
+    const useCalibration =
+      !opts?.economicOnly && hasAnchors && shouldUseBtgAnchorCalibration(events);
+
+    const mtmOpts = {
       anchors,
       stockQuotes,
       fixedIncomeTotal: rfForEconomic,
-      calibrateToAnchors: false,
+      calibrateToAnchors: useCalibration,
       quoteForDate,
-    });
+    };
 
-    const economicPoint = economicMtm.series[economicMtm.series.length - 1];
-    if (!economicPoint || economicPoint.date !== date) {
+    const mtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, mtmOpts);
+    const recordPoint = mtm.series[mtm.series.length - 1];
+    if (!recordPoint || recordPoint.date !== date) {
       throw new Error(`Sem patrimônio econômico calculado para ${date}.`);
     }
 
-    let recordPoint = economicPoint;
-    let source = 'mtm_economic';
-    let btgPatrimony: number | null = null;
-
-    if (hasAnchors && shouldUseBtgAnchorCalibration(events)) {
-      btgPatrimony = Math.round(interpolatePatrimonyTarget(date, anchors) * 100) / 100;
-      const pending = economicPoint.pendingSettlements;
-      recordPoint = {
-        ...economicPoint,
-        patrimony: btgPatrimony,
-        patrimonyGross: Math.round((btgPatrimony - pending) * 100) / 100,
-        positionsValue: economicPoint.positionsValue,
-      };
-      source = 'mtm_btg_calibrated';
+    let economicPoint = recordPoint;
+    if (useCalibration) {
+      const economicMtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
+        ...mtmOpts,
+        calibrateToAnchors: false,
+      });
+      economicPoint = economicMtm.series[economicMtm.series.length - 1] ?? recordPoint;
     }
+
+    const source = useCalibration ? 'mtm_btg_calibrated' : 'mtm_economic';
+    const btgPatrimony = useCalibration
+      ? Math.round(interpolatePatrimonyTarget(date, anchors) * 100) / 100
+      : null;
 
     const patrimonyGross = recordPoint.patrimonyGross;
 
@@ -163,7 +173,7 @@ export class PatrimonyDailyRecorder {
       cumulativeTwr = 0;
     }
 
-    const positions = economicMtm.positionSnapshots ?? [];
+    const positions = mtm.positionSnapshots ?? [];
     const recorded = await this.store.upsertPortfolioDay(ctx, {
       snapshotDate: date,
       point: recordPoint,
