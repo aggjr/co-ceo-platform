@@ -92,7 +92,15 @@ export class OptionCDailyCloseOrchestrator {
     }
 
     if (input.resetFirst && this.holdingPurge) {
-      await this.holdingPurge.purgeKeepOpening(ctx);
+      console.log(`[OptionC] org=${ctx.organizationId} reset (purge) antes da sessão de notas…`);
+      try {
+        await this.holdingPurge.purgeKeepOpening(ctx);
+        console.log(`[OptionC] org=${ctx.organizationId} reset concluído — abertura preservada.`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[OptionC] org=${ctx.organizationId} FALHA no reset: ${msg}`);
+        throw err;
+      }
     }
 
     const dataMode =

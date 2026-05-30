@@ -6,6 +6,7 @@ import {
   reconcileActivity,
   type ReconcileActivityStep,
 } from './reconcile/reconcileActivity';
+import { logReconcileFailure } from './reconcile/reconcileErrorDetail';
 import { LedgerImportService } from './LedgerImportService';
 import { resolveInvestPeriodBounds } from './investPeriodBounds';
 
@@ -135,6 +136,10 @@ export class HoldingPurgeKeepOpeningService {
       };
     } catch (e) {
       await conn.rollback();
+      logReconcileFailure('purge.transaction', orgId, e, {
+        openingDate: bounds.openingDate,
+        openingRef: bounds.openingRef,
+      });
       throw e;
     } finally {
       conn.release();
@@ -261,19 +266,19 @@ export class HoldingPurgeKeepOpeningService {
       )
     )`;
 
-    const [ple] = await conn.query<ResultSetHeader>(
-      `DELETE FROM patrimony_ledger_entries
-       WHERE organization_id = ? AND NOT ${preservePle}`,
-      [orgId, openingInSql, openingDate]
-    );
-    log?.(`DELETE patrimony_ledger_entries: ${ple.affectedRows}`, 'purge.patrimony_ledger');
-
     const [fle] = await conn.query<ResultSetHeader>(
       `DELETE FROM financial_ledger_entries
        WHERE organization_id = ? AND NOT ${preserveFle}`,
       [orgId, openingInSql, openingDate]
     );
     log?.(`DELETE financial_ledger_entries: ${fle.affectedRows}`, 'purge.financial_ledger');
+
+    const [ple] = await conn.query<ResultSetHeader>(
+      `DELETE FROM patrimony_ledger_entries
+       WHERE organization_id = ? AND NOT ${preservePle}`,
+      [orgId, openingInSql, openingDate]
+    );
+    log?.(`DELETE patrimony_ledger_entries: ${ple.affectedRows}`, 'purge.patrimony_ledger');
 
     const [be] = await conn.query<ResultSetHeader>(
       `DELETE be FROM business_events be

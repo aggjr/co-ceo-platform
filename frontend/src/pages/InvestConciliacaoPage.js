@@ -18,6 +18,21 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
+/** Mensagem amigável + detalhe técnico (MySQL/gateway) para o painel de log. */
+function formatReconcileApiError(err) {
+  const base = err?.message || String(err);
+  const d = err?.body?.errorDetail;
+  if (!d) return base;
+  const parts = [base];
+  if (d.code) parts.push(`código: ${d.code}`);
+  if (d.errno != null) parts.push(`errno: ${d.errno}`);
+  if (d.sqlMessage) parts.push(`SQL: ${d.sqlMessage}`);
+  if (d.context && Object.keys(d.context).length) {
+    parts.push(`ctx: ${JSON.stringify(d.context)}`);
+  }
+  return parts.join(' · ');
+}
+
 /* ─────────────────────────── log panel ─────────────────────────── */
 
 function appendLog(logEl, message, type = '') {
@@ -954,8 +969,9 @@ export async function InvestConciliacaoPage(container) {
       appendLog(logEl, `✅ Opção C iniciada: ${optcState.calendar.length} dia(s) de notas.`, 'ok');
       setStepState(container, 'reset', 'done', '✅ Via Opção C');
     } catch (err) {
-      appendLog(logEl, `❌ Opção C: ${err.message}`, 'err');
-      if (optcStatus) optcStatus.textContent = '❌ ' + err.message;
+      const msg = formatReconcileApiError(err);
+      appendLog(logEl, `❌ Opção C: ${msg}`, 'err');
+      if (optcStatus) optcStatus.textContent = `❌ ${err.message || msg}`;
       btnOptcStart.disabled = false;
     }
   });

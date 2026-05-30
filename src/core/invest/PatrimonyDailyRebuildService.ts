@@ -4,6 +4,7 @@ import { resolveInvestPeriodBounds } from './investPeriodBounds';
 import { LedgerImportService } from './LedgerImportService';
 import { PatrimonyDailyRecorder } from './PatrimonyDailyRecorder';
 import { PatrimonyDailyStore } from './PatrimonyDailyStore';
+import { logReconcileFailure } from './reconcile/reconcileErrorDetail';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
@@ -130,6 +131,7 @@ export class PatrimonyDailyRebuildService {
         } catch (err) {
           daysSkipped += 1;
           const msg = err instanceof Error ? err.message : String(err);
+          logReconcileFailure('patrimony-rebuild.record-day', orgId, err, { day });
           if (!msg.includes('Sem patrimônio econômico')) {
             warnings.push(`${day}: ${msg}`);
           }

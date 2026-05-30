@@ -9,6 +9,7 @@ import { RemoteRecalcController } from './RemoteRecalcController';
 import { OptionCDailyCloseOrchestrator } from '../core/invest/reconcile/OptionCDailyCloseOrchestrator';
 import { PatrimonyMonthlyAnchorsSeedService } from '../core/invest/PatrimonyMonthlyAnchorsSeedService';
 import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
+import { logReconcileFailure } from '../core/invest/reconcile/reconcileErrorDetail';
 
 export class ReconcileController {
   private readonly holdingPurge: HoldingPurgeKeepOpeningService;
@@ -39,9 +40,9 @@ export class ReconcileController {
    * opening_balance, zera odômetro, reconcilia custódia.
    */
   resetHolding = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
     try {
-      const ctx = req.userContext!;
-      const orgId = ctx.organizationId;
       if (!orgId) {
         return res.status(400).json({
           success: false,
@@ -71,10 +72,13 @@ export class ReconcileController {
         },
       });
     } catch (error: unknown) {
-      console.error('[ReconcileReset] Erro no reset:', error);
+      const detail = logReconcileFailure('reset-holding', orgId ?? undefined, error);
       const status = error instanceof GatewayError ? error.httpStatus : 500;
-      const message = error instanceof Error ? error.message : 'Erro interno no reset da holding.';
-      return res.status(status).json({ success: false, error: message });
+      return res.status(status).json({
+        success: false,
+        error: detail.message,
+        errorDetail: detail,
+      });
     }
   };
 
@@ -87,9 +91,9 @@ export class ReconcileController {
    * 3. PatrimonyDailyRebuildService (invest_portfolio_daily, mtm_economic)
    */
   recalcAll = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
     try {
-      const ctx = req.userContext!;
-      const orgId = ctx.organizationId;
       if (!orgId) {
         return res.status(400).json({
           success: false,
@@ -127,17 +131,21 @@ export class ReconcileController {
         patrimonyRebuild: rebuild,
       });
     } catch (error: unknown) {
-      console.error('[ReconcileRecalc] Erro no recálculo:', error);
-      const message = error instanceof Error ? error.message : 'Erro interno no recálculo.';
-      return res.status(500).json({ success: false, error: message });
+      const detail = logReconcileFailure('recalc-all', orgId ?? undefined, error);
+      return res.status(500).json({
+        success: false,
+        error: detail.message,
+        errorDetail: detail,
+      });
     }
   };
 
   /** POST /api/invest/reconcile/option-c/start — Opção C: reset + 2 pastas + calendário de pregões */
   optionCStart = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
     try {
-      const ctx = req.userContext!;
-      if (!ctx.organizationId) {
+      if (!orgId) {
         return res.status(400).json({ success: false, error: 'Personifique a holding.' });
       }
       const notesFiles = Array.isArray(req.body?.notesFiles) ? req.body.notesFiles : [];
@@ -145,9 +153,14 @@ export class ReconcileController {
       const resetFirst = req.body?.resetFirst === true;
       const dataMode = req.body?.dataMode as 'recover' | 'reset_from_opening' | undefined;
 
+      console.log(
+        `[OptionC] start org=${orgId} resetFirst=${resetFirst} notas=${notesFiles.length} extratos=${extractFiles.length}`
+      );
+
       const existingAnchors = await this.anchorsRepo.loadForOrganization(ctx);
       let anchorsSeeded = false;
       if (existingAnchors.month_ends.length === 0 && this.anchorSeed.resolveReference(ctx)) {
+        console.log(`[OptionC] org=${orgId} gravando âncoras BTG (tabela vazia)`);
         await this.anchorSeed.seedFromHomebrokerReference(ctx);
         anchorsSeeded = true;
       }
@@ -158,6 +171,9 @@ export class ReconcileController {
         resetFirst,
         dataMode,
       });
+      console.log(
+        `[OptionC] org=${orgId} iniciado runId=${state.runId} pregões=${state.calendar.length}`
+      );
       return res.json({
         success: true,
         message:
@@ -166,26 +182,40 @@ export class ReconcileController {
         state,
       });
     } catch (error: unknown) {
+      const detail = logReconcileFailure('option-c.start', orgId ?? undefined, error, {
+        resetFirst: req.body?.resetFirst === true,
+        notesFiles: Array.isArray(req.body?.notesFiles) ? req.body.notesFiles.length : 0,
+        extractFiles: Array.isArray(req.body?.extractFiles) ? req.body.extractFiles.length : 0,
+      });
       const status = error instanceof GatewayError ? error.httpStatus : 500;
-      const message = error instanceof Error ? error.message : 'Falha ao iniciar Opção C.';
-      return res.status(status).json({ success: false, error: message });
+      return res.status(status).json({
+        success: false,
+        error: detail.message,
+        errorDetail: detail,
+      });
     }
   };
 
   /** POST /api/invest/reconcile/option-c/next-day — fecha o próximo pregão ou avança fase extratos */
   optionCNextDay = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const runId = String(req.body?.runId || '');
     try {
-      const ctx = req.userContext!;
-      const runId = String(req.body?.runId || '');
       if (!runId) {
         return res.status(400).json({ success: false, error: 'runId obrigatório.' });
       }
       const result = await this.optionC.closeNextDay(ctx, runId);
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
+      const detail = logReconcileFailure('option-c.next-day', ctx.organizationId ?? undefined, error, {
+        runId,
+      });
       const status = error instanceof GatewayError ? error.httpStatus : 500;
-      const message = error instanceof Error ? error.message : 'Falha no fechamento diário.';
-      return res.status(status).json({ success: false, error: message });
+      return res.status(status).json({
+        success: false,
+        error: detail.message,
+        errorDetail: detail,
+      });
     }
   };
 

@@ -125,7 +125,6 @@ export class RemoteRecalcController {
         } else {
           const insertPayload: SecurePayload = {
             patrimony_item_id: asset.assetId,
-            organization_id: ctx.organizationId,
             asset_class: asset.assetType,
             ...payload,
           };

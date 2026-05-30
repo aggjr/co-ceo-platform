@@ -11,6 +11,7 @@ import { MarketQuoteRepository } from '../../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../../modules/invest/sync/InvestAssetProjection';
 import type { SecurePayload } from '../../dal/types';
 import { inferAssetType } from '../assetClassifier';
+import { logReconcileFailure } from './reconcileErrorDetail';
 
 export type QuoteSyncDayReport = {
   date: string;
@@ -109,6 +110,7 @@ export class DailyCloseMaterializeService {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       quoteSync.warnings.push(`Patrimônio ${day}: ${msg}`);
+      logReconcileFailure('daily-close.patrimony', ctx.organizationId ?? undefined, err, { date: day });
     }
 
     const custody = await this.ledger.reconcileCustody(ctx);
@@ -240,7 +242,6 @@ export class DailyCloseMaterializeService {
     if (!ctx.organizationId) return;
     const insertPayload: SecurePayload = {
       patrimony_item_id: assetId,
-      organization_id: ctx.organizationId,
       asset_class: assetType,
       ...payload,
     };

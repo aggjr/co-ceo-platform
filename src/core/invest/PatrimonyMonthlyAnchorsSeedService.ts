@@ -92,7 +92,6 @@ export class PatrimonyMonthlyAnchorsSeedService {
     );
 
     const payload = {
-      organization_id: ctx.organizationId,
       reference_date: referenceDate,
       patrimony,
       source,
