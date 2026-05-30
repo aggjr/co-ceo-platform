@@ -155,13 +155,17 @@ function renderPendingDecisions(pending) {
   }
   return pending.map((d) => {
     const ctx = d.context || {};
+    const qtyLabel =
+      d.kind === 'qty_custody_mismatch'
+        ? `patrimônio ${String(ctx.patrimonyItemsQty ?? '—')} · livro ${String(ctx.ledgerQty ?? '—')}`
+        : `qtd ${String(ctx.quantity ?? '—')} · R$ ${String(ctx.unitPrice ?? '—')}`;
     const actions = (d.allowedActions || [])
       .map((a) => `<button type="button" class="btn btn-sm btn-secondary wizard-resolve" data-decision-id="${escapeHtml(d.decisionId)}" data-action="${escapeHtml(a)}">${escapeHtml(RECON_ACTION_LABELS[a] || a)}</button>`)
       .join(' ');
     return `
       <div class="invest-conciliacao__pending-item" data-decision-id="${escapeHtml(d.decisionId)}">
         <strong>${escapeHtml(d.kind || d.summaryKey || 'pendência')}</strong>
-        <span class="muted">${escapeHtml(ctx.ticker || '')} · qtd ${escapeHtml(String(ctx.quantity ?? '—'))} · R$ ${escapeHtml(String(ctx.unitPrice ?? '—'))}</span>
+        <span class="muted">${escapeHtml(ctx.ticker || '')} · ${escapeHtml(qtyLabel)}</span>
         <div class="conciliacao-btn-row" style="margin-top:0.5rem">${actions}</div>
       </div>`;
   }).join('');
@@ -827,6 +831,18 @@ export async function InvestConciliacaoPage(container) {
     }
   }
 
+  async function refreshOptcDayPending(day) {
+    if (!optcSessionId || !day) return;
+    const data = await apiRequest(
+      `/api/invest/reconcile/session/${encodeURIComponent(optcSessionId)}/day/${encodeURIComponent(day)}`
+    );
+    await renderOptcPending(data.pendingDecisions || [], optcSessionId, day);
+    if (!(data.pendingDecisions || []).length && optcStatus) {
+      optcStatus.textContent = `✅ ${day} — sem pendências, pode fechar`;
+    }
+    return data;
+  }
+
   async function renderOptcPending(pending, sessionId, day) {
     if (!optcPending) return;
     optcPending.innerHTML = renderPendingDecisions(pending);
@@ -840,7 +856,7 @@ export async function InvestConciliacaoPage(container) {
             { method: 'POST', body: { decisionId, action } }
           );
           appendLog(logEl, `✅ Opção C: pendência resolvida (${action})`, 'ok');
-          optcPending.innerHTML = '<p class="muted">Pendência resolvida — clique em Fechamento do próximo dia.</p>';
+          await refreshOptcDayPending(day);
         } catch (err) {
           appendLog(logEl, `❌ Opção C resolver: ${err.message}`, 'err');
         }

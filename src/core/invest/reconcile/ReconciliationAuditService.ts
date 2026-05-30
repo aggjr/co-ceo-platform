@@ -42,7 +42,7 @@ export class ReconciliationAuditService {
     issues.push(...this.checkOpeningIntegrity(events));
     issues.push(...this.checkTradeCoverage(events, through));
     issues.push(...this.checkCashNoteLinks(events));
-    issues.push(...(await this.checkCustodyQty(ctx, events)));
+    issues.push(...(await this.checkCustodyQty(ctx, events, opts)));
     issues.push(...(await this.checkPortfolioDailyGaps(ctx, bounds.periodMin, through, opts)));
 
     return buildAuditReport(issues);
@@ -215,7 +215,14 @@ export class ReconciliationAuditService {
     return issues;
   }
 
-  private async checkCustodyQty(ctx: UserContext, events: LedgerEvent[]): Promise<AuditIssue[]> {
+  private async checkCustodyQty(
+    ctx: UserContext,
+    events: LedgerEvent[],
+    opts: AuditRunOptions = {}
+  ): Promise<AuditIssue[]> {
+    if (opts.scope === 'through' && !opts.horizonTrustedThrough) {
+      return [];
+    }
     const issues: AuditIssue[] = [];
     const projected = rebuildCustodyFromLedger(events);
     const assets = await this.gateway.findWhere(ctx, 'patrimony_items', {}, { limit: 500 });
