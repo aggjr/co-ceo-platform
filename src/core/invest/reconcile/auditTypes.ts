@@ -41,6 +41,8 @@ export type AuditReport = {
 export type AuditRunOptions = {
   throughDate?: string;
   scope?: 'full' | 'through';
+  /** Último dia já fechado na sessão — gaps só fazem sentido até aqui. */
+  horizonTrustedThrough?: string | null;
 };
 
 const BLOCKING: AuditSeverity[] = ['warn', 'error', 'critical'];
@@ -67,10 +69,10 @@ export function allowedActionsForKind(kind: string): ReconcileAction[] {
     case 'cash_unlinked':
       return ['pair_rows', 'void_ledger', 'defer'];
     case 'qty_custody_mismatch':
-      return ['defer'];
+      return ['confirm_skipped', 'defer'];
     case 'portfolio_daily_gap':
     case 'missing_quote':
-      return ['defer'];
+      return ['confirm_skipped', 'defer'];
     case 'skipped_informative':
       return ['confirm_skipped', 'defer'];
     default:

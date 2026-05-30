@@ -29,6 +29,7 @@ import {
 } from './reconcileActivity';
 import type { BtgBrokerageFileResult } from '../btgUploadImportService';
 import { DailyCloseMaterializeService } from './DailyCloseMaterializeService';
+import { ensureInvestReconciliationSchema } from '../../db/ensureInvestReconciliationSchema';
 
 export type ReconcileDataMode = 'recover' | 'reset_from_opening';
 
@@ -128,11 +129,13 @@ export class ReconciliationSessionService {
   private readonly dailyClose: DailyCloseMaterializeService;
 
   private readonly holdingPurge: HoldingPurgeKeepOpeningService | null;
+  private readonly dbPool: Pool | null;
 
   constructor(
     private readonly gateway: CoCeoDataGateway,
     pool?: Pool
   ) {
+    this.dbPool = pool ?? null;
     this.store = new ReconciliationSessionStore(gateway);
     this.ledger = new LedgerImportService(gateway);
     this.audit = new ReconciliationAuditService(gateway);
@@ -176,6 +179,22 @@ export class ReconciliationSessionService {
     };
 
     log(`Início sessão fase=${input.phase}`, 'session.start');
+
+    let schemaApplied = false;
+    if (this.dbPool) {
+      const schema = await ensureInvestReconciliationSchema(this.dbPool);
+      schemaApplied = schema.applied;
+      if (schema.applied) {
+        log(
+          `Schema conciliação aplicado (${schema.migrationFile})`,
+          'schema.ensure',
+          'ok'
+        );
+        console.log(
+          `[invest:reconcile] org=${orgId ?? '?'} [schema.ensure] Migration ${schema.migrationFile} aplicada`
+        );
+      }
+    }
 
     if (input.phase === 'cash') {
       await this.assertNotesPhaseComplete(ctx);
@@ -257,6 +276,7 @@ export class ReconciliationSessionService {
       session,
       activityLog,
       fileResults,
+      schemaApplied,
       importProgress: {
         filesTotal: fileResults.length,
         filesProcessed: fileResults.filter((f) => f.parseOk).length,
@@ -285,7 +305,11 @@ export class ReconciliationSessionService {
   async getDay(ctx: UserContext, sessionId: string, businessDate: string) {
     const session = await this.requireSession(ctx, sessionId);
     const preview = await this.buildDayPreview(ctx, sessionId, businessDate);
-    const audit = await this.audit.run(ctx, { throughDate: businessDate, scope: 'through' });
+    const audit = await this.audit.run(ctx, {
+      throughDate: businessDate,
+      scope: 'through',
+      horizonTrustedThrough: session.horizon_trusted_through,
+    });
     const pendingDecisions = this.mergePendingDecisions(
       sessionId,
       businessDate,
@@ -309,9 +333,20 @@ export class ReconciliationSessionService {
     input: { decisionId: string; action: ReconcileAction }
   ) {
     const runtime = this.requireRuntime(sessionId);
+    const session = await this.requireSession(ctx, sessionId);
     const dayResolved = runtime.resolvedByDay.get(businessDate) ?? new Map();
     const preview = await this.buildDayPreview(ctx, sessionId, businessDate);
-    const pending = preview.pendingDecisions;
+    const audit = await this.audit.run(ctx, {
+      throughDate: businessDate,
+      scope: 'through',
+      horizonTrustedThrough: session.horizon_trusted_through,
+    });
+    const pending = this.mergePendingDecisions(
+      sessionId,
+      businessDate,
+      preview,
+      audit.pendingDecisions
+    );
     const decision = pending.find((d) => d.decisionId === input.decisionId);
     if (!decision) {
       throw new GatewayError('INVALID_PAYLOAD', 'Decisão não encontrada ou já resolvida.', 400);
@@ -319,7 +354,9 @@ export class ReconciliationSessionService {
     if (!decision.allowedActions.includes(input.action)) {
       throw new GatewayError('INVALID_PAYLOAD', 'Ação não permitida para esta pendência.', 400);
     }
-    if (input.action === 'defer') {
+    if (input.action === 'defer' || input.action === 'confirm_skipped') {
+      dayResolved.set(input.decisionId, input.action);
+      runtime.resolvedByDay.set(businessDate, dayResolved);
       return this.getDay(ctx, sessionId, businessDate);
     }
 
@@ -334,8 +371,6 @@ export class ReconciliationSessionService {
       if (ledgerId) {
         await this.gateway.softDelete(ctx, 'patrimony_ledger_entries', ledgerId);
       }
-    } else if (input.action === 'confirm_skipped') {
-      /* somente marca resolvido */
     } else if (
       input.action === 'keep_ledger_row' ||
       input.action === 'pair_rows'
@@ -390,7 +425,11 @@ export class ReconciliationSessionService {
       progress_by_day: progress,
     });
 
-    const audit = await this.audit.run(ctx, { throughDate: businessDate, scope: 'through' });
+    const audit = await this.audit.run(ctx, {
+      throughDate: businessDate,
+      scope: 'through',
+      horizonTrustedThrough: businessDate,
+    });
     await this.store.appendDayLog(ctx, {
       sessionId,
       businessDate,

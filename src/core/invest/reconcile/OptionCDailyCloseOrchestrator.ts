@@ -27,6 +27,7 @@ export type OptionCRunState = {
   extractPending: boolean;
   lastDay: string | null;
   activityLog: string[];
+  schemaApplied?: boolean;
 };
 
 type OptionCRuntime = {
@@ -143,6 +144,7 @@ export class OptionCDailyCloseOrchestrator {
         extractPending: true,
         lastDay: null,
         activityLog: [...(started.activityLog?.map((s) => s.message) ?? [])],
+        schemaApplied: started.schemaApplied,
       },
     };
 
@@ -193,6 +195,8 @@ export class OptionCDailyCloseOrchestrator {
 
     const day = calendar[dayIndex]!;
     logStep(rt, `─── Pregão ${day} (${dayIndex + 1}/${calendar.length}) ───`);
+
+    await this.ledger.reconcileCustody(ctx);
 
     const dayLines = rt.linesByDate.get(day) ?? [];
     if (dayLines.length) {

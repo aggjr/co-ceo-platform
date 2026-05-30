@@ -63,9 +63,9 @@ app.get('*', (req, res, next) => {
 async function startServer() {
   try {
     const r = await ensureCoreSchema(pool);
-    if (r.marketMigrationApplied || r.platformJobMigrationApplied) {
+    if (r.marketMigrationApplied || r.platformJobMigrationApplied || r.reconciliationMigrationApplied) {
       console.log(
-        `[co-CEO Core] Schema core aplicado (mercado=${r.marketMigrationApplied}, jobs=${r.platformJobMigrationApplied}).`
+        `[co-CEO Core] Schema core aplicado (mercado=${r.marketMigrationApplied}, jobs=${r.platformJobMigrationApplied}, conciliação=${r.reconciliationMigrationApplied}).`
       );
     }
   } catch (err) {

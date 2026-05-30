@@ -42,7 +42,7 @@ export class ReconciliationAuditService {
     issues.push(...this.checkOpeningIntegrity(events));
     issues.push(...this.checkTradeCoverage(events, through));
     issues.push(...this.checkCashNoteLinks(events));
-    issues.push(...(await this.checkCustodyQty(ctx, events)));
+    issues.push(...(await this.checkCustodyQty(ctx, events, opts)));
     issues.push(...(await this.checkPortfolioDailyGaps(ctx, bounds.periodMin, through, opts)));
 
     return buildAuditReport(issues);
@@ -88,11 +88,10 @@ export class ReconciliationAuditService {
     to: string
   ): Promise<AuditIssue[]> {
     const issues: AuditIssue[] = [];
-    if (!ctx.organizationId) return issues;
     const rows = await this.gateway.findWhere(
       ctx,
       'business_events',
-      { organization_id: ctx.organizationId },
+      {},
       { limit: 500 }
     );
     for (const row of rows) {
@@ -216,16 +215,17 @@ export class ReconciliationAuditService {
     return issues;
   }
 
-  private async checkCustodyQty(ctx: UserContext, events: LedgerEvent[]): Promise<AuditIssue[]> {
+  private async checkCustodyQty(
+    ctx: UserContext,
+    events: LedgerEvent[],
+    opts: AuditRunOptions = {}
+  ): Promise<AuditIssue[]> {
+    if (opts.scope === 'through' && !opts.horizonTrustedThrough) {
+      return [];
+    }
     const issues: AuditIssue[] = [];
     const projected = rebuildCustodyFromLedger(events);
-    if (!ctx.organizationId) return issues;
-    const assets = await this.gateway.findWhere(
-      ctx,
-      'patrimony_items',
-      { organization_id: ctx.organizationId },
-      { limit: 500 }
-    );
+    const assets = await this.gateway.findWhere(ctx, 'patrimony_items', {}, { limit: 500 });
     const qtyByTicker = new Map<string, number>();
     for (const row of projected.assets) {
       const t = String(row.ticker ?? '').toUpperCase();
@@ -234,8 +234,10 @@ export class ReconciliationAuditService {
     }
     for (const row of assets) {
       const t = String(row.identifier ?? row.asset_ticker ?? '').toUpperCase();
+      if (!t) continue;
       const piQty = Number(row.quantity ?? 0);
       const ledgerQty = qtyByTicker.get(t) ?? 0;
+      if (Math.abs(piQty) < 0.0001 && Math.abs(ledgerQty) < 0.0001) continue;
       if (Math.abs(piQty - ledgerQty) > 0.0001) {
         issues.push({
           dimensionId: 13,
@@ -256,11 +258,13 @@ export class ReconciliationAuditService {
     opts: AuditRunOptions
   ): Promise<AuditIssue[]> {
     if (opts.scope !== 'through') return [];
-    const stored = await this.patrimonyStore.loadRange(ctx, from, through);
+    const horizon = opts.horizonTrustedThrough?.slice(0, 10);
+    if (!horizon) return [];
+    const stored = await this.patrimonyStore.loadRange(ctx, from, horizon);
     const dates = new Set(stored.map((s) => s.snapshot_date));
     const issues: AuditIssue[] = [];
     let d = from;
-    while (d <= through) {
+    while (d <= horizon) {
       const dow = new Date(`${d}T12:00:00Z`).getUTCDay();
       if (dow !== 0 && dow !== 6 && !dates.has(d)) {
         issues.push({

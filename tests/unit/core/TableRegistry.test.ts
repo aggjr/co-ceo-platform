@@ -12,10 +12,14 @@ describe('TableRegistry', () => {
     expect(t.softDelete).toBe(true);
   });
 
-  it('bloqueia organization_id no payload do cliente', () => {
+  it('remove organization_id do payload do cliente (injetado pelo gateway)', () => {
     const t = TableRegistry.assertRegistered('patrimony_items');
-    expect(() =>
-      TableRegistry.filterWritablePayload(t, { organization_id: 'hack' }, { isInstaller: false })
-    ).toThrow(GatewayError);
+    const filtered = TableRegistry.filterWritablePayload(
+      t,
+      { organization_id: 'hack', identifier: 'PETR4' },
+      { isInstaller: false }
+    );
+    expect(filtered).toEqual({ identifier: 'PETR4' });
+    expect(filtered.organization_id).toBeUndefined();
   });
 });
