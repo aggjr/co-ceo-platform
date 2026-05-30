@@ -103,13 +103,16 @@ export class OptionCDailyCloseOrchestrator {
       }
     }
 
-    const dataMode =
-      input.dataMode ?? (input.resetFirst ? 'reset_from_opening' : undefined);
+    const sessionDataMode =
+      input.resetFirst &&
+      (input.dataMode === 'reset_from_opening' || input.dataMode === undefined)
+        ? undefined
+        : input.dataMode;
 
     const started = await this.session.startSession(ctx, {
       phase: 'notes',
       files: input.notesFiles,
-      dataMode,
+      dataMode: sessionDataMode,
     });
 
     const index = await buildNotesFileIndex(input.notesFiles);
