@@ -196,6 +196,8 @@ export class OptionCDailyCloseOrchestrator {
     const day = calendar[dayIndex]!;
     logStep(rt, `─── Pregão ${day} (${dayIndex + 1}/${calendar.length}) ───`);
 
+    await this.ledger.reconcileCustody(ctx);
+
     const dayLines = rt.linesByDate.get(day) ?? [];
     if (dayLines.length) {
       const imported = await this.ledger.importEntriesOnly(ctx, dayLines, {

@@ -227,8 +227,10 @@ export class ReconciliationAuditService {
     }
     for (const row of assets) {
       const t = String(row.identifier ?? row.asset_ticker ?? '').toUpperCase();
+      if (!t) continue;
       const piQty = Number(row.quantity ?? 0);
       const ledgerQty = qtyByTicker.get(t) ?? 0;
+      if (Math.abs(piQty) < 0.0001 && Math.abs(ledgerQty) < 0.0001) continue;
       if (Math.abs(piQty - ledgerQty) > 0.0001) {
         issues.push({
           dimensionId: 13,
@@ -249,11 +251,13 @@ export class ReconciliationAuditService {
     opts: AuditRunOptions
   ): Promise<AuditIssue[]> {
     if (opts.scope !== 'through') return [];
-    const stored = await this.patrimonyStore.loadRange(ctx, from, through);
+    const horizon = opts.horizonTrustedThrough?.slice(0, 10);
+    if (!horizon) return [];
+    const stored = await this.patrimonyStore.loadRange(ctx, from, horizon);
     const dates = new Set(stored.map((s) => s.snapshot_date));
     const issues: AuditIssue[] = [];
     let d = from;
-    while (d <= through) {
+    while (d <= horizon) {
       const dow = new Date(`${d}T12:00:00Z`).getUTCDay();
       if (dow !== 0 && dow !== 6 && !dates.has(d)) {
         issues.push({

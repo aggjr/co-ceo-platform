@@ -145,7 +145,7 @@ const RECON_ACTION_LABELS = {
   void_ledger: 'Anular no livro',
   pair_rows: 'Parear linhas',
   keep_ledger_row: 'Manter livro',
-  confirm_skipped: 'Confirmar ignorado',
+  confirm_skipped: 'Aceitar e continuar',
   defer: 'Adiar',
 };
 
