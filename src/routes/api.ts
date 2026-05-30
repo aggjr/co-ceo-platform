@@ -263,6 +263,18 @@ router.get(
   invest.listPortfolio.bind(invest)
 );
 router.get(
+  '/invest/portfolio/three-prices',
+  AuthMiddleware.protect,
+  requirePermission('invest:custody:read'),
+  invest.getThreePrices.bind(invest)
+);
+router.get(
+  '/invest/portfolio/custody',
+  AuthMiddleware.protect,
+  requirePermission('invest:custody:read'),
+  invest.getCustodyDetail.bind(invest)
+);
+router.get(
   '/invest/options/strike-ladder',
   AuthMiddleware.protect,
   requirePermission('invest:custody:read'),
@@ -285,6 +297,24 @@ router.get(
   AuthMiddleware.protect,
   requirePermission('invest:ledger:read'),
   invest.getPatrimonyDaily.bind(invest)
+);
+router.get(
+  '/invest/patrimony/chart',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.getPatrimonyChart.bind(invest)
+);
+router.get(
+  '/invest/performance',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.getPerformance.bind(invest)
+);
+router.get(
+  '/invest/pnl/report',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.getPnLReport.bind(invest)
 );
 router.post(
   '/invest/patrimony-daily/record',
@@ -375,6 +405,12 @@ router.get(
   AuthMiddleware.protect,
   requirePermission('invest:ledger:read'),
   invest.getExtract.bind(invest)
+);
+router.get(
+  '/invest/cash/transit',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.getCashInTransit.bind(invest)
 );
 router.get(
   '/invest/reconcile/preflight',

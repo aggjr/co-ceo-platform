@@ -7,6 +7,13 @@ const listLedgerEvents = jest.fn();
 const reconcileCustody = jest.fn();
 const loadQuoteMapForRange = jest.fn();
 const listActiveAssets = jest.fn();
+const recalcThreePricesPublic = jest.fn();
+
+jest.mock('../../../src/core/invest/reconcile/DailyCloseMaterializeService', () => ({
+  DailyCloseMaterializeService: jest.fn().mockImplementation(() => ({
+    recalcThreePricesPublic,
+  })),
+}));
 
 jest.mock('../../../src/core/invest/PatrimonyDailyStore', () => ({
   PatrimonyDailyStore: jest.fn().mockImplementation(() => ({
@@ -82,6 +89,7 @@ describe('PatrimonyDailyRebuildService', () => {
     loadQuoteMapForRange.mockResolvedValue(new Map());
     listActiveAssets.mockResolvedValue([]);
     invalidateFromDate.mockResolvedValue(undefined);
+    recalcThreePricesPublic.mockResolvedValue({ positionsUpdated: 1, positionsZeroed: 0 });
   });
 
   it('invalida, grava dias úteis com calibração BTG quando houver âncoras e reconcilia custódia', async () => {
@@ -95,5 +103,7 @@ describe('PatrimonyDailyRebuildService', () => {
     }
     expect(result.daysWritten).toBeGreaterThan(0);
     expect(reconcileCustody).toHaveBeenCalledWith(ctx);
+    expect(recalcThreePricesPublic).toHaveBeenCalledWith(ctx, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
+    expect(result.threePricesUpdated).toBe(1);
   });
 });
