@@ -1,6 +1,7 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import type mysql from 'mysql2/promise';
 import pool from '../../config/database';
+import { clearLedgerCrossLinksByPreservedIds } from './ledgerPurgeCrossLinks';
 
 type PoolConnection = mysql.PoolConnection;
 
@@ -93,7 +94,19 @@ export class ReconcileResetService {
       await this.deleteByOrg(conn, report, 'financial_closings',
         `organization_id = ?`, [orgId]);
 
-      // ── Etapa 3: Limpar ledgers financeiros (exceto opening_balance) ──────
+      // ── Etapa 3: Limpar ledgers (desvincular FKs cruzadas antes do DELETE) ─
+      const unlinked = await clearLedgerCrossLinksByPreservedIds(
+        conn,
+        orgId,
+        preservedFinancialIds,
+        preservedPatrimonyIds
+      );
+      report.steps.push({
+        step: 'unlink_ledger_cross_refs',
+        detail: `ple↔fle desvinculados: ${unlinked.pleUnlinked} + ${unlinked.fleUnlinked}`,
+      });
+
+      // ── Etapa 3b: Limpar ledgers financeiros (exceto opening_balance) ──────
       if (preservedFinancialIds.length > 0) {
         const placeholders = preservedFinancialIds.map(() => '?').join(',');
         const [res] = await conn.query<any>(

@@ -9,6 +9,7 @@ import {
 import { logReconcileFailure } from './reconcile/reconcileErrorDetail';
 import { LedgerImportService } from './LedgerImportService';
 import { resolveInvestPeriodBounds } from './investPeriodBounds';
+import { clearLedgerCrossLinksForOpeningPurge } from './ledgerPurgeCrossLinks';
 
 const AUX_ORG_TABLES = [
   'patrimony_closings',
@@ -265,6 +266,17 @@ export class HoldingPurgeKeepOpeningService {
         )
       )
     )`;
+
+    const unlinked = await clearLedgerCrossLinksForOpeningPurge(
+      conn,
+      orgId,
+      openingDate,
+      openingInSql
+    );
+    log?.(
+      `Desvinculado ple↔fle: ${unlinked.pleUnlinked} patrimonial, ${unlinked.fleUnlinked} financeiro`,
+      'purge.unlink_cross_refs'
+    );
 
     const [fle] = await conn.query<ResultSetHeader>(
       `DELETE FROM financial_ledger_entries
