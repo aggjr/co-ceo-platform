@@ -88,3 +88,8 @@ export async function pickPdfFilesFromFolder() {
 export async function pickExtractFilesFromFolder() {
   return pickFilesFromFolder({ extensions: ['.pdf', '.csv', '.txt'] });
 }
+
+/** Fechamentos/exportacoes do home broker: JSON */
+export async function pickHomeBrokerFilesFromFolder() {
+  return pickFilesFromFolder({ extensions: ['.json'] });
+}

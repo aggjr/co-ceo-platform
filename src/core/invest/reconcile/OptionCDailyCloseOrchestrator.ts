@@ -9,10 +9,15 @@ import { PatrimonyDailyRebuildService } from '../PatrimonyDailyRebuildService';
 import { ReconciliationSessionService } from './ReconciliationSessionService';
 import { DailyCloseMaterializeService } from './DailyCloseMaterializeService';
 import { buildNotesFileIndex } from './reconcileNotesIndex';
+import {
+  HomeBrokerSnapshotUploadService,
+  type HomeBrokerSnapshotUploadResult,
+} from './HomeBrokerSnapshotUploadService';
 import type { ReconcileDecision } from './auditTypes';
 import type { LedgerImportLine } from '../ledgerTypes';
 
 export type OptionCPhase = 'notes' | 'extracts' | 'done';
+export type OptionCMode = 'strict' | 'homologation';
 
 export type OptionCRunState = {
   runId: string;
@@ -24,10 +29,13 @@ export type OptionCRunState = {
   horizonTrustedThrough: string | null;
   notesFilesCount: number;
   extractFilesCount: number;
+  homeBrokerFilesCount: number;
+  mode: OptionCMode;
   extractPending: boolean;
   lastDay: string | null;
   activityLog: string[];
   schemaApplied?: boolean;
+  homeBrokerImport?: HomeBrokerSnapshotUploadResult;
 };
 
 type OptionCRuntime = {
@@ -56,6 +64,7 @@ export class OptionCDailyCloseOrchestrator {
   private readonly dailyClose: DailyCloseMaterializeService;
   private readonly ledger: LedgerImportService;
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
+  private readonly homeBrokerUpload: HomeBrokerSnapshotUploadService;
   private readonly holdingPurge: HoldingPurgeKeepOpeningService | null;
 
   constructor(
@@ -66,6 +75,7 @@ export class OptionCDailyCloseOrchestrator {
     this.dailyClose = new DailyCloseMaterializeService(gateway);
     this.ledger = new LedgerImportService(gateway);
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
+    this.homeBrokerUpload = new HomeBrokerSnapshotUploadService(gateway);
     this.holdingPurge = pool ? new HoldingPurgeKeepOpeningService(gateway, pool) : null;
   }
 
@@ -78,8 +88,10 @@ export class OptionCDailyCloseOrchestrator {
     input: {
       notesFiles: BtgUploadFileInput[];
       extractFiles: BtgUploadFileInput[];
+      homeBrokerFiles?: BtgUploadFileInput[];
       resetFirst?: boolean;
       dataMode?: 'recover' | 'reset_from_opening';
+      mode?: OptionCMode;
     }
   ): Promise<OptionCRunState> {
     if (!ctx.organizationId) {
@@ -92,6 +104,8 @@ export class OptionCDailyCloseOrchestrator {
       throw new GatewayError('INVALID_PAYLOAD', 'Selecione a pasta de extratos BTG.', 400);
     }
 
+    const mode = input.mode ?? 'homologation';
+
     if (input.resetFirst && this.holdingPurge) {
       console.log(`[OptionC] org=${ctx.organizationId} reset (purge) antes da sessão de notas…`);
       try {
@@ -103,6 +117,11 @@ export class OptionCDailyCloseOrchestrator {
         throw err;
       }
     }
+
+    const homeBrokerImport = await this.homeBrokerUpload.importAndApply(
+      ctx,
+      input.homeBrokerFiles
+    );
 
     const sessionDataMode =
       input.resetFirst &&
@@ -141,16 +160,29 @@ export class OptionCDailyCloseOrchestrator {
         horizonTrustedThrough: null,
         notesFilesCount: input.notesFiles.length,
         extractFilesCount: input.extractFiles.length,
+        homeBrokerFilesCount: input.homeBrokerFiles?.length ?? 0,
+        mode,
         extractPending: true,
         lastDay: null,
         activityLog: [...(started.activityLog?.map((s) => s.message) ?? [])],
         schemaApplied: started.schemaApplied,
+        homeBrokerImport,
       },
     };
 
+    if (homeBrokerImport.filesTotal > 0) {
+      logStep(
+        rt,
+        `Home broker: ${homeBrokerImport.snapshotsImported} snapshot(s), ${homeBrokerImport.anchorsUpserted} ancora(s), ${homeBrokerImport.warnings.length} aviso(s).`
+      );
+      for (const warning of homeBrokerImport.warnings) {
+        logStep(rt, `Home broker aviso: ${warning}`);
+      }
+    }
+
     logStep(
       rt,
-      `Opção C iniciada — ${rt.state.calendar.length} pregão(ões) de notas, ${input.extractFiles.length} extrato(s) na fase 2.`
+      `Opção C iniciada (${mode}) — ${rt.state.calendar.length} pregão(ões) de notas, ${input.extractFiles.length} extrato(s) na fase 2.`
     );
     runsById.set(runId, rt);
     return rt.state;
@@ -193,8 +225,10 @@ export class OptionCDailyCloseOrchestrator {
     input: {
       notesFiles: BtgUploadFileInput[];
       extractFiles: BtgUploadFileInput[];
+      homeBrokerFiles?: BtgUploadFileInput[];
       resetFirst?: boolean;
       dataMode?: 'recover' | 'reset_from_opening';
+      mode?: OptionCMode;
       delayMs?: number;
     },
     onProgress?: (state: OptionCRunState) => void
@@ -204,8 +238,10 @@ export class OptionCDailyCloseOrchestrator {
     const state = await this.start(ctx, {
       notesFiles: input.notesFiles,
       extractFiles: input.extractFiles,
+      homeBrokerFiles: input.homeBrokerFiles,
       resetFirst: input.resetFirst,
       dataMode: input.dataMode,
+      mode: input.mode,
     });
 
     const runId = state.runId;
@@ -222,7 +258,7 @@ export class OptionCDailyCloseOrchestrator {
       const result = await this.closeNextDay(ctx, runId);
       onProgress?.(result.state);
 
-      if (result.status === 'blocked') {
+      if (result.status === 'blocked' && rt.state.mode !== 'homologation') {
         logStep(
           rt,
           `run-all bloqueado em ${result.day ?? '?'} — pendências não resolvidas automaticamente.`
@@ -267,7 +303,7 @@ export class OptionCDailyCloseOrchestrator {
     }
 
     const dayState = await this.session.getDay(ctx, sessionId, day);
-    if (!dayState.canClose) {
+    if (!dayState.canClose && rt.state.mode !== 'homologation') {
       logStep(
         rt,
         `Bloqueado em ${day}: ${dayState.pendingDecisions.length} pendência(s) — resolva na UI.`
@@ -281,9 +317,21 @@ export class OptionCDailyCloseOrchestrator {
       };
     }
 
+    if (!dayState.canClose && rt.state.mode === 'homologation') {
+      logStep(
+        rt,
+        `Homologação ${day}: ${dayState.pendingDecisions.length} pendência(s) registrada(s); avanço mantido.`
+      );
+    }
+
     logStep(rt, `Fechando ${day}: cotações web + patrimônio + 3 preços…`);
-    const closed = await this.session.closeDay(ctx, sessionId, day);
-    void closed;
+    const materialize =
+      rt.state.mode === 'homologation'
+        ? await this.dailyClose.materializeDay(ctx, day)
+        : undefined;
+    if (rt.state.mode !== 'homologation') {
+      await this.session.closeDay(ctx, sessionId, day);
+    }
 
     rt.state.dayIndex += 1;
     rt.state.horizonTrustedThrough = day;
@@ -301,7 +349,13 @@ export class OptionCDailyCloseOrchestrator {
       };
     }
 
-    return { status: 'closed' as const, day, state: rt.state };
+    return {
+      status: 'closed' as const,
+      day,
+      materialize,
+      pendingDecisions: dayState.pendingDecisions,
+      state: rt.state,
+    };
   }
 
   private async finishExtractsPhase(ctx: UserContext, rt: OptionCRuntime) {
@@ -312,12 +366,15 @@ export class OptionCDailyCloseOrchestrator {
     const importErrors = fileResults.filter((f: { importOk?: boolean }) => f.importOk === false).length;
 
     if (importErrors > 0) {
-      logStep(rt, `⚠️ ${importErrors} extrato(s) com erro — corrija e reinicie a fase extratos.`);
-      return {
-        status: 'blocked' as const,
-        blockReasons: ['invest.reconcile.block.extract_import'],
-        state: rt.state,
-      };
+      logStep(rt, `⚠️ ${importErrors} extrato(s) com erro — divergência registrada.`);
+      if (rt.state.mode !== 'homologation') {
+        return {
+          status: 'blocked' as const,
+          blockReasons: ['invest.reconcile.block.extract_import'],
+          state: rt.state,
+        };
+      }
+      logStep(rt, 'Homologação: seguindo para rebuild mesmo com erro em extrato.');
     }
 
     logStep(rt, 'Rebuild patrimônio diário (intervalo completo)…');

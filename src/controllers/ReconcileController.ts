@@ -141,11 +141,13 @@ export class ReconcileController {
       }
       const notesFiles = Array.isArray(req.body?.notesFiles) ? req.body.notesFiles : [];
       const extractFiles = Array.isArray(req.body?.extractFiles) ? req.body.extractFiles : [];
+      const homeBrokerFiles = Array.isArray(req.body?.homeBrokerFiles) ? req.body.homeBrokerFiles : [];
       const resetFirst = req.body?.resetFirst === true;
       const dataMode = req.body?.dataMode as 'recover' | 'reset_from_opening' | undefined;
+      const mode = req.body?.mode === 'strict' ? 'strict' : 'homologation';
 
       console.log(
-        `[OptionC] start org=${orgId} resetFirst=${resetFirst} notas=${notesFiles.length} extratos=${extractFiles.length}`
+        `[OptionC] start org=${orgId} mode=${mode} resetFirst=${resetFirst} notas=${notesFiles.length} extratos=${extractFiles.length} homeBroker=${homeBrokerFiles.length}`
       );
 
       const existingAnchors = await this.anchorsRepo.loadForOrganization(ctx);
@@ -159,8 +161,10 @@ export class ReconcileController {
       const state = await this.optionC.start(ctx, {
         notesFiles,
         extractFiles,
+        homeBrokerFiles,
         resetFirst,
         dataMode,
+        mode,
       });
       console.log(
         `[OptionC] org=${orgId} iniciado runId=${state.runId} pregões=${state.calendar.length}`
@@ -168,7 +172,9 @@ export class ReconcileController {
       return res.json({
         success: true,
         message:
-          'Opção C iniciada. Use option-c/next-day para fechar cada pregão (cotações web + patrimônio gravado).',
+          mode === 'homologation'
+            ? 'Homologação iniciada. O sistema avança dia a dia, grava patrimônio e registra divergências como avisos.'
+            : 'Opção C iniciada. Use option-c/next-day para fechar cada pregão (cotações web + patrimônio gravado).',
         anchorsSeeded,
         schemaApplied: state.schemaApplied === true,
         state,
@@ -178,6 +184,7 @@ export class ReconcileController {
         resetFirst: req.body?.resetFirst === true,
         notesFiles: Array.isArray(req.body?.notesFiles) ? req.body.notesFiles.length : 0,
         extractFiles: Array.isArray(req.body?.extractFiles) ? req.body.extractFiles.length : 0,
+        homeBrokerFiles: Array.isArray(req.body?.homeBrokerFiles) ? req.body.homeBrokerFiles.length : 0,
       });
       const status = error instanceof GatewayError ? error.httpStatus : 500;
       return res.status(status).json({
@@ -226,8 +233,10 @@ export class ReconcileController {
 
       const notesFiles = Array.isArray(req.body?.notesFiles) ? req.body.notesFiles : [];
       const extractFiles = Array.isArray(req.body?.extractFiles) ? req.body.extractFiles : [];
+      const homeBrokerFiles = Array.isArray(req.body?.homeBrokerFiles) ? req.body.homeBrokerFiles : [];
       const resetFirst = req.body?.resetFirst === true;
       const dataMode = req.body?.dataMode as 'recover' | 'reset_from_opening' | undefined;
+      const mode = req.body?.mode === 'strict' ? 'strict' : 'homologation';
       const delayMs = req.body?.delayMs != null ? Number(req.body.delayMs) : 1200;
 
       if (!notesFiles.length) {
@@ -241,7 +250,7 @@ export class ReconcileController {
       res.setTimeout(0);
 
       console.log(
-        `[OptionC/run-all] org=${orgId} notas=${notesFiles.length} extratos=${extractFiles.length} delay=${delayMs}ms`
+        `[OptionC/run-all] org=${orgId} mode=${mode} notas=${notesFiles.length} extratos=${extractFiles.length} homeBroker=${homeBrokerFiles.length} delay=${delayMs}ms`
       );
 
       const existingAnchors = await this.anchorsRepo.loadForOrganization(ctx);
@@ -252,7 +261,7 @@ export class ReconcileController {
 
       const finalState = await this.optionC.runAll(
         ctx,
-        { notesFiles, extractFiles, resetFirst, dataMode, delayMs },
+        { notesFiles, extractFiles, homeBrokerFiles, resetFirst, dataMode, mode, delayMs },
         (state) => {
           if (state.lastDay) {
             console.log(
@@ -265,9 +274,11 @@ export class ReconcileController {
 
       const blocked = finalState.phase !== 'done';
       return res.json({
-        success: !blocked,
+        success: mode === 'homologation' ? true : !blocked,
         message: blocked
-          ? `Processo pausado — pendência no pregão ${finalState.lastDay ?? '?'}. Resolva na UI e use option-c/next-day para continuar.`
+          ? mode === 'homologation'
+            ? 'Homologação avançou com avisos. Confira o log da Opção C.'
+            : `Processo pausado — pendência no pregão ${finalState.lastDay ?? '?'}. Resolva na UI e use option-c/next-day para continuar.`
           : 'Importação completa. Confira Resultado histórico e Ações/FIIs.',
         state: finalState,
       });
@@ -276,6 +287,7 @@ export class ReconcileController {
         resetFirst: req.body?.resetFirst === true,
         notesFiles: Array.isArray(req.body?.notesFiles) ? req.body.notesFiles.length : 0,
         extractFiles: Array.isArray(req.body?.extractFiles) ? req.body.extractFiles.length : 0,
+        homeBrokerFiles: Array.isArray(req.body?.homeBrokerFiles) ? req.body.homeBrokerFiles.length : 0,
       });
       const status = error instanceof GatewayError ? error.httpStatus : 500;
       return res.status(status).json({

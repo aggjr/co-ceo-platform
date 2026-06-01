@@ -7,6 +7,7 @@ import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import {
   pickPdfFilesFromFolder,
   pickExtractFilesFromFolder,
+  pickHomeBrokerFilesFromFolder,
 } from '../lib/importFilePicker.js';
 
 /* ─────────────────────────── helpers ─────────────────────────── */
@@ -209,19 +210,19 @@ export async function InvestConciliacaoPage(container) {
         <div class="conciliacao-hero__content">
           <h1 class="conciliacao-hero__title">Conciliação e Reimportação Completa</h1>
           <p class="conciliacao-hero__subtitle">
-            Três modos: <strong>Opção C</strong> (recomendado) fecha cada pregão com cotações da web e patrimônio gravado;
-            fluxo rápido em 4 passos; ou wizard manual dia a dia.
+            <strong>Opção C</strong> agora é o caminho de homologação: limpa após a abertura, remonta dia a dia,
+            grava patrimônio e registra divergências como avisos. O wizard manual fica para a conciliação rígida.
           </p>
         </div>
       </div>
 
       <!-- Opção C — fechamento calmo dia a dia (recomendado) -->
       <div class="conciliacao-action-panel invest-conciliacao__option-c" id="option-c-panel">
-        <h2>Opção C — Fechamento calmo dia a dia (recomendado)</h2>
+        <h2>Opção C — Homologação dia a dia (recomendado agora)</h2>
         <p class="muted">
-          Reset → indique <strong>as duas pastas</strong> (notas + extratos) → o sistema fecha cada pregão com
+          Reset → indique <strong>notas, extratos e opcionalmente fechamentos do home broker</strong> → o sistema fecha cada pregão com
           cotações brapi/opcoes.net, grava patrimônio diário, recalcula custódia e os 3 preços (zeram quando a posição zera).
-          Para em divergências — resolva e continue.
+          Divergências ficam no log para ajuste posterior; nesta fase o processo avança para ganhar tempo.
         </p>
         <div class="conciliacao-import-grid">
           <div class="conciliacao-import-panel">
@@ -241,6 +242,16 @@ export async function InvestConciliacaoPage(container) {
               <div class="invest-conciliacao__folder-body">
                 <input id="input-path-optc-extratos" class="invest-conciliacao__folder-path-input" placeholder="Pasta extratos" readonly />
                 <span id="label-optc-extratos" class="invest-conciliacao__folder-count"></span>
+              </div>
+            </div>
+          </div>
+          <div class="conciliacao-import-panel">
+            <h3>📊 Fechamentos home broker (JSON opcional)</h3>
+            <div class="invest-conciliacao__folder-row" style="border:none;padding:0;margin-bottom:0.5rem">
+              <button id="btn-pick-optc-homebroker" class="invest-conciliacao__folder-picker" title="Home broker">📂</button>
+              <div class="invest-conciliacao__folder-body">
+                <input id="input-path-optc-homebroker" class="invest-conciliacao__folder-path-input" placeholder="Pasta fechamentos home broker" readonly />
+                <span id="label-optc-homebroker" class="invest-conciliacao__folder-count">Opcional: snapshots ou âncoras mensais JSON</span>
               </div>
             </div>
           </div>
@@ -810,10 +821,13 @@ export async function InvestConciliacaoPage(container) {
   /* ─── Opção C ─── */
   const btnPickOptcNotas = container.querySelector('#btn-pick-optc-notas');
   const btnPickOptcExtratos = container.querySelector('#btn-pick-optc-extratos');
+  const btnPickOptcHomeBroker = container.querySelector('#btn-pick-optc-homebroker');
   const inputOptcNotas = container.querySelector('#input-path-optc-notas');
   const inputOptcExtratos = container.querySelector('#input-path-optc-extratos');
+  const inputOptcHomeBroker = container.querySelector('#input-path-optc-homebroker');
   const labelOptcNotas = container.querySelector('#label-optc-notas');
   const labelOptcExtratos = container.querySelector('#label-optc-extratos');
+  const labelOptcHomeBroker = container.querySelector('#label-optc-homebroker');
   const btnOptcStart = container.querySelector('#btn-optc-start');
   const btnOptcNextDay = container.querySelector('#btn-optc-next-day');
   const btnOptcRunAll = container.querySelector('#btn-optc-run-all');
@@ -828,6 +842,7 @@ export async function InvestConciliacaoPage(container) {
 
   let optcNotesFiles = [];
   let optcExtractFiles = [];
+  let optcHomeBrokerFiles = [];
   let optcRunId = null;
   let optcState = null;
   let optcSessionId = null;
@@ -900,8 +915,16 @@ export async function InvestConciliacaoPage(container) {
     }
     if (optcPending) optcPending.innerHTML = '';
     if (data.status === 'closed' && data.day) {
-      if (optcStatus) optcStatus.textContent = `✅ ${data.day} fechado`;
+      const pendingCount = (data.pendingDecisions || []).length;
+      if (optcStatus) {
+        optcStatus.textContent = pendingCount
+          ? `✅ ${data.day} materializado (${pendingCount} aviso(s))`
+          : `✅ ${data.day} materializado`;
+      }
       appendLog(logEl, `✅ Opção C: ${data.day} fechado com cotações + patrimônio gravado.`, 'ok');
+      if (pendingCount) {
+        appendLog(logEl, `⚠️ Homologação: ${pendingCount} pendência(s) registrada(s) no dia ${data.day}.`, 'warn');
+      }
     }
     if (data.status === 'phase_complete') {
       appendLog(logEl, '─── Fase notas OK — importando extratos…', 'section');
@@ -936,6 +959,18 @@ export async function InvestConciliacaoPage(container) {
       refreshOptcStartButton();
     } catch (err) {
       appendLog(logEl, `⚠️ Opção C extratos: ${err.message}`, 'warn');
+    }
+  });
+
+  btnPickOptcHomeBroker?.addEventListener('click', async () => {
+    try {
+      const result = await pickHomeBrokerFilesFromFolder();
+      optcHomeBrokerFiles = result.files;
+      if (inputOptcHomeBroker) inputOptcHomeBroker.value = result.folderPath || 'Pasta selecionada';
+      if (labelOptcHomeBroker) labelOptcHomeBroker.textContent = result.fileCountLabel;
+      appendLog(logEl, `📊 Home broker: ${optcHomeBrokerFiles.length} arquivo(s) JSON selecionado(s).`, 'ok');
+    } catch (err) {
+      appendLog(logEl, `⚠️ Opção C home broker: ${err.message}`, 'warn');
     }
   });
 
@@ -978,15 +1013,17 @@ export async function InvestConciliacaoPage(container) {
   btnOptcStart?.addEventListener('click', async () => {
     if (!optcNotesFiles.length || !optcExtractFiles.length) return;
     btnOptcStart.disabled = true;
-    if (optcStatus) optcStatus.textContent = 'Iniciando Opção C…';
-    appendLog(logEl, '─── Opção C: reset + indexação + calendário ───', 'section');
+    if (optcStatus) optcStatus.textContent = 'Iniciando homologação…';
+    appendLog(logEl, '─── Opção C: reset + home broker + indexação + calendário ───', 'section');
     try {
       const data = await apiRequest('/api/invest/reconcile/option-c/start', {
         method: 'POST',
         body: {
           notesFiles: optcNotesFiles,
           extractFiles: optcExtractFiles,
+          homeBrokerFiles: optcHomeBrokerFiles,
           resetFirst: optcResetFirst?.checked === true,
+          mode: 'homologation',
         },
       });
       optcRunId = data.state.runId;
@@ -1000,6 +1037,18 @@ export async function InvestConciliacaoPage(container) {
         appendLog(logEl, '✅ Âncoras BTG homebroker gravadas automaticamente (tabela vazia).', 'ok');
         await refreshOptcAnchorsStatus();
       }
+      const hb = optcState.homeBrokerImport;
+      if (hb?.filesTotal) {
+        appendLog(
+          logEl,
+          `✅ Home broker: ${hb.snapshotsImported} snapshot(s), ${hb.snapshotsApplied} aplicado(s), ${hb.anchorsUpserted} âncora(s).`,
+          'ok'
+        );
+        for (const warning of hb.warnings || []) {
+          appendLog(logEl, `⚠️ Home broker: ${warning}`, 'warn');
+        }
+        await refreshOptcAnchorsStatus();
+      }
       if (data.schemaApplied) {
         appendLog(
           logEl,
@@ -1007,7 +1056,7 @@ export async function InvestConciliacaoPage(container) {
           'ok'
         );
       }
-      appendLog(logEl, `✅ Opção C iniciada: ${optcState.calendar.length} dia(s) de notas.`, 'ok');
+      appendLog(logEl, `✅ Homologação iniciada: ${optcState.calendar.length} dia(s) de notas.`, 'ok');
       setStepState(container, 'reset', 'done', '✅ Via Opção C');
     } catch (err) {
       const msg = formatReconcileApiError(err);
@@ -1035,7 +1084,11 @@ export async function InvestConciliacaoPage(container) {
     try {
       for (let guard = 0; guard < 5000; guard += 1) {
         const data = await runOptcNextDay();
-        if (!data || data.status === 'done' || data.status === 'blocked') break;
+        if (!data || data.status === 'done') break;
+        if (data.status === 'blocked') {
+          appendLog(logEl, `⚠️ Parada operacional em ${data.day || '?'}: verifique o log da API.`, 'warn');
+          break;
+        }
         await new Promise((r) => setTimeout(r, 1500));
       }
     } catch (err) {
