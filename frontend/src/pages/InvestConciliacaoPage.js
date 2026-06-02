@@ -42,9 +42,30 @@ function appendLog(logEl, message, type = '') {
   if (!logEl) return;
   const line = document.createElement('div');
   line.className = `log-line${type ? ` log-line--${type}` : ''}`;
-  line.textContent = `[${new Date().toLocaleTimeString('pt-BR')}] ${message}`;
+  const time = new Date().toLocaleTimeString('pt-BR');
+  line.textContent = `[${time}] ${message}`;
   logEl.appendChild(line);
   logEl.scrollTop = logEl.scrollHeight;
+
+  const rows = JSON.parse(logEl.dataset.rows || '[]');
+  rows.push({ id: `log-${rows.length + 1}`, time, type: type || 'info', message });
+  logEl.dataset.rows = JSON.stringify(rows.slice(-500));
+  const hostId = logEl.dataset.excelHost;
+  const host = hostId ? document.getElementById(hostId) : null;
+  if (host) {
+    mountCoCeoExcelGrid(host, {
+      gridId: 'invest-conciliacao-log-operacoes',
+      rows,
+      emptyText: 'Sem eventos no log.',
+      summaryLabels: { total: 'Eventos', selected: '' },
+      fixedLeadingColumns: 2,
+      coCeoColumns: [
+        { key: 'time', label: 'Hora', type: 'text', width: '110px', sticky: true },
+        { key: 'type', label: 'Tipo', type: 'text', width: '110px', sticky: true },
+        { key: 'message', label: 'Mensagem', type: 'text', width: '980px' },
+      ],
+    });
+  }
 }
 
 function logOptcBrowser(level, event, detail = {}) {
@@ -439,7 +460,8 @@ export async function InvestConciliacaoPage(container) {
       <!-- Log -->
       <div class="conciliacao-action-panel">
         <h2>Log de Operações</h2>
-        <div id="conciliacao-log" class="conciliacao-log"></div>
+        <div id="conciliacao-log-table-host" class="portfolio-excel-section"></div>
+        <div id="conciliacao-log" class="conciliacao-log" hidden></div>
       </div>
 
     </div>
@@ -513,6 +535,10 @@ export async function InvestConciliacaoPage(container) {
 
   /* ─── DOM refs ─── */
   const logEl = container.querySelector('#conciliacao-log');
+  if (logEl) {
+    logEl.dataset.excelHost = 'conciliacao-log-table-host';
+    appendLog(logEl, 'Aguardando início do processamento.', 'info');
+  }
   const btnReset = container.querySelector('#btn-reset');
   
   const btnPickExtract = container.querySelector('#btn-pick-extratos');
@@ -950,8 +976,10 @@ export async function InvestConciliacaoPage(container) {
   });
   if (btnOptcStart) btnOptcStart.textContent = '1. Preparar homologação';
   if (btnOptcStart) btnOptcStart.classList.add('btn-xl');
+  if (btnOptcStart) btnOptcStart.hidden = true;
+  if (btnOptcNextDay) btnOptcNextDay.hidden = true;
   if (btnOptcRunAll) {
-    btnOptcRunAll.textContent = '2. Processar tudo';
+    btnOptcRunAll.textContent = 'Processar conciliação';
     btnOptcRunAll.classList.add('btn-xl', 'btn-xl--success');
   }
   if (optcStatus) {
@@ -1086,15 +1114,37 @@ export async function InvestConciliacaoPage(container) {
 
     if (optcNotesAnalysis) {
       const noteRows = optcFileRows.filter((row) => row.kind === 'Nota');
-      optcNotesAnalysis.innerHTML = noteRows.length
-        ? noteRows.map((row) => `
-            <div class="conciliacao-note-row">
-              <span>${escapeHtml(row.name)}</span>
-              <strong class="import-status import-status--${statusTone(row.status)}">${escapeHtml(row.status)}</strong>
-              <small>${escapeHtml(row.detail || '')}</small>
-            </div>
-          `).join('')
-        : '<p class="muted">Selecione a pasta de notas para montar a lista.</p>';
+      mountCoCeoExcelGrid(optcNotesAnalysis, {
+        gridId: 'invest-conciliacao-notas-analisadas',
+        rows: noteRows.map((row, index) => ({
+          id: row.id,
+          index: index + 1,
+          name: row.name,
+          status: row.status,
+          detail: row.detail || '',
+          tone: statusTone(row.status),
+        })),
+        emptyText: 'Selecione a pasta de notas para montar a lista.',
+        summaryLabels: { total: 'Notas', selected: '' },
+        fixedLeadingColumns: 2,
+        coCeoColumns: [
+          { key: 'index', label: '#', type: 'number', align: 'right', width: '72px', sticky: true },
+          { key: 'name', label: 'Nota', type: 'text', width: '560px', sticky: true },
+          {
+            key: 'status',
+            label: 'Resultado',
+            type: 'text',
+            width: '160px',
+            render: (row) => {
+              const span = document.createElement('span');
+              span.className = `import-status import-status--${row.tone}`;
+              span.textContent = row.status || '';
+              return span;
+            },
+          },
+          { key: 'detail', label: 'Detalhe', type: 'text', width: '520px' },
+        ],
+      });
     }
   }
 
@@ -1103,9 +1153,10 @@ export async function InvestConciliacaoPage(container) {
   function refreshOptcStartButton() {
     const ready = optcNotesFiles.length > 0 && optcExtractFiles.length > 0;
     if (btnOptcStart) btnOptcStart.disabled = !ready;
+    if (btnOptcRunAll) btnOptcRunAll.disabled = !ready;
     if (ready && !optcRunId) {
       setProcessState('Pronto para preparar', 'ok');
-      if (optcStatus) optcStatus.textContent = 'Arquivos mínimos selecionados. Clique em Preparar homologação.';
+      if (optcStatus) optcStatus.textContent = 'Arquivos mínimos selecionados. Clique em Processar conciliação.';
     }
   }
 
@@ -1201,6 +1252,33 @@ export async function InvestConciliacaoPage(container) {
       if (btnOptcRunAll) btnOptcRunAll.disabled = true;
     }
     return data;
+  }
+
+  let optcActivityLogCount = 0;
+
+  async function pollOptcRunUntilDone() {
+    if (!optcRunId) return;
+    for (let guard = 0; guard < 720; guard += 1) {
+      const data = await apiRequest(`/api/invest/reconcile/option-c/status/${encodeURIComponent(optcRunId)}`);
+      optcState = data.state;
+      updateOptcProgress(optcState);
+      const lines = optcState?.activityLog || [];
+      for (const line of lines.slice(optcActivityLogCount)) {
+        appendLog(logEl, line);
+      }
+      optcActivityLogCount = lines.length;
+      if (optcStatus) {
+        optcStatus.textContent = `Run ${optcRunId} — fase ${optcState.phase} — ${optcState.dayIndex}/${optcState.calendar.length}`;
+      }
+      if (optcState.runStatus === 'error') {
+        throw new Error(optcState.runError || 'Processamento em segundo plano parou com erro.');
+      }
+      if (optcState.phase === 'done' || optcState.runStatus === 'done') {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    }
+    throw new Error('Tempo limite acompanhando processamento em segundo plano.');
   }
 
   btnPickOptcNotas?.addEventListener('click', async () => {
@@ -1413,12 +1491,16 @@ export async function InvestConciliacaoPage(container) {
           resetFirst: optcResetFirst?.checked === true,
           mode: 'homologation',
           delayMs: 0,
+          async: true,
         },
       });
       optcState = serverRun.state;
       optcRunId = optcState?.runId || optcRunId;
       optcSessionId = optcState?.sessionId || optcSessionId;
+      optcActivityLogCount = optcState?.activityLog?.length || 0;
       updateOptcProgress(optcState);
+      appendLog(logEl, `Processamento em segundo plano iniciado: ${optcRunId}`, 'ok');
+      await pollOptcRunUntilDone();
       setStage('done');
       if (optcState?.phase === 'done') {
         setProcessState('Finalizado', 'ok');

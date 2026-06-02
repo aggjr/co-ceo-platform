@@ -35,6 +35,8 @@ export type OptionCRunState = {
   extractPending: boolean;
   lastDay: string | null;
   activityLog: string[];
+  runStatus?: 'idle' | 'running' | 'done' | 'error';
+  runError?: string | null;
   schemaApplied?: boolean;
   homeBrokerImport?: HomeBrokerSnapshotUploadResult;
 };
@@ -181,6 +183,8 @@ export class OptionCDailyCloseOrchestrator {
         extractPending: true,
         lastDay: null,
         activityLog: [...(started.activityLog?.map((s) => s.message) ?? [])],
+        runStatus: 'idle',
+        runError: null,
         schemaApplied: started.schemaApplied,
         homeBrokerImport,
       },

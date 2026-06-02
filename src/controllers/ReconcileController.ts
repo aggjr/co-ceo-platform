@@ -292,6 +292,67 @@ export class ReconcileController {
         console.log(`[OptionC/run-all] org=${orgId} âncoras BTG gravadas`);
       }
 
+      if (req.body?.async === true) {
+        const started = await this.optionC.start(ctx, {
+          notesFiles,
+          extractFiles,
+          homeBrokerFiles,
+          resetFirst,
+          dataMode,
+          mode,
+        });
+        started.runStatus = 'running';
+        started.runError = null;
+        const runId = started.runId;
+        logReconcileEvent('info', 'api.option-c.run-all.accepted', orgId, {
+          runId,
+          calendarDays: started.calendar.length,
+        });
+
+        void (async () => {
+          try {
+            let iterations = 0;
+            const maxIterations = started.calendar.length + 10;
+            while (iterations < maxIterations) {
+              iterations += 1;
+              const current = this.optionC.getRun(runId);
+              if (!current || current.phase === 'done') break;
+              const result = await this.optionC.closeNextDay(ctx, runId);
+              const state = result.state;
+              state.runStatus = state.phase === 'done' ? 'done' : 'running';
+              if (state.lastDay) {
+                console.log(
+                  `[OptionC/run-all/bg] org=${orgId} runId=${runId} dia=${state.lastDay} ` +
+                    `(${state.dayIndex}/${state.calendar.length}) fase=${state.phase}`
+                );
+              }
+              if (result.status === 'blocked' && state.mode !== 'homologation') break;
+              if (result.status === 'done') break;
+              if (delayMs > 0 && result.status !== 'phase_complete') {
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+              }
+            }
+            const finalState = this.optionC.getRun(runId);
+            if (finalState) finalState.runStatus = finalState.phase === 'done' ? 'done' : 'running';
+          } catch (error) {
+            const current = this.optionC.getRun(runId);
+            const message = error instanceof Error ? error.message : String(error);
+            if (current) {
+              current.runStatus = 'error';
+              current.runError = message;
+            }
+            logReconcileFailure('option-c.run-all.background', orgId, error, { runId });
+          }
+        })();
+
+        return res.status(202).json({
+          success: true,
+          accepted: true,
+          message: 'Processamento iniciado em segundo plano. Acompanhe pelo status da execuÃ§Ã£o.',
+          state: started,
+        });
+      }
+
       const finalState = await this.optionC.runAll(
         ctx,
         { notesFiles, extractFiles, homeBrokerFiles, resetFirst, dataMode, mode, delayMs },

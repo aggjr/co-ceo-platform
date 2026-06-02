@@ -26,6 +26,7 @@ const optionMarketGlobalCtx: UserContext = {
 };
 
 const optionMarketRunCache = new Map<string, OptionMarketSyncReport>();
+const optionMarketUnderlyingCache = new Set<string>();
 
 function optionMarketCacheKey(ctx: UserContext, underlyings: string[]): string {
   const owner = ctx.organizationId ? `org:${ctx.organizationId}` : 'global';
@@ -89,8 +90,13 @@ export class OptionMarketSyncService {
     let inserted = 0;
     let updated = 0;
     const errors: OptionMarketSyncReport['errors'] = [];
+    const fetchedUnderlyings: string[] = [];
 
     for (const underlying of underlyings) {
+      const underlyingCacheKey = cacheKey ? optionMarketCacheKey(ctx, [underlying]) : null;
+      if (underlyingCacheKey && optionMarketUnderlyingCache.has(underlyingCacheKey)) {
+        continue;
+      }
       try {
         const expirations = await fetchOpcoesNetOptionsChainAll(underlying);
         const parsed = parseOpcoesNetExpirations(underlying, expirations, asOfDate);
@@ -98,6 +104,8 @@ export class OptionMarketSyncService {
         const result = await this.marketRepo.upsertMany(optionMarketGlobalCtx, parsed);
         inserted += result.inserted;
         updated += result.updated;
+        if (underlyingCacheKey) optionMarketUnderlyingCache.add(underlyingCacheKey);
+        fetchedUnderlyings.push(underlying);
       } catch (err) {
         errors.push({
           underlying,
@@ -107,7 +115,14 @@ export class OptionMarketSyncService {
       if (delayMs > 0) await sleep(delayMs);
     }
 
-    const report = { underlyings, rowsParsed, inserted, updated, errors, cacheHit: false };
+    const report = {
+      underlyings,
+      rowsParsed,
+      inserted,
+      updated,
+      errors,
+      cacheHit: fetchedUnderlyings.length === 0 && errors.length === 0,
+    };
     if (cacheKey && errors.length === 0) {
       optionMarketRunCache.set(cacheKey, report);
     }
