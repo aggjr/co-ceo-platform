@@ -55,6 +55,17 @@ function parseJsonField<T>(value: unknown): T | null {
   }
 }
 
+function toMysqlTimestamp(value: string | Date | null): string | null {
+  if (value == null) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isNaN(date.getTime())) {
+    return date.toISOString().slice(0, 19).replace('T', ' ');
+  }
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) return raw;
+  return raw.replace('T', ' ').replace(/\.\d{3}Z$/, '').replace(/Z$/, '');
+}
+
 function rowToSession(row: Record<string, unknown>): ReconciliationSessionRow {
   return {
     id: String(row.id),
@@ -129,7 +140,9 @@ export class ReconciliationSessionStore {
       payload.progress_by_day = JSON.stringify(patch.progress_by_day);
     }
     if (patch.file_index != null) payload.file_index = JSON.stringify(patch.file_index);
-    if (patch.completed_at !== undefined) payload.completed_at = patch.completed_at;
+    if (patch.completed_at !== undefined) {
+      payload.completed_at = toMysqlTimestamp(patch.completed_at);
+    }
 
     await this.gateway.update(ctx, 'invest_reconciliation_sessions', sessionId, payload);
     const row = await this.getById(ctx, sessionId);
