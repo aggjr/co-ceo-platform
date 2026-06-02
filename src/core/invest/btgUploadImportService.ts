@@ -28,6 +28,7 @@ import {
   type ParsedExtractForBatch,
 } from './btgExtractBatchReconcile';
 import type { LedgerEvent } from './CustodyEngine';
+import { logReconcileEvent, logReconcileFailure } from './reconcile/reconcileErrorDetail';
 
 const DEFAULT_OPENING_BALANCE = 58_758.79;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
@@ -385,6 +386,10 @@ export async function applyBtgExtractBatchUpload(
   totals: BtgImportApplyResult;
   blockedMessage?: string;
 }> {
+  const startedAt = Date.now();
+  logReconcileEvent('info', 'btg-extract.batch.start', ctx.organizationId ?? undefined, {
+    files: files.length,
+  });
   const preview = await previewBtgExtractBatchUpload(ctx, ledger, files);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -432,6 +437,13 @@ export async function applyBtgExtractBatchUpload(
       name: item.path,
       contentBase64: files.find((f) => f.name === item.path)!.contentBase64,
     }, { injectCashAdjustment });
+    if (!applied.importOk) {
+      logReconcileEvent('warn', 'btg-extract.file.error', ctx.organizationId ?? undefined, {
+        fileName: item.fileName,
+        month: base.month ?? base.preview?.firstDate?.slice(0, 7) ?? null,
+        error: applied.importError ?? applied.parseError ?? 'unknown',
+      });
+    }
 
     ledgerEvents = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
     const afterRecon = buildExtractReconcileFields(item, ledgerEvents, prevClosing);
@@ -468,6 +480,15 @@ export async function applyBtgExtractBatchUpload(
   });
 
   const reconcile = await ledger.reconcileCustody(ctx);
+  const importErrors = fileResults.filter((r) => r.importOk === false).length;
+  logReconcileEvent(importErrors ? 'warn' : 'info', 'btg-extract.batch.done', ctx.organizationId ?? undefined, {
+    files: fileResults.length,
+    importErrors,
+    inserted: totalInserted,
+    skipped: totalSkipped,
+    chainOk: batchChainIntact(fileResults),
+    durationMs: Date.now() - startedAt,
+  });
 
   return {
     fileResults,
@@ -561,6 +582,12 @@ export async function applyBtgExtractUpload(
       preview: previewResult.preview,
     };
   } catch (e) {
+    logReconcileFailure('btg-extract.file.apply', ctx.organizationId ?? undefined, e, {
+      fileName: previewResult.fileName,
+      firstDate: previewResult.preview.firstDate,
+      lastDate: previewResult.preview.lastDate,
+      entryCount: previewResult.preview.entryCount,
+    });
     return {
       ...previewResult,
       importOk: false,

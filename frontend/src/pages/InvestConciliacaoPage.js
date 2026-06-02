@@ -45,6 +45,16 @@ function appendLog(logEl, message, type = '') {
   logEl.scrollTop = logEl.scrollHeight;
 }
 
+function logOptcBrowser(level, event, detail = {}) {
+  const payload = {
+    ts: new Date().toISOString(),
+    event,
+    ...detail,
+  };
+  const method = level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'info';
+  console[method]('[invest:reconcile:ui]', payload);
+}
+
 /* ─────────────────────────── step cards ─────────────────────────── */
 
 function setStepState(container, stepId, state, detail) {
@@ -1108,6 +1118,14 @@ export async function InvestConciliacaoPage(container) {
       body: { runId: optcRunId },
     });
     optcState = data.state;
+    logOptcBrowser('info', 'option-c.next-day.response', {
+      runId: optcRunId,
+      status: data.status,
+      phase: optcState?.phase,
+      day: data.day || null,
+      dayIndex: optcState?.dayIndex,
+      calendarDays: optcState?.calendar?.length,
+    });
     updateOptcProgress(optcState);
     for (const line of optcState?.activityLog?.slice(-5) || []) {
       appendLog(logEl, line);
@@ -1146,6 +1164,11 @@ export async function InvestConciliacaoPage(container) {
     try {
       const result = await pickPdfFilesFromFolder();
       optcNotesFiles = result.files;
+      logOptcBrowser('info', 'files.notes.selected', {
+        count: optcNotesFiles.length,
+        folderPath: result.folderPath || null,
+        fileNames: optcNotesFiles.map((file) => fileDisplayName(file.name)),
+      });
       if (inputOptcNotas) inputOptcNotas.value = result.folderPath || 'Pasta selecionada';
       if (labelOptcNotas) labelOptcNotas.textContent = result.fileCountLabel;
       upsertFileRows('Nota', optcNotesFiles, 'Aguardando análise', 'Será analisada ao preparar a homologação.');
@@ -1160,6 +1183,11 @@ export async function InvestConciliacaoPage(container) {
     try {
       const result = await pickExtractFilesFromFolder();
       optcExtractFiles = result.files;
+      logOptcBrowser('info', 'files.extracts.selected', {
+        count: optcExtractFiles.length,
+        folderPath: result.folderPath || null,
+        fileNames: optcExtractFiles.map((file) => fileDisplayName(file.name)),
+      });
       if (inputOptcExtratos) inputOptcExtratos.value = result.folderPath || 'Pasta selecionada';
       if (labelOptcExtratos) labelOptcExtratos.textContent = result.fileCountLabel;
       upsertFileRows('Extrato', optcExtractFiles, 'Aguardando leitura', 'Será importado na fase financeira.');
@@ -1174,6 +1202,11 @@ export async function InvestConciliacaoPage(container) {
     try {
       const result = await pickHomeBrokerFilesFromFolder();
       optcHomeBrokerFiles = result.files;
+      logOptcBrowser('info', 'files.homebroker.selected', {
+        count: optcHomeBrokerFiles.length,
+        folderPath: result.folderPath || null,
+        fileNames: optcHomeBrokerFiles.map((file) => fileDisplayName(file.name)),
+      });
       if (inputOptcHomeBroker) inputOptcHomeBroker.value = result.folderPath || 'Pasta selecionada';
       if (labelOptcHomeBroker) labelOptcHomeBroker.textContent = result.fileCountLabel;
       upsertFileRows('Home broker', optcHomeBrokerFiles, 'Aguardando leitura', 'Opcional para âncoras e snapshots.');
@@ -1221,6 +1254,12 @@ export async function InvestConciliacaoPage(container) {
 
   btnOptcStart?.addEventListener('click', async () => {
     if (!optcNotesFiles.length || !optcExtractFiles.length) return;
+    logOptcBrowser('info', 'option-c.start.request', {
+      notesFiles: optcNotesFiles.length,
+      extractFiles: optcExtractFiles.length,
+      homeBrokerFiles: optcHomeBrokerFiles.length,
+      resetFirst: optcResetFirst?.checked === true,
+    });
     btnOptcStart.disabled = true;
     setStage('start');
     setProcessState('Preparando', 'idle');
@@ -1243,6 +1282,13 @@ export async function InvestConciliacaoPage(container) {
       optcRunId = data.state.runId;
       optcState = data.state;
       optcSessionId = data.state.sessionId;
+      logOptcBrowser('info', 'option-c.start.response', {
+        runId: optcRunId,
+        sessionId: optcSessionId,
+        calendarDays: optcState.calendar.length,
+        phase: optcState.phase,
+        homeBrokerWarnings: optcState.homeBrokerImport?.warnings?.length ?? 0,
+      });
       updateOptcProgress(optcState);
       if (btnOptcNextDay) btnOptcNextDay.disabled = false;
       if (btnOptcRunAll) btnOptcRunAll.disabled = false;
@@ -1304,6 +1350,12 @@ export async function InvestConciliacaoPage(container) {
   btnOptcRunAll?.addEventListener('click', async () => {
     btnOptcRunAll.disabled = true;
     if (btnOptcNextDay) btnOptcNextDay.disabled = true;
+    logOptcBrowser('info', 'option-c.run-all.start', {
+      runId: optcRunId,
+      phase: optcState?.phase,
+      dayIndex: optcState?.dayIndex,
+      calendarDays: optcState?.calendar?.length,
+    });
     setStage('run');
     setProcessState('Processando', 'idle');
     setFileRowsStatus('Extrato', 'Importando', 'Lendo financeiro e conciliando liquidações.');
@@ -1316,12 +1368,22 @@ export async function InvestConciliacaoPage(container) {
           setProcessState('Finalizado', 'ok');
           setFileRowsStatus('Extrato', 'Lido/importado', 'Processo finalizado.');
           setFileRowsStatus('Nota', 'Analisada', 'Processo finalizado.');
+          logOptcBrowser('info', 'option-c.run-all.done', {
+            runId: optcRunId,
+            phase: optcState?.phase,
+            dayIndex: optcState?.dayIndex,
+          });
           break;
         }
         if (data.status === 'blocked') {
           setStage('done');
           setProcessState('Parou', 'err');
           setFileRowsStatus('Extrato', 'Parou', `Parada operacional em ${data.day || '?'}.`);
+          logOptcBrowser('warn', 'option-c.run-all.blocked', {
+            runId: optcRunId,
+            day: data.day || null,
+            phase: optcState?.phase,
+          });
           appendLog(logEl, `⚠️ Parada operacional em ${data.day || '?'}: verifique o log da API.`, 'warn');
           break;
         }
@@ -1331,6 +1393,11 @@ export async function InvestConciliacaoPage(container) {
       setStage('done');
       setProcessState('Parou com erro', 'err');
       setFileRowsStatus('Extrato', 'Erro', err.message);
+      logOptcBrowser('error', 'option-c.run-all.error', {
+        runId: optcRunId,
+        message: err.message,
+        apiError: err?.body?.errorDetail || null,
+      });
       appendLog(logEl, `❌ Opção C run-all: ${err.message}`, 'err');
     } finally {
       if (optcState?.phase !== 'done' && optcState?.phase !== 'extracts') {

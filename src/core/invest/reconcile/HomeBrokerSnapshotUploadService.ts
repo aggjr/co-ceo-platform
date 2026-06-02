@@ -6,6 +6,7 @@ import { BrokerCustodySnapshotRepository } from '../BrokerCustodySnapshotReposit
 import { parseBrokerCustodySnapshotJson } from '../brokerCustodySnapshotImport';
 import { PatrimonyMonthlyAnchorsSeedService } from '../PatrimonyMonthlyAnchorsSeedService';
 import type { PatrimonyAnchorFile } from '../patrimonyAnchors';
+import { logReconcileEvent } from './reconcileErrorDetail';
 
 export type HomeBrokerSnapshotUploadResult = {
   filesTotal: number;
@@ -63,16 +64,29 @@ export class HomeBrokerSnapshotUploadService {
       appliedDates: [],
     };
 
+    logReconcileEvent('info', 'homebroker.upload.start', ctx.organizationId, {
+      files: result.filesTotal,
+    });
+
     for (const file of files ?? []) {
       try {
         const raw = decodeJsonFile(file);
         if (looksLikeAnchorFile(raw)) {
           const seeded = await this.anchors.seedFromFile(ctx, raw);
           result.anchorsUpserted += seeded.upserted;
+          logReconcileEvent('info', 'homebroker.file.anchor', ctx.organizationId, {
+            fileName: file.name,
+            upserted: seeded.upserted,
+          });
           continue;
         }
 
         const input = parseBrokerCustodySnapshotJson(raw);
+        logReconcileEvent('info', 'homebroker.file.snapshot', ctx.organizationId, {
+          fileName: file.name,
+          referenceDate: input.referenceDate,
+          positions: input.positions.length,
+        });
         await this.snapshots.upsertFromInput(ctx, input);
         result.snapshotsImported += 1;
 
@@ -91,8 +105,20 @@ export class HomeBrokerSnapshotUploadService {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         result.warnings.push(`${file.name}: ${msg}`);
+        logReconcileEvent('warn', 'homebroker.file.warning', ctx.organizationId, {
+          fileName: file.name,
+          message: msg,
+        });
       }
     }
+
+    logReconcileEvent(result.warnings.length ? 'warn' : 'info', 'homebroker.upload.done', ctx.organizationId, {
+      files: result.filesTotal,
+      snapshotsImported: result.snapshotsImported,
+      snapshotsApplied: result.snapshotsApplied,
+      anchorsUpserted: result.anchorsUpserted,
+      warnings: result.warnings.length,
+    });
 
     return result;
   }

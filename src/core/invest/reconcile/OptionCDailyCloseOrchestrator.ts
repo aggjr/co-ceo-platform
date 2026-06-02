@@ -13,6 +13,7 @@ import {
   HomeBrokerSnapshotUploadService,
   type HomeBrokerSnapshotUploadResult,
 } from './HomeBrokerSnapshotUploadService';
+import { logReconcileEvent, logReconcileFailure } from './reconcileErrorDetail';
 import type { ReconcileDecision } from './auditTypes';
 import type { LedgerImportLine } from '../ledgerTypes';
 
@@ -53,7 +54,14 @@ function newRunId(orgId: string): string {
 
 function logStep(rt: OptionCRuntime, message: string): void {
   rt.state.activityLog.push(message);
-  console.log(`[OptionC] org=${rt.state.organizationId} ${message}`);
+  logReconcileEvent('info', 'option-c.step', rt.state.organizationId, {
+    runId: rt.state.runId,
+    phase: rt.state.phase,
+    dayIndex: rt.state.dayIndex,
+    calendarDays: rt.state.calendar.length,
+    lastDay: rt.state.lastDay,
+    message,
+  });
 }
 
 /**
@@ -107,11 +115,19 @@ export class OptionCDailyCloseOrchestrator {
     const mode = input.mode ?? 'homologation';
 
     if (input.resetFirst && this.holdingPurge) {
+      logReconcileEvent('info', 'option-c.reset.start', ctx.organizationId, {
+        mode,
+        notesFiles: input.notesFiles.length,
+        extractFiles: input.extractFiles.length,
+        homeBrokerFiles: input.homeBrokerFiles?.length ?? 0,
+      });
       console.log(`[OptionC] org=${ctx.organizationId} reset (purge) antes da sessão de notas…`);
       try {
         await this.holdingPurge.purgeKeepOpening(ctx);
+        logReconcileEvent('info', 'option-c.reset.done', ctx.organizationId, { mode });
         console.log(`[OptionC] org=${ctx.organizationId} reset concluído — abertura preservada.`);
       } catch (err) {
+        logReconcileFailure('option-c.reset', ctx.organizationId, err, { mode });
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[OptionC] org=${ctx.organizationId} FALHA no reset: ${msg}`);
         throw err;
@@ -256,6 +272,15 @@ export class OptionCDailyCloseOrchestrator {
       if (!rt || rt.state.phase === 'done') break;
 
       const result = await this.closeNextDay(ctx, runId);
+      logReconcileEvent('info', 'option-c.run-all.iteration', ctx.organizationId ?? undefined, {
+        runId,
+        iteration: iterations,
+        status: result.status,
+        phase: result.state.phase,
+        day: result.day ?? null,
+        dayIndex: result.state.dayIndex,
+        calendarDays: result.state.calendar.length,
+      });
       onProgress?.(result.state);
 
       if (result.status === 'blocked' && rt.state.mode !== 'homologation') {
@@ -364,6 +389,15 @@ export class OptionCDailyCloseOrchestrator {
     const applied = await applyBtgExtractBatchUpload(ctx, this.ledger, rt.extractFiles);
     const fileResults = applied.fileResults ?? [];
     const importErrors = fileResults.filter((f: { importOk?: boolean }) => f.importOk === false).length;
+    logReconcileEvent(importErrors ? 'warn' : 'info', 'option-c.extracts.done', rt.state.organizationId, {
+      runId: rt.state.runId,
+      files: fileResults.length,
+      importErrors,
+      inserted: applied.totals?.inserted ?? 0,
+      skipped: applied.totals?.skipped ?? 0,
+      chainOk: applied.chainOk,
+      blockedMessage: applied.blockedMessage ?? null,
+    });
 
     if (importErrors > 0) {
       logStep(rt, `⚠️ ${importErrors} extrato(s) com erro — divergência registrada.`);

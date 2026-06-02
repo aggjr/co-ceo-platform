@@ -9,7 +9,7 @@ import { DailyCloseMaterializeService } from '../core/invest/reconcile/DailyClos
 import { OptionCDailyCloseOrchestrator } from '../core/invest/reconcile/OptionCDailyCloseOrchestrator';
 import { PatrimonyMonthlyAnchorsSeedService } from '../core/invest/PatrimonyMonthlyAnchorsSeedService';
 import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
-import { logReconcileFailure } from '../core/invest/reconcile/reconcileErrorDetail';
+import { logReconcileEvent, logReconcileFailure } from '../core/invest/reconcile/reconcileErrorDetail';
 
 export class ReconcileController {
   private readonly holdingPurge: HoldingPurgeKeepOpeningService;
@@ -149,6 +149,13 @@ export class ReconcileController {
       console.log(
         `[OptionC] start org=${orgId} mode=${mode} resetFirst=${resetFirst} notas=${notesFiles.length} extratos=${extractFiles.length} homeBroker=${homeBrokerFiles.length}`
       );
+      logReconcileEvent('info', 'api.option-c.start.request', orgId, {
+        mode,
+        resetFirst,
+        notesFiles: notesFiles.length,
+        extractFiles: extractFiles.length,
+        homeBrokerFiles: homeBrokerFiles.length,
+      });
 
       const existingAnchors = await this.anchorsRepo.loadForOrganization(ctx);
       let anchorsSeeded = false;
@@ -165,6 +172,13 @@ export class ReconcileController {
         resetFirst,
         dataMode,
         mode,
+      });
+      logReconcileEvent('info', 'api.option-c.start.response', orgId, {
+        runId: state.runId,
+        sessionId: state.sessionId,
+        calendarDays: state.calendar.length,
+        homeBrokerWarnings: state.homeBrokerImport?.warnings.length ?? 0,
+        schemaApplied: state.schemaApplied === true,
       });
       console.log(
         `[OptionC] org=${orgId} iniciado runId=${state.runId} pregões=${state.calendar.length}`
@@ -203,7 +217,18 @@ export class ReconcileController {
       if (!runId) {
         return res.status(400).json({ success: false, error: 'runId obrigatório.' });
       }
+      logReconcileEvent('info', 'api.option-c.next-day.request', ctx.organizationId ?? undefined, {
+        runId,
+      });
       const result = await this.optionC.closeNextDay(ctx, runId);
+      logReconcileEvent('info', 'api.option-c.next-day.response', ctx.organizationId ?? undefined, {
+        runId,
+        status: result.status,
+        phase: result.state.phase,
+        day: result.day ?? null,
+        dayIndex: result.state.dayIndex,
+        calendarDays: result.state.calendar.length,
+      });
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
       const detail = logReconcileFailure('option-c.next-day', ctx.organizationId ?? undefined, error, {
@@ -252,6 +277,14 @@ export class ReconcileController {
       console.log(
         `[OptionC/run-all] org=${orgId} mode=${mode} notas=${notesFiles.length} extratos=${extractFiles.length} homeBroker=${homeBrokerFiles.length} delay=${delayMs}ms`
       );
+      logReconcileEvent('info', 'api.option-c.run-all.request', orgId, {
+        mode,
+        resetFirst,
+        notesFiles: notesFiles.length,
+        extractFiles: extractFiles.length,
+        homeBrokerFiles: homeBrokerFiles.length,
+        delayMs,
+      });
 
       const existingAnchors = await this.anchorsRepo.loadForOrganization(ctx);
       if (existingAnchors.month_ends.length === 0 && this.anchorSeed.resolveReference(ctx)) {
@@ -273,6 +306,14 @@ export class ReconcileController {
       );
 
       const blocked = finalState.phase !== 'done';
+      logReconcileEvent(blocked ? 'warn' : 'info', 'api.option-c.run-all.response', orgId, {
+        runId: finalState.runId,
+        phase: finalState.phase,
+        dayIndex: finalState.dayIndex,
+        calendarDays: finalState.calendar.length,
+        lastDay: finalState.lastDay,
+        blocked,
+      });
       return res.json({
         success: mode === 'homologation' ? true : !blocked,
         message: blocked

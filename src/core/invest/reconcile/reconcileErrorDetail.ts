@@ -10,12 +10,37 @@ export type ReconcileErrorDetail = {
   context?: Record<string, unknown>;
 };
 
+type ReconcileLogLevel = 'info' | 'warn';
+
 type MysqlLikeError = {
   code?: string;
   errno?: number;
   sqlMessage?: string;
   sqlState?: string;
 };
+
+function safeJson(value: Record<string, unknown> | undefined): string {
+  if (!value || !Object.keys(value).length) return '{}';
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '{"log":"unserializable"}';
+  }
+}
+
+export function logReconcileEvent(
+  level: ReconcileLogLevel,
+  scope: string,
+  orgId: string | undefined,
+  context?: Record<string, unknown>
+): void {
+  const line = `[invest:reconcile] org=${orgId ?? '-'} scope=${scope} ctx=${safeJson(context)}`;
+  if (level === 'warn') {
+    console.warn(line);
+  } else {
+    console.info(line);
+  }
+}
 
 export function formatReconcileError(
   error: unknown,
@@ -58,7 +83,7 @@ export function logReconcileFailure(
     detail.code ? `code=${detail.code}` : '',
     detail.errno != null ? `errno=${detail.errno}` : '',
     detail.sqlMessage ? `sqlMessage=${detail.sqlMessage}` : '',
-    context && Object.keys(context).length ? `ctx=${JSON.stringify(context)}` : '',
+    context && Object.keys(context).length ? `ctx=${safeJson(context)}` : '',
   ].filter(Boolean);
 
   console.error(`[invest:reconcile] org=${orgId ?? '—'} FALHA ${parts.join(' | ')}`);

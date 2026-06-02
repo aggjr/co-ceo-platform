@@ -11,7 +11,7 @@ import { MarketQuoteRepository } from '../../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../../modules/invest/sync/InvestAssetProjection';
 import type { SecurePayload } from '../../dal/types';
 import { inferAssetType } from '../assetClassifier';
-import { logReconcileFailure } from './reconcileErrorDetail';
+import { logReconcileEvent, logReconcileFailure } from './reconcileErrorDetail';
 
 export type QuoteSyncDayReport = {
   date: string;
@@ -63,6 +63,9 @@ export class DailyCloseMaterializeService {
   async syncQuotesForDate(ctx: UserContext, date: string): Promise<QuoteSyncDayReport> {
     const day = date.slice(0, 10);
     const warnings: string[] = [];
+    logReconcileEvent('info', 'daily-close.quotes.start', ctx.organizationId ?? undefined, {
+      date: day,
+    });
 
     if (isWeekend(day)) {
       warnings.push(`${day} é fim de semana — cotações de pregão podem repetir último dia útil.`);
@@ -70,6 +73,14 @@ export class DailyCloseMaterializeService {
 
     const stockResult = await this.quoteSync.syncFromBrapi(ctx, day);
     const optionReport = await this.optionMarket.syncFromOpcoesNet(ctx, { asOfDate: day });
+    logReconcileEvent('info', 'daily-close.quotes.done', ctx.organizationId ?? undefined, {
+      date: day,
+      stocksRequested: stockResult.requested,
+      stocksSaved: stockResult.updated,
+      stocksMissing: stockResult.missing.length,
+      optionsSynced: optionReport.inserted + optionReport.updated,
+      optionErrors: optionReport.errors.length,
+    });
 
     if (stockResult.missing.length) {
       warnings.push(
@@ -97,6 +108,10 @@ export class DailyCloseMaterializeService {
 
   async materializeDay(ctx: UserContext, date: string): Promise<MaterializeDayReport> {
     const day = date.slice(0, 10);
+    const startedAt = Date.now();
+    logReconcileEvent('info', 'daily-close.materialize.start', ctx.organizationId ?? undefined, {
+      date: day,
+    });
     const quoteSync = await this.syncQuotesForDate(ctx, day);
 
     await this.store.invalidateFromDate(ctx, day);
@@ -115,6 +130,15 @@ export class DailyCloseMaterializeService {
 
     const custody = await this.ledger.reconcileCustody(ctx);
     const { positionsUpdated, positionsZeroed } = await this.recalcThreePrices(ctx, day);
+    logReconcileEvent('info', 'daily-close.materialize.done', ctx.organizationId ?? undefined, {
+      date: day,
+      durationMs: Date.now() - startedAt,
+      patrimonyRecorded,
+      economicPatrimony,
+      positionsUpdated,
+      positionsZeroed,
+      warnings: quoteSync.warnings.length,
+    });
 
     return {
       date: day,
