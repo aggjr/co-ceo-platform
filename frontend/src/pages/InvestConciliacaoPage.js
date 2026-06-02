@@ -1,9 +1,11 @@
 import '../styles/invest-conciliacao.css';
 import '../styles/invest-conciliacao-modal.css';
+import '../styles/coceo-excel-table.css';
 import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
 import { isAuthenticated, isGlobalSession } from '../auth/session.js';
+import { mountCoCeoExcelGrid } from '../lib/coCeoExcelGrid.js';
 import {
   pickPdfFilesFromFolder,
   pickExtractFilesFromFolder,
@@ -473,7 +475,9 @@ export async function InvestConciliacaoPage(container) {
         <span id="optc-files-summary" class="conciliacao-state-badge conciliacao-state-badge--idle">Nenhum arquivo selecionado</span>
       </div>
       <div class="conciliacao-excel-wrap">
-        <table class="conciliacao-excel-table">
+        <div id="optc-files-table-host" class="portfolio-excel-section"></div>
+        <!-- Tabela manual antiga substituída pelo ExcelTable oficial CO-CEO. -->
+        <table class="conciliacao-excel-table" hidden>
           <thead>
             <tr>
               <th>#</th>
@@ -911,6 +915,7 @@ export async function InvestConciliacaoPage(container) {
   const optcProgressLabel = container.querySelector('#optc-progress-label');
   const optcProgressBar = container.querySelector('#optc-progress-bar');
   const optcResetFirst = container.querySelector('#optc-reset-first');
+  const optcFilesTableHost = container.querySelector('#optc-files-table-host');
   const optcFilesTableBody = container.querySelector('#optc-files-table-body');
   const optcFilesSummary = container.querySelector('#optc-files-summary');
   const optcNotesAnalysis = container.querySelector('#optc-notes-analysis');
@@ -1014,6 +1019,42 @@ export async function InvestConciliacaoPage(container) {
   }
 
   function renderOptcFileTables() {
+    if (optcFilesTableHost) {
+      const rows = optcFileRows.map((row, index) => ({
+        id: row.id,
+        index: index + 1,
+        kind: row.kind,
+        name: row.name,
+        status: row.status,
+        detail: row.detail || '',
+        tone: statusTone(row.status),
+      }));
+      mountCoCeoExcelGrid(optcFilesTableHost, {
+        gridId: 'invest-conciliacao-arquivos-lidos',
+        rows,
+        emptyText: 'Aguardando seleção das pastas.',
+        summaryLabels: { total: 'Arquivos', selected: '' },
+        fixedLeadingColumns: 2,
+        coCeoColumns: [
+          { key: 'index', label: '#', type: 'number', align: 'right', width: '72px', sticky: true },
+          { key: 'kind', label: 'Tipo', type: 'text', width: '140px', sticky: true },
+          { key: 'name', label: 'Arquivo', type: 'text', width: '520px' },
+          {
+            key: 'status',
+            label: 'Resultado',
+            type: 'text',
+            width: '170px',
+            render: (row) => {
+              const span = document.createElement('span');
+              span.className = `import-status import-status--${row.tone}`;
+              span.textContent = row.status || '';
+              return span;
+            },
+          },
+          { key: 'detail', label: 'Detalhe', type: 'text', width: '520px' },
+        ],
+      });
+    }
     if (optcFilesTableBody) {
       if (!optcFileRows.length) {
         optcFilesTableBody.innerHTML =
@@ -1056,6 +1097,8 @@ export async function InvestConciliacaoPage(container) {
         : '<p class="muted">Selecione a pasta de notas para montar a lista.</p>';
     }
   }
+
+  renderOptcFileTables();
 
   function refreshOptcStartButton() {
     const ready = optcNotesFiles.length > 0 && optcExtractFiles.length > 0;
@@ -1361,6 +1404,50 @@ export async function InvestConciliacaoPage(container) {
     setFileRowsStatus('Extrato', 'Importando', 'Lendo financeiro e conciliando liquidações.');
     appendLog(logEl, '─── Opção C: fechamento automático (calmo) ───', 'section');
     try {
+      const serverRun = await apiRequest('/api/invest/reconcile/option-c/run-all', {
+        method: 'POST',
+        body: {
+          notesFiles: optcNotesFiles,
+          extractFiles: optcExtractFiles,
+          homeBrokerFiles: optcHomeBrokerFiles,
+          resetFirst: optcResetFirst?.checked === true,
+          mode: 'homologation',
+          delayMs: 0,
+        },
+      });
+      optcState = serverRun.state;
+      optcRunId = optcState?.runId || optcRunId;
+      optcSessionId = optcState?.sessionId || optcSessionId;
+      updateOptcProgress(optcState);
+      setStage('done');
+      if (optcState?.phase === 'done') {
+        setProcessState('Finalizado', 'ok');
+        setFileRowsStatus('Extrato', 'Lido/importado', 'Processo finalizado.');
+        setFileRowsStatus('Nota', 'Analisada', 'Processo finalizado.');
+        setFileRowsStatus(
+          'Home broker',
+          optcHomeBrokerFiles.length ? 'Lido' : 'NÃ£o enviado',
+          optcHomeBrokerFiles.length ? 'Arquivo opcional processado.' : 'Sem arquivos opcionais.'
+        );
+        if (optcStatus) optcStatus.textContent = `Run ${optcRunId} finalizado.`;
+        appendLog(logEl, 'âœ… OpÃ§Ã£o C run-all concluÃ­da no servidor.', 'ok');
+        logOptcBrowser('info', 'option-c.run-all.done', {
+          runId: optcRunId,
+          phase: optcState?.phase,
+          dayIndex: optcState?.dayIndex,
+        });
+      } else {
+        setProcessState('Parou', 'err');
+        setFileRowsStatus('Extrato', 'Parou', serverRun.message || 'Processo pausado no servidor.');
+        appendLog(logEl, `âš ï¸ OpÃ§Ã£o C pausada: ${serverRun.message || 'verifique o log da API.'}`, 'warn');
+        logOptcBrowser('warn', 'option-c.run-all.blocked', {
+          runId: optcRunId,
+          phase: optcState?.phase,
+          dayIndex: optcState?.dayIndex,
+          message: serverRun.message || null,
+        });
+      }
+      return;
       for (let guard = 0; guard < 5000; guard += 1) {
         const data = await runOptcNextDay();
         if (!data || data.status === 'done') {
