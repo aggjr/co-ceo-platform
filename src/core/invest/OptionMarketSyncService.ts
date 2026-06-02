@@ -1,4 +1,5 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
+import { SYSTEM_INSTALLER_USER_ID } from '../dal/types';
 import { inferUnderlyingTicker, isOptionTicker } from './assetClassifier';
 import { fetchOpcoesNetOptionsChainAll } from './opcoesNetClient';
 import { parseOpcoesNetExpirations } from './opcoesNetChainParser';
@@ -16,6 +17,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const optionMarketGlobalCtx: UserContext = {
+  userId: SYSTEM_INSTALLER_USER_ID,
+  organizationId: null,
+  impersonatorId: null,
+  scope: 'global',
+};
+
 /**
  * Atualiza invest_options_market a partir do opcoes.net.br para ações-mãe
  * com opções em custódia em qualquer cliente.
@@ -29,7 +37,13 @@ export class OptionMarketSyncService {
 
   /** Custódia real em patrimony_items (não exige invest_position_ext). */
   async listUnderlyingsWithOptionsInUse(ctx: UserContext): Promise<string[]> {
-    const rows = await this.gateway.readQuery(ctx, 'invest_open_option_tickers', []);
+    const rows = ctx.organizationId
+      ? await this.gateway.readQuery(
+          optionMarketGlobalCtx,
+          'invest_open_option_tickers_for_org',
+          [ctx.organizationId]
+        )
+      : await this.gateway.readQuery(optionMarketGlobalCtx, 'invest_open_option_tickers', []);
     const underlyings = new Set<string>();
     for (const row of rows) {
       const ticker = String(row.ticker ?? '').toUpperCase();
@@ -61,7 +75,7 @@ export class OptionMarketSyncService {
         const expirations = await fetchOpcoesNetOptionsChainAll(underlying);
         const parsed = parseOpcoesNetExpirations(underlying, expirations, asOfDate);
         rowsParsed += parsed.length;
-        const result = await this.marketRepo.upsertMany(ctx, parsed);
+        const result = await this.marketRepo.upsertMany(optionMarketGlobalCtx, parsed);
         inserted += result.inserted;
         updated += result.updated;
       } catch (err) {
