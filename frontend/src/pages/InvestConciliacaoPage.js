@@ -435,6 +435,68 @@ export async function InvestConciliacaoPage(container) {
 
   await renderShell(container, { title: 'INVEST — Conciliação', contentHtml: content });
 
+  /*
+   * Visual atual de homologação:
+   * Os fluxos antigos continuam no template por enquanto, mas ficam ocultos via CSS:
+   * wizard manual, reset isolado, importação isolada, recálculo isolado e botões auxiliares.
+   * Este bloco injeta apenas os painéis que serão usados agora.
+   */
+  container.querySelector('#option-c-panel')?.insertAdjacentHTML('afterend', `
+    <div class="conciliacao-action-panel conciliacao-results-panel">
+      <div class="conciliacao-panel-heading">
+        <div>
+          <p class="conciliacao-kicker">Conferência</p>
+          <h2>Notas analisadas</h2>
+        </div>
+      </div>
+      <div id="optc-notes-analysis" class="conciliacao-notes-list">
+        <p class="muted">Selecione a pasta de notas para montar a lista.</p>
+      </div>
+    </div>
+
+    <div class="conciliacao-action-panel conciliacao-results-panel">
+      <div class="conciliacao-panel-heading">
+        <div>
+          <p class="conciliacao-kicker">Tabela tipo Excel</p>
+          <h2>Arquivos lidos no processo</h2>
+        </div>
+        <span id="optc-files-summary" class="conciliacao-state-badge conciliacao-state-badge--idle">Nenhum arquivo selecionado</span>
+      </div>
+      <div class="conciliacao-excel-wrap">
+        <table class="conciliacao-excel-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tipo</th>
+              <th>Arquivo</th>
+              <th>Resultado</th>
+              <th>Detalhe</th>
+            </tr>
+          </thead>
+          <tbody id="optc-files-table-body">
+            <tr><td colspan="5" class="muted">Aguardando seleção das pastas.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `);
+  container.querySelector('#option-c-panel h2')?.insertAdjacentHTML('afterend', `
+    <div class="conciliacao-stage-strip" aria-label="Etapas da homologação">
+      <div class="conciliacao-stage conciliacao-stage--active" data-optc-stage="files">
+        <span>1</span><strong>Arquivos</strong><small>notas e extratos</small>
+      </div>
+      <div class="conciliacao-stage" data-optc-stage="start">
+        <span>2</span><strong>Preparação</strong><small>reset e indexação</small>
+      </div>
+      <div class="conciliacao-stage" data-optc-stage="run">
+        <span>3</span><strong>Remontagem</strong><small>dia a dia</small>
+      </div>
+      <div class="conciliacao-stage" data-optc-stage="done">
+        <span>4</span><strong>Resultado</strong><small>finalizado ou parado</small>
+      </div>
+    </div>
+  `);
+
   /* ─── DOM refs ─── */
   const logEl = container.querySelector('#conciliacao-log');
   const btnReset = container.querySelector('#btn-reset');
@@ -839,6 +901,10 @@ export async function InvestConciliacaoPage(container) {
   const optcProgressLabel = container.querySelector('#optc-progress-label');
   const optcProgressBar = container.querySelector('#optc-progress-bar');
   const optcResetFirst = container.querySelector('#optc-reset-first');
+  const optcFilesTableBody = container.querySelector('#optc-files-table-body');
+  const optcFilesSummary = container.querySelector('#optc-files-summary');
+  const optcNotesAnalysis = container.querySelector('#optc-notes-analysis');
+  const optcProcessState = document.createElement('span');
 
   let optcNotesFiles = [];
   let optcExtractFiles = [];
@@ -846,10 +912,148 @@ export async function InvestConciliacaoPage(container) {
   let optcRunId = null;
   let optcState = null;
   let optcSessionId = null;
+  let optcFileRows = [];
+
+  const heroTitle = container.querySelector('.conciliacao-hero__title');
+  const heroSubtitle = container.querySelector('.conciliacao-hero__subtitle');
+  const optionTitle = container.querySelector('#option-c-panel h2');
+  if (heroTitle) heroTitle.textContent = 'Conciliação INVEST';
+  if (heroSubtitle) {
+    heroSubtitle.textContent =
+      'Fluxo de homologação: selecione as pastas, prepare a base e processe tudo. A tela mostra progresso, notas analisadas e arquivos lidos.';
+  }
+  if (optionTitle) optionTitle.textContent = 'Remontar carteira e patrimônio';
+
+  [
+    [btnPickOptcNotas, 'Selecionar notas'],
+    [btnPickOptcExtratos, 'Selecionar extratos'],
+    [btnPickOptcHomeBroker, 'Selecionar fechamentos'],
+  ].forEach(([button, label]) => {
+    if (!button) return;
+    button.textContent = label;
+    button.className = 'btn btn-file';
+  });
+  if (btnOptcStart) btnOptcStart.textContent = '1. Preparar homologação';
+  if (btnOptcStart) btnOptcStart.classList.add('btn-xl');
+  if (btnOptcRunAll) {
+    btnOptcRunAll.textContent = '2. Processar tudo';
+    btnOptcRunAll.classList.add('btn-xl', 'btn-xl--success');
+  }
+  if (optcStatus) {
+    optcStatus.classList.add('conciliacao-status-text');
+    optcStatus.textContent = 'Selecione notas e extratos para começar.';
+    optcStatus.parentElement?.prepend(optcProcessState);
+  }
+  optcProcessState.id = 'optc-process-state';
+  optcProcessState.className = 'conciliacao-state-badge conciliacao-state-badge--idle';
+  optcProcessState.textContent = 'Aguardando arquivos';
+
+  function fileDisplayName(path) {
+    return String(path || '')
+      .replace(/\\/g, '/')
+      .split('/')
+      .filter(Boolean)
+      .pop() || String(path || 'arquivo');
+  }
+
+  function setProcessState(label, tone = 'idle') {
+    optcProcessState.className = `conciliacao-state-badge conciliacao-state-badge--${tone}`;
+    optcProcessState.textContent = label;
+  }
+
+  function setStage(stage) {
+    container.querySelectorAll('[data-optc-stage]').forEach((el) => {
+      el.classList.toggle('conciliacao-stage--active', el.getAttribute('data-optc-stage') === stage);
+      el.classList.toggle('conciliacao-stage--done', false);
+    });
+    const order = ['files', 'start', 'run', 'done'];
+    const index = order.indexOf(stage);
+    order.slice(0, Math.max(index, 0)).forEach((doneStage) => {
+      container
+        .querySelector(`[data-optc-stage="${doneStage}"]`)
+        ?.classList.add('conciliacao-stage--done');
+    });
+  }
+
+  function upsertFileRows(kind, files, status, detail) {
+    optcFileRows = optcFileRows.filter((row) => row.kind !== kind);
+    optcFileRows.push(
+      ...files.map((file, index) => ({
+        id: `${kind}-${index}-${file.name}`,
+        kind,
+        name: fileDisplayName(file.name),
+        status,
+        detail,
+      }))
+    );
+    renderOptcFileTables();
+  }
+
+  function setFileRowsStatus(kind, status, detail) {
+    optcFileRows = optcFileRows.map((row) =>
+      row.kind === kind ? { ...row, status, detail } : row
+    );
+    renderOptcFileTables();
+  }
+
+  function statusTone(status) {
+    const s = String(status || '').toLowerCase();
+    if (s.includes('erro') || s.includes('parou')) return 'err';
+    if (s.includes('final') || s.includes('analis') || s.includes('lido') || s.includes('import')) return 'ok';
+    return 'pending';
+  }
+
+  function renderOptcFileTables() {
+    if (optcFilesTableBody) {
+      if (!optcFileRows.length) {
+        optcFilesTableBody.innerHTML =
+          '<tr><td colspan="5" class="muted">Aguardando seleção das pastas.</td></tr>';
+      } else {
+        optcFilesTableBody.innerHTML = optcFileRows
+          .map((row, index) => `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${escapeHtml(row.kind)}</td>
+              <td>${escapeHtml(row.name)}</td>
+              <td><span class="import-status import-status--${statusTone(row.status)}">${escapeHtml(row.status)}</span></td>
+              <td>${escapeHtml(row.detail || '')}</td>
+            </tr>
+          `)
+          .join('');
+      }
+    }
+
+    if (optcFilesSummary) {
+      const total = optcFileRows.length;
+      const ok = optcFileRows.filter((row) => statusTone(row.status) === 'ok').length;
+      const err = optcFileRows.filter((row) => statusTone(row.status) === 'err').length;
+      optcFilesSummary.className = `conciliacao-state-badge conciliacao-state-badge--${err ? 'err' : ok === total && total ? 'ok' : 'idle'}`;
+      optcFilesSummary.textContent = total
+        ? `${ok}/${total} concluído(s)${err ? `, ${err} com erro` : ''}`
+        : 'Nenhum arquivo selecionado';
+    }
+
+    if (optcNotesAnalysis) {
+      const noteRows = optcFileRows.filter((row) => row.kind === 'Nota');
+      optcNotesAnalysis.innerHTML = noteRows.length
+        ? noteRows.map((row) => `
+            <div class="conciliacao-note-row">
+              <span>${escapeHtml(row.name)}</span>
+              <strong class="import-status import-status--${statusTone(row.status)}">${escapeHtml(row.status)}</strong>
+              <small>${escapeHtml(row.detail || '')}</small>
+            </div>
+          `).join('')
+        : '<p class="muted">Selecione a pasta de notas para montar a lista.</p>';
+    }
+  }
 
   function refreshOptcStartButton() {
     const ready = optcNotesFiles.length > 0 && optcExtractFiles.length > 0;
     if (btnOptcStart) btnOptcStart.disabled = !ready;
+    if (ready && !optcRunId) {
+      setProcessState('Pronto para preparar', 'ok');
+      if (optcStatus) optcStatus.textContent = 'Arquivos mínimos selecionados. Clique em Preparar homologação.';
+    }
   }
 
   function updateOptcProgress(state) {
@@ -944,6 +1148,8 @@ export async function InvestConciliacaoPage(container) {
       optcNotesFiles = result.files;
       if (inputOptcNotas) inputOptcNotas.value = result.folderPath || 'Pasta selecionada';
       if (labelOptcNotas) labelOptcNotas.textContent = result.fileCountLabel;
+      upsertFileRows('Nota', optcNotesFiles, 'Aguardando análise', 'Será analisada ao preparar a homologação.');
+      setStage('files');
       refreshOptcStartButton();
     } catch (err) {
       appendLog(logEl, `⚠️ Opção C notas: ${err.message}`, 'warn');
@@ -956,6 +1162,8 @@ export async function InvestConciliacaoPage(container) {
       optcExtractFiles = result.files;
       if (inputOptcExtratos) inputOptcExtratos.value = result.folderPath || 'Pasta selecionada';
       if (labelOptcExtratos) labelOptcExtratos.textContent = result.fileCountLabel;
+      upsertFileRows('Extrato', optcExtractFiles, 'Aguardando leitura', 'Será importado na fase financeira.');
+      setStage('files');
       refreshOptcStartButton();
     } catch (err) {
       appendLog(logEl, `⚠️ Opção C extratos: ${err.message}`, 'warn');
@@ -968,6 +1176,7 @@ export async function InvestConciliacaoPage(container) {
       optcHomeBrokerFiles = result.files;
       if (inputOptcHomeBroker) inputOptcHomeBroker.value = result.folderPath || 'Pasta selecionada';
       if (labelOptcHomeBroker) labelOptcHomeBroker.textContent = result.fileCountLabel;
+      upsertFileRows('Home broker', optcHomeBrokerFiles, 'Aguardando leitura', 'Opcional para âncoras e snapshots.');
       appendLog(logEl, `📊 Home broker: ${optcHomeBrokerFiles.length} arquivo(s) JSON selecionado(s).`, 'ok');
     } catch (err) {
       appendLog(logEl, `⚠️ Opção C home broker: ${err.message}`, 'warn');
@@ -1013,6 +1222,11 @@ export async function InvestConciliacaoPage(container) {
   btnOptcStart?.addEventListener('click', async () => {
     if (!optcNotesFiles.length || !optcExtractFiles.length) return;
     btnOptcStart.disabled = true;
+    setStage('start');
+    setProcessState('Preparando', 'idle');
+    setFileRowsStatus('Nota', 'Analisando', 'Indexando notas e calendário.');
+    setFileRowsStatus('Extrato', 'Aguardando', 'Será lido após as notas.');
+    setFileRowsStatus('Home broker', 'Lendo', 'Aplicando snapshots ou âncoras, se houver.');
     if (optcStatus) optcStatus.textContent = 'Iniciando homologação…';
     appendLog(logEl, '─── Opção C: reset + home broker + indexação + calendário ───', 'section');
     try {
@@ -1032,6 +1246,14 @@ export async function InvestConciliacaoPage(container) {
       updateOptcProgress(optcState);
       if (btnOptcNextDay) btnOptcNextDay.disabled = false;
       if (btnOptcRunAll) btnOptcRunAll.disabled = false;
+      setFileRowsStatus('Nota', 'Analisada', `${optcState.calendar.length} pregão(ões) encontrado(s).`);
+      setFileRowsStatus('Extrato', 'Aguardando importação', 'Clique em Processar tudo para importar.');
+      setFileRowsStatus(
+        'Home broker',
+        optcHomeBrokerFiles.length ? 'Lido' : 'Não enviado',
+        optcHomeBrokerFiles.length ? 'Arquivo opcional processado.' : 'Sem arquivos opcionais.'
+      );
+      setProcessState('Pronto para processar', 'ok');
       if (optcStatus) optcStatus.textContent = `Run ${optcRunId} — ${optcState.calendar.length} pregão(ões)`;
       if (data.anchorsSeeded) {
         appendLog(logEl, '✅ Âncoras BTG homebroker gravadas automaticamente (tabela vazia).', 'ok');
@@ -1060,6 +1282,8 @@ export async function InvestConciliacaoPage(container) {
       setStepState(container, 'reset', 'done', '✅ Via Opção C');
     } catch (err) {
       const msg = formatReconcileApiError(err);
+      setProcessState('Parou na preparação', 'err');
+      setFileRowsStatus('Nota', 'Erro na análise', msg);
       appendLog(logEl, `❌ Opção C: ${msg}`, 'err');
       if (optcStatus) optcStatus.textContent = `❌ ${err.message || msg}`;
       btnOptcStart.disabled = false;
@@ -1079,19 +1303,34 @@ export async function InvestConciliacaoPage(container) {
 
   btnOptcRunAll?.addEventListener('click', async () => {
     btnOptcRunAll.disabled = true;
-    btnOptcNextDay.disabled = true;
+    if (btnOptcNextDay) btnOptcNextDay.disabled = true;
+    setStage('run');
+    setProcessState('Processando', 'idle');
+    setFileRowsStatus('Extrato', 'Importando', 'Lendo financeiro e conciliando liquidações.');
     appendLog(logEl, '─── Opção C: fechamento automático (calmo) ───', 'section');
     try {
       for (let guard = 0; guard < 5000; guard += 1) {
         const data = await runOptcNextDay();
-        if (!data || data.status === 'done') break;
+        if (!data || data.status === 'done') {
+          setStage('done');
+          setProcessState('Finalizado', 'ok');
+          setFileRowsStatus('Extrato', 'Lido/importado', 'Processo finalizado.');
+          setFileRowsStatus('Nota', 'Analisada', 'Processo finalizado.');
+          break;
+        }
         if (data.status === 'blocked') {
+          setStage('done');
+          setProcessState('Parou', 'err');
+          setFileRowsStatus('Extrato', 'Parou', `Parada operacional em ${data.day || '?'}.`);
           appendLog(logEl, `⚠️ Parada operacional em ${data.day || '?'}: verifique o log da API.`, 'warn');
           break;
         }
         await new Promise((r) => setTimeout(r, 1500));
       }
     } catch (err) {
+      setStage('done');
+      setProcessState('Parou com erro', 'err');
+      setFileRowsStatus('Extrato', 'Erro', err.message);
       appendLog(logEl, `❌ Opção C run-all: ${err.message}`, 'err');
     } finally {
       if (optcState?.phase !== 'done' && optcState?.phase !== 'extracts') {
