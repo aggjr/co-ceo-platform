@@ -221,7 +221,9 @@ export class LedgerEventProjection {
       const patFees = LedgerEventProjection.feesFromMetadata(meta);
       events.push({
         id: String(row.id),
+        business_event_id: row.business_event_id ? String(row.business_event_id) : null,
         transaction_date: date,
+        settlement_date: date,
         broker_note_ref: brokerNoteRef,
         notes: row.notes ? String(row.notes) : null,
         asset_id: itemId,
@@ -280,7 +282,11 @@ export class LedgerEventProjection {
       const cashFees = LedgerEventProjection.feesFromMetadata(meta);
       events.push({
         id: String(row.id),
+        business_event_id: row.business_event_id ? String(row.business_event_id) : null,
         transaction_date: date,
+        settlement_date: row.settlement_date
+          ? LedgerEventProjection.toIsoDate(row.settlement_date)
+          : date,
         broker_note_ref: brokerNoteRef,
         notes: row.description ? String(row.description) : null,
         asset_id: accId,

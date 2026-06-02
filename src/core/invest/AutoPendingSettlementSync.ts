@@ -29,13 +29,12 @@ export type AutoPendingSyncResult = {
 };
 
 /**
- * Gera `pending_settlement` (valor em trânsito) no livro-razão financeiro:
- * ação/FII D+2, prêmio de opção D+1, RF conforme calendário — conferir
- * extrato BTG na data prevista.
+ * Gera a perna financeira em transicao para operacoes D+n.
  *
- * Grava em financial_ledger_entries (status='pending' enquanto não liquida,
- * status='cleared' quando settle_date <= hoje). InvestOperations encapsula
- * a resolução da conta de caixa e da idempotência por broker_note_ref.
+ * No replay historico da conciliacao, a pendencia precisa existir no dia D e
+ * a baixa precisa existir no D+n, mesmo que ambos sejam datas passadas em
+ * relacao a hoje. Isso permite reconstruir o grafico diario de patrimonio e
+ * manter a ligacao entre ativo e financeiro pelo mesmo business_event_id.
  */
 export async function syncAutoPendingSettlements(
   _gateway: CoCeoDataGateway,
@@ -48,12 +47,15 @@ export async function syncAutoPendingSettlements(
 ): Promise<AutoPendingSyncResult> {
   const today = (options.today || new Date().toISOString().slice(0, 10)).slice(0, 10);
   const pendingByRef = new Map<string, number>();
+  const settlementRefs = new Set<string>();
 
   for (const e of events) {
     if (String(e.transaction_type) !== 'pending_settlement') continue;
-    const ref = String(e.broker_note_ref || '');
-    if (!ref.startsWith(AUTO_D2_REF_PREFIX)) continue;
-    pendingByRef.set(ref, (pendingByRef.get(ref) ?? 0) + Number(e.total_net_value ?? 0));
+    const rawRef = String(e.broker_note_ref || '');
+    if (!rawRef.startsWith(AUTO_D2_REF_PREFIX)) continue;
+    const baseRef = rawRef.endsWith(':CLEAR') ? rawRef.slice(0, -':CLEAR'.length) : rawRef;
+    settlementRefs.add(baseRef);
+    pendingByRef.set(baseRef, (pendingByRef.get(baseRef) ?? 0) + Number(e.total_net_value ?? 0));
   }
 
   let created = 0;
@@ -72,11 +74,13 @@ export async function syncAutoPendingSettlements(
     const txType = String(e.transaction_type);
     const settleOn = cashSettlementDate(tradeDate, assetType, txType, ticker);
     const net = Number(e.total_net_value ?? 0);
-    const open = pendingByRef.get(ref) ?? 0;
     const rule = cashSettlementRuleLabel(assetType, txType, ticker);
+    let open = pendingByRef.get(ref) ?? 0;
 
-    if (settleOn > today) {
-      if (Math.abs(open) < 0.01) {
+    if (!settlementRefs.has(ref)) {
+      if (Math.abs(net) < 0.01) {
+        skipped += 1;
+      } else {
         const result = await options.operations.recordOperation(ctx, {
           date: tradeDate,
           ticker: MAIN_CASH_TICKER,
@@ -86,20 +90,22 @@ export async function syncAutoPendingSettlements(
           total_net_value: net,
           settlement_date: settleOn,
           broker_note_ref: ref,
-          notes: `Valor em transito — ${rule} — liquidacao prevista ${settleOn} — ${ticker} (${txType})`,
+          business_event_id: e.business_event_id ?? undefined,
+          notes: `Valor em transito - ${rule} - liquidacao prevista ${settleOn} - ${ticker} (${txType})`,
           asset_type: 'cash',
         });
         if (!result.skipped) {
           pendingByRef.set(ref, net);
+          settlementRefs.add(ref);
+          open = net;
           created += 1;
         } else {
           skipped += 1;
         }
-      } else {
-        skipped += 1;
       }
-      continue;
     }
+
+    if (settleOn > today) continue;
 
     if (Math.abs(open) >= 0.01) {
       const result = await options.operations.recordOperation(ctx, {
@@ -111,7 +117,8 @@ export async function syncAutoPendingSettlements(
         total_net_value: -open,
         settlement_date: settleOn,
         broker_note_ref: `${ref}:CLEAR`,
-        notes: `Liquidacao na conta — ${rule} — ${ticker} (${settleOn})`,
+        business_event_id: e.business_event_id ?? undefined,
+        notes: `Liquidacao na conta - ${rule} - ${ticker} (${settleOn})`,
         asset_type: 'cash',
       });
       if (!result.skipped) {

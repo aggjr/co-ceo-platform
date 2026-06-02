@@ -233,6 +233,75 @@ function assignExtractRefs(entries: LedgerImportLine[]): LedgerImportLine[] {
   });
 }
 
+function isLiqBolsaLine(line: LedgerImportLine): boolean {
+  return /LIQ\s+BOLSA/i.test(String(line.notes || ''));
+}
+
+function signedCashValue(line: LedgerImportLine): number {
+  return Math.round(Number(line.total_net_value ?? 0) * 100) / 100;
+}
+
+function pendingSettlementCandidates(events: LedgerEvent[], date: string, net: number): LedgerEvent[] {
+  const expectedDate = date.slice(0, 10);
+  const expectedSign = Math.sign(net);
+  return events.filter((e) => {
+    if (String(e.transaction_type) !== 'pending_settlement') return false;
+    if (!e.business_event_id) return false;
+    const ref = String(e.broker_note_ref || '');
+    if (!ref.startsWith('AUTO-D2:') || ref.endsWith(':CLEAR')) return false;
+    const settleDate = String(e.settlement_date || e.transaction_date || '').slice(0, 10);
+    if (settleDate !== expectedDate) return false;
+    const value = Number(e.total_net_value ?? 0);
+    if (Math.sign(value) !== expectedSign) return false;
+    return Math.abs(value) >= 0.01;
+  });
+}
+
+function canRepresentAggregate(candidates: LedgerEvent[], net: number): boolean {
+  const total = candidates.reduce((sum, e) => sum + Number(e.total_net_value ?? 0), 0);
+  return Math.abs(Math.round((total - net) * 100) / 100) <= 0.02;
+}
+
+function expandLiqBolsaByBusinessEvent(
+  entries: LedgerImportLine[],
+  events: LedgerEvent[]
+): { entries: LedgerImportLine[]; expanded: number; keptAggregated: number } {
+  let expanded = 0;
+  let keptAggregated = 0;
+  const out: LedgerImportLine[] = [];
+
+  for (const line of entries) {
+    if (!isLiqBolsaLine(line)) {
+      out.push(line);
+      continue;
+    }
+
+    const net = signedCashValue(line);
+    const candidates = pendingSettlementCandidates(events, line.date, net);
+    if (!candidates.length || !canRepresentAggregate(candidates, net)) {
+      keptAggregated += 1;
+      out.push(line);
+      continue;
+    }
+
+    candidates.forEach((candidate, idx) => {
+      const candidateNet = Math.round(Number(candidate.total_net_value ?? 0) * 100) / 100;
+      out.push({
+        ...line,
+        operation: candidateNet >= 0 ? 'capital_deposit' : 'capital_withdrawal',
+        total_net_value: candidateNet,
+        broker_note_ref: `${line.broker_note_ref}:BE${String(idx + 1).padStart(2, '0')}`,
+        business_event_id: candidate.business_event_id ?? undefined,
+        settlement_date: String(candidate.settlement_date || line.date).slice(0, 10),
+        notes: `${line.notes || 'LIQ BOLSA'} - liquidacao vinculada ao evento ${candidate.business_event_id}`,
+      });
+      expanded += 1;
+    });
+  }
+
+  return { entries: out, expanded, keptAggregated };
+}
+
 function buildExtractPreview(
   file: BtgUploadFileInput,
   format: BtgExtractFileFormat,
@@ -552,7 +621,22 @@ export async function applyBtgExtractUpload(
   }
 
   try {
-    const entries = await parseExtractUploadImportLines(file, options?.parseOptions);
+    await ledger.reconcileCustody(ctx);
+    let entries = await parseExtractUploadImportLines(file, options?.parseOptions);
+    const ledgerEventsBeforeExtract = await ledger.listLedgerEvents(
+      ctx,
+      '2000-01-01',
+      new Date().toISOString().slice(0, 10)
+    );
+    const liqBolsaExpansion = expandLiqBolsaByBusinessEvent(entries, ledgerEventsBeforeExtract);
+    entries = liqBolsaExpansion.entries;
+    if (liqBolsaExpansion.expanded || liqBolsaExpansion.keptAggregated) {
+      logReconcileEvent('info', 'btg-extract.liq-bolsa.business-events', ctx.organizationId ?? undefined, {
+        fileName: previewResult.fileName,
+        expanded: liqBolsaExpansion.expanded,
+        keptAggregated: liqBolsaExpansion.keptAggregated,
+      });
+    }
 
     if (options?.injectCashAdjustment) {
       const adj = options.injectCashAdjustment;

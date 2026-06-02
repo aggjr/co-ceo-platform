@@ -42,7 +42,9 @@ function allowsNegativeBalance(assetType: string, ticker: string): boolean {
 
 export type LedgerEvent = {
   id?: string;
+  business_event_id?: string | null;
   transaction_date?: string;
+  settlement_date?: string | null;
   broker_note_ref?: string | null;
   notes?: string | null;
   asset_id: string;
