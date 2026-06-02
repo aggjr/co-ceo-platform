@@ -72,7 +72,10 @@ export class DailyCloseMaterializeService {
     }
 
     const stockResult = await this.quoteSync.syncFromBrapi(ctx, day);
-    const optionReport = await this.optionMarket.syncFromOpcoesNet(ctx, { asOfDate: day });
+    const optionReport = await this.optionMarket.syncFromOpcoesNet(ctx, {
+      asOfDate: day,
+      reuseSessionCache: true,
+    });
     logReconcileEvent('info', 'daily-close.quotes.done', ctx.organizationId ?? undefined, {
       date: day,
       stocksRequested: stockResult.requested,
@@ -80,6 +83,7 @@ export class DailyCloseMaterializeService {
       stocksMissing: stockResult.missing.length,
       optionsSynced: optionReport.inserted + optionReport.updated,
       optionErrors: optionReport.errors.length,
+      optionCacheHit: optionReport.cacheHit === true,
     });
 
     if (stockResult.missing.length) {

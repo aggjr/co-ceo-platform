@@ -11,6 +11,7 @@ export type OptionMarketSyncReport = {
   inserted: number;
   updated: number;
   errors: Array<{ underlying: string; message: string }>;
+  cacheHit?: boolean;
 };
 
 function sleep(ms: number): Promise<void> {
@@ -23,6 +24,13 @@ const optionMarketGlobalCtx: UserContext = {
   impersonatorId: null,
   scope: 'global',
 };
+
+const optionMarketRunCache = new Map<string, OptionMarketSyncReport>();
+
+function optionMarketCacheKey(ctx: UserContext, underlyings: string[]): string {
+  const owner = ctx.organizationId ? `org:${ctx.organizationId}` : 'global';
+  return `${owner}|${underlyings.join(',')}`;
+}
 
 /**
  * Atualiza invest_options_market a partir do opcoes.net.br para ações-mãe
@@ -55,7 +63,7 @@ export class OptionMarketSyncService {
 
   async syncFromOpcoesNet(
     ctx: UserContext,
-    options?: { underlyings?: string[]; asOfDate?: string; delayMs?: number }
+    options?: { underlyings?: string[]; asOfDate?: string; delayMs?: number; reuseSessionCache?: boolean }
   ): Promise<OptionMarketSyncReport> {
     const underlyings =
       options?.underlyings?.length
@@ -64,6 +72,18 @@ export class OptionMarketSyncService {
 
     const asOfDate = options?.asOfDate ?? new Date().toISOString().slice(0, 10);
     const delayMs = options?.delayMs ?? 400;
+    const cacheKey = options?.reuseSessionCache ? optionMarketCacheKey(ctx, underlyings) : null;
+    if (cacheKey) {
+      const cached = optionMarketRunCache.get(cacheKey);
+      if (cached) {
+        return {
+          ...cached,
+          inserted: 0,
+          updated: 0,
+          cacheHit: true,
+        };
+      }
+    }
 
     let rowsParsed = 0;
     let inserted = 0;
@@ -87,6 +107,10 @@ export class OptionMarketSyncService {
       if (delayMs > 0) await sleep(delayMs);
     }
 
-    return { underlyings, rowsParsed, inserted, updated, errors };
+    const report = { underlyings, rowsParsed, inserted, updated, errors, cacheHit: false };
+    if (cacheKey && errors.length === 0) {
+      optionMarketRunCache.set(cacheKey, report);
+    }
+    return report;
   }
 }
