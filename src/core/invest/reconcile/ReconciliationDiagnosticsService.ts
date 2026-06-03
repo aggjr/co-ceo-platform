@@ -83,8 +83,12 @@ function chooseCompareStatus(
   ledgerQty: number,
   brokerMarkQty: number,
   brokerTotalQty: number,
-  ticker: string
+  ticker: string,
+  hasSnapshot: boolean
 ): { status: 'ok' | 'warn' | 'error' | 'missing_broker'; basis: string; delta: number } {
+  if (!hasSnapshot) {
+    return { status: 'warn', basis: 'snapshot ausente', delta: 0 };
+  }
   if (brokerMarkQty === 0 && brokerTotalQty === 0) {
     return Math.abs(ledgerQty) <= toleranceForQty(ticker)
       ? { status: 'ok', basis: 'sem posicao broker', delta: 0 }
@@ -147,11 +151,26 @@ export class ReconciliationDiagnosticsService {
     const stored = await this.loadStoredPositions(ctx);
     const broker = this.aggregateBroker(latestSnapshot);
 
-    const assetRows = this.buildAssetRows(custody.assets, stored, broker, threePrices);
+    const assetRows = this.buildAssetRows(
+      custody.assets,
+      stored,
+      broker,
+      threePrices,
+      Boolean(latestSnapshot)
+    );
     const eventRows = this.buildBusinessEventRows(events);
     const cashRows = this.buildCashRows(events, latestSnapshot, asOf);
     const resetRows = await this.buildResetRows(ctx);
     const critical = this.buildCriticalFindings(assetRows, eventRows, cashRows, resetRows);
+    if (!latestSnapshot) {
+      critical.unshift({
+        id: 'snapshot-missing',
+        area: 'Home broker',
+        severity: 'error',
+        finding:
+          'Snapshot de custodia nao encontrado. Os JSON mensais de patrimonio servem como ancoras, mas nao conferem quantidade por ativo. Importe um JSON com referenceDate, composition e positions[].',
+      });
+    }
 
     return {
       success: true,
@@ -245,7 +264,8 @@ export class ReconciliationDiagnosticsService {
     ledgerAssets: ReturnType<typeof rebuildCustodyFromLedger>['assets'],
     stored: Map<string, StoredPosition>,
     broker: Map<string, BrokerQty>,
-    threePrices: ReturnType<typeof computeThreePricesByUnderlying>
+    threePrices: ReturnType<typeof computeThreePricesByUnderlying>,
+    hasSnapshot: boolean
   ) {
     const tickers = new Set<string>();
     for (const a of ledgerAssets) tickers.add(String(a.ticker).toUpperCase());
@@ -268,7 +288,13 @@ export class ReconciliationDiagnosticsService {
       const assetType = String(ledger?.assetType ?? st?.assetType ?? inferAssetType(ticker));
       const ledgerQty = round(Number(ledger?.quantity ?? 0));
       const storedQty = round(Number(st?.quantity ?? 0));
-      const compare = chooseCompareStatus(ledgerQty, round(br.markQty), round(br.totalQty), ticker);
+      const compare = chooseCompareStatus(
+        ledgerQty,
+        round(br.markQty),
+        round(br.totalQty),
+        ticker,
+        hasSnapshot
+      );
       const storedDelta = round(storedQty - ledgerQty);
       let status = compare.status;
       const notes: string[] = [];
@@ -276,7 +302,10 @@ export class ReconciliationDiagnosticsService {
         status = status === 'error' || status === 'missing_broker' ? status : 'warn';
         notes.push(`patrimony_items difere do livro (${storedDelta})`);
       }
-      if (compare.status !== 'ok') notes.push(`delta broker ${compare.basis}: ${compare.delta}`);
+      if (compare.status !== 'ok' && hasSnapshot) {
+        notes.push(`delta broker ${compare.basis}: ${compare.delta}`);
+      }
+      if (!hasSnapshot) notes.push('snapshot broker ausente; sem batimento contra corretora');
       if (!ledger && (Math.abs(br.totalQty) > 0 || Math.abs(storedQty) > 0)) {
         notes.push('sem posicao no livro projetado');
       }
