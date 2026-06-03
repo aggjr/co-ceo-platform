@@ -92,13 +92,17 @@ function parseQuoteRows(
         price = close;
         kind = 'close';
         asOf = asOfDate;
+      } else {
+        // Block falling back to the latest quote for a past date request
+        continue;
       }
-    }
-    if (price == null) {
-      const last = Number(row.regularMarketPrice);
-      if (Number.isFinite(last) && last > 0) {
-        price = last;
-        kind = 'last';
+    } else {
+      if (price == null) {
+        const last = Number(row.regularMarketPrice);
+        if (Number.isFinite(last) && last > 0) {
+          price = last;
+          kind = 'last';
+        }
       }
     }
     if (price == null) continue;
@@ -127,7 +131,7 @@ async function fetchBrapiBatch(
   const params = new URLSearchParams();
   if (options.token) params.set('token', options.token);
   if (options.needsHistory) {
-    params.set('range', '1mo');
+    params.set('range', '1y');
     params.set('interval', '1d');
   }
 

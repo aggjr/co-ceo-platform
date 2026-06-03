@@ -1,0 +1,170 @@
+<USER_REQUEST>
+{
+  "classe_ativo": "Renda Variável",
+  "participacao_carteira_percentual": 84.35,
+  "saldo_total": 1226537.58,
+  "resultado_12_meses": {
+    "valor": -221888.64,
+    "percentual": -15.12
+  },
+  "categoria": "Ações",
+  "quantidade_produtos": 4,
+  "ativos": [
+    {
+      "ticker": "BBAS3",
+      "empresa": "Banco do Brasil",
+      "quantidade": 6000,
+      "preco_medio": 21.03,
+      "proventos_posicao": 720.44,
+      "preco_mercado": 20.08,
+      "resultado_com_proventos_percentual": -3.93,
+      "saldo_bruto": 120480.00
+    },
+    {
+      "ticker": "ITUB4",
+      "empresa": "Itaú Unibanco",
+      "quantidade": 5100,
+      "preco_medio": 41.20,
+      "proventos_posicao": 78.82,
+      "preco_mercado": 39.36,
+      "resultado_com_proventos_percentual": -4.43,
+      "saldo_bruto": 200736.00
+    },
+    {
+      "ticker": "PRIO3",
+      "empresa": "PRIO",
+      "quantidade": 12700,
+      "preco_medio": 62.98,
+      "proventos_posicao": 0.00,
+      "preco_mercado": 62.82,
+      "resultado_com_proventos_percentual": -0.25,
+      "saldo_bruto": 797814.00
+    },
+    {
+      "ticker": "WEGE3",
+      "empresa": "WEG",
+      "quantidade": 2500,
+      "preco_medio": 44.61,
+      "proventos_posicao": 0.00,
+      "preco_mercado": 43.00,
+      "resultado_com_proventos_percentual": -3.60,
+      "saldo_bruto": 107500.00
+    }
+  ]
+}
+
+{
+  "alocacao": [
+    {
+      "categoria": "Renda Fixa",
+      "participacao_percentual": 14.41,
+      "saldo": 209596.06,
+      "resultado_12_meses": {
+        "valor": 119420.10,
+        "percentual": 13.52
+      }
+    },
+    {
+      "categoria": "Conta Investimento",
+      "participacao_percentual": 1.18,
+      "saldo": 17183.76
+    },
+    {
+      "categoria": "Valores em Trânsito",
+      "participacao_percentual": 0.05,
+      "saldo": 775.75
+    }
+  ]
+}
+
+{
+  "categoria": "Opções",
+  "quantidade_produtos": 29,
+  "resultado_total": -10096.54,
+  "opcoes": [
+    {
+      "codigo": "ITUBF422",
+      "quantidade": -300,
+      "tipo": "Call",
+      "posicao": "Vendida",
+      "vencimen
+<truncated 2275 bytes>
+,
+      "quantidade": -900,
+      "tipo": "Put",
+      "posicao": "Vendida",
+      "vencimento": "2026-06-19",
+      "strike": 38.61,
+      "premio_exercicio": 0.49,
+      "preco_medio": 0.38,
+      "resultado": -444.19,
+      "resultado_percentual": -30.69
+    },
+    {
+      "codigo": "ITUBR431",
+      "quantidade": -700,
+      "tipo": "Put",
+      "posicao": "Vendida",
+      "vencimento": "2026-06-19",
+      "strike": 39.34,
+      "premio_exercicio": 0.74,
+      "preco_medio": 0.55,
+      "resultado": -517.32,
+      "resultado_percentual": -35.13
+    },
+    {
+      "codigo": "ITUBR436",
+      "quantidade": -300,
+      "tipo": "Put",
+      "posicao": "Vendida",
+      "vencimento": "2026-06-19",
+      "strike": 39.82,
+      "premio_exercicio": 0.96,
+      "preco_medio": 0.68,
+      "resultado": -288.17,
+      "resultado_percentual": -40.51
+    },
+    {
+      "codigo": "PRIOQ69",
+      "quantidade": -1000,
+      "tipo": "Put",
+      "posicao": "Vendida",
+      "vencimento": "2027-05-21",
+      "strike": 69.00,
+      "premio_exercicio": 5.65,
+      "preco_medio": 6.99,
+      "resultado": -5646.81,
+      "resultado_percentual": 19.19
+    },
+    {
+      "codigo": "WEGER435",
+      "quantidade": -300,
+      "tipo": "Put",
+      "posicao": "Vendida",
+      "vencimento": "2026-06-19",
+      "strike": 43.53,
+      "premio_exercicio": 1.27,
+      "preco_medio": 0.94,
+      "resultado": -380.54,
+      "resultado_percentual": -34.47
+    }
+  ],
+  "resumo": {
+    "calls_vendidas": 15,
+    "calls_compradas": 2,
+    "puts_vendidas": 12,
+    "puts_compradas": 0
+  }
+}
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-06-02T21:52:55-03:00.
+
+The user's current state is as follows:
+Active Document: c:\co_ceo_platform\src\index.ts (LANGUAGE_TYPESCRIPT)
+Cursor is on line: 1
+Other open documents:
+- c:\co_ceo_platform\src\index.ts (LANGUAGE_TYPESCRIPT)
+- c:\co_ceo_platform\scripts\wipe-holding-full.ts (LANGUAGE_TYPESCRIPT)
+- c:\co_ceo_platform\scripts\reimport-btg-month.ts (LANGUAGE_TYPESCRIPT)
+</ADDITIONAL_METADATA>

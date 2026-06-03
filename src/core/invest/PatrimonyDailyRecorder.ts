@@ -10,6 +10,8 @@ import { PatrimonyDailyStore, type StoredPortfolioDay } from './PatrimonyDailySt
 import { aggregateExternalFlowsByDate } from './portfolioPerformance';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
+import { ExternalOptionQuoteFetcher } from './ExternalOptionQuoteFetcher';
+import { isOptionTicker } from './assetClassifier';
 
 export type RecordDailyPatrimonyResult = {
   snapshotDate: string;
@@ -26,6 +28,7 @@ export class PatrimonyDailyRecorder {
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly anchorsRepo: PatrimonyMonthlyAnchorsRepository;
+  private readonly externalOptionFetcher: ExternalOptionQuoteFetcher;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -33,6 +36,7 @@ export class PatrimonyDailyRecorder {
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
+    this.externalOptionFetcher = new ExternalOptionQuoteFetcher(gateway);
   }
 
   async loadStockQuotes(ctx: UserContext, asOf?: string): Promise<{
@@ -56,7 +60,7 @@ export class PatrimonyDailyRecorder {
     const quotes: Record<string, number> = {};
     let quotesAsOf: string | null = null;
 
-    const marketMap = await this.marketQuotes.loadLatestQuoteMap(ctx, tickers);
+    const marketMap = await this.marketQuotes.loadLatestQuoteMap(ctx, tickers, targetDate);
 
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
@@ -115,6 +119,37 @@ export class PatrimonyDailyRecorder {
         ? {}
         : stockQuotesLatest;
 
+    // Etapa 5.1: Fetch external options quotes and inject them into quoteForDate or stockQuotes
+    const optionTickers = new Set<string>();
+    for (const e of events) {
+      const ticker = String(e.asset_ticker).toUpperCase();
+      if (isOptionTicker(ticker)) {
+        optionTickers.add(ticker);
+      }
+    }
+
+    const fetchedOptionsMap = new Map<string, number>();
+    for (const ticker of optionTickers) {
+      const quote = await this.externalOptionFetcher.fetchOptionQuote(ticker, date);
+      if (quote.closingPrice != null) {
+        fetchedOptionsMap.set(ticker, quote.closingPrice);
+      }
+    }
+
+    let augmentedQuoteForDate = quoteForDate;
+    if (quoteForDate) {
+      augmentedQuoteForDate = (ticker: string, qdate: string) => {
+        if (qdate === date && fetchedOptionsMap.has(ticker)) {
+          return fetchedOptionsMap.get(ticker);
+        }
+        return quoteForDate(ticker, qdate);
+      };
+    } else {
+      for (const [t, p] of fetchedOptionsMap) {
+        stockQuotes[t] = p;
+      }
+    }
+
     const rfLedger = fixedIncomeTotalFromLedger(events);
     const rfAnchor = Number(anchors.fixed_income_total ?? 0);
     const rfForEconomic = hasAnchors && rfAnchor > 0 ? rfAnchor : rfLedger;
@@ -127,7 +162,7 @@ export class PatrimonyDailyRecorder {
       stockQuotes,
       fixedIncomeTotal: rfForEconomic,
       calibrateToAnchors: useCalibration,
-      quoteForDate,
+      quoteForDate: augmentedQuoteForDate,
     };
 
     const mtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, mtmOpts);

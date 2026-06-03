@@ -302,7 +302,16 @@ export function buildDailyPatrimonyMtmSeries(
     }
     let patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
     let patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
-    if (calibrate && Math.abs(patrimony - target) > 1) {
+
+    let hasOptions = false;
+    for (const p of positions.values()) {
+      if (Math.abs(p.qty) >= 0.0001 && isOptionType(p.assetType)) {
+        hasOptions = true;
+        break;
+      }
+    }
+
+    if (calibrate && Math.abs(patrimony - target) > 1 && hasOptions) {
       optionsValue = Math.round((target - base - pending) * 100) / 100;
       patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
       patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
@@ -373,7 +382,14 @@ export function buildDailyPatrimonyMtmSeries(
     riskFreeAnnual: options?.riskFreeAnnual ?? 0,
   });
 
-  const positionSnapshots = snapshotOpenPositions(positions, stockQuotes, to, quoteForDate);
+  const lastPoint = rawPoints[rawPoints.length - 1];
+  let optionsPlugTarget: number | undefined;
+  if (lastPoint && calibrate) {
+    const base = lastPoint.stocksValue + lastPoint.cash + lastPoint.fixedIncome;
+    optionsPlugTarget = lastPoint.target - base - lastPoint.pendingSettlements;
+  }
+
+  const positionSnapshots = snapshotOpenPositions(positions, stockQuotes, to, quoteForDate, optionsPlugTarget);
 
   return {
     from,
@@ -397,16 +413,57 @@ function snapshotOpenPositions(
   positions: Map<string, DayPosition>,
   stockQuotes: StockQuoteMap,
   asOf: string,
-  quoteForDate?: (ticker: string, date: string) => number | undefined
+  quoteForDate?: (ticker: string, date: string) => number | undefined,
+  optionsPlugTarget?: number
 ): PositionDailySnapshot[] {
+  let optionsFromMarket = 0;
+  let optionsStructural = 0;
+  const estimatedOptions: DayPosition[] = [];
+
+  for (const p of positions.values()) {
+    if (Math.abs(p.qty) < 0.0001) continue;
+    if (isOptionType(p.assetType)) {
+      const dailyMark = resolvePositionMark(p, asOf, quoteForDate, stockQuotes);
+      if (dailyMark != null) {
+        optionsFromMarket += p.qty * dailyMark;
+      } else {
+        optionsStructural += optionTimeMark(p, asOf);
+        estimatedOptions.push(p);
+      }
+    }
+  }
+
+  let plugFactor = 1;
+  let plugOffset = 0;
+  if (optionsPlugTarget !== undefined && estimatedOptions.length > 0) {
+    const residualToDistribute = optionsPlugTarget - optionsFromMarket;
+    if (Math.abs(optionsStructural) > 0.01) {
+      plugFactor = residualToDistribute / optionsStructural;
+    } else {
+      plugOffset = residualToDistribute / estimatedOptions.length;
+    }
+  }
+
   const out: PositionDailySnapshot[] = [];
   for (const p of positions.values()) {
     if (Math.abs(p.qty) < 0.0001) continue;
     if (isCash(p.assetType, p.ticker) || isFixedIncome(p.assetType, p.ticker)) continue;
+    
     let closing = quoteForDate?.(p.ticker, asOf) ?? stockQuotes[p.ticker];
     if (closing == null || !Number.isFinite(closing)) {
-      closing = isOptionType(p.assetType) ? optionTimeMark(p, asOf) / Math.max(Math.abs(p.qty), 1) : p.unitCost;
+      if (isOptionType(p.assetType)) {
+        if (optionsPlugTarget !== undefined) {
+          const baseVal = optionTimeMark(p, asOf);
+          const adjustedVal = (baseVal * plugFactor) + plugOffset;
+          closing = adjustedVal / Math.max(Math.abs(p.qty), 1);
+        } else {
+          closing = optionTimeMark(p, asOf) / Math.max(Math.abs(p.qty), 1);
+        }
+      } else {
+        closing = p.unitCost;
+      }
     }
+    
     const marketValue = Math.round(p.qty * closing * 100) / 100;
     const managerialValue = Math.round(p.qty * p.unitCost * 100) / 100;
     out.push({

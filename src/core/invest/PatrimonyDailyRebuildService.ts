@@ -143,7 +143,7 @@ export class PatrimonyDailyRebuildService {
       }
 
       await this.ledger.reconcileCustody(ctx);
-      const threePrices = await this.dailyClose.recalcThreePricesPublic(ctx, today);
+      const threePrices = await this.dailyClose.recalcThreePricesPublic(ctx, to);
 
       const finishedAt = new Date().toISOString();
       statusByOrg.set(orgId, {

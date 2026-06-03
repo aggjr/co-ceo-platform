@@ -353,11 +353,11 @@ export class OptionCDailyCloseOrchestrator {
       );
     }
 
-    logStep(rt, `Fechando ${day}: cotações web + patrimônio + 3 preços…`);
-    const materialize =
-      rt.state.mode === 'homologation'
-        ? await this.dailyClose.materializeDay(ctx, day)
-        : undefined;
+    logStep(rt, `Importando notas para o dia ${day}... Materialização movida para o final da etapa de extratos.`);
+    const materialize = undefined;
+    // rt.state.mode === 'homologation'
+    //   ? await this.dailyClose.materializeDay(ctx, day)
+    //   : undefined;
     if (rt.state.mode !== 'homologation') {
       await this.session.closeDay(ctx, sessionId, day);
     }

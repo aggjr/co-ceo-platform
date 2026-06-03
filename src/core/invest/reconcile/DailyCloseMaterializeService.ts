@@ -166,8 +166,8 @@ export class DailyCloseMaterializeService {
     ctx: UserContext,
     asOfDate: string
   ): Promise<{ positionsUpdated: number; positionsZeroed: number }> {
-    const today = new Date().toISOString().slice(0, 10);
-    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+    const limitDate = asOfDate ? asOfDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', limitDate);
     const { assets } = rebuildCustodyFromLedger(events);
     const pricesMap = computeThreePricesByUnderlying(events);
 
@@ -176,7 +176,7 @@ export class DailyCloseMaterializeService {
       .filter((a) => (a.assetType === 'stock' || a.assetType === 'fii') && a.ticker)
       .map((a) => String(a.ticker).trim().toUpperCase());
     const marketQuoteMap = stockTickers.length
-      ? await this.marketQuotes.loadLatestQuoteMap(marketCtx, stockTickers)
+      ? await this.marketQuotes.loadLatestQuoteMap(marketCtx, stockTickers, limitDate)
       : new Map<string, { price: number; date: string }>();
 
     const openAssetIds = new Set(assets.map((a) => a.assetId));
