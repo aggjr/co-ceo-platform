@@ -531,6 +531,11 @@ export async function InvestConciliacaoPage(container) {
         3 preços, eventos de negócio e saldo em transição.
       </p>
       <div id="diagnostics-summary" class="conciliacao-status-text"></div>
+      <div class="conciliacao-daily-ledgers" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start;">
+        <div id="diagnostics-daily-financial-host" class="portfolio-excel-section"></div>
+        <div id="diagnostics-daily-business-host" class="portfolio-excel-section"></div>
+        <div id="diagnostics-daily-portfolio-host" class="portfolio-excel-section"></div>
+      </div>
       <div id="diagnostics-critical-host" class="portfolio-excel-section"></div>
       <div id="diagnostics-assets-host" class="portfolio-excel-section"></div>
       <div id="diagnostics-events-host" class="portfolio-excel-section"></div>
@@ -969,6 +974,9 @@ export async function InvestConciliacaoPage(container) {
   const optcProcessState = document.createElement('span');
   const btnLoadDiagnostics = container.querySelector('#btn-load-diagnostics');
   const diagnosticsSummary = container.querySelector('#diagnostics-summary');
+  const diagnosticsDailyFinancialHost = container.querySelector('#diagnostics-daily-financial-host');
+  const diagnosticsDailyBusinessHost = container.querySelector('#diagnostics-daily-business-host');
+  const diagnosticsDailyPortfolioHost = container.querySelector('#diagnostics-daily-portfolio-host');
   const diagnosticsCriticalHost = container.querySelector('#diagnostics-critical-host');
   const diagnosticsAssetsHost = container.querySelector('#diagnostics-assets-host');
   const diagnosticsEventsHost = container.querySelector('#diagnostics-events-host');
@@ -1097,6 +1105,70 @@ export async function InvestConciliacaoPage(container) {
         `${summary.assetErrors || 0} ativo(s), ${summary.eventErrors || 0} evento(s), ` +
         `${summary.cashErrors || 0} financeiro(s) com erro.`;
     }
+
+    mountCoCeoExcelGrid(diagnosticsDailyFinancialHost, {
+      caption: '1. Planilha financeira por dia',
+      gridId: 'invest-conciliacao-diario-financeiro',
+      rows: report.dailyAudit?.financial || [],
+      emptyText: 'Sem trilha financeira diária.',
+      summaryLabels: { total: 'Dias', selected: '' },
+      fixedLeadingColumns: 1,
+      coCeoColumns: [
+        { key: 'date', label: 'Dia', type: 'text', width: '120px', sticky: true },
+        { key: 'openingCash', label: 'Caixa inicial', type: 'currency', width: '135px' },
+        { key: 'openingTransit', label: 'Trânsito inicial', type: 'currency', width: '145px' },
+        { key: 'assetMovementValue', label: 'Mov. ativos', type: 'currency', width: '135px' },
+        { key: 'pureFinancialValue', label: 'Financeiro puro', type: 'currency', width: '145px' },
+        { key: 'transitChange', label: 'Var. trânsito', type: 'currency', width: '135px' },
+        { key: 'closingTransit', label: 'Trânsito final', type: 'currency', width: '145px' },
+        { key: 'closingCash', label: 'Caixa final', type: 'currency', width: '135px' },
+        { key: 'closingCashWithTransit', label: 'Caixa + trânsito', type: 'currency', width: '155px' },
+        { key: 'assetDetails', label: 'Detalhe ligado a ativos', type: 'text', width: '520px' },
+        { key: 'pureFinancialDetails', label: 'Detalhe financeiro puro', type: 'text', width: '520px' },
+        { key: 'transitDetails', label: 'Detalhe trânsito', type: 'text', width: '520px' },
+      ],
+    });
+
+    mountCoCeoExcelGrid(diagnosticsDailyBusinessHost, {
+      caption: '2. Operações de negócio por dia',
+      gridId: 'invest-conciliacao-diario-negocio',
+      rows: report.dailyAudit?.business || [],
+      emptyText: 'Sem operações de negócio diárias.',
+      summaryLabels: { total: 'Dias', selected: '' },
+      fixedLeadingColumns: 2,
+      coCeoColumns: [
+        { key: 'date', label: 'Dia', type: 'text', width: '120px', sticky: true },
+        { key: 'status', label: 'Status', type: 'text', width: '110px', sticky: true, render: renderStatusCell },
+        { key: 'businessEvents', label: 'Eventos', type: 'number', width: '105px' },
+        { key: 'bothSidesEvents', label: '2 lados', type: 'number', width: '105px' },
+        { key: 'financialOnlyEvents', label: 'Só financeiro', type: 'number', width: '130px' },
+        { key: 'assetOnlyEvents', label: 'Só ativos', type: 'number', width: '115px' },
+        { key: 'missingBusinessEventCount', label: 'Sem evento', type: 'number', width: '120px' },
+        { key: 'linkedAssetExpectedCash', label: 'Caixa esperado ativos', type: 'currency', width: '165px' },
+        { key: 'linkedFinancialCash', label: 'Caixa ligado', type: 'currency', width: '140px' },
+        { key: 'eventCashDelta', label: 'Delta evento', type: 'currency', width: '140px' },
+        { key: 'businessExplanation', label: 'Explicações de negócio', type: 'text', width: '680px' },
+        { key: 'unlinkedExplanation', label: 'Sem explicação', type: 'text', width: '620px' },
+      ],
+    });
+
+    mountCoCeoExcelGrid(diagnosticsDailyPortfolioHost, {
+      caption: '3. Planilha de ativos por dia',
+      gridId: 'invest-conciliacao-diario-ativos',
+      rows: report.dailyAudit?.portfolio || [],
+      emptyText: 'Sem trilha diária de ativos.',
+      summaryLabels: { total: 'Dias', selected: '' },
+      fixedLeadingColumns: 1,
+      coCeoColumns: [
+        { key: 'date', label: 'Dia', type: 'text', width: '120px', sticky: true },
+        { key: 'openingPortfolioValue', label: 'Carteira inicial', type: 'currency', width: '150px' },
+        { key: 'assetMovementDelta', label: 'Alteração carteira', type: 'currency', width: '165px' },
+        { key: 'closingPortfolioValue', label: 'Carteira final', type: 'currency', width: '150px' },
+        { key: 'totalPatrimonyFromSheets', label: 'Patrimônio calculado', type: 'currency', width: '175px' },
+        { key: 'changedAssets', label: 'Alterações no dia', type: 'text', width: '620px' },
+        { key: 'consideredAssets', label: 'Carteira final considerada', type: 'text', width: '760px' },
+      ],
+    });
 
     mountCoCeoExcelGrid(diagnosticsCriticalHost, {
       caption: 'Achados críticos',

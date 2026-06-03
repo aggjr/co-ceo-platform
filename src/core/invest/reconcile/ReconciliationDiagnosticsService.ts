@@ -32,6 +32,56 @@ type BrokerQty = {
   lineKinds: string;
 };
 
+type DailyFinancialAuditRow = {
+  id: string;
+  date: string;
+  openingCash: number;
+  openingTransit: number;
+  assetMovementValue: number;
+  pureFinancialValue: number;
+  transitChange: number;
+  closingTransit: number;
+  closingCash: number;
+  closingCashWithTransit: number;
+  assetDetails: string;
+  pureFinancialDetails: string;
+  transitDetails: string;
+};
+
+type DailyBusinessAuditRow = {
+  id: string;
+  date: string;
+  status: 'ok' | 'warn' | 'error';
+  businessEvents: number;
+  bothSidesEvents: number;
+  financialOnlyEvents: number;
+  assetOnlyEvents: number;
+  missingBusinessEventCount: number;
+  linkedAssetExpectedCash: number;
+  linkedFinancialCash: number;
+  eventCashDelta: number;
+  businessExplanation: string;
+  unlinkedExplanation: string;
+};
+
+type DailyPortfolioAuditRow = {
+  id: string;
+  date: string;
+  openingPortfolioValue: number;
+  assetMovementDelta: number;
+  closingPortfolioValue: number;
+  totalPatrimonyFromSheets: number;
+  changedAssets: string;
+  consideredAssets: string;
+};
+
+type AuditPositionState = {
+  ticker: string;
+  assetType: string;
+  qty: number;
+  unitValue: number;
+};
+
 function round(n: number, scale = 4): number {
   const p = 10 ** scale;
   return Math.round((Number(n) || 0) * p) / p;
@@ -129,6 +179,46 @@ function eventCashValue(e: LedgerEvent): number {
   return Number(e.total_net_value ?? 0);
 }
 
+function dateRange(from: string, to: string): string[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) {
+    return [];
+  }
+  const out: string[] = [];
+  const d = new Date(`${from}T12:00:00Z`);
+  const end = new Date(`${to}T12:00:00Z`);
+  while (d <= end) {
+    out.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return out;
+}
+
+function detailList(items: string[], max = 18): string {
+  if (!items.length) return '';
+  if (items.length <= max) return items.join(' | ');
+  return `${items.slice(0, max).join(' | ')} | +${items.length - max} item(ns)`;
+}
+
+function signedOpeningQty(e: LedgerEvent): number {
+  const q = Math.abs(Number(e.quantity ?? 0));
+  const ticker = String(e.asset_ticker || '').toUpperCase();
+  const type = String(e.asset_type || inferAssetType(ticker));
+  if ((type === 'option_call' || type === 'option_put') && Number(e.total_net_value ?? 0) < -0.005) {
+    return -q;
+  }
+  return q;
+}
+
+function assetQuantityDelta(e: LedgerEvent, currentQty: number): number | null {
+  const type = String(e.transaction_type);
+  const q = Number(e.quantity ?? 0);
+  if (type === 'opening_balance') return signedOpeningQty(e) - currentQty;
+  if (type === 'buy' || type === 'put_buy' || type === 'call_buy' || type === 'bonus') return Math.abs(q);
+  if (type === 'sell' || type === 'put_sell' || type === 'call_sell') return -Math.abs(q);
+  if (type === 'option_exercise') return q;
+  return null;
+}
+
 export class ReconciliationDiagnosticsService {
   private readonly ledger: LedgerImportService;
   private readonly snapshots: BrokerCustodySnapshotRepository;
@@ -160,6 +250,7 @@ export class ReconciliationDiagnosticsService {
     );
     const eventRows = this.buildBusinessEventRows(events);
     const cashRows = this.buildCashRows(events, latestSnapshot, asOf);
+    const dailyAudit = this.buildDailyAuditRows(events, asOf);
     const resetRows = await this.buildResetRows(ctx);
     const critical = this.buildCriticalFindings(assetRows, eventRows, cashRows, resetRows);
     if (!latestSnapshot) {
@@ -196,6 +287,7 @@ export class ReconciliationDiagnosticsService {
       assets: assetRows,
       businessEvents: eventRows,
       cash: cashRows,
+      dailyAudit,
       reset: resetRows,
     };
   }
@@ -494,6 +586,256 @@ export class ReconciliationDiagnosticsService {
           : 'nenhum ajuste automatico encontrado',
       },
     ];
+  }
+
+  private buildDailyAuditRows(events: LedgerEvent[], asOf: string): {
+    financial: DailyFinancialAuditRow[];
+    business: DailyBusinessAuditRow[];
+    portfolio: DailyPortfolioAuditRow[];
+  } {
+    const sorted = [...events].sort((a, b) =>
+      String(a.transaction_date).localeCompare(String(b.transaction_date)) ||
+      String(a.id ?? '').localeCompare(String(b.id ?? ''))
+    );
+    const firstDate =
+      sorted.map((e) => String(e.transaction_date || '').slice(0, 10)).find(Boolean) || asOf;
+    const calendar = dateRange(firstDate, asOf);
+    const byDate = new Map<string, LedgerEvent[]>();
+    for (const e of sorted) {
+      const d = String(e.transaction_date || '').slice(0, 10);
+      if (!d) continue;
+      byDate.set(d, [...(byDate.get(d) || []), e]);
+    }
+
+    const eventHasAsset = new Set<string>();
+    for (const e of sorted) {
+      if (!e.business_event_id) continue;
+      const ticker = String(e.asset_ticker || '').toUpperCase();
+      const assetType = String(e.asset_type || inferAssetType(ticker));
+      if (!isCashTicker(ticker, assetType)) eventHasAsset.add(String(e.business_event_id));
+    }
+
+    let grossCash = 0;
+    const pendingByRef = new Map<string, number>();
+    const positions = new Map<string, AuditPositionState>();
+    const financial: DailyFinancialAuditRow[] = [];
+    const business: DailyBusinessAuditRow[] = [];
+    const portfolio: DailyPortfolioAuditRow[] = [];
+
+    const transitTotal = () => money([...pendingByRef.values()].reduce((sum, value) => sum + value, 0));
+    const portfolioTotal = () =>
+      money(
+        [...positions.values()].reduce((sum, p) => {
+          if (Math.abs(p.qty) < 0.000001) return sum;
+          return sum + p.qty * p.unitValue;
+        }, 0)
+      );
+    const portfolioDetails = () =>
+      detailList(
+        [...positions.values()]
+          .filter((p) => Math.abs(p.qty) >= 0.000001)
+          .sort((a, b) => a.ticker.localeCompare(b.ticker))
+          .map((p) => `${p.ticker}: ${round(p.qty)} x ${money(p.unitValue)} = ${money(p.qty * p.unitValue)}`),
+        24
+      );
+
+    for (const date of calendar) {
+      const day = byDate.get(date) || [];
+      const openingTransit = transitTotal();
+      const openingCash = money(grossCash - openingTransit);
+      const openingPortfolioValue = portfolioTotal();
+      let assetMovementValue = 0;
+      let pureFinancialValue = 0;
+      let transitChange = 0;
+      const assetDetails: string[] = [];
+      const pureDetails: string[] = [];
+      const transitDetails: string[] = [];
+      const changedAssets: string[] = [];
+      const businessGroups = new Map<string, LedgerEvent[]>();
+      const unlinked: LedgerEvent[] = [];
+
+      for (const e of day) {
+        if (e.business_event_id) {
+          const id = String(e.business_event_id);
+          businessGroups.set(id, [...(businessGroups.get(id) || []), e]);
+        } else if (String(e.transaction_type) !== 'opening_balance') {
+          unlinked.push(e);
+        }
+      }
+
+      for (const e of day) {
+        const ticker = String(e.asset_ticker || '').toUpperCase();
+        const assetType = String(e.asset_type || inferAssetType(ticker));
+        const txType = String(e.transaction_type);
+        const isCash = isCashTicker(ticker, assetType);
+
+        if (isCash) {
+          const value = Number(e.total_net_value ?? 0);
+          grossCash += value;
+          if (txType === 'pending_settlement') {
+            const rawRef = String(e.broker_note_ref || e.id || `${date}-${transitDetails.length}`);
+            const baseRef = rawRef.endsWith(':CLEAR') ? rawRef.slice(0, -':CLEAR'.length) : rawRef;
+            pendingByRef.set(baseRef, money((pendingByRef.get(baseRef) ?? 0) + value));
+            transitChange += value;
+            transitDetails.push(`${rawRef}: ${money(value)}`);
+            continue;
+          }
+
+          const linkedToAsset =
+            Boolean(e.business_event_id && eventHasAsset.has(String(e.business_event_id))) ||
+            isBusinessTrade(e);
+          if (linkedToAsset) {
+            assetMovementValue += value;
+            assetDetails.push(`${txType} ${ticker}: ${money(value)}`);
+          } else {
+            pureFinancialValue += value;
+            pureDetails.push(`${txType} ${ticker}: ${money(value)}`);
+          }
+          continue;
+        }
+
+        if (e.impacts_managerial_price === false || e.impacts_managerial_price === 0) continue;
+        const previous = positions.get(ticker) || {
+          ticker,
+          assetType,
+          qty: 0,
+          unitValue: Number(e.unit_price ?? 0),
+        };
+        const beforeValue = previous.qty * previous.unitValue;
+        const unit = Number(e.unit_price ?? 0);
+        const qtyDelta = assetQuantityDelta(e, previous.qty);
+        const next: AuditPositionState = { ...previous };
+        if (unit > 0) next.unitValue = unit;
+        if (txType === 'split') {
+          next.qty = Number(e.quantity ?? previous.qty);
+        } else if (qtyDelta != null) {
+          next.qty += qtyDelta;
+        } else if (txType === 'revaluation' && unit > 0) {
+          next.unitValue = unit;
+        }
+        positions.set(ticker, next);
+        const afterValue = next.qty * next.unitValue;
+        const deltaValue = money(afterValue - beforeValue);
+        if (Math.abs(deltaValue) > 0.005 || qtyDelta != null || txType === 'split') {
+          changedAssets.push(
+            `${ticker} ${txType}: qtd ${round(previous.qty)} -> ${round(next.qty)}, valor ${money(beforeValue)} -> ${money(afterValue)}`
+          );
+        }
+      }
+
+      const closingTransit = transitTotal();
+      const closingCash = money(grossCash - closingTransit);
+      const closingPortfolioValue = portfolioTotal();
+      const businessRow = this.buildDailyBusinessRow(date, businessGroups, unlinked);
+
+      financial.push({
+        id: `fin-${date}`,
+        date,
+        openingCash,
+        openingTransit,
+        assetMovementValue: money(assetMovementValue),
+        pureFinancialValue: money(pureFinancialValue),
+        transitChange: money(transitChange),
+        closingTransit,
+        closingCash,
+        closingCashWithTransit: money(closingCash + closingTransit),
+        assetDetails: detailList(assetDetails),
+        pureFinancialDetails: detailList(pureDetails),
+        transitDetails: detailList(transitDetails),
+      });
+
+      business.push(businessRow);
+
+      portfolio.push({
+        id: `port-${date}`,
+        date,
+        openingPortfolioValue,
+        assetMovementDelta: money(closingPortfolioValue - openingPortfolioValue),
+        closingPortfolioValue,
+        totalPatrimonyFromSheets: money(closingCash + closingTransit + closingPortfolioValue),
+        changedAssets: detailList(changedAssets, 16),
+        consideredAssets: portfolioDetails(),
+      });
+    }
+
+    return { financial, business, portfolio };
+  }
+
+  private buildDailyBusinessRow(
+    date: string,
+    groups: Map<string, LedgerEvent[]>,
+    unlinked: LedgerEvent[]
+  ): DailyBusinessAuditRow {
+    let bothSidesEvents = 0;
+    let financialOnlyEvents = 0;
+    let assetOnlyEvents = 0;
+    let linkedAssetExpectedCash = 0;
+    let linkedFinancialCash = 0;
+    let twoSidedExpectedCash = 0;
+    let twoSidedFinancialCash = 0;
+    const explanations: string[] = [];
+    const unlinkedExplanation: string[] = [];
+
+    for (const [eventId, legs] of groups) {
+      const assetLegs = legs.filter((e) => {
+        const ticker = String(e.asset_ticker || '').toUpperCase();
+        return !isCashTicker(ticker, String(e.asset_type || ''));
+      });
+      const cashLegs = legs.filter((e) => {
+        const ticker = String(e.asset_ticker || '').toUpperCase();
+        return isCashTicker(ticker, String(e.asset_type || ''));
+      });
+      const hasAsset = assetLegs.length > 0;
+      const hasCash = cashLegs.length > 0;
+      const expectedCash = money(assetLegs.filter(isBusinessTrade).reduce((sum, e) => sum + tradeSignedCash(e), 0));
+      const actualCash = money(
+        cashLegs
+          .filter((e) => String(e.transaction_type) !== 'pending_settlement')
+          .reduce((sum, e) => sum + Number(e.total_net_value ?? 0), 0)
+      );
+      linkedAssetExpectedCash += expectedCash;
+      linkedFinancialCash += actualCash;
+      if (hasAsset && hasCash) {
+        bothSidesEvents += 1;
+        twoSidedExpectedCash += expectedCash;
+        twoSidedFinancialCash += actualCash;
+      } else if (hasCash) financialOnlyEvents += 1;
+      else if (hasAsset) assetOnlyEvents += 1;
+      const tickers = [...new Set(assetLegs.map((e) => String(e.asset_ticker || '').toUpperCase()))].join(',');
+      const ops = [...new Set(legs.map((e) => String(e.transaction_type)))].join(',');
+      explanations.push(
+        `${eventId.slice(0, 8)} ${tickers || 'financeiro'} ${ops}: ativo ${money(expectedCash)}, caixa ${money(actualCash)}`
+      );
+    }
+
+    for (const e of unlinked) {
+      const ticker = String(e.asset_ticker || '').toUpperCase();
+      const isCash = isCashTicker(ticker, String(e.asset_type || ''));
+      unlinkedExplanation.push(
+        `${isCash ? 'FIN' : 'ATIVO'} ${String(e.transaction_type)} ${ticker}: ${money(Number(e.total_net_value ?? 0))}`
+      );
+    }
+
+    const eventCashDelta = money(twoSidedFinancialCash - twoSidedExpectedCash);
+    let status: 'ok' | 'warn' | 'error' = 'ok';
+    if (unlinked.length > 0 || Math.abs(eventCashDelta) > 0.05) status = 'error';
+    else if (assetOnlyEvents > 0 || financialOnlyEvents > 0) status = 'warn';
+
+    return {
+      id: `biz-${date}`,
+      date,
+      status,
+      businessEvents: groups.size,
+      bothSidesEvents,
+      financialOnlyEvents,
+      assetOnlyEvents,
+      missingBusinessEventCount: unlinked.length,
+      linkedAssetExpectedCash: money(linkedAssetExpectedCash),
+      linkedFinancialCash: money(linkedFinancialCash),
+      eventCashDelta,
+      businessExplanation: detailList(explanations, 18),
+      unlinkedExplanation: detailList(unlinkedExplanation, 18),
+    };
   }
 
   private async buildResetRows(ctx: UserContext) {
