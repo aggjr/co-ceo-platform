@@ -310,6 +310,8 @@ export async function InvestConciliacaoPage(container) {
         <div id="optc-progress" class="invest-conciliacao__progress-wrap" hidden>
           <div class="invest-conciliacao__progress-label" id="optc-progress-label"></div>
           <div class="invest-conciliacao__progress-track"><div class="invest-conciliacao__progress-bar" id="optc-progress-bar"></div></div>
+          <div class="invest-conciliacao__progress-label" id="optc-progress-label-extracts" style="margin-top: 1rem" hidden></div>
+          <div class="invest-conciliacao__progress-track" id="optc-progress-track-extracts" hidden><div class="invest-conciliacao__progress-bar" id="optc-progress-bar-extracts"></div></div>
         </div>
         <div id="optc-pending" class="invest-conciliacao__pending" style="margin-top:1rem"></div>
       </div>
@@ -1163,12 +1165,46 @@ export async function InvestConciliacaoPage(container) {
   function updateOptcProgress(state) {
     if (!state || !optcProgress) return;
     optcProgress.hidden = false;
-    const total = state.phase === 'notes' ? state.calendar.length : state.extractFilesCount || 1;
-    const done = state.phase === 'notes' ? state.dayIndex : state.phase === 'done' ? total : 0;
-    const pct = total > 0 ? Math.round((100 * done) / total) : 0;
-    if (optcProgressBar) optcProgressBar.style.width = `${pct}%`;
+    
+    // Fase 1: Notas
+    const notesTotal = state.calendar.length || 1;
+    const notesDone = state.phase === 'notes' ? state.dayIndex : notesTotal;
+    const notesPct = Math.round((100 * notesDone) / notesTotal);
+    
+    if (optcProgressBar) optcProgressBar.style.width = `${notesPct}%`;
     if (optcProgressLabel) {
-      optcProgressLabel.textContent = `Fase ${state.phase} · ${done}/${total} · horizonte ${state.horizonTrustedThrough || '—'}`;
+      optcProgressLabel.textContent = `Fase notas · ${notesDone}/${notesTotal} pregões analisados`;
+    }
+
+    // Fase 2: Extratos
+    const labelExtracts = container.querySelector('#optc-progress-label-extracts');
+    const trackExtracts = container.querySelector('#optc-progress-track-extracts');
+    const barExtracts = container.querySelector('#optc-progress-bar-extracts');
+
+    if (state.phase === 'extracts' || state.phase === 'done') {
+      if (labelExtracts) labelExtracts.hidden = false;
+      if (trackExtracts) trackExtracts.hidden = false;
+      
+      const extractsTotal = state.extractFilesCount || 1;
+      
+      if (barExtracts) {
+        if (state.phase === 'extracts') {
+          barExtracts.classList.add('invest-conciliacao__progress-bar--animated');
+          barExtracts.style.width = '100%';
+        } else {
+          barExtracts.classList.remove('invest-conciliacao__progress-bar--animated');
+          barExtracts.style.width = '100%';
+        }
+      }
+      
+      if (labelExtracts) {
+        labelExtracts.textContent = state.phase === 'done' 
+          ? `Fase extratos/materialização · Concluído`
+          : `Fase extratos/materialização · Processando ${extractsTotal} arquivo(s) (pode levar alguns segundos)...`;
+      }
+    } else {
+      if (labelExtracts) labelExtracts.hidden = true;
+      if (trackExtracts) trackExtracts.hidden = true;
     }
   }
 
@@ -1268,7 +1304,9 @@ export async function InvestConciliacaoPage(container) {
       }
       optcActivityLogCount = lines.length;
       if (optcStatus) {
-        optcStatus.textContent = `Run ${optcRunId} — fase ${optcState.phase} — ${optcState.dayIndex}/${optcState.calendar.length}`;
+        let statusMsg = `Run ${optcRunId} — fase ${optcState.phase}`;
+        if (optcState.phase === 'notes') statusMsg += ` — ${optcState.dayIndex}/${optcState.calendar.length}`;
+        optcStatus.textContent = statusMsg;
       }
       if (optcState.runStatus === 'error') {
         throw new Error(optcState.runError || 'Processamento em segundo plano parou com erro.');
