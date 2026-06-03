@@ -32,11 +32,10 @@ export class OptionHistoricalSyncService {
       // Como a tabela cacheia por data, verificamos se existe *alguma* entrada NOT_FOUND
       // ou se há pelo menos um registro com data recente. Para simplificar, buscamos
       // qualquer registro para o ticker com status NOT_FOUND, indicando que a API não possui a série.
-      const cacheCheck = await this.gateway.readQuery(
+      const cacheCheck = await this.gateway.findWhere(
         globalCtx,
         'invest_options_fetch_cache',
-        [ticker],
-        'SELECT id FROM invest_options_fetch_cache WHERE ticker = ? AND status = "NOT_FOUND" LIMIT 1'
+        { ticker, status: 'NOT_FOUND' }
       );
       
       if (cacheCheck.length > 0) {
@@ -54,11 +53,15 @@ export class OptionHistoricalSyncService {
         
         if (json.error || !json.results) {
           // Marca no cache como não encontrado, para nunca mais pesquisar (acelera o sistema)
-          await this.gateway.runQuery(
+          await this.gateway.insert(
             globalCtx,
             'invest_options_fetch_cache',
-            [ticker, new Date().toISOString().slice(0, 10), 'NOT_FOUND', 'brapi'],
-            'INSERT IGNORE INTO invest_options_fetch_cache (ticker, quote_date, status, source) VALUES (?, ?, ?, ?)'
+            {
+              ticker,
+              fetch_date: new Date().toISOString().slice(0, 10),
+              status: 'NOT_FOUND',
+              source_system: 'brapi'
+            }
           );
         } else {
           // Se encontrou dados, podemos salvar em market_quotes_daily!

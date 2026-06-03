@@ -103,11 +103,11 @@ function parseQuoteRows(
     let asOf = options.asOfDate || new Date().toISOString().slice(0, 10);
 
     if (options.asOfDate) {
-      const close = pickCloseForDate(row, asOfDate);
+      const close = pickCloseForDate(row, options.asOfDate);
       if (close != null) {
         price = close;
         kind = 'close';
-        asOf = asOfDate;
+        asOf = options.asOfDate;
       } else {
         // Block falling back to the latest quote for a past date request
         continue;
