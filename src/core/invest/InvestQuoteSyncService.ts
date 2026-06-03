@@ -10,6 +10,10 @@ import { authBootstrapContext } from '../auth/authBootstrapContext';
 import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
 import { fetchOpcoesNetOptionQuotes } from './opcoesNetQuotes';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
+import {
+  fetchYahooStockHistory,
+  fetchYahooStockQuoteForDate,
+} from '../market/ExternalStockQuoteProvider';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
 export type QuoteSyncResult = {
@@ -67,17 +71,36 @@ export class InvestQuoteSyncService {
       throw new Error('organizationId obrigatório.');
     }
     const tickers = await this.listB3QuoteTickers(ctx);
-    const quotes = await fetchB3Quotes(tickers, {
-      asOfDate,
-      token: process.env.BRAPI_TOKEN,
-    });
+    let quotes: B3QuoteResult[] = [];
+    try {
+      quotes = await fetchB3Quotes(tickers, {
+        asOfDate,
+        token: process.env.BRAPI_TOKEN,
+      });
+    } catch (err) {
+      console.warn('[syncFromBrapi] brapi acoes/FIIs:', err);
+    }
     const quoteByTicker = new Map(quotes.map((q) => [q.ticker, q]));
     const missing: string[] = [];
     let updated = 0;
 
     const marketCtx = authBootstrapContext();
     for (const ticker of tickers) {
-      const q = quoteByTicker.get(ticker);
+      let q = quoteByTicker.get(ticker);
+      let provider = 'brapi';
+      if (!q && asOfDate) {
+        const fallback = await fetchYahooStockQuoteForDate(ticker, asOfDate).catch(() => null);
+        if (fallback) {
+          q = {
+            ticker: fallback.ticker,
+            price: fallback.price,
+            asOf: fallback.asOf,
+            source: 'brapi',
+            kind: fallback.kind,
+          };
+          provider = fallback.source;
+        }
+      }
       if (!q) {
         missing.push(ticker);
         continue;
@@ -86,8 +109,10 @@ export class InvestQuoteSyncService {
         ticker: q.ticker,
         quoteDate: q.asOf,
         closingPrice: q.price,
-        source: 'brapi',
-        metadata: { kind: q.kind },
+        source: provider === 'brapi' ? 'brapi' : 'user_manual',
+        metadata: provider === 'brapi'
+          ? { kind: q.kind }
+          : { kind: q.kind, provider, fallback_for: 'brapi' },
       });
       const ok = await this.writeQuoteToPositionExt(ctx, ticker, q.price, q.asOf);
       if (ok) updated += 1;
@@ -142,10 +167,15 @@ export class InvestQuoteSyncService {
     const tickers = await this.listB3QuoteTickers(ctx);
     if (!tickers.length) return 0;
     
-    const quotes = await fetchB3Quotes(tickers, {
-      returnAllHistory: true,
-      token: process.env.BRAPI_TOKEN,
-    });
+    let quotes: B3QuoteResult[] = [];
+    try {
+      quotes = await fetchB3Quotes(tickers, {
+        returnAllHistory: true,
+        token: process.env.BRAPI_TOKEN,
+      });
+    } catch (err) {
+      console.warn('[syncHistoricalFromBrapi] brapi historico:', err);
+    }
     
     let updated = 0;
     const marketCtx = authBootstrapContext();
@@ -158,6 +188,26 @@ export class InvestQuoteSyncService {
         metadata: { kind: q.kind },
       });
       updated++;
+    }
+    const from = (process.env.INVEST_QUOTES_HISTORY_FROM || '2026-01-01').slice(0, 10);
+    const to = new Date().toISOString().slice(0, 10);
+    for (const ticker of tickers) {
+      const bars = await fetchYahooStockHistory(ticker, from, to).catch(() => []);
+      for (const q of bars) {
+        await this.marketQuotes.upsertQuote(marketCtx, {
+          ticker: q.ticker,
+          quoteDate: q.asOf,
+          closingPrice: q.price,
+          source: 'user_manual',
+          metadata: {
+            kind: q.kind,
+            provider: q.source,
+            fallback_for: 'brapi',
+            backfill: true,
+          },
+        });
+        updated++;
+      }
     }
     return updated;
   }

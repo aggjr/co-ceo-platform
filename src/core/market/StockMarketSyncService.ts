@@ -2,6 +2,7 @@ import type { CoCeoDataGateway, UserContext } from '../dal';
 import { inferAssetType } from '../invest/assetClassifier';
 import { fetchB3Quotes } from '../invest/B3QuoteProvider';
 import { MarketQuoteRepository } from './MarketQuoteRepository';
+import { fetchYahooStockQuoteForDate } from './ExternalStockQuoteProvider';
 
 export type StockMarketSyncReport = {
   asOf: string;
@@ -64,7 +65,27 @@ export class StockMarketSyncService {
         got.add(q.ticker);
         saved += 1;
       } catch {
-        missing.push(ticker);
+        try {
+          const fallback = asOfDate
+            ? await fetchYahooStockQuoteForDate(ticker, asOfDate)
+            : null;
+          if (!fallback) {
+            missing.push(ticker);
+            continue;
+          }
+          await this.repo.upsertQuote(ctx, {
+            ticker: fallback.ticker,
+            quoteDate: fallback.asOf,
+            closingPrice: fallback.price,
+            source: 'user_manual',
+            metadata: { kind: fallback.kind, provider: fallback.source, fallback_for: 'brapi' },
+          });
+          got.add(fallback.ticker);
+          quotesReceived += 1;
+          saved += 1;
+        } catch {
+          missing.push(ticker);
+        }
       }
     }
 

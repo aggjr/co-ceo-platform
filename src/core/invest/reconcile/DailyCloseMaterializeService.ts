@@ -209,8 +209,7 @@ export class DailyCloseMaterializeService {
       }
 
       const mq = marketQuoteMap.get(ticker);
-      const lastPrice =
-        mq?.price ?? (pmC && pmC > 0 ? pmC : null);
+      const lastPrice = mq?.price ?? null;
 
       await this.upsertPositionExt(ctx, asset.assetId, asset.assetType, {
         pm_estrito: pmA,

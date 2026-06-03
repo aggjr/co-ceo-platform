@@ -16,6 +16,7 @@ export type FetchB3QuotesOptions = {
   /** Data do fechamento desejado (YYYY-MM-DD). Se omitido, usa último pregão disponível. */
   asOfDate?: string;
   returnAllHistory?: boolean;
+  historyRange?: string;
   token?: string;
   baseUrl?: string;
 };
@@ -72,6 +73,11 @@ function requestDelayMs(): number {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function historyRange(input?: string): string {
+  const raw = (input || process.env.BRAPI_HISTORY_RANGE || '6mo').trim();
+  return raw || '6mo';
 }
 
 function parseQuoteRows(
@@ -141,6 +147,7 @@ async function fetchBrapiBatch(
     token: string;
     asOfDate?: string;
     returnAllHistory?: boolean;
+    historyRange?: string;
     needsHistory: boolean;
   }
 ): Promise<B3QuoteResult[]> {
@@ -148,7 +155,7 @@ async function fetchBrapiBatch(
   const params = new URLSearchParams();
   if (options.token) params.set('token', options.token);
   if (options.needsHistory) {
-    params.set('range', '1y');
+    params.set('range', historyRange(options.historyRange));
     params.set('interval', '1d');
   }
 
@@ -210,6 +217,7 @@ export async function fetchB3Quotes(
         token,
         asOfDate,
         returnAllHistory: options.returnAllHistory,
+        historyRange: options.historyRange,
         needsHistory,
       }))
     );
