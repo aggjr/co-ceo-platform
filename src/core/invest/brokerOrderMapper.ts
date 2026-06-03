@@ -58,6 +58,10 @@ function optionOperation(
   return isCall ? 'call_buy' : 'put_buy';
 }
 
+function isStockLike(assetType: string): boolean {
+  return assetType === 'stock' || assetType === 'fii';
+}
+
 /**
  * Converte linha do histórico de ordens (BTG / Profit) em lançamento(s) do livro-razão.
  *
@@ -147,6 +151,26 @@ export function mapBrokerOrderToLedger(
   }
 
   const assetType = inferAssetType(ticker);
+  if (isStockLike(assetType)) {
+    const gross = qtyShares * price;
+    const isBuy = row.direction === 'C';
+    return [
+      {
+        date,
+        ticker,
+        asset_type: assetType,
+        underlying_ticker: ticker,
+        operation: isBuy ? 'buy' : 'sell',
+        quantity: qtyShares,
+        unit_price: price,
+        total_net_value: isBuy ? -gross : gross,
+        broker_note_ref: row.broker_note_ref,
+        notes: `Ordem ${row.direction} - ${ticker}`,
+        impacts_managerial_price: true,
+      },
+    ];
+  }
+
   if (assetType !== 'option_call' && assetType !== 'option_put') {
     return [];
   }

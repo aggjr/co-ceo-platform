@@ -1,6 +1,7 @@
 import {
   brokerageNotesToLedgerLines,
   BTG_NOTE_LEDGER_REF_PREFIX,
+  suppressBrokerageNoteCashLines,
 } from '../../../src/core/invest/btgBrokerageNoteLedgerTranslator';
 import type { BtgBrokerageNote } from '../../../src/core/invest/btgBrokerageNoteParser';
 
@@ -127,6 +128,59 @@ describe('btgBrokerageNoteLedgerTranslator', () => {
       }),
     ]);
     expect(lines[0].operation).toBe('securities_lending');
-    expect(lines[0].total_net_value).toBeCloseTo(0.31, 4);
+    expect(lines[0].total_net_value).toBe(0);
+  });
+
+  it('maps regular SPOT stock note to buy', () => {
+    const lines = brokerageNotesToLedgerLines([
+      note({
+        dedupeKey: 'S|2|2026-02-10',
+        noteNumber: '27994604',
+        category: 'SPOT',
+        pregaoDate: '2026-02-10',
+        trades: [
+          {
+            negotiation: '1-BOVESPA',
+            side: 'C',
+            marketType: 'VISTA',
+            operationLabel: 'Compra',
+            sideLabel: 'Compra',
+            maturity: null,
+            specification: 'PRIO3 ON',
+            ticker: 'PRIO3',
+            underlyingStock: 'PRIO3',
+            isExercise: false,
+            quantity: 500,
+            unitPrice: 42.5,
+            grossValue: 21250,
+            dc: 'D',
+          },
+        ],
+      }),
+    ]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      ticker: 'PRIO3',
+      operation: 'buy',
+      quantity: 500,
+      unit_price: 42.5,
+    });
+  });
+
+  it('suppresses note cash without erasing patrimony pricing inputs', () => {
+    const suppressed = suppressBrokerageNoteCashLines([
+      {
+        date: '2026-02-10',
+        ticker: 'PRIO3',
+        asset_type: 'stock',
+        operation: 'buy',
+        quantity: 500,
+        unit_price: 42.5,
+        total_net_value: -21250,
+      },
+    ]);
+    expect(suppressed[0].total_net_value).toBe(-21250);
+    expect(suppressed[0].unit_price).toBe(42.5);
+    expect(suppressed[0].skip_financial_ledger).toBe(true);
   });
 });

@@ -189,6 +189,6 @@ const NOTE_CASH_OPS = new Set<LedgerTransactionType>([
 export function suppressBrokerageNoteCashLines(lines: LedgerImportLine[]): LedgerImportLine[] {
   return lines.map((line) => {
     if (!NOTE_CASH_OPS.has(line.operation as LedgerTransactionType)) return line;
-    return { ...line, total_net_value: 0, unit_price: 0 };
+    return { ...line, skip_financial_ledger: true };
   });
 }

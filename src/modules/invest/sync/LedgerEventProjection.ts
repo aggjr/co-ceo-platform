@@ -219,6 +219,7 @@ export class LedgerEventProjection {
         : signedQty;
 
       const patFees = LedgerEventProjection.feesFromMetadata(meta);
+      const metadataNet = Number(meta.total_net_value);
       events.push({
         id: String(row.id),
         business_event_id: row.business_event_id ? String(row.business_event_id) : null,
@@ -233,7 +234,7 @@ export class LedgerEventProjection {
         transaction_type: txType,
         quantity: legacyQty,
         unit_price: unitPrice,
-        total_net_value: totalNet,
+        total_net_value: Number.isFinite(metadataNet) ? metadataNet : totalNet,
         brokerage_fee: patFees.brokerage,
         b3_fees: patFees.b3,
         irrf_tax: patFees.irrf,

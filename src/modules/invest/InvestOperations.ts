@@ -698,6 +698,10 @@ export class InvestOperations {
       const finMeta: Record<string, unknown> = {
         legacy_op: op,
         broker_note_ref: ref ?? null,
+        total_net_value: Number(
+          line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)
+        ),
+        skip_financial_ledger: Boolean(line.skip_financial_ledger),
       };
       // Registra o ticker candidato no metadata para rastreabilidade futura
       // (quando source do dividendo for identificavel).
@@ -945,6 +949,10 @@ export class InvestOperations {
       metadata: {
         legacy_op: op,
         broker_note_ref: ref ?? null,
+        total_net_value: Number(
+          line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)
+        ),
+        skip_financial_ledger: Boolean(line.skip_financial_ledger),
         ...(line.option_strike != null && line.option_strike > 0
           ? { option_strike: line.option_strike }
           : {}),
@@ -975,7 +983,7 @@ export class InvestOperations {
     // Trades e opcoes: geram fluxo de caixa real → perna patrimonial + perna financeira linkadas.
     // Corporate actions (split/bonus/revaluation): sem fluxo de caixa → apenas perna patrimonial.
     // Pernas sem link sao legitimas quando genuinamente nao ha relacao com o outro mundo.
-    if (cashDirection) {
+    if (cashDirection && !line.skip_financial_ledger) {
       const { accountId } = await this.resolveCashAccount(ctx, 'CAIXA-DEFAULT', line.date);
       const totalCash = Math.abs(Number(line.total_net_value ?? line.quantity * line.unit_price));
       const fees = Math.abs(

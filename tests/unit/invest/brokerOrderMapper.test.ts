@@ -24,6 +24,44 @@ describe('brokerOrderMapper', () => {
     expect(lines[0].total_net_value).toBeCloseTo(900 * 1.27);
   });
 
+  it('maps regular stock buy to buy ledger line', () => {
+    const lines = mapBrokerOrderToLedger({
+      ticker: 'PRIO3',
+      direction: 'C',
+      quantity: 500,
+      avgPrice: 42.5,
+      date: '2026-02-10',
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      ticker: 'PRIO3',
+      asset_type: 'stock',
+      operation: 'buy',
+      quantity: 500,
+      unit_price: 42.5,
+      total_net_value: -21250,
+    });
+  });
+
+  it('maps regular stock sell to sell ledger line', () => {
+    const lines = mapBrokerOrderToLedger({
+      ticker: 'ITUB4',
+      direction: 'V',
+      quantity: 100,
+      avgPrice: 41,
+      date: '2026-02-11',
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      ticker: 'ITUB4',
+      asset_type: 'stock',
+      operation: 'sell',
+      quantity: 100,
+      unit_price: 41,
+      total_net_value: 4100,
+    });
+  });
+
   it('maps May put exercise to stock buy on BBAS3', () => {
     const lines = mapBrokerOrderToLedger({
       ticker: 'BBASQ223E',

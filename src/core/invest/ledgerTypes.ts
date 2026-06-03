@@ -102,6 +102,12 @@ export type LedgerImportLine = {
   broker_note_ref?: string;
   notes?: string;
   impacts_managerial_price?: boolean;
+  /**
+   * Quando true, a linha grava apenas a perna patrimonial. Usado no fluxo BTG
+   * mensal em que a nota explica quantidade/preco/taxas e o extrato LIQ BOLSA
+   * explica a baixa/entrada efetiva de caixa.
+   */
+  skip_financial_ledger?: boolean;
   /** Strike de exercício (R$) — persiste em metadata do ativo. */
   option_strike?: number;
   option_expiration?: string;

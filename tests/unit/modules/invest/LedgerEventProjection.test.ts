@@ -91,6 +91,54 @@ describe('LedgerEventProjection', () => {
     expect(e.total_net_value).toBeCloseTo(5400 * 38.33, 4);
   });
 
+  it('preserva total_net_value economico do metadata quando a nota nao gravou caixa', async () => {
+    const gw = makeGateway({
+      patrimony_items: [
+        {
+          id: 'item-prio3',
+          organization_id: ORG,
+          source_module: 'INVEST',
+          subcategory: 'stock',
+          identifier: 'PRIO3',
+        },
+      ],
+      invest_position_ext: [
+        {
+          patrimony_item_id: 'item-prio3',
+          organization_id: ORG,
+          asset_class: 'stock',
+          underlying_ticker: null,
+        },
+      ],
+      patrimony_ledger_entries: [
+        {
+          id: 'led-note',
+          organization_id: ORG,
+          patrimony_item_id: 'item-prio3',
+          transaction_date: '2026-04-17',
+          movement_type: 'acquisition',
+          quantity_delta: 100,
+          unit_value: 52,
+          total_value: 5200,
+          impacts_valuation: true,
+          external_ref: 'BROKER_REF:BUY-NOTE-NO-CASH',
+          notes: 'Compra PRIO3',
+          metadata: JSON.stringify({
+            legacy_op: 'buy',
+            broker_note_ref: 'BUY-NOTE-NO-CASH',
+            total_net_value: -5212.34,
+            skip_financial_ledger: true,
+          }),
+        },
+      ],
+    });
+    const proj = new LedgerEventProjection(gw);
+    const events = await proj.listLedgerEvents(ctx, '2020-01-01', '2030-12-31');
+    expect(events).toHaveLength(1);
+    expect(events[0].transaction_type).toBe('buy');
+    expect(events[0].total_net_value).toBe(-5212.34);
+  });
+
   it('projeta opening_balance de PUT vendida (quantity_delta negativo) com qty abs e net signed', async () => {
     const gw = makeGateway({
       patrimony_items: [

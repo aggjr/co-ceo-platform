@@ -112,6 +112,37 @@ describe('Trade: link bidirecional entre pernas (ambas existem)', () => {
     expect(finLeg!.related_patrimony_ledger_id).toBe(patLeg!.id);
   });
 
+  it('buy com skip_financial_ledger grava patrimonio sem duplicar caixa', async () => {
+    const gw = new InMemoryGateway();
+    await seedCatalog(gw);
+    const { ops } = buildStack(gw);
+
+    await ops.recordOperation(ctx, {
+      date: '2026-04-17',
+      ticker: 'PRIO3',
+      operation: 'buy',
+      quantity: 100,
+      unit_price: 52,
+      total_net_value: -5212.34,
+      brokerage_fee: 10,
+      b3_fees: 2.34,
+      broker_note_ref: 'BUY-NOTE-NO-CASH',
+      skip_financial_ledger: true,
+    });
+
+    const patRows = gw.dump('patrimony_ledger_entries').filter((r) => !r.deleted_at);
+    const finRows = gw.dump('financial_ledger_entries').filter((r) => !r.deleted_at);
+    const patLeg = patRows.find((r) => r.movement_type === 'acquisition');
+    const meta = JSON.parse(String(patLeg?.metadata ?? '{}'));
+
+    expect(patLeg).toBeTruthy();
+    expect(Number(patLeg!.quantity_delta)).toBe(100);
+    expect(Number(patLeg!.unit_value)).toBe(52);
+    expect(meta.total_net_value).toBe(-5212.34);
+    expect(meta.skip_financial_ledger).toBe(true);
+    expect(finRows).toHaveLength(0);
+  });
+
   it('cost_adjustment cria ambas as pernas linkadas', async () => {
     const gw = new InMemoryGateway();
     await seedCatalog(gw);
