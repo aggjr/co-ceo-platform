@@ -552,4 +552,11 @@ Mesmo que as correcoes acima estejam integradas, elas so podem ser consideradas 
 
 Se qualquer criterio falhar, os dados gerados continuam em homologacao/untrusted e a importacao deve ser refeita apos a correcao.
 
-*(Status: Integrado à Main na versão V0.0.263)*
+### 11.7. Ajustes de Renda Fixa, Abertura de Caixa e Calibração de Opções (2026-06-03)
+As seguintes falhas severas reportadas na validação foram corrigidas:
+1. **Deduplicação do Caixa Inicial (`extractLedgerEnrichment`)**: Corrigida a lógica de `isDuplicateManualOpeningCash`. O sistema agora remove lançamentos manuais de saldo inicial na existência canônica do `BTG-EXTRATO-OPENING`, mitigando a divergência extrema no saldo (ex: -R$ 112k duplicados na abertura de caixa).
+2. **Reconhecimento de Renda Fixa no Ledger (`PatrimonyMtmDailyEngine`)**: A Renda Fixa (ex: LFT) estava sendo ignorada no preenchimento do mapa de posições (`positions.set(...)`). Qualquer nova compra de RF derrubava o caixa, mas a curva do patrimônio ficava com a RF flat/congelada na âncora mensal. Agora, a Renda Fixa é somada via posições ativas, resolvendo quedas anômalas antes do mês fechar.
+3. **Prevenção de Extrapolação na Calibração (Residual Plug)**: A lógica do alvo (target) só processa interpolação até a data máxima do último fechamento oficial (âncora). Extrapolações "futuras" (meses correntes ainda não fechados) deixaram de usar uma âncora inexistente, evitando saltos destrutivos na ponta do gráfico.
+4. **Resgate de Last Known Prices**: Restabelecido o loop falho de persistência para as cotações, permitindo que finais de semana e feriados apliquem efetivamente o preço do último dia útil, barrando as falhas onde o gráfico buscava `unitCost` e criava deflexões abruptas de preço nos feriados/finais de semana.
+
+*(Status: Atualizações aplicadas ao motor core)*

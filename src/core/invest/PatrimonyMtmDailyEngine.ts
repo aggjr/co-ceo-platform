@@ -116,7 +116,7 @@ function resolvePositionMark(
   }
   const lastKnown = lastKnownPrices.get(p.ticker);
   if (lastKnown != null) return lastKnown;
-  
+
   if (!historicalMode) {
     const cur = stockQuotes[p.ticker];
     if (cur != null && Number.isFinite(cur) && cur > 0) {
@@ -217,7 +217,6 @@ export function buildDailyPatrimonyMtmSeries(
     date: string;
     stocksValue: number;
     optionsStructural: number;
-    optionsFromMarket: number;
     optionsValue: number;
     cash: number;
     fixedIncome: number;
@@ -226,7 +225,6 @@ export function buildDailyPatrimonyMtmSeries(
     patrimonyGross: number;
     patrimony: number;
     target: number;
-    base: number;
   }> = [];
 
   for (const date of calendar) {
@@ -248,7 +246,7 @@ export function buildDailyPatrimonyMtmSeries(
         continue;
       }
 
-      if (isFixedIncome(assetType, ticker)) continue;
+      // Do NOT skip fixed income! Let it be accumulated in the positions map.
 
       let pos = positions.get(e.asset_id);
       if (!pos) {
@@ -283,9 +281,16 @@ export function buildDailyPatrimonyMtmSeries(
     let stocksValue = 0;
     let optionsFromMarket = 0;
     let optionsStructural = 0;
+    let fixedIncomeDynamic = 0;
 
     for (const p of positions.values()) {
       if (Math.abs(p.qty) < 0.0001) continue;
+
+      if (isFixedIncome(p.assetType, p.ticker)) {
+        fixedIncomeDynamic += p.qty * p.unitCost;
+        continue;
+      }
+
       const dailyMark = resolvePositionMark(p, date, quoteForDate, stockQuotes, lastKnownPrices);
       if (isOptionType(p.assetType)) {
         if (dailyMark != null) {
@@ -301,61 +306,54 @@ export function buildDailyPatrimonyMtmSeries(
       }
     }
 
-    const base = stocksValue + cash + fixedIncome;
+    const currentFixedIncome = fixedIncomeDynamic || fixedIncome; // Use dynamic if available, otherwise static
+    const base = stocksValue + cash + currentFixedIncome;
     const pending = Math.round(pendingSettlements * 100) / 100;
+    const lastAnchorDate = anchors.month_ends.length > 0 
+      ? anchors.month_ends[anchors.month_ends.length - 1]!.date 
+      : '';
+    const shouldCalibrate = calibrate && date <= lastAnchorDate;
+    const target = shouldCalibrate ? interpolatePatrimonyTarget(date, anchors) : 0;
     
-    // First pass: always compute the uncalibrated values
-    let optionsValue = Math.round((optionsFromMarket + optionsStructural) * 100) / 100;
+    let optionsValue: number;
+    if (!shouldCalibrate) {
+      optionsValue = Math.round((optionsFromMarket + optionsStructural) * 100) / 100;
+    } else if (optionsStructural === 0 && Object.keys(stockQuotes).length > 0) {
+      optionsValue = Math.round(optionsFromMarket * 100) / 100;
+    } else {
+      const residual = Math.round((target - base - pending - optionsFromMarket) * 100) / 100;
+      optionsValue = Math.round((optionsFromMarket + residual) * 100) / 100;
+    }
     let patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
     let patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
+
+    let hasOptions = false;
+    for (const p of positions.values()) {
+      if (Math.abs(p.qty) >= 0.0001 && isOptionType(p.assetType)) {
+        hasOptions = true;
+        break;
+      }
+    }
+
+    if (shouldCalibrate && Math.abs(patrimony - target) > 1 && hasOptions) {
+      optionsValue = Math.round((target - base - pending) * 100) / 100;
+      patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
+      patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
+    }
 
     rawPoints.push({
       date,
       stocksValue: Math.round(stocksValue * 100) / 100,
       optionsStructural: Math.round(optionsStructural * 100) / 100,
-      optionsFromMarket: Math.round(optionsFromMarket * 100) / 100,
       optionsValue,
       cash: Math.round(cash * 100) / 100,
-      fixedIncome,
+      fixedIncome: Math.round(currentFixedIncome * 100) / 100,
       pendingSettlements: pending,
       scheduledCashPending: Math.round(scheduledCashPending * 100) / 100,
       patrimonyGross,
       patrimony,
-      target: 0,
-      base,
+      target: shouldCalibrate ? Math.round(target * 100) / 100 : patrimony,
     });
-  }
-
-  // Second pass: apply calibration using dynamic anchors if needed
-  if (calibrate && rawPoints.length > 0) {
-    const lastPoint = rawPoints[rawPoints.length - 1]!;
-    
-    // Clone anchors so we can dynamically append the current month's final estimated value
-    const dynamicAnchors = {
-      month_ends: [...anchors.month_ends],
-      fixed_income_total: anchors.fixed_income_total,
-    };
-    
-    if (dynamicAnchors.month_ends.length > 0) {
-      const lastAnchor = dynamicAnchors.month_ends[dynamicAnchors.month_ends.length - 1]!;
-      if (lastPoint.date > lastAnchor.date) {
-        dynamicAnchors.month_ends.push({
-          date: lastPoint.date,
-          patrimony: lastPoint.patrimony
-        });
-      }
-    }
-
-    for (const p of rawPoints) {
-      const target = interpolatePatrimonyTarget(p.date, dynamicAnchors);
-      p.target = Math.round(target * 100) / 100;
-      
-      if (Math.abs(p.patrimony - target) > 1) {
-        p.optionsValue = Math.round((target - p.base - p.pendingSettlements) * 100) / 100;
-        p.patrimonyGross = Math.round((p.base + p.optionsValue) * 100) / 100;
-        p.patrimony = Math.round((p.patrimonyGross + p.pendingSettlements) * 100) / 100;
-      }
-    }
   }
 
   const series: DailyPatrimonyPoint[] = [];
