@@ -137,6 +137,7 @@ describe('LedgerEventProjection', () => {
     expect(events).toHaveLength(1);
     expect(events[0].transaction_type).toBe('buy');
     expect(events[0].total_net_value).toBe(-5212.34);
+    expect(events[0].skip_financial_ledger).toBe(true);
   });
 
   it('projeta opening_balance de PUT vendida (quantity_delta negativo) com qty abs e net signed', async () => {

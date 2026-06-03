@@ -21,6 +21,16 @@ describe('BtgExtractLineParser', () => {
     expect(row?.signedCash).toBeCloseTo(399.48);
   });
 
+  it('parseBtgMovementLine resolves reversed PDF amounts using previous balance', () => {
+    const row = parseBtgMovementLine(
+      '09/01/2026 Compra de Tesouro Direto: LFT 01/03/2031 54.160,08 6.795,79',
+      60955.87
+    );
+    expect(row?.balance).toBeCloseTo(6795.79);
+    expect(row?.movementAmount).toBeCloseTo(54160.08);
+    expect(row?.signedCash).toBeCloseTo(-54160.08);
+  });
+
   it('skips aggregated bolsa liquidation', () => {
     expect(
       classifyBtgDescription('LIQ BOLSA (Operacoes)- Pregão:05/01/2026').skip
@@ -93,6 +103,19 @@ describe('BtgExtractLineParser', () => {
       expect(buy).toBeDefined();
       expect(buy?.event_source_ref).toBe('BTG-TD:2026-01-09:LFT-20310301');
       expect(buy?.extract_category).toBe(1);
+    });
+
+    it('compra de TD continua correta quando o PDF inverte saldo e movimento', () => {
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 60.955,87',
+          '09/01/2026 Compra de Tesouro Direto: LFT 01/03/2031 54.160,08\t6.795,79',
+        ],
+        60955.87
+      );
+      const buy = entries.find((e) => e.operation === 'buy');
+      expect(buy?.quantity).toBeCloseTo(54160.08, 4);
+      expect(buy?.total_net_value).toBeCloseTo(-54160.08, 4);
     });
 
     it('IRRF cobrado sobre TD vira cost_adjustment no LFT com mesmo event_source_ref da TD', () => {

@@ -59,6 +59,7 @@ export type LedgerEvent = {
   b3_fees?: number | null;
   irrf_tax?: number | null;
   impacts_managerial_price?: boolean | number | null;
+  skip_financial_ledger?: boolean | number | null;
 };
 
 export type AssetCustodyState = {

@@ -318,8 +318,6 @@ export function buildDailyPatrimonyMtmSeries(
     let optionsValue: number;
     if (!shouldCalibrate) {
       optionsValue = Math.round((optionsFromMarket + optionsStructural) * 100) / 100;
-    } else if (optionsStructural === 0 && Object.keys(stockQuotes).length > 0) {
-      optionsValue = Math.round(optionsFromMarket * 100) / 100;
     } else {
       const residual = Math.round((target - base - pending - optionsFromMarket) * 100) / 100;
       optionsValue = Math.round((optionsFromMarket + residual) * 100) / 100;
@@ -327,15 +325,7 @@ export function buildDailyPatrimonyMtmSeries(
     let patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
     let patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
 
-    let hasOptions = false;
-    for (const p of positions.values()) {
-      if (Math.abs(p.qty) >= 0.0001 && isOptionType(p.assetType)) {
-        hasOptions = true;
-        break;
-      }
-    }
-
-    if (shouldCalibrate && Math.abs(patrimony - target) > 1 && hasOptions) {
+    if (shouldCalibrate && Math.abs(patrimony - target) > 1) {
       optionsValue = Math.round((target - base - pending) * 100) / 100;
       patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
       patrimony = Math.round((patrimonyGross + pending) * 100) / 100;

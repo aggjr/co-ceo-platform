@@ -239,6 +239,8 @@ export class LedgerEventProjection {
         b3_fees: patFees.b3,
         irrf_tax: patFees.irrf,
         impacts_managerial_price: impactsValuation,
+        skip_financial_ledger:
+          meta.skip_financial_ledger === true || meta.skip_financial_ledger === 1,
         _sortKey: `${date}|${row.created_at ?? ''}|${row.id}`,
       });
     }

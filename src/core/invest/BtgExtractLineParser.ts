@@ -23,6 +23,29 @@ export function parseBrNumber(raw: string): number {
   return Number(t);
 }
 
+function resolveBalanceAndMovementFromPrevious(
+  previousBalance: number,
+  a: number,
+  b: number
+): { balance: number; movement: number } {
+  const tol = 0.02;
+  const near = (x: number, y: number) => Math.abs(x - y) <= tol;
+  const fitA = near(Math.abs(previousBalance - a), Math.abs(b));
+  const fitB = near(Math.abs(previousBalance - b), Math.abs(a));
+  if (fitA && !fitB) return { balance: a, movement: Math.abs(b) };
+  if (fitB && !fitA) return { balance: b, movement: Math.abs(a) };
+
+  const hi = Math.max(a, b);
+  const lo = Math.min(a, b);
+  if (near(hi + lo, previousBalance) && previousBalance > 0) {
+    const hiRatio = hi / previousBalance;
+    if (hiRatio > 0.999 || lo < 100) return { balance: hi, movement: Math.abs(lo) };
+    return { balance: lo, movement: Math.abs(hi) };
+  }
+
+  return { balance: hi, movement: Math.abs(lo) };
+}
+
 export function parseBtgMovementLine(
   line: string,
   previousBalance: number | null
@@ -35,8 +58,14 @@ export function parseBtgMovementLine(
   if (numbers.length < 2) return null;
 
   /** BTG PDF: penúltimo = saldo após lançamento; último = valor do lançamento. */
-  const balance = parseBrNumber(numbers[numbers.length - 2]!);
-  const movementAmount = parseBrNumber(numbers[numbers.length - 1]!);
+  const a = parseBrNumber(numbers[numbers.length - 2]!);
+  const b = parseBrNumber(numbers[numbers.length - 1]!);
+  const resolved =
+    previousBalance != null && !Number.isNaN(previousBalance)
+      ? resolveBalanceAndMovementFromPrevious(previousBalance, a, b)
+      : { balance: a, movement: Math.abs(b) };
+  const balance = resolved.balance;
+  const movementAmount = resolved.movement;
   const descEnd = rest.lastIndexOf(numbers[numbers.length - 2]!);
   const description = rest.slice(0, descEnd).trim();
 
