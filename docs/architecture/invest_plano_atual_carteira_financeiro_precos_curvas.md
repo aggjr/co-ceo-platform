@@ -27,6 +27,41 @@ Conclusao pratica:
 2. Nao rodar nova importacao definitiva antes das correcoes P0-P3 deste documento.
 3. Depois das correcoes, refazer a importacao/replay preservando apenas a abertura confiavel de 2026-01-01 e as ancoras mensais que forem validadas.
 
+## 1.1 Direcao obrigatoria revisada em 2026-06-03
+
+O planejamento deve respeitar a seguinte hierarquia de verdade:
+
+1. **Abertura 2026-01-01**: ponto inicial confiavel de ativos e financeiro.
+2. **Ancoras mensais do home broker/corretora**: patrimonio total e rentabilidade mensal constatada. Essas ancoras nao sao apenas referencia visual; elas sao a regua de fechamento mensal do grafico.
+3. **Cotacoes diarias de acoes/FIIs**: obrigatorias para cada dia util e para cada ativo de renda variavel relevante. Acoes como PRIO3, ITUB4, BBAS3 e WEGE3 nao podem ser estimadas por interpolacao residual.
+4. **Extratos financeiros**: fonte do caixa liquidado e dos eventos financeiros.
+5. **Opcoes**: primeiro tentar cotacao observada em fonte externa; se nao encontrar, usar estimativa controlada por interpolacao/residuo para fechar o patrimonio contra as ancoras mensais.
+
+Regra importante: o residuo entre patrimonio calculado e patrimonio da corretora deve ser absorvido prioritariamente por opcoes sem preco observado, nunca por acoes. Se uma acao nao tem fechamento diario, o sistema deve buscar outra fonte ou bloquear o dia como incompleto.
+
+### Politica de cotacoes
+
+Para acoes e FIIs:
+
+- fechamento diario e obrigatorio;
+- buscar primeiro na brapi quando o range permitir;
+- se a brapi limitar o historico, buscar fonte alternativa, como Status Invest, Investidor10, Yahoo/Stooq ou outro provedor historico confiavel;
+- se nenhuma fonte retornar fechamento para um dia util, o dia deve ficar pendente;
+- carry-forward so pode ser usado para fim de semana/feriado sem pregao, nunca para dia util sem cotacao.
+
+Para opcoes:
+
+- tentar busca historica uma vez por ticker/fonte e guardar cache do resultado;
+- se encontrar preco observado, usar o preco observado;
+- se nao encontrar, marcar como `not_found` e permitir estimativa residual/interpolada;
+- a estimativa deve carregar metadata indicando fonte `estimated_anchor_residual`, data, valor e ancora mensal usada.
+
+Para patrimonio mensal:
+
+- a curva diaria deve fechar nos pontos mensais da corretora;
+- a diferenca entre o livro marcado a mercado e a ancora mensal deve ser explicada em relatorio;
+- se a diferenca vier de cotacao ausente de acao, e erro de dados, nao residuo de opcoes.
+
 ## 2. Estruturas relevantes para o objetivo atual
 
 O proximo agente nao precisa conhecer todas as areas do sistema. Para este objetivo, as estruturas relevantes sao estas.
@@ -52,23 +87,25 @@ Regra: carteira e PMs devem derivar do ledger, nao da tela.
 - `market_quotes_daily`: cotacoes historicas de acoes, FIIs, opcoes quando houver fonte, e benchmarks por ticker.
 - `market_index_daily`: CDI e indices.
 
-Regra: uma cotacao historica so pode ser gravada na data em que ela realmente ocorreu. Nunca gravar preco atual com data antiga.
+Regra: uma cotacao historica so pode ser gravada na data em que ela realmente ocorreu. Nunca gravar preco atual com data antiga. Para acoes/FIIs, a falta de cotacao em dia util e bloqueante.
 
 ### Curva de patrimonio
 
 - `invest_portfolio_daily`: patrimonio diario consolidado.
 - `invest_daily_snapshots`: posicoes por ativo no dia.
-- `invest_patrimony_monthly_anchors`: totais mensais do home broker, usados como referencia/ancora.
+- `invest_patrimony_monthly_anchors`: totais mensais do home broker, usados como ancora de fechamento mensal e rentabilidade constatada.
 
-Regra: curva principal deve ser economica e explicavel pelo livro + cotacoes validas. Ancora do home broker pode ajudar, mas nao pode mascarar erro do livro.
+Regra: curva principal deve ser economica e explicavel pelo livro + cotacoes validas, mas deve respeitar os pontos mensais constatados pela corretora. Ancora do home broker pode calibrar opcoes sem preco observado, mas nao pode mascarar cotacao ausente de acao nem erro de caixa.
 
 ## 3. Falhas encontradas na arquitetura atual
 
-### P0. Cotacoes historicas da brapi podem estar erradas
+### P0. Cotacoes historicas de acoes sao obrigatorias e nao podem cair em preco atual
 
 Arquivo:
 
 - `src/core/invest/B3QuoteProvider.ts`
+- `src/core/invest/InvestQuoteSyncService.ts`
+- `src/core/market/MarketQuoteRepository.ts`
 
 Problema:
 
@@ -76,12 +113,20 @@ Quando `fetchB3Quotes` recebe `asOfDate`, ele pede historico com `range=1mo`. Pa
 
 O codigo entao cai em `regularMarketPrice`, que e o preco atual/ultimo, mas mantem `asOf = asOfDate`. Na pratica, pode gravar o preco atual da PRIO3 como se fosse cotacao de 2026-01-xx.
 
+Problema adicional de produto:
+
+- a brapi pode limitar o historico disponivel pelo plano;
+- isso nao permite estimar acao;
+- se a brapi nao entregar o fechamento diario, o sistema deve procurar outra fonte;
+- a acao continua obrigatoria: PRIO3, ITUB4, BBAS3, WEGE3 e demais acoes/FIIs em carteira precisam ter fechamento diario real.
+
 Efeito:
 
 - Curva de PRIO3 fica errada.
 - `market_quotes_daily` fica contaminada.
 - Patrimonio diario fica errado porque usa essas cotacoes.
 - `invest_position_ext.last_price` pode ficar incoerente.
+- A diferenca contra a ancora mensal pode ser jogada indevidamente para opcoes, escondendo erro de acao.
 
 Correcao obrigatoria:
 
@@ -90,7 +135,13 @@ Correcao obrigatoria:
   - cotacao atual/latest;
   - cotacao historica.
 - Historico antigo deve vir de fonte historica confiavel, import de arquivo, backfill especifico ou endpoint com range suficiente.
+- Implementar cadeia de fontes para acoes/FIIs:
+  1. brapi, quando tiver range suficiente;
+  2. fonte alternativa historica, como Status Invest, Investidor10, Yahoo/Stooq ou provedor equivalente;
+  3. import/manual somente como ultimo recurso, mantendo metadata.
+- Para dia util sem fechamento de acao, bloquear materializacao do dia.
 - Metadado deve registrar se a cotacao e `historical_close`, `previous_close`, `latest_snapshot` ou `manual`.
+- `previous_close` so e aceitavel para dia sem pregao. Para dia util com pregao, precisa de `historical_close`.
 
 ### P1. Recalculo dos 3 precos ignora `asOfDate`
 
@@ -223,7 +274,7 @@ Correcao recomendada:
 - Criar relatorio de `matched`, `partial`, `unmatched`.
 - Quando nao bater, nao transformar em verdade silenciosa.
 
-### P6. Home broker mensal ainda nao tem contrato rigoroso
+### P6. Home broker mensal e ancora de resultado constatado
 
 Arquivos:
 
@@ -239,15 +290,24 @@ Efeito:
 
 - Ancoras podem nao entrar.
 - Opcoes sem cotacao diaria podem ser interpoladas ou estimadas sem rastreabilidade suficiente.
+- O sistema pode produzir rentabilidade TWR diferente da rentabilidade mensal constatada pela corretora, mesmo quando a ancora mensal existe.
 
 Correcao obrigatoria:
 
 - Definir schema minimo dos JSONs.
 - Exigir ou inferir `referenceDate` a partir do nome do arquivo, mas registrar a origem da inferencia.
+- Tratar a rentabilidade mensal/patrimonio mensal da corretora como fechamento constatado.
+- A curva diaria deve passar pelas ancoras mensais.
+- Se a curva economica nao fecha na ancora, explicar o delta em ordem:
+  1. cotacao ausente/incorreta de acao ou FII;
+  2. caixa/extrato divergente;
+  3. opcao com preco observado ausente;
+  4. residuo estimado de opcao.
 - Separar claramente:
   - preco observado;
   - preco interpolado;
   - valor residual para bater patrimonio.
+- Nunca usar residuo de opcao para compensar erro conhecido de acao ou de financeiro.
 
 ## 4. Erro na criacao das estruturas?
 
@@ -284,11 +344,15 @@ Depois das correcoes, o procedimento recomendado e:
    - tickers da carteira, especialmente PRIO3;
    - periodo 2026-01-01 ate `lastTrustedDate`;
    - rows `source='brapi'` com metadata `kind='last'` gravadas em data historica antiga devem ser consideradas suspeitas.
-4. Recarregar cotacoes historicas confiaveis antes de gravar patrimonio.
-5. Rodar replay da conciliacao.
-6. Rodar auditorias de consistencia.
+4. Recarregar cotacoes historicas confiaveis antes de gravar patrimonio:
+   - para acoes/FIIs, fechamento diario obrigatorio em todos os dias uteis;
+   - para opcoes, preco observado quando encontrado, senao estimativa documentada;
+   - para CDI, serie diaria em `market_index_daily`.
+5. Validar ancoras mensais da corretora e rentabilidades constatadas.
+6. Rodar replay da conciliacao.
+7. Rodar auditorias de consistencia.
 
-Ancoras mensais do home broker podem ser preservadas se os arquivos forem validados e tiverem `referenceDate` confiavel. Caso contrario, limpar e reimportar tambem.
+Ancoras mensais do home broker devem ser preservadas se os arquivos forem validados e tiverem `referenceDate` confiavel. Caso contrario, limpar e reimportar tambem. A curva diaria reconstruida deve fechar nessas ancoras; se nao fechar, o delta precisa aparecer em relatorio antes de o dia/mes ser considerado confiavel.
 
 ## 6. Ordem de correcao para os proximos agentes
 
@@ -303,10 +367,14 @@ Tarefas:
 - Ajustar `B3QuoteProvider` para nao gravar `regularMarketPrice` como historico antigo.
 - Adicionar log/erro claro quando historico nao estiver disponivel.
 - Marcar no retorno da conciliacao que dados atuais estao `untrusted` se houver cotacao faltante.
+- Implementar fallback de fonte para acoes/FIIs quando brapi nao tiver range suficiente.
+- Tornar cotacao de acao/FII em dia util requisito bloqueante.
 
 Aceite:
 
 - Pedir PRIO3 para 2026-01-15 nao pode gravar preco atual com `quote_date=2026-01-15`.
+- PRIO3 deve ter fechamento real para cada dia util do periodo confiavel.
+- Se uma fonte nao conseguir entregar PRIO3 em certo dia util, o sistema deve tentar a proxima fonte ou bloquear o dia.
 
 ### Etapa 2 - Corrigir fechamento as-of
 
@@ -367,6 +435,10 @@ Tarefas:
 
 - Rodar reset preservando opening.
 - Limpar cotacoes historicas suspeitas.
+- Carregar cotacoes historicas diarias obrigatorias de acoes/FIIs.
+- Carregar CDI diario.
+- Carregar/validar ancoras mensais do home broker.
+- Buscar opcoes historicas uma vez por ticker; se nao achar, registrar `not_found`.
 - Reimportar fontes.
 - Gerar relatorio final de validacao.
 
@@ -374,10 +446,11 @@ Aceite:
 
 - Carteira bate com home broker.
 - Financeiro bate com extrato.
-- PRIO3 bate com fonte historica externa.
+- PRIO3 e demais acoes/FIIs batem com fonte historica externa em todos os dias uteis.
 - CDI tem serie consistente.
 - 3 PMs de PRIO3 e demais acoes batem com regra definida.
-- Patrimonio diario fecha com livro + cotacoes + ancoras justificadas.
+- Patrimonio diario fecha com livro + cotacoes reais de acoes + estimativas documentadas de opcoes + ancoras mensais constatadas.
+- Rentabilidade mensal do sistema respeita a rentabilidade constatada nas ancoras da corretora, salvo delta explicitamente explicado e marcado como pendencia.
 
 ## 7. Validacoes obrigatorias antes de considerar concluido
 
@@ -404,10 +477,13 @@ Aceite:
 
 ### Curvas
 
-- PRIO3 usa cotacao historica real em `market_quotes_daily`.
+- PRIO3 e demais acoes/FIIs usam cotacao historica real em `market_quotes_daily` para todo dia util.
 - CDI usa `market_index_daily`.
 - Patrimonio usa `invest_portfolio_daily` somente para dias confiaveis.
-- Datas sem cotacao devem aparecer como pendencia ou usar regra explicita de carry-forward, nunca preco atual disfarçado de historico.
+- Datas sem cotacao de acao em dia util devem aparecer como pendencia bloqueante.
+- Carry-forward so e aceito para fim de semana/feriado sem pregao.
+- Opcoes sem preco observado podem receber interpolacao/residuo, desde que documentado por ticker e por periodo.
+- A curva do patrimonio deve passar pelas ancoras mensais da corretora.
 
 ## 8. Arquivos que o proximo agente deve abrir primeiro
 
@@ -436,11 +512,14 @@ Nao comece por UI. A UI esta mostrando erro produzido pelo dominio.
   - financeiro;
   - 3 precos;
   - curvas de patrimonio/PRIO/CDI.
+- As ancoras mensais da corretora sao a regua de rentabilidade constatada.
+- Cotacao diaria de acao/FII e obrigatoria em dia util; nao estimar acao por residuo.
+- Residuo/interpolacao e ferramenta para opcoes sem preco observado, nao para corrigir erro de acao ou financeiro.
 - Nao aceitar grafico bonito se a fonte de cotacao ou o as-of estiver incorreto.
 
 ## 10. Frase guia para os proximos agentes
 
-Nao tente consertar o grafico diretamente. Primeiro garanta que cada dia usa apenas ledger e cotacoes validas daquele dia; depois reconstrua carteira, financeiro, PMs e patrimonio a partir dessa base.
+Nao tente consertar o grafico diretamente. Primeiro garanta que cada dia usa apenas ledger, caixa e cotacoes reais de acoes daquele dia; depois estime somente o que faltar nas opcoes para fechar contra as ancoras mensais da corretora.
 
 ## 11. Progresso e Implementações Concluídas (2026-06-03)
 
@@ -460,5 +539,17 @@ Aplicado um algoritmo dinâmico (`interpolatePatrimonyTarget`) na 2ª passagem d
 
 ### 11.5. Busca e Cache Otimizados de Histórico de Opções
 Criado o serviço independente `OptionHistoricalSyncService.ts` e o cache `invest_options_fetch_cache`. As pesquisas só tentam raspagens pesadas em APIs abertas (opcoes.net, Status Invest) 1 vez por ativo. Caso a série não exista nessas fontes (ex: opções exóticas não listadas historicamente), grava-se `status = NOT_FOUND` de forma persistente, evitando atrasos sistêmicos eternos e passando aquela opção diretamente para marcação via calibração residual (Plug).
+
+### 11.6. Revalidacao obrigatoria apos revisao de 2026-06-03
+
+Mesmo que as correcoes acima estejam integradas, elas so podem ser consideradas suficientes se passarem nestes criterios:
+
+- nenhuma acao/FII em carteira pode usar `unitCost`, preco atual ou residuo como fechamento de dia util;
+- PRIO3 precisa ter fechamento diario real para todos os dias uteis do periodo confiavel;
+- as ancoras mensais da corretora precisam ser reproduzidas pela curva mensal do sistema;
+- qualquer diferenca residual deve ser atribuida somente a opcoes sem preco observado e registrada em metadata;
+- se faltar cotacao de acao, o replay deve parar ou marcar o dia como pendente, nao prosseguir silenciosamente.
+
+Se qualquer criterio falhar, os dados gerados continuam em homologacao/untrusted e a importacao deve ser refeita apos a correcao.
 
 *(Status: Integrado à Main na versão V0.0.263)*
