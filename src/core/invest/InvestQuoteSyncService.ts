@@ -137,6 +137,31 @@ export class InvestQuoteSyncService {
     };
   }
 
+  async syncHistoricalFromBrapi(ctx: UserContext): Promise<number> {
+    if (!ctx.organizationId) throw new Error('organizationId obrigatório.');
+    const tickers = await this.listB3QuoteTickers(ctx);
+    if (!tickers.length) return 0;
+    
+    const quotes = await fetchB3Quotes(tickers, {
+      returnAllHistory: true,
+      token: process.env.BRAPI_TOKEN,
+    });
+    
+    let updated = 0;
+    const marketCtx = authBootstrapContext();
+    for (const q of quotes) {
+      await this.marketQuotes.upsertQuote(marketCtx, {
+        ticker: q.ticker,
+        quoteDate: q.asOf,
+        closingPrice: q.price,
+        source: 'brapi',
+        metadata: { kind: q.kind },
+      });
+      updated++;
+    }
+    return updated;
+  }
+
   /** Atualiza last_price em invest_position_ext (ações, opções, FIIs). */
   async applyLastPrices(
     ctx: UserContext,

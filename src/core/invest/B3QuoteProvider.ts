@@ -15,6 +15,7 @@ export type B3QuoteResult = {
 export type FetchB3QuotesOptions = {
   /** Data do fechamento desejado (YYYY-MM-DD). Se omitido, usa último pregão disponível. */
   asOfDate?: string;
+  returnAllHistory?: boolean;
   token?: string;
   baseUrl?: string;
 };
@@ -75,18 +76,33 @@ function sleep(ms: number): Promise<void> {
 
 function parseQuoteRows(
   rows: BrapiQuoteRow[],
-  asOfDate: string | undefined
+  options: { asOfDate?: string; returnAllHistory?: boolean }
 ): B3QuoteResult[] {
   const results: B3QuoteResult[] = [];
   for (const row of rows) {
     const ticker = String(row.symbol || '').toUpperCase();
     if (!ticker) continue;
 
+    if (options.returnAllHistory && row.historicalDataPrice?.length) {
+      for (const bar of row.historicalDataPrice) {
+        if (Number.isFinite(bar.close) && bar.close > 0) {
+          results.push({
+            ticker,
+            price: Math.round(bar.close * 10000) / 10000,
+            asOf: utcDateFromUnixSeconds(bar.date),
+            source: 'brapi',
+            kind: 'close',
+          });
+        }
+      }
+      continue;
+    }
+
     let price: number | null = null;
     let kind: 'close' | 'last' = 'last';
-    let asOf = asOfDate || new Date().toISOString().slice(0, 10);
+    let asOf = options.asOfDate || new Date().toISOString().slice(0, 10);
 
-    if (asOfDate) {
+    if (options.asOfDate) {
       const close = pickCloseForDate(row, asOfDate);
       if (close != null) {
         price = close;
@@ -124,6 +140,7 @@ async function fetchBrapiBatch(
     base: string;
     token: string;
     asOfDate?: string;
+    returnAllHistory?: boolean;
     needsHistory: boolean;
   }
 ): Promise<B3QuoteResult[]> {
@@ -166,7 +183,7 @@ async function fetchBrapiBatch(
     throw new Error(`brapi HTTP ${res.status} (${symbols}): ${msg}`);
   }
 
-  return parseQuoteRows(json.results || [], options.asOfDate);
+  return parseQuoteRows(json.results || [], { asOfDate: options.asOfDate, returnAllHistory: options.returnAllHistory });
 }
 
 /** Busca cotações na brapi (1 ticker/request no plano gratuito). */
@@ -180,7 +197,7 @@ export async function fetchB3Quotes(
   const base = (options.baseUrl || DEFAULT_BASE).replace(/\/$/, '');
   const token = options.token || process.env.BRAPI_TOKEN || '';
   const asOfDate = options.asOfDate?.slice(0, 10);
-  const needsHistory = Boolean(asOfDate);
+  const needsHistory = Boolean(asOfDate || options.returnAllHistory);
   const batchSize = tickersPerRequest();
   const results: B3QuoteResult[] = [];
 
@@ -192,6 +209,7 @@ export async function fetchB3Quotes(
         base,
         token,
         asOfDate,
+        returnAllHistory: options.returnAllHistory,
         needsHistory,
       }))
     );
