@@ -7,6 +7,7 @@ import { LedgerImportService } from '../core/invest/LedgerImportService';
 import { PatrimonyDailyRebuildService } from '../core/invest/PatrimonyDailyRebuildService';
 import { DailyCloseMaterializeService } from '../core/invest/reconcile/DailyCloseMaterializeService';
 import { OptionCDailyCloseOrchestrator } from '../core/invest/reconcile/OptionCDailyCloseOrchestrator';
+import { ReconciliationDiagnosticsService } from '../core/invest/reconcile/ReconciliationDiagnosticsService';
 import { PatrimonyMonthlyAnchorsSeedService } from '../core/invest/PatrimonyMonthlyAnchorsSeedService';
 import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
 import { logReconcileEvent, logReconcileFailure } from '../core/invest/reconcile/reconcileErrorDetail';
@@ -17,6 +18,7 @@ export class ReconcileController {
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly dailyClose: DailyCloseMaterializeService;
   private readonly optionC: OptionCDailyCloseOrchestrator;
+  private readonly diagnostics: ReconciliationDiagnosticsService;
   private readonly anchorSeed: PatrimonyMonthlyAnchorsSeedService;
   private readonly anchorsRepo: PatrimonyMonthlyAnchorsRepository;
 
@@ -29,6 +31,7 @@ export class ReconcileController {
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.dailyClose = new DailyCloseMaterializeService(gateway);
     this.optionC = new OptionCDailyCloseOrchestrator(gateway, pool);
+    this.diagnostics = new ReconciliationDiagnosticsService(gateway);
     this.anchorSeed = new PatrimonyMonthlyAnchorsSeedService(gateway);
     this.anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
   }
@@ -124,6 +127,28 @@ export class ReconcileController {
     } catch (error: unknown) {
       const detail = logReconcileFailure('recalc-all', orgId ?? undefined, error);
       return res.status(500).json({
+        success: false,
+        error: detail.message,
+        errorDetail: detail,
+      });
+    }
+  };
+
+  /** GET /api/invest/reconcile/diagnostics - batimento individual de ativos, eventos e caixa */
+  diagnosticsReport = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
+    try {
+      if (!orgId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const asOf = req.query.asOf ? String(req.query.asOf).slice(0, 10) : undefined;
+      const report = await this.diagnostics.build(ctx, asOf);
+      return res.json(report);
+    } catch (error: unknown) {
+      const detail = logReconcileFailure('diagnostics', orgId ?? undefined, error);
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      return res.status(status).json({
         success: false,
         error: detail.message,
         errorDetail: detail,

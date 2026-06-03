@@ -517,6 +517,25 @@ export async function InvestConciliacaoPage(container) {
         </table>
       </div>
     </div>
+
+    <div class="conciliacao-action-panel conciliacao-results-panel">
+      <div class="conciliacao-panel-heading">
+        <div>
+          <p class="conciliacao-kicker">Batimento individual</p>
+          <h2>Conferir carteira, eventos e caixa</h2>
+        </div>
+        <button id="btn-load-diagnostics" class="btn btn-primary" type="button">Conferir agora</button>
+      </div>
+      <p class="muted">
+        Use esta conferência antes de confiar no gráfico: ela cruza livro, posição atual, snapshot do home broker,
+        3 preços, eventos de negócio e saldo em transição.
+      </p>
+      <div id="diagnostics-summary" class="conciliacao-status-text"></div>
+      <div id="diagnostics-critical-host" class="portfolio-excel-section"></div>
+      <div id="diagnostics-assets-host" class="portfolio-excel-section"></div>
+      <div id="diagnostics-events-host" class="portfolio-excel-section"></div>
+      <div id="diagnostics-cash-host" class="portfolio-excel-section"></div>
+    </div>
   `);
   container.querySelector('#option-c-panel h2')?.insertAdjacentHTML('afterend', `
     <div class="conciliacao-stage-strip" aria-label="Etapas da homologação">
@@ -948,6 +967,12 @@ export async function InvestConciliacaoPage(container) {
   const optcFilesSummary = container.querySelector('#optc-files-summary');
   const optcNotesAnalysis = container.querySelector('#optc-notes-analysis');
   const optcProcessState = document.createElement('span');
+  const btnLoadDiagnostics = container.querySelector('#btn-load-diagnostics');
+  const diagnosticsSummary = container.querySelector('#diagnostics-summary');
+  const diagnosticsCriticalHost = container.querySelector('#diagnostics-critical-host');
+  const diagnosticsAssetsHost = container.querySelector('#diagnostics-assets-host');
+  const diagnosticsEventsHost = container.querySelector('#diagnostics-events-host');
+  const diagnosticsCashHost = container.querySelector('#diagnostics-cash-host');
 
   let optcNotesFiles = [];
   let optcExtractFiles = [];
@@ -1046,6 +1071,110 @@ export async function InvestConciliacaoPage(container) {
     if (s.includes('erro') || s.includes('parou')) return 'err';
     if (s.includes('final') || s.includes('analis') || s.includes('lido') || s.includes('import')) return 'ok';
     return 'pending';
+  }
+
+  function diagnosticTone(status) {
+    const s = String(status || '').toLowerCase();
+    if (s.includes('error') || s.includes('missing')) return 'err';
+    if (s.includes('warn')) return 'pending';
+    return 'ok';
+  }
+
+  function renderStatusCell(row) {
+    const span = document.createElement('span');
+    span.className = `import-status import-status--${diagnosticTone(row.status)}`;
+    span.textContent = row.status || '';
+    return span;
+  }
+
+  function mountDiagnostics(report) {
+    const summary = report.summary || {};
+    const snap = report.snapshot;
+    if (diagnosticsSummary) {
+      diagnosticsSummary.textContent =
+        `Data ${report.asOf || '-'} · snapshot ${snap?.referenceDate || 'não encontrado'} · ` +
+        `${summary.criticalFindings || 0} achado(s) crítico(s), ` +
+        `${summary.assetErrors || 0} ativo(s), ${summary.eventErrors || 0} evento(s), ` +
+        `${summary.cashErrors || 0} financeiro(s) com erro.`;
+    }
+
+    mountCoCeoExcelGrid(diagnosticsCriticalHost, {
+      caption: 'Achados críticos',
+      gridId: 'invest-conciliacao-diagnostico-critico',
+      rows: report.critical || [],
+      emptyText: 'Nenhum achado crítico encontrado.',
+      summaryLabels: { total: 'Achados', selected: '' },
+      fixedLeadingColumns: 2,
+      coCeoColumns: [
+        { key: 'area', label: 'Área', type: 'text', width: '140px', sticky: true },
+        { key: 'severity', label: 'Severidade', type: 'text', width: '130px', sticky: true },
+        { key: 'finding', label: 'Achado', type: 'text', width: '980px' },
+      ],
+    });
+
+    mountCoCeoExcelGrid(diagnosticsAssetsHost, {
+      caption: 'Ativos: livro × posição atual × home broker × 3 preços',
+      gridId: 'invest-conciliacao-diagnostico-ativos',
+      rows: report.assets || [],
+      emptyText: 'Sem ativos para conferir.',
+      summaryLabels: { total: 'Ativos', selected: '' },
+      fixedLeadingColumns: 3,
+      coCeoColumns: [
+        { key: 'status', label: 'Status', type: 'text', width: '110px', sticky: true, render: renderStatusCell },
+        { key: 'ticker', label: 'Ticker', type: 'text', width: '110px', sticky: true },
+        { key: 'assetType', label: 'Tipo', type: 'text', width: '130px', sticky: true },
+        { key: 'ledgerQty', label: 'Qtd livro', type: 'number', width: '120px' },
+        { key: 'storedQty', label: 'Qtd tela', type: 'number', width: '120px' },
+        { key: 'brokerMarkQty', label: 'Qtd broker', type: 'number', width: '120px' },
+        { key: 'brokerPendingQty', label: 'Qtd pendente broker', type: 'number', width: '160px' },
+        { key: 'qtyDelta', label: 'Delta qtd', type: 'number', width: '120px' },
+        { key: 'pmEstrito', label: 'PM estrito', type: 'currency', width: '130px' },
+        { key: 'pmB3', label: 'PM B3', type: 'currency', width: '120px' },
+        { key: 'pmGerencial', label: 'Meu PM', type: 'currency', width: '120px' },
+        { key: 'brokerAvgPrice', label: 'PM broker', type: 'currency', width: '130px' },
+        { key: 'avgPriceDelta', label: 'Delta PM', type: 'number', width: '120px' },
+        { key: 'lastPrice', label: 'Cotação', type: 'currency', width: '120px' },
+        { key: 'finding', label: 'Diagnóstico', type: 'text', width: '620px' },
+      ],
+    });
+
+    mountCoCeoExcelGrid(diagnosticsEventsHost, {
+      caption: 'Eventos de negócio: elo entre ativo e financeiro',
+      gridId: 'invest-conciliacao-diagnostico-eventos',
+      rows: report.businessEvents || [],
+      emptyText: 'Sem eventos para conferir.',
+      summaryLabels: { total: 'Eventos', selected: '' },
+      fixedLeadingColumns: 3,
+      coCeoColumns: [
+        { key: 'status', label: 'Status', type: 'text', width: '110px', sticky: true, render: renderStatusCell },
+        { key: 'date', label: 'Data', type: 'text', width: '120px', sticky: true },
+        { key: 'tickers', label: 'Ativos', type: 'text', width: '230px', sticky: true },
+        { key: 'patrimonyLegs', label: 'Pernas ativo', type: 'number', width: '130px' },
+        { key: 'cashLegs', label: 'Pernas caixa', type: 'number', width: '130px' },
+        { key: 'tradeCash', label: 'Valor ativo', type: 'currency', width: '140px' },
+        { key: 'clearedCash', label: 'Caixa liquidado', type: 'currency', width: '150px' },
+        { key: 'pendingCash', label: 'Caixa trânsito', type: 'currency', width: '150px' },
+        { key: 'openPending', label: 'Trânsito aberto', type: 'currency', width: '150px' },
+        { key: 'finding', label: 'Diagnóstico', type: 'text', width: '650px' },
+      ],
+    });
+
+    mountCoCeoExcelGrid(diagnosticsCashHost, {
+      caption: 'Financeiro e renda fixa',
+      gridId: 'invest-conciliacao-diagnostico-caixa',
+      rows: report.cash || [],
+      emptyText: 'Sem dados financeiros.',
+      summaryLabels: { total: 'Linhas', selected: '' },
+      fixedLeadingColumns: 2,
+      coCeoColumns: [
+        { key: 'status', label: 'Status', type: 'text', width: '110px', sticky: true, render: renderStatusCell },
+        { key: 'item', label: 'Item', type: 'text', width: '220px', sticky: true },
+        { key: 'systemValue', label: 'Sistema', type: 'currency', width: '150px' },
+        { key: 'brokerValue', label: 'Broker', type: 'currency', width: '150px' },
+        { key: 'delta', label: 'Delta', type: 'currency', width: '150px' },
+        { key: 'finding', label: 'Diagnóstico', type: 'text', width: '720px' },
+      ],
+    });
   }
 
   function renderOptcFileTables() {
@@ -1411,6 +1540,29 @@ export async function InvestConciliacaoPage(container) {
 
   void refreshOptcAnchorsStatus();
 
+  async function loadDiagnostics() {
+    if (btnLoadDiagnostics) btnLoadDiagnostics.disabled = true;
+    if (diagnosticsSummary) diagnosticsSummary.textContent = 'Conferindo carteira, eventos e caixa...';
+    try {
+      const data = await apiRequest('/api/invest/reconcile/diagnostics');
+      mountDiagnostics(data);
+      appendLog(
+        logEl,
+        `Conferência individual: ${data.summary?.criticalFindings || 0} achado(s) crítico(s).`,
+        (data.summary?.criticalFindings || 0) ? 'warn' : 'ok'
+      );
+    } catch (err) {
+      if (diagnosticsSummary) diagnosticsSummary.textContent = `Erro na conferência: ${err.message}`;
+      appendLog(logEl, `Conferência individual: ${err.message}`, 'err');
+    } finally {
+      if (btnLoadDiagnostics) btnLoadDiagnostics.disabled = false;
+    }
+  }
+
+  btnLoadDiagnostics?.addEventListener('click', () => {
+    void loadDiagnostics();
+  });
+
   btnOptcStart?.addEventListener('click', async () => {
     if (!optcNotesFiles.length || !optcExtractFiles.length) return;
     logOptcBrowser('info', 'option-c.start.request', {
@@ -1556,6 +1708,7 @@ export async function InvestConciliacaoPage(container) {
           phase: optcState?.phase,
           dayIndex: optcState?.dayIndex,
         });
+        await loadDiagnostics();
       } else {
         setProcessState('Parou', 'err');
         setFileRowsStatus('Extrato', 'Parou', serverRun.message || 'Processo pausado no servidor.');

@@ -205,6 +205,13 @@ router.post(
   reconcile.recalcAll.bind(reconcile)
 );
 
+router.get(
+  '/invest/reconcile/diagnostics',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  reconcile.diagnosticsReport.bind(reconcile)
+);
+
 router.post(
   '/invest/reconcile/option-c/start',
   AuthMiddleware.protect,
