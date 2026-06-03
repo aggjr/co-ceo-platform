@@ -441,3 +441,24 @@ Nao comece por UI. A UI esta mostrando erro produzido pelo dominio.
 ## 10. Frase guia para os proximos agentes
 
 Nao tente consertar o grafico diretamente. Primeiro garanta que cada dia usa apenas ledger e cotacoes validas daquele dia; depois reconstrua carteira, financeiro, PMs e patrimonio a partir dessa base.
+
+## 11. Progresso e Implementações Concluídas (2026-06-03)
+
+As seguintes etapas e refatorações foram concluídas e validadas:
+
+### 11.1. Bloqueio de Falsas Cotações Históricas e Carry-Forward
+A estrutura do `B3QuoteProvider.ts` foi ajustada para impedir o vazamento do preço atual ao solicitar um fechamento as-of histórico. Também foi adicionado o cache temporal `lastKnownPrices` no `PatrimonyMtmDailyEngine.ts`. Assim, se uma cotação faltar no final de semana, o ativo preserva o preço do último dia útil fechado em vez de despencar para o `unitCost` (o que causava gráficos defeituosos de cotação para ativos como PRIO3).
+
+### 11.2. Fechamento AS-OF e Horizonte de Rebuild
+Foi corrigido o loop do tempo, garantindo que nenhum recálculo histórico de preços, patrimônios ou relatórios enxergue eventos do futuro que ainda não haviam ocorrido na respectiva data de D.
+
+### 11.3. Orquestração Simultânea de Notas e Extratos
+As conciliações foram unificadas no `OptionCDailyCloseOrchestrator` para não processar isoladamente patrimônios de opções que não conversam com o saldo em conta corrente na mesma data de transação.
+
+### 11.4. Calibração de Patrimônio Diário via Interpolação (Residual Plug)
+Aplicado um algoritmo dinâmico (`interpolatePatrimonyTarget`) na 2ª passagem do `PatrimonyMtmDailyEngine`. O alvo do Home Broker (via `month_ends`) passou a interpolar dia-a-dia. Se falta "X reais" na conta para o gráfico bater com a âncora correta do patrimônio, esses reais são absorvidos pelas posições estruturais em Opções na forma de *plugFactor* ou *plugOffset*.
+
+### 11.5. Busca e Cache Otimizados de Histórico de Opções
+Criado o serviço independente `OptionHistoricalSyncService.ts` e o cache `invest_options_fetch_cache`. As pesquisas só tentam raspagens pesadas em APIs abertas (opcoes.net, Status Invest) 1 vez por ativo. Caso a série não exista nessas fontes (ex: opções exóticas não listadas historicamente), grava-se `status = NOT_FOUND` de forma persistente, evitando atrasos sistêmicos eternos e passando aquela opção diretamente para marcação via calibração residual (Plug).
+
+*(Status: Integrado à Main na versão V0.0.263)*
