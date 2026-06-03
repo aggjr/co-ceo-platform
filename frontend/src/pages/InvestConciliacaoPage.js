@@ -1495,8 +1495,29 @@ export async function InvestConciliacaoPage(container) {
 
   async function pollOptcRunUntilDone() {
     if (!optcRunId) return;
+    let transientErrors = 0;
     for (let guard = 0; guard < 720; guard += 1) {
-      const data = await apiRequest(`/api/invest/reconcile/option-c/status/${encodeURIComponent(optcRunId)}`);
+      let data;
+      try {
+        data = await apiRequest(`/api/invest/reconcile/option-c/status/${encodeURIComponent(optcRunId)}`);
+        transientErrors = 0;
+      } catch (err) {
+        transientErrors += 1;
+        const msg = err?.message || String(err);
+        appendLog(
+          logEl,
+          `⚠️ Status temporariamente indisponível (${transientErrors}/12): ${msg}`,
+          'warn'
+        );
+        logOptcBrowser('warn', 'option-c.status.transient-error', {
+          runId: optcRunId,
+          transientErrors,
+          message: msg,
+        });
+        if (transientErrors >= 12) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        continue;
+      }
       optcState = data.state;
       updateOptcProgress(optcState);
       const lines = optcState?.activityLog || [];

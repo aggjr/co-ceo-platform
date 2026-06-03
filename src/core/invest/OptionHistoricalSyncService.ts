@@ -32,11 +32,18 @@ export class OptionHistoricalSyncService {
       // Como a tabela cacheia por data, verificamos se existe *alguma* entrada NOT_FOUND
       // ou se há pelo menos um registro com data recente. Para simplificar, buscamos
       // qualquer registro para o ticker com status NOT_FOUND, indicando que a API não possui a série.
-      const cacheCheck = await this.gateway.findWhere(
-        globalCtx,
-        'invest_options_fetch_cache',
-        { ticker, status: 'NOT_FOUND' }
-      );
+      let cacheCheck: Record<string, unknown>[] = [];
+      try {
+        cacheCheck = await this.gateway.findWhere(
+          globalCtx,
+          'invest_options_fetch_cache',
+          { ticker, status: 'NOT_FOUND' }
+        );
+      } catch (err: any) {
+        if (err?.code !== 'ER_NO_SUCH_TABLE' && !String(err?.message || '').includes("doesn't exist")) {
+          throw err;
+        }
+      }
       
       if (cacheCheck.length > 0) {
         continue; // Já pesquisamos em todos os lugares e não existe. Pula direto para interpolação.
@@ -58,8 +65,10 @@ export class OptionHistoricalSyncService {
             'invest_options_fetch_cache',
             {
               ticker,
+              quote_date: new Date().toISOString().slice(0, 10),
               fetch_date: new Date().toISOString().slice(0, 10),
               status: 'NOT_FOUND',
+              source: 'brapi',
               source_system: 'brapi'
             }
           );

@@ -58,7 +58,9 @@ export class ExternalOptionQuoteFetcher {
       return null;
     } catch (err: any) {
       // Se a tabela não existir, apenas ignoramos para não quebrar (embora devesse existir)
-      console.error(`Error querying invest_options_fetch_cache: ${err.message}`);
+      if (err?.code !== 'ER_NO_SUCH_TABLE') {
+        console.error(`Error querying invest_options_fetch_cache: ${err.message}`);
+      }
       return null;
     } finally {
       conn.release();
@@ -69,13 +71,22 @@ export class ExternalOptionQuoteFetcher {
     const conn = await (this.gateway as any).pool.getConnection();
     try {
       await conn.query(
-        `INSERT INTO invest_options_fetch_cache (ticker, quote_date, closing_price, status, source)
-         VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE closing_price = VALUES(closing_price), status = VALUES(status), source = VALUES(source)`,
-        [quote.ticker, quote.quoteDate, quote.closingPrice, quote.status, quote.source]
+        `INSERT INTO invest_options_fetch_cache (ticker, quote_date, fetch_date, closing_price, status, source)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE closing_price = VALUES(closing_price), status = VALUES(status), source = VALUES(source), fetch_date = VALUES(fetch_date)`,
+        [
+          quote.ticker,
+          quote.quoteDate,
+          new Date().toISOString().slice(0, 10),
+          quote.closingPrice,
+          quote.status,
+          quote.source,
+        ]
       );
     } catch (err: any) {
-      console.error(`Error saving to invest_options_fetch_cache: ${err.message}`);
+      if (err?.code !== 'ER_NO_SUCH_TABLE') {
+        console.error(`Error saving to invest_options_fetch_cache: ${err.message}`);
+      }
     } finally {
       conn.release();
     }

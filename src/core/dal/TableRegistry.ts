@@ -143,6 +143,12 @@ const TABLES: TableDefinition[] = [
     countsTowardStorage: false,
   }),
   // ===== Mercado (cotações e índices compartilhados, ver migration 20) =====
+  def('invest_options_fetch_cache', 'global', {
+    softDelete: false,
+    primaryKey: 'ticker',
+    primaryKeyColumns: ['ticker', 'quote_date'],
+    countsTowardStorage: false,
+  }),
   def('market_instruments', 'global', {
     softDelete: false,
     primaryKey: 'ticker',
