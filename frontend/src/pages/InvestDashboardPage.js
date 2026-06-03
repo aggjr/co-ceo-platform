@@ -211,12 +211,6 @@ export async function InvestDashboardPage(container) {
           <p class="muted">Carregando...</p>
         </${D}>
       </${D}>
-      <nav class="invest-patrimony-links" aria-label="Atalhos INVEST">
-        <a href="/invest/portfolio" data-link>Portfólio →</a>
-        · <a href="/invest/historico-operacoes" data-link>Notas / operações →</a>
-        · <a href="/invest/ganhos-por-acao" data-link>Resultados por ação →</a>
-        · <a href="/invest/conciliacao" data-link>Conciliação →</a>
-      </nav>
     </${D}>
   </${D}>`;
 

@@ -18,20 +18,6 @@
   overflow: visible;
 }
 
-.invest-patrimony-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  padding-top: 4px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  margin-top: 8px;
-}
-
-.invest-patrimony-links a {
-  font-size: 13px;
-  font-weight: 600;
-}
-
 .patrimony-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -134,13 +120,15 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  height: 480px;
-  min-height: 460px;
+  height: clamp(460px, calc(100vh - 340px), 680px);
+  min-height: 420px;
   box-sizing: border-box;
 }
 
 .holding-chart-canvas-wrap canvas {
   display: block;
+  width: 100% !important;
+  height: 100% !important;
   max-width: 100% !important;
 }
 

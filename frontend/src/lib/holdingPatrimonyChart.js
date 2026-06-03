@@ -60,6 +60,32 @@ function indexedToPct(indexLevel) {
   return (Number(indexLevel) / 100 - 1) * 100;
 }
 
+function visibleAxisBounds(chart) {
+  const values = [];
+  chart.data.datasets.forEach((dataset, index) => {
+    if (!chart.isDatasetVisible(index)) return;
+    (dataset.data || []).forEach((v) => {
+      const n = Number(v);
+      if (Number.isFinite(n)) values.push(n);
+    });
+  });
+  if (!values.length) return { min: 97, max: 103 };
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const spread = Math.max(1, max - min);
+  const padding = Math.max(2, spread * 0.08);
+  return {
+    min: Math.floor((min - padding) * 10) / 10,
+    max: Math.ceil((max + padding) * 10) / 10,
+  };
+}
+
+function applyVisibleAxisBounds(chart) {
+  const bounds = visibleAxisBounds(chart);
+  chart.options.scales.yIndex.min = bounds.min;
+  chart.options.scales.yIndex.max = bounds.max;
+}
+
 function isoDate(value) {
   return String(value ?? '').slice(0, 10);
 }
@@ -269,16 +295,6 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
     ? `${opts.datasetLabel} (TWR %)`
     : 'Carteira (TWR %)';
 
-  const indexLevels = [
-    ...portfolioIndexed,
-    ...(hasCdi ? cdiValues : []),
-    ...(hasStock ? stockValues : []),
-  ].filter((v) => v != null && Number.isFinite(Number(v)));
-  const idxMin = indexLevels.length ? Math.min(...indexLevels.map(Number)) : 100;
-  const idxMax = indexLevels.length ? Math.max(...indexLevels.map(Number)) : 100;
-  const yPadding = Math.max(3, (idxMax - idxMin) * 0.06);
-  const yAxisMin = Math.min(100, idxMin) - yPadding;
-
   /** @type {import('chart.js').ChartDataset[]} */
   /** @type {import('chart.js').ChartDataset[]} */
   const datasets = [];
@@ -359,6 +375,7 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
             if (index == null) return;
             const visible = chart.isDatasetVisible(index);
             chart.setDatasetVisibility(index, !visible);
+            applyVisibleAxisBounds(chart);
             chart.update();
           },
         },
@@ -395,7 +412,6 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
       scales: {
         yIndex: {
           position: 'left',
-          min: yAxisMin,
           grid: { color: 'rgba(255,255,255,0.06)' },
           ticks: {
             color: '#94A3B8',
@@ -424,10 +440,12 @@ export function mountHoldingPatrimonyChart(canvas, series, opts = {}) {
     },
   });
 
+  applyVisibleAxisBounds(activeChart);
+  activeChart.update('none');
+
   const syncChartLayout = () => {
     if (!activeChart || !wrap) return;
     activeChart.resize();
-    wrap.style.height = `${Math.max(460, activeChart.height)}px`;
   };
 
   syncChartLayout();
