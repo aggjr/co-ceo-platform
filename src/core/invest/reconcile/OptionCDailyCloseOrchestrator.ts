@@ -3,6 +3,9 @@ import type { CoCeoDataGateway, UserContext } from '../../dal';
 import { GatewayError } from '../../dal/errors';
 import type { BtgUploadFileInput } from '../btgUploadImportService';
 import { applyBtgExtractBatchUpload } from '../btgUploadImportService';
+import { ExternalOptionQuoteFetcher } from '../ExternalOptionQuoteFetcher';
+import { InvestQuoteSyncService } from '../InvestQuoteSyncService';
+import { OptionHistoricalSyncService } from '../OptionHistoricalSyncService';
 import { LedgerImportService } from '../LedgerImportService';
 import { HoldingPurgeKeepOpeningService } from '../HoldingPurgeKeepOpeningService';
 import { PatrimonyDailyRebuildService } from '../PatrimonyDailyRebuildService';
@@ -413,6 +416,20 @@ export class OptionCDailyCloseOrchestrator {
         };
       }
       logStep(rt, 'Homologação: seguindo para rebuild mesmo com erro em extrato.');
+    }
+
+    logStep(rt, 'Baixando cotações históricas em lote (Brapi)...');
+    try {
+      const quoteSync = new InvestQuoteSyncService(this.gateway);
+      const quotesFetched = await quoteSync.syncHistoricalFromBrapi(ctx);
+      logStep(rt, `Cotações atualizadas com sucesso: ${quotesFetched} registros globais.`);
+
+      logStep(rt, 'Baixando cotações de opções pendentes...');
+      const optionQuoteSync = new OptionHistoricalSyncService(this.gateway);
+      await optionQuoteSync.syncMissingOptions(ctx);
+      logStep(rt, 'Verificação de opções pendentes concluída.');
+    } catch (err) {
+      logStep(rt, `⚠️ Falha ao baixar cotações históricas: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     logStep(rt, 'Rebuild patrimônio diário (intervalo completo)…');
