@@ -11,8 +11,8 @@ import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
 import { fetchOpcoesNetOptionQuotes } from './opcoesNetQuotes';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import {
-  fetchYahooStockHistory,
-  fetchYahooStockQuoteForDate,
+  fetchExternalStockHistory,
+  fetchExternalStockQuoteForDate,
 } from '../market/ExternalStockQuoteProvider';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 
@@ -89,7 +89,7 @@ export class InvestQuoteSyncService {
       let q = quoteByTicker.get(ticker);
       let provider = 'brapi';
       if (!q && asOfDate) {
-        const fallback = await fetchYahooStockQuoteForDate(ticker, asOfDate).catch(() => null);
+        const fallback = await fetchExternalStockQuoteForDate(ticker, asOfDate).catch(() => null);
         if (fallback) {
           q = {
             ticker: fallback.ticker,
@@ -192,7 +192,7 @@ export class InvestQuoteSyncService {
     const from = (process.env.INVEST_QUOTES_HISTORY_FROM || '2026-01-01').slice(0, 10);
     const to = new Date().toISOString().slice(0, 10);
     for (const ticker of tickers) {
-      const bars = await fetchYahooStockHistory(ticker, from, to).catch(() => []);
+      const bars = await fetchExternalStockHistory(ticker, from, to).catch(() => []);
       for (const q of bars) {
         await this.marketQuotes.upsertQuote(marketCtx, {
           ticker: q.ticker,

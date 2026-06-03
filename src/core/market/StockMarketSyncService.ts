@@ -2,7 +2,7 @@ import type { CoCeoDataGateway, UserContext } from '../dal';
 import { inferAssetType } from '../invest/assetClassifier';
 import { fetchB3Quotes } from '../invest/B3QuoteProvider';
 import { MarketQuoteRepository } from './MarketQuoteRepository';
-import { fetchYahooStockQuoteForDate } from './ExternalStockQuoteProvider';
+import { fetchExternalStockQuoteForDate } from './ExternalStockQuoteProvider';
 
 export type StockMarketSyncReport = {
   asOf: string;
@@ -67,7 +67,7 @@ export class StockMarketSyncService {
       } catch {
         try {
           const fallback = asOfDate
-            ? await fetchYahooStockQuoteForDate(ticker, asOfDate)
+            ? await fetchExternalStockQuoteForDate(ticker, asOfDate)
             : null;
           if (!fallback) {
             missing.push(ticker);
