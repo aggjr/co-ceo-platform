@@ -989,6 +989,7 @@ export async function InvestConciliacaoPage(container) {
   let optcState = null;
   let optcSessionId = null;
   let optcFileRows = [];
+  const OPTC_LAST_RUN_STORAGE_KEY = 'invest:conciliacao:option-c:last-run:v1';
 
   const heroTitle = container.querySelector('.conciliacao-hero__title');
   const heroSubtitle = container.querySelector('.conciliacao-hero__subtitle');
@@ -1065,6 +1066,7 @@ export async function InvestConciliacaoPage(container) {
       }))
     );
     renderOptcFileTables();
+    saveOptcLastRun();
   }
 
   function setFileRowsStatus(kind, status, detail) {
@@ -1072,6 +1074,7 @@ export async function InvestConciliacaoPage(container) {
       row.kind === kind ? { ...row, status, detail } : row
     );
     renderOptcFileTables();
+    saveOptcLastRun();
   }
 
   function statusTone(status) {
@@ -1353,6 +1356,91 @@ export async function InvestConciliacaoPage(container) {
 
   renderOptcFileTables();
 
+  function readOptcLogRows() {
+    try {
+      const rows = JSON.parse(logEl?.dataset?.rows || '[]');
+      return Array.isArray(rows) ? rows.slice(-500) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveOptcLastRun() {
+    if (!optcRunId && !optcState && !optcFileRows.length) return;
+    try {
+      const state = optcState
+        ? {
+            ...optcState,
+            activityLog: Array.isArray(optcState.activityLog)
+              ? optcState.activityLog.slice(-500)
+              : [],
+          }
+        : null;
+      localStorage.setItem(
+        OPTC_LAST_RUN_STORAGE_KEY,
+        JSON.stringify({
+          version: 1,
+          savedAt: new Date().toISOString(),
+          runId: optcRunId,
+          state,
+          sessionId: optcSessionId,
+          fileRows: optcFileRows.slice(-1000),
+          activityLogCount: optcActivityLogCount,
+          statusText: optcStatus?.textContent || '',
+          processStateText: optcProcessState.textContent || '',
+          processStateClass: optcProcessState.className || '',
+          logRows: readOptcLogRows(),
+        })
+      );
+    } catch {
+      // localStorage pode estar cheio ou indisponivel; a conciliacao continua no servidor.
+    }
+  }
+
+  function restoreOptcLogRows(rows) {
+    if (!logEl || !Array.isArray(rows) || !rows.length) return;
+    logEl.innerHTML = '';
+    logEl.dataset.rows = '[]';
+    for (const row of rows.slice(-500)) {
+      appendLog(logEl, row.message || '', row.type || '');
+    }
+  }
+
+  function stageFromOptcState(state) {
+    if (!state) return 'files';
+    if (state.phase === 'done' || state.runStatus === 'done') return 'done';
+    if (state.phase === 'notes' || state.phase === 'extracts' || state.runStatus === 'running') return 'run';
+    return state.runId ? 'start' : 'files';
+  }
+
+  function applyRestoredOptcState(saved) {
+    if (!saved || typeof saved !== 'object') return false;
+    optcRunId = saved.runId || saved.state?.runId || null;
+    optcState = saved.state || null;
+    optcSessionId = saved.sessionId || saved.state?.sessionId || null;
+    optcFileRows = Array.isArray(saved.fileRows) ? saved.fileRows : [];
+    optcActivityLogCount = Number(saved.activityLogCount || optcState?.activityLog?.length || 0);
+    renderOptcFileTables();
+    if (optcState) updateOptcProgress(optcState);
+    setStage(stageFromOptcState(optcState));
+    if (saved.processStateText) {
+      optcProcessState.textContent = saved.processStateText;
+      if (saved.processStateClass) optcProcessState.className = saved.processStateClass;
+    } else if (optcState?.runStatus === 'error') {
+      setProcessState('Parou com erro', 'err');
+    } else if (optcState?.phase === 'done' || optcState?.runStatus === 'done') {
+      setProcessState('Finalizado', 'ok');
+    } else if (optcRunId) {
+      setProcessState('Processando', 'idle');
+    }
+    if (optcStatus && saved.statusText) optcStatus.textContent = saved.statusText;
+    restoreOptcLogRows(saved.logRows);
+    if (btnOptcStart) btnOptcStart.disabled = true;
+    if (btnOptcNextDay) btnOptcNextDay.disabled = true;
+    if (btnOptcRunAll) btnOptcRunAll.disabled = true;
+    return Boolean(optcRunId || optcState || optcFileRows.length);
+  }
+
   function refreshOptcStartButton() {
     const ready = optcNotesFiles.length > 0 && optcExtractFiles.length > 0;
     if (btnOptcStart) btnOptcStart.disabled = !ready;
@@ -1530,6 +1618,7 @@ export async function InvestConciliacaoPage(container) {
         if (optcState.phase === 'notes') statusMsg += ` — ${optcState.dayIndex}/${optcState.calendar.length}`;
         optcStatus.textContent = statusMsg;
       }
+      saveOptcLastRun();
       if (optcState.runStatus === 'error') {
         throw new Error(optcState.runError || 'Processamento em segundo plano parou com erro.');
       }
@@ -1539,6 +1628,51 @@ export async function InvestConciliacaoPage(container) {
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
     throw new Error('Tempo limite acompanhando processamento em segundo plano.');
+  }
+
+  async function refreshRestoredOptcRun() {
+    if (!optcRunId) return;
+    try {
+      const data = await apiRequest(`/api/invest/reconcile/option-c/status/${encodeURIComponent(optcRunId)}`);
+      optcState = data.state;
+      optcSessionId = optcState?.sessionId || optcSessionId;
+      updateOptcProgress(optcState);
+      const lines = optcState?.activityLog || [];
+      for (const line of lines.slice(optcActivityLogCount)) {
+        appendLog(logEl, line);
+      }
+      optcActivityLogCount = lines.length;
+      if (optcStatus && optcState) {
+        optcStatus.textContent = `Run ${optcRunId} — fase ${optcState.phase}`;
+      }
+      saveOptcLastRun();
+      if (
+        optcState &&
+        optcState.runStatus !== 'done' &&
+        optcState.runStatus !== 'error' &&
+        optcState.phase !== 'done'
+      ) {
+        await pollOptcRunUntilDone();
+        if (optcState?.phase === 'done' || optcState?.runStatus === 'done') {
+          setStage('done');
+          setProcessState('Finalizado', 'ok');
+          if (optcStatus) optcStatus.textContent = `Run ${optcRunId} finalizado.`;
+          saveOptcLastRun();
+        }
+      }
+    } catch (err) {
+      appendLog(logEl, `⚠️ Não foi possível atualizar a última conciliação: ${err.message}`, 'warn');
+      saveOptcLastRun();
+    }
+  }
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(OPTC_LAST_RUN_STORAGE_KEY) || 'null');
+    if (applyRestoredOptcState(saved)) {
+      void refreshRestoredOptcRun();
+    }
+  } catch {
+    // Estado antigo inválido: ignora e deixa a tela pronta para uma nova conciliação.
   }
 
   btnPickOptcNotas?.addEventListener('click', async () => {
@@ -1730,12 +1864,14 @@ export async function InvestConciliacaoPage(container) {
       }
       appendLog(logEl, `✅ Homologação iniciada: ${optcState.calendar.length} dia(s) de notas.`, 'ok');
       setStepState(container, 'reset', 'done', '✅ Via Opção C');
+      saveOptcLastRun();
     } catch (err) {
       const msg = formatReconcileApiError(err);
       setProcessState('Parou na preparação', 'err');
       setFileRowsStatus('Nota', 'Erro na análise', msg);
       appendLog(logEl, `❌ Opção C: ${msg}`, 'err');
       if (optcStatus) optcStatus.textContent = `❌ ${err.message || msg}`;
+      saveOptcLastRun();
       btnOptcStart.disabled = false;
     }
   });
@@ -1783,6 +1919,7 @@ export async function InvestConciliacaoPage(container) {
       optcActivityLogCount = optcState?.activityLog?.length || 0;
       updateOptcProgress(optcState);
       appendLog(logEl, `Processamento em segundo plano iniciado: ${optcRunId}`, 'ok');
+      saveOptcLastRun();
       await pollOptcRunUntilDone();
       setStage('done');
       if (optcState?.phase === 'done') {
@@ -1802,6 +1939,7 @@ export async function InvestConciliacaoPage(container) {
           dayIndex: optcState?.dayIndex,
         });
         await loadDiagnostics();
+        saveOptcLastRun();
       } else {
         setProcessState('Parou', 'err');
         setFileRowsStatus('Extrato', 'Parou', serverRun.message || 'Processo pausado no servidor.');
@@ -1812,6 +1950,7 @@ export async function InvestConciliacaoPage(container) {
           dayIndex: optcState?.dayIndex,
           message: serverRun.message || null,
         });
+        saveOptcLastRun();
       }
       return;
       for (let guard = 0; guard < 5000; guard += 1) {
@@ -1852,6 +1991,7 @@ export async function InvestConciliacaoPage(container) {
         apiError: err?.body?.errorDetail || null,
       });
       appendLog(logEl, `❌ Opção C run-all: ${err.message}`, 'err');
+      saveOptcLastRun();
     } finally {
       if (optcState?.phase !== 'done' && optcState?.phase !== 'extracts') {
         btnOptcNextDay.disabled = false;

@@ -3,6 +3,7 @@ import {
   cashBalanceFromLedger,
   resolveCashInvestDisplayBalance,
 } from '../../../src/core/invest/cashInvestLedger';
+import { AUTO_D2_REF_PREFIX } from '../../../src/core/invest/AutoPendingSettlementSync';
 
 describe('cashInvestLedger', () => {
   it('saldo caixa = soma total_net_value (não qty×preço)', () => {
@@ -127,5 +128,37 @@ describe('cashInvestLedger', () => {
       },
     ];
     expect(cashBalanceFromLedger(entries, '2026-03-15')).toBeCloseTo(1_000, 2);
+  });
+
+  it('saldo exibido incorpora pending vencido na data de liquidacao', () => {
+    const tradeId = 'trade-stock-1';
+    const entries = [
+      {
+        id: tradeId,
+        asset_id: 'a-prio',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        quantity: 100,
+        unit_price: 40,
+        total_net_value: -4000,
+        transaction_date: '2026-05-12',
+      },
+      {
+        id: 'cash-pending',
+        asset_id: 'a-caixa',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'pending_settlement',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: -4000,
+        transaction_date: '2026-05-12',
+        broker_note_ref: `${AUTO_D2_REF_PREFIX}${tradeId}`,
+      },
+    ];
+
+    expect(resolveCashInvestDisplayBalance(entries, '2026-05-12')).toBeCloseTo(0, 2);
+    expect(resolveCashInvestDisplayBalance(entries, '2026-05-14')).toBeCloseTo(-4000, 2);
   });
 });

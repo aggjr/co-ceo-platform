@@ -47,10 +47,11 @@ export class CashBalanceService {
       const amount = Number(leg.amount ?? 0) * sign;
       const status = String(leg.status ?? 'cleared');
       const settlementDate = toIsoDate(leg.settlement_date);
+      const isSettledByDate = Boolean(settlementDate && settlementDate <= asOfDate);
 
-      if (status === 'cleared') {
+      if (status === 'cleared' || (status === 'pending' && isSettledByDate)) {
         settledCash += amount;
-      } else if (status === 'pending' && settlementDate > asOfDate) {
+      } else if (status === 'pending') {
         inTransit += amount;
       }
     }

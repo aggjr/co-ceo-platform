@@ -133,5 +133,17 @@ describe('CashBalanceService', () => {
       inTransit: -250,
       cashWithTransit: 750,
     });
+
+    const settledSnapshot = await new CashBalanceService(gateway).getSnapshot(
+      ctx,
+      'acc-1',
+      '2026-01-06'
+    );
+
+    expect(settledSnapshot).toEqual({
+      settledCash: 750,
+      inTransit: 0,
+      cashWithTransit: 750,
+    });
   });
 });

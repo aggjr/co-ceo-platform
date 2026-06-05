@@ -43,6 +43,11 @@ describe('cashInTransit', () => {
     expect(s.settledCashBalance).toBe(0);
     expect(s.lines.length).toBeGreaterThan(0);
     expect(s.lines[0]!.settleDate).toBe('2026-05-14');
+
+    const settled = buildCashInTransitSummary(entries, '2026-05-14');
+    expect(settled.inTransitNet).toBe(0);
+    expect(settled.settledCashBalance).toBe(-4000);
+    expect(settled.cashIncludingTransit).toBe(-4000);
   });
 
   it('previsão de compra com total_net positivo gera payable negativo', () => {

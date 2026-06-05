@@ -86,12 +86,52 @@ function rowToStored(row: Record<string, unknown>): StoredPortfolioDay {
   };
 }
 
+let portfolioDailyCashColumnsPromise: Promise<void> | null = null;
+
+function shouldSkipPortfolioDailyCashColumnsEnsure(): boolean {
+  return process.env.NODE_ENV === 'test' || Boolean(process.env.JEST_WORKER_ID);
+}
+
+function isIgnorableColumnEnsureError(err: unknown): boolean {
+  const code = (err as { code?: string })?.code;
+  return code === 'ER_DUP_FIELDNAME' || code === 'ER_NO_SUCH_TABLE';
+}
+
+async function ensurePortfolioDailyCashColumns(): Promise<void> {
+  if (shouldSkipPortfolioDailyCashColumnsEnsure()) return;
+
+  if (!portfolioDailyCashColumnsPromise) {
+    portfolioDailyCashColumnsPromise = (async () => {
+      const statements = [
+        `ALTER TABLE invest_portfolio_daily
+           ADD COLUMN settled_cash DECIMAL(18, 4) NULL AFTER positions_value`,
+        `ALTER TABLE invest_portfolio_daily
+           ADD COLUMN cash_in_transit DECIMAL(18, 4) NULL AFTER settled_cash`,
+      ];
+
+      for (const sql of statements) {
+        try {
+          await pool.query(sql);
+        } catch (err) {
+          if (!isIgnorableColumnEnsureError(err)) throw err;
+        }
+      }
+    })().catch((err) => {
+      portfolioDailyCashColumnsPromise = null;
+      throw err;
+    });
+  }
+
+  await portfolioDailyCashColumnsPromise;
+}
+
 export class PatrimonyDailyStore {
   constructor(private readonly gateway: CoCeoDataGateway) {}
 
   async loadRange(ctx: UserContext, from: string, to: string): Promise<StoredPortfolioDay[]> {
     if (!ctx.organizationId) return [];
     try {
+      await ensurePortfolioDailyCashColumns();
       const rows = await this.gateway.readQuery(ctx, 'invest_portfolio_daily_range', [
         ctx.organizationId,
         from,
@@ -106,6 +146,7 @@ export class PatrimonyDailyStore {
 
   async loadDayBefore(ctx: UserContext, beforeDate: string): Promise<StoredPortfolioDay | null> {
     if (!ctx.organizationId) return null;
+    await ensurePortfolioDailyCashColumns();
     const rows = await this.gateway.readQuery(ctx, 'invest_portfolio_daily_before', [
       ctx.organizationId,
       beforeDate,
@@ -138,6 +179,7 @@ export class PatrimonyDailyStore {
     if (!ctx.organizationId) {
       throw new Error('organizationId obrigatório para gravar patrimônio diário.');
     }
+    await ensurePortfolioDailyCashColumns();
     const orgId = ctx.organizationId;
     const existing = await this.gateway.findWhere(
       ctx,

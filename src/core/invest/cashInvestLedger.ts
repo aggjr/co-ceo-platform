@@ -1,6 +1,7 @@
 import type { LedgerEvent } from './CustodyEngine';
 import { AUTO_D2_REF_PREFIX } from './AutoPendingSettlementSync';
 import { isDuplicateManualOpeningCash } from './extractLedgerEnrichment';
+import { cashSettlementDate, resolveAssetTypeForSettlement } from './settlementCalendar';
 
 const CASH_TICKER_PREFIX = 'CAIXA';
 
@@ -38,6 +39,11 @@ function sumOpenPendingOnCash(
   asOfDate: string
 ): number {
   const byRef = new Map<string, number>();
+  const tradeById = new Map<string, LedgerEvent>();
+  for (const e of entries || []) {
+    if (e.id) tradeById.set(String(e.id), e);
+  }
+
   for (const e of cashLedgerEventsForBalance(entries)) {
     if (String(e.transaction_type) !== 'pending_settlement') continue;
     const d = String(e.transaction_date || '').slice(0, 10);
@@ -47,6 +53,16 @@ function sumOpenPendingOnCash(
     if (ref.endsWith(':CLEAR')) {
       byRef.set(ref.slice(0, -':CLEAR'.length), 0);
     } else {
+      const tradeId = ref.slice(AUTO_D2_REF_PREFIX.length);
+      const trade = tradeById.get(tradeId);
+      if (trade) {
+        const ticker = String(trade.asset_ticker || '').toUpperCase();
+        const assetType = resolveAssetTypeForSettlement(ticker, String(trade.asset_type || ''));
+        const txType = String(trade.transaction_type || '');
+        const tradeDate = String(trade.transaction_date || '').slice(0, 10);
+        const settleDate = cashSettlementDate(tradeDate, assetType, txType, ticker);
+        if (settleDate <= asOfDate) continue;
+      }
       byRef.set(ref, (byRef.get(ref) ?? 0) + Number(e.total_net_value ?? 0));
     }
   }
