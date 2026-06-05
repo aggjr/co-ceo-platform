@@ -1204,6 +1204,7 @@ export async function InvestConciliacaoPage(container) {
       coCeoColumns: [
         { key: 'date', label: 'Dia', type: 'text', width: '120px', sticky: true },
         { key: 'status', label: 'Status', type: 'text', width: '110px', sticky: true, render: renderStatusCell },
+        { key: 'finding', label: 'Diagnóstico', type: 'text', width: '360px' },
         { key: 'businessEvents', label: 'Eventos', type: 'number', width: '105px' },
         { key: 'bothSidesEvents', label: '2 lados', type: 'number', width: '105px' },
         { key: 'financialOnlyEvents', label: 'Só financeiro', type: 'number', width: '130px' },
@@ -1226,10 +1227,11 @@ export async function InvestConciliacaoPage(container) {
       fixedLeadingColumns: 1,
       coCeoColumns: [
         { key: 'date', label: 'Dia', type: 'text', width: '120px', sticky: true },
-        { key: 'openingPortfolioValue', label: 'Carteira inicial', type: 'currency', width: '150px' },
-        { key: 'assetMovementDelta', label: 'Alteração carteira', type: 'currency', width: '165px' },
-        { key: 'closingPortfolioValue', label: 'Carteira final', type: 'currency', width: '150px' },
-        { key: 'totalPatrimonyFromSheets', label: 'Patrimônio calculado', type: 'currency', width: '175px' },
+        { key: 'openingPatrimonyValue', label: 'Patrimônio inicial', type: 'currency', width: '165px' },
+        { key: 'openingPortfolioValue', label: 'Ativos iniciais', type: 'currency', width: '150px' },
+        { key: 'assetMovementDelta', label: 'Alteração ativos', type: 'currency', width: '160px' },
+        { key: 'closingPortfolioValue', label: 'Ativos finais', type: 'currency', width: '145px' },
+        { key: 'closingPatrimonyValue', label: 'Patrimônio final', type: 'currency', width: '165px' },
         { key: 'changedAssets', label: 'Alterações no dia', type: 'text', width: '620px' },
         { key: 'consideredAssets', label: 'Carteira final considerada', type: 'text', width: '760px' },
       ],

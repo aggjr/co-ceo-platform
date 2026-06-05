@@ -54,6 +54,7 @@ type DailyBusinessAuditRow = {
   id: string;
   date: string;
   status: 'ok' | 'warn' | 'error';
+  finding: string;
   businessEvents: number;
   bothSidesEvents: number;
   financialOnlyEvents: number;
@@ -69,9 +70,11 @@ type DailyBusinessAuditRow = {
 type DailyPortfolioAuditRow = {
   id: string;
   date: string;
+  openingPatrimonyValue: number;
   openingPortfolioValue: number;
   assetMovementDelta: number;
   closingPortfolioValue: number;
+  closingPatrimonyValue: number;
   totalPatrimonyFromSheets: number;
   changedAssets: string;
   consideredAssets: string;
@@ -184,6 +187,15 @@ function isBusinessTrade(e: LedgerEvent): boolean {
 function eventCashValue(e: LedgerEvent): number {
   if (!isCashTicker(String(e.asset_ticker || ''), String(e.asset_type || ''))) return 0;
   return Number(e.total_net_value ?? 0);
+}
+
+function isPendingSettlementClear(e: LedgerEvent): boolean {
+  return String(e.transaction_type) === 'pending_settlement' && String(e.broker_note_ref || '').endsWith(':CLEAR');
+}
+
+function dailyBusinessCashValue(e: LedgerEvent): number {
+  if (isPendingSettlementClear(e)) return 0;
+  return eventCashValue(e);
 }
 
 function dateRange(from: string, to: string): string[] {
@@ -800,6 +812,7 @@ export class ReconciliationDiagnosticsService {
       const openingTransit = transitTotal();
       const openingCash = money(grossCash - openingTransit);
       const openingPortfolioValue = portfolioTotal();
+      const openingPatrimonyValue = money(openingCash + openingTransit + openingPortfolioValue);
       const assetMovementValue = { value: 0 };
       const pureFinancialValue = { value: 0 };
       const transitChange = { value: 0 };
@@ -812,6 +825,7 @@ export class ReconciliationDiagnosticsService {
 
       for (const e of day) {
         if (String(e.transaction_type) === 'opening_balance') continue;
+        if (isPendingSettlementClear(e)) continue;
         if (e.business_event_id) {
           const id = String(e.business_event_id);
           businessGroups.set(id, [...(businessGroups.get(id) || []), e]);
@@ -836,6 +850,7 @@ export class ReconciliationDiagnosticsService {
       const closingTransit = transitTotal();
       const closingCash = money(grossCash - closingTransit);
       const closingPortfolioValue = portfolioTotal();
+      const closingPatrimonyValue = money(closingCash + closingTransit + closingPortfolioValue);
       const businessRow = this.buildDailyBusinessRow(date, businessGroups, unlinked);
 
       financial.push({
@@ -859,10 +874,12 @@ export class ReconciliationDiagnosticsService {
       portfolio.push({
         id: `port-${date}`,
         date,
+        openingPatrimonyValue,
         openingPortfolioValue,
         assetMovementDelta: money(closingPortfolioValue - openingPortfolioValue),
         closingPortfolioValue,
-        totalPatrimonyFromSheets: money(closingCash + closingTransit + closingPortfolioValue),
+        closingPatrimonyValue,
+        totalPatrimonyFromSheets: closingPatrimonyValue,
         changedAssets: detailList(changedAssets, 16),
         consideredAssets: portfolioDetails(),
       });
@@ -896,13 +913,9 @@ export class ReconciliationDiagnosticsService {
         return isCashTicker(ticker, String(e.asset_type || ''));
       });
       const hasAsset = assetLegs.length > 0;
-      const hasCash = cashLegs.length > 0;
+      const hasCash = cashLegs.some((e) => Math.abs(dailyBusinessCashValue(e)) > 0.005);
       const expectedCash = money(assetLegs.filter(isBusinessTrade).reduce((sum, e) => sum + tradeSignedCash(e), 0));
-      const actualCash = money(
-        cashLegs
-          .filter((e) => String(e.transaction_type) !== 'pending_settlement')
-          .reduce((sum, e) => sum + Number(e.total_net_value ?? 0), 0)
-      );
+      const actualCash = money(cashLegs.reduce((sum, e) => sum + dailyBusinessCashValue(e), 0));
       linkedAssetExpectedCash += expectedCash;
       linkedFinancialCash += actualCash;
       if (hasAsset && hasCash) {
@@ -930,11 +943,19 @@ export class ReconciliationDiagnosticsService {
     let status: 'ok' | 'warn' | 'error' = 'ok';
     if (unlinked.length > 0 || Math.abs(eventCashDelta) > 0.05) status = 'error';
     else if (assetOnlyEvents > 0 || financialOnlyEvents > 0) status = 'warn';
+    const findingParts: string[] = [];
+    if (unlinked.length > 0) findingParts.push(`${unlinked.length} perna(s) sem business_event_id`);
+    if (Math.abs(eventCashDelta) > 0.05) {
+      findingParts.push(`delta entre ativo e financeiro: ${eventCashDelta}`);
+    }
+    if (assetOnlyEvents > 0) findingParts.push(`${assetOnlyEvents} evento(s) com ativo sem caixa no dia`);
+    if (financialOnlyEvents > 0) findingParts.push(`${financialOnlyEvents} evento(s) financeiro(s) sem ativo no dia`);
 
     return {
       id: `biz-${date}`,
       date,
       status,
+      finding: findingParts.join(' | ') || 'OK',
       businessEvents: groups.size,
       bothSidesEvents,
       financialOnlyEvents,

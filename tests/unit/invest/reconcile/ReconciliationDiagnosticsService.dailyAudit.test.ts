@@ -77,14 +77,23 @@ describe('ReconciliationDiagnosticsService daily audit', () => {
     const jan1Financial = report.financial.find((row: any) => row.date === '2026-01-01');
     const jan1Business = report.business.find((row: any) => row.date === '2026-01-01');
     const jan1Portfolio = report.portfolio.find((row: any) => row.date === '2026-01-01');
+    const jan5Business = report.business.find((row: any) => row.date === '2026-01-05');
+    const jan7Business = report.business.find((row: any) => row.date === '2026-01-07');
     const jan6Financial = report.financial.find((row: any) => row.date === '2026-01-06');
     const jan7Financial = report.financial.find((row: any) => row.date === '2026-01-07');
 
     expect(jan1Financial.openingCash).toBeCloseTo(58_758.79, 2);
     expect(jan1Business.status).toBe('ok');
     expect(jan1Business.businessEvents).toBe(0);
+    expect(jan1Business.finding).toBe('OK');
+    expect(jan1Portfolio.openingPatrimonyValue).toBeCloseTo(59_758.79, 2);
     expect(jan1Portfolio.openingPortfolioValue).toBeCloseTo(1000, 2);
     expect(jan1Portfolio.assetMovementDelta).toBeCloseTo(0, 2);
+    expect(jan5Business.status).toBe('ok');
+    expect(jan5Business.finding).toBe('OK');
+    expect(jan5Business.linkedFinancialCash).toBeCloseTo(-400, 2);
+    expect(jan7Business.status).toBe('ok');
+    expect(jan7Business.businessEvents).toBe(0);
     expect(jan6Financial.openingTransit).toBeCloseTo(-400, 2);
     expect(jan7Financial.openingTransit).toBeCloseTo(0, 2);
     expect(jan7Financial.openingCash).toBeCloseTo(58_358.79, 2);
