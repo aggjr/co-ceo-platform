@@ -1040,6 +1040,68 @@ export async function InvestConciliacaoPage(container) {
     optcProcessState.textContent = label;
   }
 
+  function clearLogPanel() {
+    if (!logEl) return;
+    logEl.innerHTML = '';
+    logEl.dataset.rows = '[]';
+    const hostId = logEl.dataset.excelHost;
+    const host = hostId ? document.getElementById(hostId) : null;
+    if (host) host.innerHTML = '';
+  }
+
+  function clearHost(host) {
+    if (host) host.innerHTML = '';
+  }
+
+  function resetOptcProgressBars() {
+    if (optcProgress) optcProgress.hidden = true;
+    if (optcProgressBar) optcProgressBar.style.width = '0%';
+    if (optcProgressLabel) optcProgressLabel.textContent = '';
+    const labelExtracts = container.querySelector('#optc-progress-label-extracts');
+    const trackExtracts = container.querySelector('#optc-progress-track-extracts');
+    const barExtracts = container.querySelector('#optc-progress-bar-extracts');
+    if (labelExtracts) {
+      labelExtracts.hidden = true;
+      labelExtracts.textContent = '';
+    }
+    if (trackExtracts) trackExtracts.hidden = true;
+    if (barExtracts) barExtracts.style.width = '0%';
+  }
+
+  function clearDiagnosticsTables() {
+    if (diagnosticsSummary) diagnosticsSummary.textContent = '';
+    [
+      diagnosticsDailyFinancialHost,
+      diagnosticsDailyBusinessHost,
+      diagnosticsDailyPortfolioHost,
+      diagnosticsCriticalHost,
+      diagnosticsAssetsHost,
+      diagnosticsEventsHost,
+      diagnosticsCashHost,
+    ].forEach(clearHost);
+  }
+
+  function resetOptcRunScreen() {
+    optcRunId = null;
+    optcState = null;
+    optcSessionId = null;
+    optcActivityLogCount = 0;
+    try {
+      localStorage.removeItem(OPTC_LAST_RUN_STORAGE_KEY);
+    } catch {
+      // localStorage pode estar indisponivel.
+    }
+    clearLogPanel();
+    resetOptcProgressBars();
+    clearDiagnosticsTables();
+    if (optcPending) optcPending.innerHTML = '';
+    clearHost(optcNotesAnalysis);
+    setStage('files');
+    setProcessState('Preparando nova conciliação', 'idle');
+    if (optcStatus) optcStatus.textContent = 'Preparando nova conciliação...';
+    appendLog(logEl, 'Nova conciliação iniciada. Estado anterior da tela foi limpo.', 'section');
+  }
+
   function setStage(stage) {
     container.querySelectorAll('[data-optc-stage]').forEach((el) => {
       el.classList.toggle('conciliacao-stage--active', el.getAttribute('data-optc-stage') === stage);
@@ -1888,6 +1950,7 @@ export async function InvestConciliacaoPage(container) {
   });
 
   btnOptcRunAll?.addEventListener('click', async () => {
+    resetOptcRunScreen();
     btnOptcRunAll.disabled = true;
     if (btnOptcNextDay) btnOptcNextDay.disabled = true;
     logOptcBrowser('info', 'option-c.run-all.start', {
