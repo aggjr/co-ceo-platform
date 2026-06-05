@@ -7,6 +7,89 @@ import { inferAssetType } from './assetClassifier';
 export const B3_STOCK_PAYMENT_BUSINESS_DAYS = 2;
 export const B3_OPTION_PREMIUM_BUSINESS_DAYS = 1;
 
+export type SettlementCalendarUnit = 'business_days' | 'calendar_days';
+
+export type InvestmentSettlementRule = {
+  ruleCode: string;
+  assetTypes: string[];
+  transactionTypes: string[];
+  tickerPrefixes?: string[];
+  validFrom: string;
+  validTo?: string | null;
+  daysOffset: number;
+  calendarUnit: SettlementCalendarUnit;
+  label: string;
+};
+
+export const INVESTMENT_SETTLEMENT_RULES: InvestmentSettlementRule[] = [
+  {
+    ruleCode: 'B3_OPTION_PREMIUM_D1',
+    assetTypes: ['option_call', 'option_put'],
+    transactionTypes: ['call_sell', 'put_sell', 'call_buy', 'put_buy'],
+    validFrom: '1900-01-01',
+    daysOffset: 1,
+    calendarUnit: 'business_days',
+    label: 'Opção — prêmio D+1 útil',
+  },
+  {
+    ruleCode: 'B3_EQUITY_D3_LEGACY',
+    assetTypes: ['stock', 'fii', 'etf', 'bdr'],
+    transactionTypes: ['buy', 'sell'],
+    validFrom: '1900-01-01',
+    validTo: '2019-05-26',
+    daysOffset: 3,
+    calendarUnit: 'business_days',
+    label: 'Ação/FII — liquidação D+3 úteis (regra histórica)',
+  },
+  {
+    ruleCode: 'B3_EQUITY_D2',
+    assetTypes: ['stock', 'fii', 'etf', 'bdr'],
+    transactionTypes: ['buy', 'sell'],
+    validFrom: '2019-05-27',
+    daysOffset: 2,
+    calendarUnit: 'business_days',
+    label: 'Ação/FII — liquidação D+2 úteis',
+  },
+  {
+    ruleCode: 'TESOURO_D1',
+    assetTypes: ['fixed_income'],
+    transactionTypes: ['buy', 'sell'],
+    tickerPrefixes: ['TESOURO-', 'TD-', 'LFT-'],
+    validFrom: '1900-01-01',
+    daysOffset: 1,
+    calendarUnit: 'business_days',
+    label: 'Tesouro/RF — D+1 útil',
+  },
+  {
+    ruleCode: 'CDB_D1',
+    assetTypes: ['fixed_income'],
+    transactionTypes: ['buy', 'sell'],
+    tickerPrefixes: ['CDB-'],
+    validFrom: '1900-01-01',
+    daysOffset: 1,
+    calendarUnit: 'business_days',
+    label: 'CDB — D+1 útil',
+  },
+  {
+    ruleCode: 'FIXED_INCOME_D1',
+    assetTypes: ['fixed_income'],
+    transactionTypes: ['buy', 'sell'],
+    validFrom: '1900-01-01',
+    daysOffset: 1,
+    calendarUnit: 'business_days',
+    label: 'Renda fixa — D+1 útil',
+  },
+  {
+    ruleCode: 'SECURITIES_LENDING_NET30',
+    assetTypes: ['stock', 'fii', 'securities_lending'],
+    transactionTypes: ['securities_lending'],
+    validFrom: '1900-01-01',
+    daysOffset: 30,
+    calendarUnit: 'calendar_days',
+    label: 'Aluguel/termo — liquidação D+30 corridos',
+  },
+];
+
 const MS_DAY = 24 * 60 * 60 * 1000;
 
 function parseUtcDate(isoDate: string): Date | null {
@@ -34,8 +117,15 @@ export function addBusinessDays(isoDate: string, businessDays: number): string {
   return formatUtcDate(d);
 }
 
+export function addCalendarDays(isoDate: string, calendarDays: number): string {
+  const d = parseUtcDate(isoDate);
+  if (!d) return isoDate.slice(0, 10) || isoDate;
+  d.setUTCDate(d.getUTCDate() + Math.max(0, Math.floor(calendarDays)));
+  return formatUtcDate(d);
+}
+
 export function isStockLikeAsset(assetType: string): boolean {
-  return assetType === 'stock' || assetType === 'fii';
+  return assetType === 'stock' || assetType === 'fii' || assetType === 'etf' || assetType === 'bdr';
 }
 
 export function isFixedIncomeAsset(assetType: string, ticker: string): boolean {
@@ -68,9 +158,46 @@ export function isOptionPremiumTrade(assetType: string, transactionType: string)
  */
 export function fixedIncomeSettlementBusinessDays(ticker: string): number {
   const t = ticker.trim().toUpperCase();
-  if (t.startsWith('LFT-') || t.startsWith('TESOURO-') || t.startsWith('TD-')) return 1;
-  if (t.startsWith('CDB-')) return 1;
-  return 1;
+  const rule = investmentSettlementRuleFor(new Date().toISOString().slice(0, 10), 'fixed_income', 'buy', t);
+  return rule?.calendarUnit === 'business_days' ? rule.daysOffset : 1;
+}
+
+function tickerMatches(rule: InvestmentSettlementRule, ticker: string): boolean {
+  if (!rule.tickerPrefixes?.length) return true;
+  const t = ticker.toUpperCase();
+  return rule.tickerPrefixes.some((prefix) => t.startsWith(prefix));
+}
+
+function dateMatches(rule: InvestmentSettlementRule, tradeDate: string): boolean {
+  const day = tradeDate.slice(0, 10);
+  return day >= rule.validFrom && (!rule.validTo || day <= rule.validTo);
+}
+
+export function investmentSettlementRuleFor(
+  tradeDate: string,
+  assetType: string,
+  transactionType: string,
+  ticker?: string
+): InvestmentSettlementRule | null {
+  const day = tradeDate.slice(0, 10);
+  const type = String(transactionType);
+  const asset = String(assetType || '').trim();
+  const tickerU = String(ticker || '').toUpperCase();
+  return (
+    INVESTMENT_SETTLEMENT_RULES.find(
+      (rule) =>
+        dateMatches(rule, day) &&
+        rule.assetTypes.includes(asset) &&
+        rule.transactionTypes.includes(type) &&
+        tickerMatches(rule, tickerU)
+    ) ?? null
+  );
+}
+
+function applySettlementOffset(day: string, rule: InvestmentSettlementRule): string {
+  return rule.calendarUnit === 'calendar_days'
+    ? addCalendarDays(day, rule.daysOffset)
+    : addBusinessDays(day, rule.daysOffset);
 }
 
 /**
@@ -83,19 +210,8 @@ export function cashSettlementDate(
   ticker?: string
 ): string {
   const day = tradeDate.slice(0, 10);
-  const type = String(transactionType);
-  const tickerU = String(ticker || '').toUpperCase();
-
-  if (isOptionPremiumTrade(assetType, type)) {
-    return addBusinessDays(day, B3_OPTION_PREMIUM_BUSINESS_DAYS);
-  }
-  if (isStockLikeAsset(assetType) && (type === 'buy' || type === 'sell')) {
-    return addBusinessDays(day, B3_STOCK_PAYMENT_BUSINESS_DAYS);
-  }
-  if (isFixedIncomeAsset(assetType, tickerU) && (type === 'buy' || type === 'sell')) {
-    return addBusinessDays(day, fixedIncomeSettlementBusinessDays(tickerU));
-  }
-  return day;
+  const rule = investmentSettlementRuleFor(day, assetType, transactionType, ticker);
+  return rule ? applySettlementOffset(day, rule) : day;
 }
 
 export function defersCashSettlement(
@@ -103,35 +219,21 @@ export function defersCashSettlement(
   transactionType: string,
   ticker?: string
 ): boolean {
-  const type = String(transactionType);
-  const tickerU = String(ticker || '').toUpperCase();
-  if (isOptionPremiumTrade(assetType, type)) return true;
-  if (isStockLikeAsset(assetType) && (type === 'buy' || type === 'sell')) return true;
-  if (isFixedIncomeAsset(assetType, tickerU) && (type === 'buy' || type === 'sell')) {
-    return fixedIncomeSettlementBusinessDays(tickerU) > 0;
-  }
-  return false;
+  const day = new Date().toISOString().slice(0, 10);
+  const rule = investmentSettlementRuleFor(day, assetType, transactionType, ticker);
+  return Boolean(rule && rule.daysOffset > 0);
 }
 
 /** Rótulo da regra para UI / notas do livro. */
 export function cashSettlementRuleLabel(
   assetType: string,
   transactionType: string,
-  ticker?: string
+  ticker?: string,
+  tradeDate?: string
 ): string {
-  const type = String(transactionType);
-  const tickerU = String(ticker || '').toUpperCase();
-  if (isOptionPremiumTrade(assetType, type)) {
-    return 'Opção — prêmio D+1 útil';
-  }
-  if (isStockLikeAsset(assetType) && (type === 'buy' || type === 'sell')) {
-    return 'Ação/FII — liquidação D+2 úteis';
-  }
-  if (isFixedIncomeAsset(assetType, tickerU)) {
-    const d = fixedIncomeSettlementBusinessDays(tickerU);
-    return d === 0 ? 'Renda fixa — D0' : `Renda fixa — D+${d} útil(is)`;
-  }
-  return 'Liquidação no pregão';
+  const day = (tradeDate || new Date().toISOString()).slice(0, 10);
+  const rule = investmentSettlementRuleFor(day, assetType, transactionType, ticker);
+  return rule?.label ?? 'Liquidação no pregão';
 }
 
 /** Inferência de tipo quando o lançamento não traz asset_type explícito. */

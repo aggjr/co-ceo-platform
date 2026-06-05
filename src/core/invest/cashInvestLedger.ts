@@ -5,14 +5,28 @@ import { cashSettlementDate, resolveAssetTypeForSettlement } from './settlementC
 
 const CASH_TICKER_PREFIX = 'CAIXA';
 
+function isAutoPendingClear(e: LedgerEvent): boolean {
+  const ref = String(e.broker_note_ref || '');
+  return (
+    String(e.transaction_type) === 'pending_settlement' &&
+    ref.startsWith(AUTO_D2_REF_PREFIX) &&
+    ref.endsWith(':CLEAR')
+  );
+}
+
 /** Mesma regra do extrato BTG na UI: ignora abertura manual duplicada quando já há BTG-EXTRATO-OPENING. */
 export function cashLedgerEventsForBalance(
-  entries: LedgerEvent[] | null | undefined
+  entries: LedgerEvent[] | null | undefined,
+  options?: { includeAutoPendingClear?: boolean }
 ): LedgerEvent[] {
   const cashOnly = (entries || []).filter((e) =>
     isCashInvestTicker(String(e.asset_ticker || ''))
   );
-  return cashOnly.filter((e) => !isDuplicateManualOpeningCash(e, cashOnly));
+  return cashOnly.filter(
+    (e) =>
+      !isDuplicateManualOpeningCash(e, cashOnly) &&
+      (options?.includeAutoPendingClear || !isAutoPendingClear(e))
+  );
 }
 
 /** Saldo em conta investimento = soma dos total_net_value dos lançamentos de caixa até a data. */
@@ -44,7 +58,7 @@ function sumOpenPendingOnCash(
     if (e.id) tradeById.set(String(e.id), e);
   }
 
-  for (const e of cashLedgerEventsForBalance(entries)) {
+  for (const e of cashLedgerEventsForBalance(entries, { includeAutoPendingClear: true })) {
     if (String(e.transaction_type) !== 'pending_settlement') continue;
     const d = String(e.transaction_date || '').slice(0, 10);
     if (d && d > asOfDate) continue;

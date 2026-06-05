@@ -74,7 +74,7 @@ export async function syncAutoPendingSettlements(
     const txType = String(e.transaction_type);
     const settleOn = cashSettlementDate(tradeDate, assetType, txType, ticker);
     const net = Number(e.total_net_value ?? 0);
-    const rule = cashSettlementRuleLabel(assetType, txType, ticker);
+    const rule = cashSettlementRuleLabel(assetType, txType, ticker, tradeDate);
     let open = pendingByRef.get(ref) ?? 0;
 
     if (!settlementRefs.has(ref)) {

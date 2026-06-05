@@ -156,6 +156,18 @@ describe('cashInvestLedger', () => {
         transaction_date: '2026-05-12',
         broker_note_ref: `${AUTO_D2_REF_PREFIX}${tradeId}`,
       },
+      {
+        id: 'cash-pending-clear',
+        asset_id: 'a-caixa',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'pending_settlement',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 4000,
+        transaction_date: '2026-05-14',
+        broker_note_ref: `${AUTO_D2_REF_PREFIX}${tradeId}:CLEAR`,
+      },
     ];
 
     expect(resolveCashInvestDisplayBalance(entries, '2026-05-12')).toBeCloseTo(0, 2);

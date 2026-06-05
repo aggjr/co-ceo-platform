@@ -69,13 +69,13 @@ function collectOpenPendingLines(
     const base = pendingBaseRef(ref);
     if (!base) continue;
 
+    const tradeDate = String(e.transaction_date || '').slice(0, 10);
+    if (tradeDate && tradeDate > asOfDate) continue;
+
     if (ref.endsWith(':CLEAR')) {
       byRef.delete(base);
       continue;
     }
-
-    const tradeDate = String(e.transaction_date || '').slice(0, 10);
-    if (tradeDate && tradeDate > asOfDate) continue;
 
     const prev = byRef.get(base);
     const net = Number(e.total_net_value ?? 0);
@@ -121,7 +121,7 @@ function collectOpenPendingLines(
       transactionType: txType,
       assetType,
       rule: trade
-        ? cashSettlementRuleLabel(assetType, txType, ticker)
+        ? cashSettlementRuleLabel(assetType, txType, ticker, String(trade.transaction_date).slice(0, 10))
         : 'Previsão no livro',
       notes: row.notes || `Ref ${ref}`,
       brokerNoteRef: ref,
@@ -168,7 +168,7 @@ function collectTradeForecastLines(
       ticker,
       transactionType: txType,
       assetType,
-      rule: cashSettlementRuleLabel(assetType, txType, ticker),
+      rule: cashSettlementRuleLabel(assetType, txType, ticker, tradeDate),
       notes: `Previsão — conferir extrato BTG em ${settleDate}`,
       brokerNoteRef: e.broker_note_ref ? String(e.broker_note_ref) : null,
       ledgerEntryId: e.id ? String(e.id) : entryKey,

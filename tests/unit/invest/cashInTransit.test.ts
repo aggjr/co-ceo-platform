@@ -37,6 +37,19 @@ describe('cashInTransit', () => {
         broker_note_ref: `${AUTO_D2_REF_PREFIX}${tradeId}`,
         notes: 'Valor em trânsito',
       },
+      {
+        id: 'cash-clear',
+        asset_id: 'a-caixa',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'pending_settlement',
+        transaction_date: '2026-05-14',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 4000,
+        broker_note_ref: `${AUTO_D2_REF_PREFIX}${tradeId}:CLEAR`,
+        notes: 'Baixa do transito',
+      },
     ];
     const s = buildCashInTransitSummary(entries, '2026-05-12');
     expect(s.inTransitNet).toBe(-4000);

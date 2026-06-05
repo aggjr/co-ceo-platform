@@ -9,6 +9,8 @@ import { computeThreePricesByUnderlying } from '../threePricesEngine';
 import { buildCashInTransitSummary } from '../cashInTransit';
 import { cashBalanceFromLedger, settledCashBalanceFromLedger } from '../cashInvestLedger';
 import { fixedIncomeTotalFromLedger } from '../patrimonyLedgerGates';
+import { AUTO_D2_REF_PREFIX } from '../AutoPendingSettlementSync';
+import { cashSettlementDate, resolveAssetTypeForSettlement } from '../settlementCalendar';
 
 type StoredPosition = {
   ticker: string;
@@ -80,6 +82,11 @@ type AuditPositionState = {
   assetType: string;
   qty: number;
   unitValue: number;
+};
+
+type AuditPendingCashState = {
+  amount: number;
+  settleDate: string | null;
 };
 
 function round(n: number, scale = 4): number {
@@ -471,6 +478,7 @@ export class ReconciliationDiagnosticsService {
     const byEvent = new Map<string, LedgerEvent[]>();
     const orphans: LedgerEvent[] = [];
     for (const e of events) {
+      if (String(e.transaction_type) === 'opening_balance') continue;
       if (e.business_event_id) {
         const id = String(e.business_event_id);
         byEvent.set(id, [...(byEvent.get(id) || []), e]);
@@ -636,6 +644,7 @@ export class ReconciliationDiagnosticsService {
 
     const eventHasAsset = new Set<string>();
     for (const e of sorted) {
+      if (String(e.transaction_type) === 'opening_balance') continue;
       if (!e.business_event_id) continue;
       const ticker = String(e.asset_ticker || '').toUpperCase();
       const assetType = String(e.asset_type || inferAssetType(ticker));
@@ -643,13 +652,35 @@ export class ReconciliationDiagnosticsService {
     }
 
     let grossCash = 0;
-    const pendingByRef = new Map<string, number>();
+    const pendingByRef = new Map<string, AuditPendingCashState>();
+    const tradeById = new Map<string, LedgerEvent>();
+    for (const e of sorted) {
+      if (e.id) tradeById.set(String(e.id), e);
+    }
     const positions = new Map<string, AuditPositionState>();
     const financial: DailyFinancialAuditRow[] = [];
     const business: DailyBusinessAuditRow[] = [];
     const portfolio: DailyPortfolioAuditRow[] = [];
 
-    const transitTotal = () => money([...pendingByRef.values()].reduce((sum, value) => sum + value, 0));
+    const transitTotal = () => money([...pendingByRef.values()].reduce((sum, row) => sum + row.amount, 0));
+    const pendingSettleDate = (baseRef: string, fallbackDate: string): string | null => {
+      if (!baseRef.startsWith(AUTO_D2_REF_PREFIX)) return fallbackDate;
+      const trade = tradeById.get(baseRef.slice(AUTO_D2_REF_PREFIX.length));
+      if (!trade) return fallbackDate;
+      const ticker = String(trade.asset_ticker || '').toUpperCase();
+      const assetType = resolveAssetTypeForSettlement(ticker, String(trade.asset_type || ''));
+      return cashSettlementDate(
+        String(trade.transaction_date || '').slice(0, 10),
+        assetType,
+        String(trade.transaction_type || ''),
+        ticker
+      );
+    };
+    const releaseMaturedTransit = (date: string) => {
+      for (const [ref, row] of [...pendingByRef.entries()]) {
+        if (row.settleDate && row.settleDate <= date) pendingByRef.delete(ref);
+      }
+    };
     const portfolioTotal = () =>
       money(
         [...positions.values()].reduce((sum, p) => {
@@ -666,14 +697,112 @@ export class ReconciliationDiagnosticsService {
         24
       );
 
+    const applyLedgerEventToAuditState = (
+      e: LedgerEvent,
+      date: string,
+      mode: 'opening' | 'movement',
+      dayState?: {
+        assetMovementValue: { value: number };
+        pureFinancialValue: { value: number };
+        transitChange: { value: number };
+        assetDetails: string[];
+        pureDetails: string[];
+        transitDetails: string[];
+        changedAssets: string[];
+      }
+    ) => {
+      const ticker = String(e.asset_ticker || '').toUpperCase();
+      const assetType = String(e.asset_type || inferAssetType(ticker));
+      const txType = String(e.transaction_type);
+      const isCash = isCashTicker(ticker, assetType);
+
+      if (isCash) {
+        const value = Number(e.total_net_value ?? 0);
+        if (txType === 'pending_settlement') {
+          const rawRef = String(e.broker_note_ref || e.id || `${date}-${dayState?.transitDetails.length ?? 0}`);
+          const baseRef = rawRef.endsWith(':CLEAR') ? rawRef.slice(0, -':CLEAR'.length) : rawRef;
+          if (rawRef.endsWith(':CLEAR')) {
+            pendingByRef.delete(baseRef);
+            if (mode === 'movement' && dayState) {
+              dayState.transitDetails.push(`${rawRef}: baixa de transito`);
+            }
+            return;
+          }
+          grossCash += value;
+          const prev = pendingByRef.get(baseRef);
+          pendingByRef.set(baseRef, {
+            amount: money((prev?.amount ?? 0) + value),
+            settleDate: prev?.settleDate ?? pendingSettleDate(baseRef, String(e.settlement_date || date).slice(0, 10)),
+          });
+          if (mode === 'movement' && dayState) {
+            dayState.transitChange.value += value;
+            dayState.transitDetails.push(`${rawRef}: ${money(value)}`);
+          }
+          return;
+        }
+
+        grossCash += value;
+        if (mode === 'movement' && dayState) {
+          const linkedToAsset =
+            Boolean(e.business_event_id && eventHasAsset.has(String(e.business_event_id))) ||
+            isBusinessTrade(e);
+          if (linkedToAsset) {
+            dayState.assetMovementValue.value += value;
+            dayState.assetDetails.push(`${txType} ${ticker}: ${money(value)}`);
+          } else {
+            dayState.pureFinancialValue.value += value;
+            dayState.pureDetails.push(`${txType} ${ticker}: ${money(value)}`);
+          }
+        }
+        return;
+      }
+
+      if (e.impacts_managerial_price === false || e.impacts_managerial_price === 0) return;
+      const previous = positions.get(ticker) || {
+        ticker,
+        assetType,
+        qty: 0,
+        unitValue: Number(e.unit_price ?? 0),
+      };
+      const beforeValue = previous.qty * previous.unitValue;
+      const unit = Number(e.unit_price ?? 0);
+      const qtyDelta = assetQuantityDelta(e, previous.qty);
+      const next: AuditPositionState = { ...previous };
+      if (unit > 0) next.unitValue = unit;
+      if (txType === 'split') {
+        next.qty = Number(e.quantity ?? previous.qty);
+      } else if (qtyDelta != null) {
+        next.qty += qtyDelta;
+      } else if (txType === 'revaluation' && unit > 0) {
+        next.unitValue = unit;
+      }
+      positions.set(ticker, next);
+
+      if (mode === 'movement' && dayState) {
+        const afterValue = next.qty * next.unitValue;
+        const deltaValue = money(afterValue - beforeValue);
+        if (Math.abs(deltaValue) > 0.005 || qtyDelta != null || txType === 'split') {
+          dayState.changedAssets.push(
+            `${ticker} ${txType}: qtd ${round(previous.qty)} -> ${round(next.qty)}, valor ${money(beforeValue)} -> ${money(afterValue)}`
+          );
+        }
+      }
+    };
+
     for (const date of calendar) {
       const day = byDate.get(date) || [];
+      for (const e of day) {
+        if (String(e.transaction_type) === 'opening_balance') {
+          applyLedgerEventToAuditState(e, date, 'opening');
+        }
+      }
+      releaseMaturedTransit(date);
       const openingTransit = transitTotal();
       const openingCash = money(grossCash - openingTransit);
       const openingPortfolioValue = portfolioTotal();
-      let assetMovementValue = 0;
-      let pureFinancialValue = 0;
-      let transitChange = 0;
+      const assetMovementValue = { value: 0 };
+      const pureFinancialValue = { value: 0 };
+      const transitChange = { value: 0 };
       const assetDetails: string[] = [];
       const pureDetails: string[] = [];
       const transitDetails: string[] = [];
@@ -682,6 +811,7 @@ export class ReconciliationDiagnosticsService {
       const unlinked: LedgerEvent[] = [];
 
       for (const e of day) {
+        if (String(e.transaction_type) === 'opening_balance') continue;
         if (e.business_event_id) {
           const id = String(e.business_event_id);
           businessGroups.set(id, [...(businessGroups.get(id) || []), e]);
@@ -691,63 +821,16 @@ export class ReconciliationDiagnosticsService {
       }
 
       for (const e of day) {
-        const ticker = String(e.asset_ticker || '').toUpperCase();
-        const assetType = String(e.asset_type || inferAssetType(ticker));
-        const txType = String(e.transaction_type);
-        const isCash = isCashTicker(ticker, assetType);
-
-        if (isCash) {
-          const value = Number(e.total_net_value ?? 0);
-          grossCash += value;
-          if (txType === 'pending_settlement') {
-            const rawRef = String(e.broker_note_ref || e.id || `${date}-${transitDetails.length}`);
-            const baseRef = rawRef.endsWith(':CLEAR') ? rawRef.slice(0, -':CLEAR'.length) : rawRef;
-            pendingByRef.set(baseRef, money((pendingByRef.get(baseRef) ?? 0) + value));
-            transitChange += value;
-            transitDetails.push(`${rawRef}: ${money(value)}`);
-            continue;
-          }
-
-          const linkedToAsset =
-            Boolean(e.business_event_id && eventHasAsset.has(String(e.business_event_id))) ||
-            isBusinessTrade(e);
-          if (linkedToAsset) {
-            assetMovementValue += value;
-            assetDetails.push(`${txType} ${ticker}: ${money(value)}`);
-          } else {
-            pureFinancialValue += value;
-            pureDetails.push(`${txType} ${ticker}: ${money(value)}`);
-          }
-          continue;
-        }
-
-        if (e.impacts_managerial_price === false || e.impacts_managerial_price === 0) continue;
-        const previous = positions.get(ticker) || {
-          ticker,
-          assetType,
-          qty: 0,
-          unitValue: Number(e.unit_price ?? 0),
-        };
-        const beforeValue = previous.qty * previous.unitValue;
-        const unit = Number(e.unit_price ?? 0);
-        const qtyDelta = assetQuantityDelta(e, previous.qty);
-        const next: AuditPositionState = { ...previous };
-        if (unit > 0) next.unitValue = unit;
-        if (txType === 'split') {
-          next.qty = Number(e.quantity ?? previous.qty);
-        } else if (qtyDelta != null) {
-          next.qty += qtyDelta;
-        } else if (txType === 'revaluation' && unit > 0) {
-          next.unitValue = unit;
-        }
-        positions.set(ticker, next);
-        const afterValue = next.qty * next.unitValue;
-        const deltaValue = money(afterValue - beforeValue);
-        if (Math.abs(deltaValue) > 0.005 || qtyDelta != null || txType === 'split') {
-          changedAssets.push(
-            `${ticker} ${txType}: qtd ${round(previous.qty)} -> ${round(next.qty)}, valor ${money(beforeValue)} -> ${money(afterValue)}`
-          );
-        }
+        if (String(e.transaction_type) === 'opening_balance') continue;
+        applyLedgerEventToAuditState(e, date, 'movement', {
+          assetMovementValue,
+          pureFinancialValue,
+          transitChange,
+          assetDetails,
+          pureDetails,
+          transitDetails,
+          changedAssets,
+        });
       }
 
       const closingTransit = transitTotal();
@@ -760,9 +843,9 @@ export class ReconciliationDiagnosticsService {
         date,
         openingCash,
         openingTransit,
-        assetMovementValue: money(assetMovementValue),
-        pureFinancialValue: money(pureFinancialValue),
-        transitChange: money(transitChange),
+        assetMovementValue: money(assetMovementValue.value),
+        pureFinancialValue: money(pureFinancialValue.value),
+        transitChange: money(transitChange.value),
         closingTransit,
         closingCash,
         closingCashWithTransit: money(closingCash + closingTransit),
