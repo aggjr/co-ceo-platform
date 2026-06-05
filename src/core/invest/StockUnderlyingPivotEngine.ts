@@ -65,6 +65,15 @@ function netCash(e: LedgerEvent): number {
   return Number(e.total_net_value ?? 0);
 }
 
+function tradeCashBeforeExpenses(e: LedgerEvent, type: string): number {
+  const qty = Math.abs(Number(e.quantity ?? 0));
+  const price = Number(e.unit_price ?? 0);
+  const gross = qty * price;
+  if (['buy', 'call_buy', 'put_buy'].includes(type)) return -gross;
+  if (['sell', 'call_sell', 'put_sell', 'option_exercise'].includes(type)) return gross;
+  return netCash(e);
+}
+
 function underlyingOf(e: LedgerEvent): string {
   const explicit = e.underlying_ticker?.trim();
   if (explicit) return explicit.toUpperCase();
@@ -84,6 +93,12 @@ function isStockUnderlying(ticker: string): boolean {
 
 function addToRow(row: StockPivotRow, col: StockPivotColumnKey, amount: number): void {
   row[col] = Math.round((row[col] + amount) * 100) / 100;
+}
+
+function signedExpense(value: number): number {
+  const n = Number(value ?? 0);
+  if (!Number.isFinite(n) || n === 0) return 0;
+  return -Math.abs(n);
 }
 
 export type StockUnderlyingPivotResult = {
@@ -207,6 +222,7 @@ export function buildStockUnderlyingPivot(
     const type = String(e.transaction_type);
     const assetType = String(e.asset_type || inferAssetType(String(e.asset_ticker)));
     const net = netCash(e);
+    const tradeCash = tradeCashBeforeExpenses(e, type);
     const qty = Math.abs(Number(e.quantity));
     
     const { closedQty, costBasisClosed, wasLong } = applyCustody(e);
@@ -226,9 +242,12 @@ export function buildStockUnderlyingPivot(
       case 'bonus':
         addToRow(row, 'bonus', net);
         break;
+      case 'cash_yield':
+        addToRow(row, 'outros_ganhos', net);
+        break;
       case 'fee':
       case 'penalty_b3':
-        addToRow(row, 'taxas', Math.abs(net));
+        addToRow(row, 'taxas', signedExpense(net));
         break;
       case 'revaluation':
         addToRow(row, 'outros_ganhos', net);
@@ -243,42 +262,42 @@ export function buildStockUnderlyingPivot(
         if (assetType === 'stock' || assetType === 'fii') {
           if (type === 'buy') {
             if (closedQty > 0 && !wasLong) {
-               const netOfClosed = qty > 0 ? net * (closedQty / qty) : net;
-               const pnl = netOfClosed + costBasisClosed; 
+               const cashOfClosed = qty > 0 ? tradeCash * (closedQty / qty) : tradeCash;
+               const pnl = cashOfClosed + costBasisClosed;
                addToRow(row, 'trade', pnl);
             }
             recordSameDayBuy(und, day, qty);
           } else if (type === 'sell' || type === 'option_exercise') {
             const dtQty = consumeSameDayBuy(und, day, qty);
             const swingQty = Math.max(0, qty - dtQty);
-            const netPerShare = qty > 0 ? net / qty : 0;
+            const cashPerShare = qty > 0 ? tradeCash / qty : 0;
             const costPerShare = closedQty > 0 ? costBasisClosed / closedQty : 0;
 
             if (dtQty > 0) {
-              const pnlDt = (netPerShare * dtQty) - (costPerShare * dtQty);
+              const pnlDt = (cashPerShare * dtQty) - (costPerShare * dtQty);
               addToRow(row, 'day_trade', pnlDt);
             }
             if (swingQty > 0) {
-              const pnlSw = (netPerShare * swingQty) - (costPerShare * swingQty);
+              const pnlSw = (cashPerShare * swingQty) - (costPerShare * swingQty);
               addToRow(row, 'trade', pnlSw);
             }
             if (dtQty === 0 && swingQty === 0 && qty > 0) {
-              addToRow(row, 'trade', net - costBasisClosed);
+              addToRow(row, 'trade', tradeCash - costBasisClosed);
             }
           }
         } else if (assetType === 'option_put' || assetType === 'option_call') {
           if (['sell', 'call_sell', 'put_sell', 'option_exercise'].includes(type)) {
              if (closedQty > 0 && wasLong) {
-                const netOfClosed = qty > 0 ? net * (closedQty / qty) : net;
-                const pnl = netOfClosed - costBasisClosed;
+                const cashOfClosed = qty > 0 ? tradeCash * (closedQty / qty) : tradeCash;
+                const pnl = cashOfClosed - costBasisClosed;
                 if (assetType === 'option_call') addToRow(row, 'compra_call', pnl);
                 else if (assetType === 'option_put') addToRow(row, 'compra_put', pnl);
              }
           } 
           else if (['buy', 'call_buy', 'put_buy'].includes(type)) {
              if (closedQty > 0 && !wasLong) {
-                const netOfClosed = qty > 0 ? net * (closedQty / qty) : net;
-                const pnl = netOfClosed + costBasisClosed;
+                const cashOfClosed = qty > 0 ? tradeCash * (closedQty / qty) : tradeCash;
+                const pnl = cashOfClosed + costBasisClosed;
                 if (assetType === 'option_call') addToRow(row, 'venda_call', pnl);
                 else if (assetType === 'option_put') addToRow(row, 'venda_put', pnl);
              }
@@ -287,7 +306,7 @@ export function buildStockUnderlyingPivot(
         break;
       }
       default:
-        if (net !== 0 && !['capital_deposit', 'capital_withdrawal', 'cash_yield', 'pending_settlement', 'opening_balance'].includes(type)) {
+        if (net !== 0 && !['capital_deposit', 'capital_withdrawal', 'pending_settlement', 'opening_balance'].includes(type)) {
           addToRow(row, 'outros_ganhos', net);
         }
         break;
@@ -295,7 +314,7 @@ export function buildStockUnderlyingPivot(
 
     const exp = expenseAmount(e);
     if (exp > 0 && type !== 'fee') {
-      addToRow(row, 'taxas', exp);
+      addToRow(row, 'taxas', -exp);
     }
   }
 
@@ -337,12 +356,12 @@ export function buildStockUnderlyingPivot(
     .map((row) => {
       let gain = 0;
       for (const col of gainCols) gain += row[col];
-      row.ganho_aproximado = Math.round((gain - row.taxas) * 100) / 100;
+      row.ganho_aproximado = Math.round((gain + row.taxas) * 100) / 100;
       return row;
     })
     .filter((row) => {
       if (Math.abs(row.ganho_aproximado) > 0.01) return true;
-      return gainCols.some((c) => Math.abs(row[c]) > 0.01) || row.taxas > 0.01;
+      return gainCols.some((c) => Math.abs(row[c]) > 0.01) || Math.abs(row.taxas) > 0.01;
     });
 
   rows.sort((a, b) => Math.abs(b.ganho_aproximado) - Math.abs(a.ganho_aproximado));

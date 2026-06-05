@@ -38,7 +38,7 @@ describe('buildStockUnderlyingPivot', () => {
         transaction_date: '2026-03-10',
         quantity: 100,
         unit_price: 42,
-        total_net_value: 4200,
+        total_net_value: 4190,
         brokerage_fee: 10,
       }),
     ];
@@ -48,8 +48,55 @@ describe('buildStockUnderlyingPivot', () => {
     expect(row).toBeDefined();
     expect(row!.day_trade).toBeCloseTo(200, 0);
     expect(row!.trade).toBeCloseTo(0, 0);
-    expect(row!.taxas).toBeGreaterThan(0);
+    expect(row!.taxas).toBeLessThan(0);
     expect(row!.ganho_aproximado).toBeCloseTo(190, 0);
+  });
+
+  it('mantém despesas negativas e resultado igual à soma das colunas de resultado', () => {
+    const entries: LedgerEvent[] = [
+      ev({
+        asset_id: 's1',
+        transaction_type: 'buy',
+        transaction_date: '2026-03-10',
+        quantity: 100,
+        unit_price: 40,
+        total_net_value: -4000,
+      }),
+      ev({
+        asset_id: 's1',
+        transaction_type: 'sell',
+        transaction_date: '2026-03-11',
+        quantity: 100,
+        unit_price: 42,
+        total_net_value: 4190,
+        brokerage_fee: 10,
+      }),
+      ev({
+        asset_id: 's1-yield',
+        transaction_type: 'cash_yield',
+        transaction_date: '2026-03-12',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 25,
+      }),
+      ev({
+        asset_id: 's1-fee',
+        transaction_type: 'fee',
+        transaction_date: '2026-03-13',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: -5,
+      }),
+    ];
+
+    const r = buildStockUnderlyingPivot(entries, '2026-01-01', '2026-12-31');
+    const row = r.rows.find((x) => x.underlying === 'PRIO3');
+
+    expect(row).toBeDefined();
+    expect(row!.trade).toBeCloseTo(200, 2);
+    expect(row!.outros_ganhos).toBeCloseTo(25, 2);
+    expect(row!.taxas).toBeCloseTo(-15, 2);
+    expect(row!.ganho_aproximado).toBeCloseTo(210, 2);
   });
 
   it('mantém prêmio de put vendida em resultado_custodia até ser fechada', () => {

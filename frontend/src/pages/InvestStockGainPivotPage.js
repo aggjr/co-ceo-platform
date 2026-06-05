@@ -54,7 +54,7 @@ function rowPeriodResult(row) {
     sum += Number(row[key] ?? 0);
   }
   const taxas = Number(row.taxas ?? 0);
-  return Math.round((sum - taxas) * 100) / 100;
+  return Math.round((sum + taxas) * 100) / 100;
 }
 
 function buildFooterColumnTotals(totals) {

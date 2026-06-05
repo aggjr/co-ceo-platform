@@ -64,6 +64,8 @@ function dateRangePreset(op) {
     return null;
 }
 
+const TABLE_SCROLL_END_GUTTER_PX = 40;
+
 export class ExcelTable {
     constructor({ container, columns, projectId, endpointPrefix, onFilterChange, onSortChange, enableSelection, onSelectionChange, headerRow, footerRow, summaryLabels, onBulkEdit, onBulkDelete, enabled = true, tableTheme = null, fixedLeadingColumns = 0, gridId = null, columnWidthLimits = null, footerAggregate = null, footerColumnTotals = null }) {
         this.container = container;
@@ -149,7 +151,7 @@ export class ExcelTable {
             (s, col) => s + columnWidthToLayoutPx(col.width || '100px', 100),
             selW
         );
-        this._tableEl.style.width = `${total}px`;
+        this._tableEl.style.width = `${total + TABLE_SCROLL_END_GUTTER_PX}px`;
     }
 
     // Allow updating options dynamically
@@ -584,7 +586,7 @@ export class ExcelTable {
             selW
         );
         const table = document.createElement('table');
-        table.style.width = `${totalTableWidth}px`;
+        table.style.width = `${totalTableWidth + TABLE_SCROLL_END_GUTTER_PX}px`;
         table.style.borderCollapse = 'separate';
         table.style.borderSpacing = '0';
         table.style.fontSize = 'var(--text-table)';
