@@ -12,6 +12,10 @@ export type ModuleCategoryRow = {
   default_quantity_unit: string;
   default_valuation_method: string;
   default_settlement_profile: string;
+  contributes_to_patrimony?: boolean | number;
+  requires_market_quote?: boolean | number;
+  default_quote_source?: string | null;
+  valuation_mode?: 'market_price' | 'computed' | 'historical_cost';
   is_active: boolean | number;
 };
 

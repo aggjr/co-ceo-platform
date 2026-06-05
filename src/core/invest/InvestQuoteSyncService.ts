@@ -9,12 +9,22 @@ import { inferOptionExpiryDate, inferOptionMonthFromTicker } from './optionExpir
 import { authBootstrapContext } from '../auth/authBootstrapContext';
 import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
 import { fetchOpcoesNetOptionQuotes } from './opcoesNetQuotes';
-import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
+import { MarketQuoteRepository, type QuoteSource } from '../market/MarketQuoteRepository';
 import {
   fetchExternalStockHistory,
   fetchExternalStockQuoteForDate,
 } from '../market/ExternalStockQuoteProvider';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
+import { ModuleCategories } from '../module-registry';
+
+export type QuoteSyncQuote = {
+  ticker: string;
+  price: number;
+  asOf: string;
+  source: QuoteSource;
+  kind: string;
+  provider?: string;
+};
 
 export type QuoteSyncResult = {
   asOf: string;
@@ -22,7 +32,7 @@ export type QuoteSyncResult = {
   updated: number;
   skipped: number;
   missing: string[];
-  quotes: B3QuoteResult[];
+  quotes: QuoteSyncQuote[];
 };
 
 export type SnapshotOptionRow = {
@@ -35,128 +45,186 @@ export type SnapshotOptionRow = {
 export class InvestQuoteSyncService {
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuotes: MarketQuoteRepository;
+  private readonly categories: ModuleCategories;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuotes = new MarketQuoteRepository(gateway);
+    this.categories = new ModuleCategories(gateway);
   }
 
-  /** Ações/FIIs em custódia + subjacentes das opções abertas (para cotação na grade de opções). */
-  async listB3QuoteTickers(ctx: UserContext): Promise<string[]> {
-    if (!ctx.organizationId) return [];
+  private addQuoteTarget(targets: Map<string, Set<string>>, source: string | null, ticker: string): void {
+    const cleanSource = String(source || '').trim();
+    const cleanTicker = String(ticker || '').trim().toUpperCase();
+    if (!cleanSource || !cleanTicker || cleanTicker.startsWith('CAIXA-')) return;
+    const list = targets.get(cleanSource) ?? new Set<string>();
+    list.add(cleanTicker);
+    targets.set(cleanSource, list);
+  }
+
+  private async addCategoryQuoteTarget(
+    ctx: UserContext,
+    targets: Map<string, Set<string>>,
+    ticker: string,
+    subcategory: string
+  ): Promise<void> {
+    if (!(await this.categories.requiresMarketQuote(ctx, subcategory))) return;
+    this.addQuoteTarget(targets, await this.categories.defaultQuoteSource(ctx, subcategory), ticker);
+  }
+
+  private async listQuoteTargetsBySource(ctx: UserContext): Promise<Map<string, Set<string>>> {
+    if (!ctx.organizationId) return new Map();
     const assets = await this.assetProjection.listActiveAssets(ctx);
-    const tickers: string[] = [];
+    const targets = new Map<string, Set<string>>();
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
-      const type = String(row.asset_type || inferAssetType(ticker));
-      if (type === 'stock' || type === 'fii') {
-        tickers.push(ticker);
-        continue;
-      }
-      if (
-        type === 'option_call' ||
-        type === 'option_put' ||
-        isOptionTicker(ticker)
-      ) {
-        const und = inferUnderlyingTicker(ticker);
-        if (und) tickers.push(und);
+      const subcategory = String(row.asset_type || inferAssetType(ticker));
+      await this.addCategoryQuoteTarget(ctx, targets, ticker, subcategory);
+
+      const underlying = inferUnderlyingTicker(ticker);
+      if (underlying) {
+        await this.addCategoryQuoteTarget(ctx, targets, underlying, inferAssetType(underlying));
       }
     }
-    return [...new Set(tickers)];
+    return targets;
+  }
+
+  /** Compatibilidade: tickers cujo catálogo aponta para a fonte brapi. */
+  async listB3QuoteTickers(ctx: UserContext): Promise<string[]> {
+    const targets = await this.listQuoteTargetsBySource(ctx);
+    return [...(targets.get('brapi') ?? new Set<string>())];
+  }
+
+  private quoteSourceForStorage(source: string): QuoteSource {
+    const allowed = new Set<QuoteSource>([
+      'brapi',
+      'opcoes_net',
+      'tesouro_direto',
+      'computed_cdi',
+      'computed_pre',
+      'computed_ipca',
+      'yahoo_finance',
+      'coingecko',
+      'user_manual',
+    ]);
+    return allowed.has(source as QuoteSource) ? (source as QuoteSource) : 'user_manual';
+  }
+
+  private async fetchQuotesForSource(
+    source: string,
+    tickers: string[],
+    asOfDate?: string
+  ): Promise<QuoteSyncQuote[]> {
+    if (!tickers.length) return [];
+    if (source === 'brapi') {
+      const brapiQuotes = await fetchB3Quotes(tickers, {
+        asOfDate,
+        token: process.env.BRAPI_TOKEN,
+      });
+      const out: QuoteSyncQuote[] = brapiQuotes.map((q) => ({
+        ticker: q.ticker,
+        price: q.price,
+        asOf: q.asOf,
+        source: 'brapi',
+        kind: q.kind,
+      }));
+      if (asOfDate) {
+        const found = new Set(out.map((q) => q.ticker));
+        for (const ticker of tickers) {
+          if (found.has(ticker)) continue;
+          const fallback = await fetchExternalStockQuoteForDate(ticker, asOfDate).catch(() => null);
+          if (!fallback) continue;
+          out.push({
+            ticker: fallback.ticker,
+            price: fallback.price,
+            asOf: fallback.asOf,
+            source: this.quoteSourceForStorage(fallback.source),
+            kind: fallback.kind,
+            provider: fallback.source,
+          });
+        }
+      }
+      return out;
+    }
+    if (source === 'opcoes_net') {
+      const optionQuotes = await fetchOpcoesNetOptionQuotes(tickers, { asOfDate });
+      return optionQuotes.map((q) => ({
+        ticker: q.ticker,
+        price: q.price,
+        asOf: q.asOf,
+        source: 'opcoes_net',
+        kind: 'option_last',
+      }));
+    }
+    if (source === 'yahoo_finance') {
+      const out: QuoteSyncQuote[] = [];
+      if (!asOfDate) return out;
+      for (const ticker of tickers) {
+        const q = await fetchExternalStockQuoteForDate(ticker, asOfDate).catch(() => null);
+        if (!q) continue;
+        out.push({
+          ticker: q.ticker,
+          price: q.price,
+          asOf: q.asOf,
+          source: this.quoteSourceForStorage(q.source),
+          kind: q.kind,
+          provider: q.source,
+        });
+      }
+      return out;
+    }
+    console.warn(`[InvestQuoteSyncService] fonte de cotacao sem adaptador ativo: ${source}`);
+    return [];
   }
 
   async syncFromBrapi(ctx: UserContext, asOfDate?: string): Promise<QuoteSyncResult> {
     if (!ctx.organizationId) {
       throw new Error('organizationId obrigatório.');
     }
-    const tickers = await this.listB3QuoteTickers(ctx);
-    let quotes: B3QuoteResult[] = [];
-    try {
-      quotes = await fetchB3Quotes(tickers, {
-        asOfDate,
-        token: process.env.BRAPI_TOKEN,
-      });
-    } catch (err) {
-      console.warn('[syncFromBrapi] brapi acoes/FIIs:', err);
-    }
-    const quoteByTicker = new Map(quotes.map((q) => [q.ticker, q]));
+    const targetsBySource = await this.listQuoteTargetsBySource(ctx);
+    const requested = [...targetsBySource.values()].reduce((sum, tickers) => sum + tickers.size, 0);
+    const quotes: QuoteSyncQuote[] = [];
     const missing: string[] = [];
     let updated = 0;
 
     const marketCtx = authBootstrapContext();
-    for (const ticker of tickers) {
-      let q = quoteByTicker.get(ticker);
-      let provider = 'brapi';
-      if (!q && asOfDate) {
-        const fallback = await fetchExternalStockQuoteForDate(ticker, asOfDate).catch(() => null);
-        if (fallback) {
-          q = {
-            ticker: fallback.ticker,
-            price: fallback.price,
-            asOf: fallback.asOf,
-            source: 'brapi',
-            kind: fallback.kind,
-          };
-          provider = fallback.source;
-        }
-      }
-      if (!q) {
-        missing.push(ticker);
-        continue;
-      }
-      await this.marketQuotes.upsertQuote(marketCtx, {
-        ticker: q.ticker,
-        quoteDate: q.asOf,
-        closingPrice: q.price,
-        source: provider === 'brapi' ? 'brapi' : 'user_manual',
-        metadata: provider === 'brapi'
-          ? { kind: q.kind }
-          : { kind: q.kind, provider, fallback_for: 'brapi' },
-      });
-      const ok = await this.writeQuoteToPositionExt(ctx, ticker, q.price, q.asOf);
-      if (ok) updated += 1;
-    }
-
-    const optionTickers: string[] = [];
-    for (const row of await this.assetProjection.listActiveAssets(ctx)) {
-      const ticker = String(row.asset_ticker ?? '').toUpperCase();
-      if (!ticker || !isOptionTicker(ticker)) continue;
-      const type = String(row.asset_type || inferAssetType(ticker));
-      if (
-        type === 'option_call' ||
-        type === 'option_put' ||
-        isOptionTicker(ticker)
-      ) {
-        optionTickers.push(ticker);
-      }
-    }
-    const uniqueOptions = [...new Set(optionTickers)];
-    if (uniqueOptions.length) {
+    for (const [source, tickerSet] of targetsBySource.entries()) {
+      const tickers = [...tickerSet];
+      let sourceQuotes: QuoteSyncQuote[] = [];
       try {
-        const optQuotes = await fetchOpcoesNetOptionQuotes(uniqueOptions, { asOfDate });
-        for (const q of optQuotes) {
-          await this.marketQuotes.upsertQuote(marketCtx, {
-            ticker: q.ticker,
-            quoteDate: q.asOf,
-            closingPrice: q.price,
-            source: 'opcoes_net',
-            metadata: { kind: 'option_last' },
-          });
-          const ok = await this.writeQuoteToPositionExt(ctx, q.ticker, q.price, q.asOf);
-          if (ok) updated += 1;
-        }
+        sourceQuotes = await this.fetchQuotesForSource(source, tickers, asOfDate);
       } catch (err) {
-        console.warn('[syncFromBrapi] opcoes.net opções:', err);
+        console.warn(`[syncFromBrapi] ${source}:`, err);
+      }
+      const quoteByTicker = new Map(sourceQuotes.map((q) => [q.ticker, q]));
+      quotes.push(...sourceQuotes);
+      for (const ticker of tickers) {
+        const q = quoteByTicker.get(ticker);
+        if (!q) {
+          missing.push(`${ticker}:${source}`);
+          continue;
+        }
+        await this.marketQuotes.upsertQuote(marketCtx, {
+          ticker: q.ticker,
+          quoteDate: q.asOf,
+          closingPrice: q.price,
+          source: q.source,
+          metadata: q.provider
+            ? { kind: q.kind, provider: q.provider, requested_source: source }
+            : { kind: q.kind, requested_source: source },
+        });
+        const ok = await this.writeQuoteToPositionExt(ctx, ticker, q.price, q.asOf);
+        if (ok) updated += 1;
       }
     }
 
     const asOf = asOfDate?.slice(0, 10) || quotes[0]?.asOf || new Date().toISOString().slice(0, 10);
     return {
       asOf,
-      requested: tickers.length + uniqueOptions.length,
+      requested,
       updated,
-      skipped: tickers.length - updated - missing.length,
+      skipped: Math.max(0, requested - updated - missing.length),
       missing,
       quotes,
     };

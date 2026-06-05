@@ -129,6 +129,11 @@ const TABLES: TableDefinition[] = [
     primaryKey: 'profile_code',
     countsTowardStorage: false,
   }),
+  def('module_quote_sources', 'global', {
+    softDelete: false,
+    primaryKey: 'source_code',
+    countsTowardStorage: false,
+  }),
   def('invest_position_ext', 'tenant', {
     softDelete: false,
     primaryKey: 'patrimony_item_id',

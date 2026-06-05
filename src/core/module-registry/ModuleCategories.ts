@@ -18,6 +18,7 @@ import type {
  */
 export class ModuleCategories {
   private byCategoryKey = new Map<string, ModuleCategoryRow>();
+  private bySubcategory = new Map<string, ModuleCategoryRow>();
   private byModuleCode = new Map<string, ModuleCategoryRow[]>();
   private valuationMethods = new Map<string, ValuationMethodRow>();
   private settlementProfiles = new Map<string, SettlementProfileRow>();
@@ -38,6 +39,7 @@ export class ModuleCategories {
 
     for (const row of categories) {
       this.byCategoryKey.set(ModuleCategories.key(row.category, row.subcategory), row);
+      this.bySubcategory.set(row.subcategory.toLowerCase(), row);
       const list = this.byModuleCode.get(row.module_code) ?? [];
       list.push(row);
       this.byModuleCode.set(row.module_code, list);
@@ -58,6 +60,7 @@ export class ModuleCategories {
 
   clearCache(): void {
     this.byCategoryKey.clear();
+    this.bySubcategory.clear();
     this.byModuleCode.clear();
     this.valuationMethods.clear();
     this.settlementProfiles.clear();
@@ -114,5 +117,25 @@ export class ModuleCategories {
   async listForModule(ctx: UserContext, moduleCode: string): Promise<ModuleCategoryRow[]> {
     await this.ensureLoaded(ctx);
     return this.byModuleCode.get(moduleCode) ?? [];
+  }
+
+  async resolveSubcategory(ctx: UserContext, subcategory: string): Promise<ModuleCategoryRow | null> {
+    await this.ensureLoaded(ctx);
+    return this.bySubcategory.get(subcategory.toLowerCase()) ?? null;
+  }
+
+  async contributesToPatrimony(ctx: UserContext, subcategory: string): Promise<boolean> {
+    const row = await this.resolveSubcategory(ctx, subcategory);
+    return row?.contributes_to_patrimony === true || row?.contributes_to_patrimony === 1;
+  }
+
+  async requiresMarketQuote(ctx: UserContext, subcategory: string): Promise<boolean> {
+    const row = await this.resolveSubcategory(ctx, subcategory);
+    return row?.requires_market_quote === true || row?.requires_market_quote === 1;
+  }
+
+  async defaultQuoteSource(ctx: UserContext, subcategory: string): Promise<string | null> {
+    const row = await this.resolveSubcategory(ctx, subcategory);
+    return row?.default_quote_source ? String(row.default_quote_source) : null;
   }
 }

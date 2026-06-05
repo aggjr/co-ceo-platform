@@ -9,6 +9,8 @@ export type QuoteSource =
   | 'computed_cdi'
   | 'computed_pre'
   | 'computed_ipca'
+  | 'yahoo_finance'
+  | 'coingecko'
   | 'user_manual';
 
 export type MarketQuoteRow = {
