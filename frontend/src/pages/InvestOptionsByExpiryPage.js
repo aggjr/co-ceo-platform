@@ -54,13 +54,16 @@ const AMP_COLORS = {
   call: 'rgba(59, 130, 246, 0.8)',
   put: 'rgba(249, 115, 22, 0.8)',
   quoteLine: 'rgba(200, 200, 200, 0.8)',
+  pmStrict: 'rgba(255, 215, 0, 0.85)',
+  pmB3: 'rgba(52, 211, 153, 0.85)',
+  pmManagerial: 'rgba(168, 85, 247, 0.85)',
 };
 
 let currentChartQty = null;
 let currentChartNotional = null;
 
 /** Eixo X numérico (R$ strike) — distância visual proporcional ao valor do strike. */
-function buildXScale(activeStrikes, underlyingQuote, pmStrict) {
+function buildXScale(activeStrikes, underlyingQuote, priceReferences = []) {
   let minS = Math.min(...activeStrikes);
   let maxS = Math.max(...activeStrikes);
   if (underlyingQuote != null && underlyingQuote > 0) {
@@ -68,10 +71,12 @@ function buildXScale(activeStrikes, underlyingQuote, pmStrict) {
     minS = Math.min(minS, quote);
     maxS = Math.max(maxS, quote);
   }
-  if (pmStrict != null && pmStrict > 0) {
-    const pm = Number(pmStrict);
-    minS = Math.min(minS, pm);
-    maxS = Math.max(maxS, pm);
+  for (const ref of priceReferences) {
+    const price = Number(ref?.value);
+    if (Number.isFinite(price) && price > 0) {
+      minS = Math.min(minS, price);
+      maxS = Math.max(maxS, price);
+    }
   }
   const span = maxS - minS || 1;
   const pad = Math.max(0.5, span * 0.025);
@@ -112,6 +117,49 @@ function ampTooltipLabel(ctx, formatValue) {
   const strike =
     x != null && Number.isFinite(Number(x)) ? formatBrl(Number(x)) : '—';
   return `${ctx.dataset.label}: ${formatValue(y)} · strike ${strike}`;
+}
+
+function validPrice(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function buildPriceReferences(underlying, prices, quote) {
+  const specs = [
+    {
+      key: 'pm-strict-line',
+      label: 'PM Estrito',
+      value: prices.strict,
+      color: AMP_COLORS.pmStrict,
+      dash: [4, 4],
+    },
+    {
+      key: 'pm-b3-line',
+      label: 'PM B3',
+      value: prices.b3,
+      color: AMP_COLORS.pmB3,
+      dash: [7, 4],
+    },
+    {
+      key: 'pm-managerial-line',
+      label: 'Meu PM',
+      value: prices.managerial,
+      color: AMP_COLORS.pmManagerial,
+      dash: [2, 4],
+    },
+  ];
+  return specs
+    .map((ref) => ({ ...ref, value: validPrice(ref.value) }))
+    .filter((ref) => ref.value != null)
+    .map((ref, index) => {
+      const nearQuote =
+        quote != null && Math.abs(ref.value - quote) < Math.max(0.5, quote * 0.035);
+      return {
+        ...ref,
+        underlying,
+        yAdjust: (nearQuote ? 28 : 0) + index * 26,
+      };
+    });
 }
 
 function strikesFromPortfolio(rows, underlying, expiry) {
@@ -259,6 +307,12 @@ export async function InvestOptionsByExpiryPage(container) {
 
     let sortedStrikes = [];
     let quote = null;
+    let priceReferences = [];
+    const underlyingPrices = {
+      strict: null,
+      b3: null,
+      managerial: null,
+    };
 
     try {
       const ladder = await apiRequest(
@@ -270,6 +324,11 @@ export async function InvestOptionsByExpiryPage(container) {
         .sort((a, b) => a - b);
       if (ladder.quote != null && Number(ladder.quote) > 0) {
         quote = Number(ladder.quote);
+      }
+      if (ladder.prices) {
+        underlyingPrices.strict = validPrice(ladder.prices.strict);
+        underlyingPrices.b3 = validPrice(ladder.prices.b3);
+        underlyingPrices.managerial = validPrice(ladder.prices.managerial);
       }
     } catch {
       /* fallback só custódia */
@@ -294,7 +353,6 @@ export async function InvestOptionsByExpiryPage(container) {
       volumeByStrike.set(s, { callQty: 0, callNotional: 0, putQty: 0, putNotional: 0 });
     }
 
-    let pmStrict = null;
     filtered.forEach((row) => {
       const f = cardFieldRows(row);
       if (f.strike == null || !volumeByStrike.has(f.strike)) return;
@@ -311,10 +369,17 @@ export async function InvestOptionsByExpiryPage(container) {
       if (quote == null && f.underlyingQuote > 0) {
         quote = f.underlyingQuote;
       }
-      if (pmStrict == null && row.underlyingPmStrict > 0) {
-        pmStrict = Number(row.underlyingPmStrict);
+      if (underlyingPrices.strict == null && row.underlyingPmStrict > 0) {
+        underlyingPrices.strict = Number(row.underlyingPmStrict);
+      }
+      if (underlyingPrices.b3 == null && row.underlyingPmB3 > 0) {
+        underlyingPrices.b3 = Number(row.underlyingPmB3);
+      }
+      if (underlyingPrices.managerial == null && row.underlyingPmManagerial > 0) {
+        underlyingPrices.managerial = Number(row.underlyingPmManagerial);
       }
     });
+    priceReferences = buildPriceReferences(underlying, underlyingPrices, quote);
 
     const activeStrikes = sortedStrikes.filter((s) => {
       const b = volumeByStrike.get(s);
@@ -391,24 +456,23 @@ export async function InvestOptionsByExpiryPage(container) {
       };
     }
 
-    if (pmStrict != null && pmStrict > 0) {
-      const pmLabelY = (quote != null && Math.abs(pmStrict - quote) < (quote * 0.05)) ? 30 : 0;
-      annotations['pm-strict-line'] = {
+    for (const ref of priceReferences) {
+      annotations[ref.key] = {
         type: 'line',
         scaleID: 'x',
-        value: pmStrict,
-        borderColor: 'rgba(255, 215, 0, 0.8)',
+        value: ref.value,
+        borderColor: ref.color,
         borderWidth: 2,
-        borderDash: [4, 4],
+        borderDash: ref.dash,
         label: {
           display: true,
-          content: `PM Estrito ${underlying}: ${formatBrl(pmStrict)}`,
+          content: `${ref.label} ${ref.underlying}: ${formatBrl(ref.value)}`,
           position: 'start',
           backgroundColor: 'rgba(15, 23, 42, 0.9)',
-          color: 'rgba(255, 215, 0, 0.8)',
+          color: ref.color,
           font: { size: 12, weight: 'bold' },
           padding: 6,
-          yAdjust: pmLabelY
+          yAdjust: ref.yAdjust,
         },
       };
     }
@@ -429,7 +493,7 @@ export async function InvestOptionsByExpiryPage(container) {
         annotation: { annotations },
       },
       scales: {
-        x: buildXScale(activeStrikes, quote, pmStrict),
+        x: buildXScale(activeStrikes, quote, priceReferences),
       },
     };
 

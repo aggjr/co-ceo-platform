@@ -536,6 +536,9 @@ export class InvestController {
         .filter((s) => Number.isFinite(s) && s > 0);
       const quoteMap = await this.marketQuoteRepo.loadLatestQuoteMap(ctx, [underlying]);
       const mq = quoteMap.get(underlying);
+      const today = new Date().toISOString().slice(0, 10);
+      const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+      const threePrices = computeThreePricesByUnderlying(events, today).get(underlying);
       return res.json({
         success: true,
         underlying,
@@ -543,6 +546,13 @@ export class InvestController {
         strikes,
         quote: mq?.price ?? null,
         quoteAsOf: mq?.date ?? null,
+        prices: threePrices
+          ? {
+              strict: threePrices.estrito,
+              b3: threePrices.b3,
+              managerial: threePrices.gerencial,
+            }
+          : null,
       });
     } catch (err) {
       console.error('[getOptionStrikeLadder]', err);

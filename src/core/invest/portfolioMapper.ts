@@ -141,6 +141,10 @@ export type PortfolioItemDto = {
   underlyingLastPrice: number | null;
   /** PM estrito da ação-mãe em carteira comprada (qty > 0); null se não houver posição long. */
   underlyingPmStrict: number | null;
+  /** PM B3 da ação-mãe em carteira comprada (qty > 0); null se não houver posição long. */
+  underlyingPmB3: number | null;
+  /** Meu preço médio da ação-mãe em carteira comprada (qty > 0); null se não houver posição long. */
+  underlyingPmManagerial: number | null;
   /** Spot − strike (R$); positivo = ação acima do strike. */
   strikeDistanceBrl: number | null;
   /** (Spot − strike) / strike × 100. */
@@ -406,6 +410,8 @@ export function enrichPortfolioRow(
     notional,
     underlyingLastPrice: null,
     underlyingPmStrict: null,
+    underlyingPmB3: null,
+    underlyingPmManagerial: null,
     strikeDistanceBrl: null,
     strikeDistancePct: null,
   };
@@ -513,6 +519,10 @@ export function attachUnderlyingMarketData(
     const equityPm = underlyingKey ? pmByUnderlying.get(underlyingKey) : undefined;
     const underlyingPmStrict =
       equityPm != null && equityPm.strict > 0 ? equityPm.strict : null;
+    const underlyingPmB3 =
+      equityPm != null && equityPm.b3 > 0 ? equityPm.b3 : null;
+    const underlyingPmManagerial =
+      equityPm != null && equityPm.managerial > 0 ? equityPm.managerial : null;
 
     let strikeDistanceBrl: number | null = null;
     let strikeDistancePct: number | null = null;
@@ -528,6 +538,8 @@ export function attachUnderlyingMarketData(
       notional,
       underlyingLastPrice,
       underlyingPmStrict,
+      underlyingPmB3,
+      underlyingPmManagerial,
       strikeDistanceBrl,
       strikeDistancePct,
     };
