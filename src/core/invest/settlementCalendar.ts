@@ -9,8 +9,30 @@ export const B3_OPTION_PREMIUM_BUSINESS_DAYS = 1;
 
 export type SettlementCalendarUnit = 'business_days' | 'calendar_days';
 
+export type SettlementCounterparty = {
+  counterpartyCode: string;
+  moduleCode: string;
+  counterpartyKind: 'exchange' | 'broker' | 'supplier' | 'customer' | 'internal' | 'other';
+  countryCode?: string;
+  canonicalName: string;
+};
+
+export type SettlementContractType = {
+  contractTypeCode: string;
+  moduleCode: string;
+  canonicalName: string;
+  description?: string;
+};
+
+export type SettlementCounterpartyContractType = {
+  counterpartyCode: string;
+  contractTypeCode: string;
+  isDefault?: boolean;
+};
+
 export type InvestmentSettlementRule = {
   ruleCode: string;
+  contractTypeCode: string;
   assetTypes: string[];
   transactionTypes: string[];
   tickerPrefixes?: string[];
@@ -21,9 +43,69 @@ export type InvestmentSettlementRule = {
   label: string;
 };
 
+export const SETTLEMENT_COUNTERPARTIES: SettlementCounterparty[] = [
+  {
+    counterpartyCode: 'B3_BR',
+    moduleCode: 'INVEST',
+    counterpartyKind: 'exchange',
+    countryCode: 'BR',
+    canonicalName: 'B3 Brasil Bolsa Balcao',
+  },
+  {
+    counterpartyCode: 'TESOURO_BR',
+    moduleCode: 'INVEST',
+    counterpartyKind: 'supplier',
+    countryCode: 'BR',
+    canonicalName: 'Tesouro Direto',
+  },
+  {
+    counterpartyCode: 'BTG_BR',
+    moduleCode: 'INVEST',
+    counterpartyKind: 'broker',
+    countryCode: 'BR',
+    canonicalName: 'BTG Pactual',
+  },
+];
+
+export const SETTLEMENT_CONTRACT_TYPES: SettlementContractType[] = [
+  {
+    contractTypeCode: 'B3_OPTION_PREMIUM',
+    moduleCode: 'INVEST',
+    canonicalName: 'Premio de opcao B3',
+    description: 'Premios de compra/venda de opcoes padronizadas B3.',
+  },
+  {
+    contractTypeCode: 'B3_EQUITY_SPOT',
+    moduleCode: 'INVEST',
+    canonicalName: 'Mercado a vista B3',
+    description: 'Acoes, FIIs, ETFs e BDRs negociados a vista.',
+  },
+  {
+    contractTypeCode: 'BR_FIXED_INCOME_SPOT',
+    moduleCode: 'INVEST',
+    canonicalName: 'Renda fixa Brasil',
+    description: 'Titulos de renda fixa, Tesouro e CDBs.',
+  },
+  {
+    contractTypeCode: 'SECURITIES_LENDING',
+    moduleCode: 'INVEST',
+    canonicalName: 'Aluguel/termo de ativos',
+    description: 'Contratos padronizados de aluguel/remuneracao/termo.',
+  },
+];
+
+export const SETTLEMENT_COUNTERPARTY_CONTRACT_TYPES: SettlementCounterpartyContractType[] = [
+  { counterpartyCode: 'B3_BR', contractTypeCode: 'B3_OPTION_PREMIUM', isDefault: true },
+  { counterpartyCode: 'B3_BR', contractTypeCode: 'B3_EQUITY_SPOT', isDefault: true },
+  { counterpartyCode: 'B3_BR', contractTypeCode: 'SECURITIES_LENDING', isDefault: true },
+  { counterpartyCode: 'TESOURO_BR', contractTypeCode: 'BR_FIXED_INCOME_SPOT', isDefault: true },
+  { counterpartyCode: 'BTG_BR', contractTypeCode: 'BR_FIXED_INCOME_SPOT' },
+];
+
 export const INVESTMENT_SETTLEMENT_RULES: InvestmentSettlementRule[] = [
   {
     ruleCode: 'B3_OPTION_PREMIUM_D1',
+    contractTypeCode: 'B3_OPTION_PREMIUM',
     assetTypes: ['option_call', 'option_put'],
     transactionTypes: ['call_sell', 'put_sell', 'call_buy', 'put_buy'],
     validFrom: '1900-01-01',
@@ -33,6 +115,7 @@ export const INVESTMENT_SETTLEMENT_RULES: InvestmentSettlementRule[] = [
   },
   {
     ruleCode: 'B3_EQUITY_D3_LEGACY',
+    contractTypeCode: 'B3_EQUITY_SPOT',
     assetTypes: ['stock', 'fii', 'etf', 'bdr'],
     transactionTypes: ['buy', 'sell'],
     validFrom: '1900-01-01',
@@ -43,6 +126,7 @@ export const INVESTMENT_SETTLEMENT_RULES: InvestmentSettlementRule[] = [
   },
   {
     ruleCode: 'B3_EQUITY_D2',
+    contractTypeCode: 'B3_EQUITY_SPOT',
     assetTypes: ['stock', 'fii', 'etf', 'bdr'],
     transactionTypes: ['buy', 'sell'],
     validFrom: '2019-05-27',
@@ -52,6 +136,7 @@ export const INVESTMENT_SETTLEMENT_RULES: InvestmentSettlementRule[] = [
   },
   {
     ruleCode: 'TESOURO_D1',
+    contractTypeCode: 'BR_FIXED_INCOME_SPOT',
     assetTypes: ['fixed_income'],
     transactionTypes: ['buy', 'sell'],
     tickerPrefixes: ['TESOURO-', 'TD-', 'LFT-'],
@@ -62,6 +147,7 @@ export const INVESTMENT_SETTLEMENT_RULES: InvestmentSettlementRule[] = [
   },
   {
     ruleCode: 'CDB_D1',
+    contractTypeCode: 'BR_FIXED_INCOME_SPOT',
     assetTypes: ['fixed_income'],
     transactionTypes: ['buy', 'sell'],
     tickerPrefixes: ['CDB-'],
@@ -72,6 +158,7 @@ export const INVESTMENT_SETTLEMENT_RULES: InvestmentSettlementRule[] = [
   },
   {
     ruleCode: 'FIXED_INCOME_D1',
+    contractTypeCode: 'BR_FIXED_INCOME_SPOT',
     assetTypes: ['fixed_income'],
     transactionTypes: ['buy', 'sell'],
     validFrom: '1900-01-01',
@@ -81,6 +168,7 @@ export const INVESTMENT_SETTLEMENT_RULES: InvestmentSettlementRule[] = [
   },
   {
     ruleCode: 'SECURITIES_LENDING_NET30',
+    contractTypeCode: 'SECURITIES_LENDING',
     assetTypes: ['stock', 'fii', 'securities_lending'],
     transactionTypes: ['securities_lending'],
     validFrom: '1900-01-01',

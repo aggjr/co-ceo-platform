@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS invest_settlement_rules;
+
 CREATE TABLE IF NOT EXISTS settlement_counterparties (
     counterparty_code VARCHAR(80) PRIMARY KEY,
     module_code VARCHAR(40) NOT NULL,
@@ -30,10 +32,10 @@ CREATE TABLE IF NOT EXISTS settlement_counterparty_contract_types (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (counterparty_code, contract_type_code),
-    CONSTRAINT fk_sct_counterparty
+    CONSTRAINT fk_sct_counterparty_39
       FOREIGN KEY (counterparty_code) REFERENCES settlement_counterparties(counterparty_code)
       ON DELETE CASCADE,
-    CONSTRAINT fk_sct_contract_type
+    CONSTRAINT fk_sct_contract_type_39
       FOREIGN KEY (contract_type_code) REFERENCES settlement_contract_types(contract_type_code)
       ON DELETE CASCADE
 );
@@ -52,7 +54,7 @@ CREATE TABLE IF NOT EXISTS settlement_contract_rules (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_scr_contract_type
+    CONSTRAINT fk_scr_contract_type_39
       FOREIGN KEY (contract_type_code) REFERENCES settlement_contract_types(contract_type_code)
       ON DELETE CASCADE,
     INDEX idx_scr_contract_validity (contract_type_code, valid_from, valid_to),
@@ -63,7 +65,7 @@ CREATE TABLE IF NOT EXISTS settlement_rule_asset_types (
     rule_code VARCHAR(80) NOT NULL,
     asset_type VARCHAR(80) NOT NULL,
     PRIMARY KEY (rule_code, asset_type),
-    CONSTRAINT fk_srat_rule
+    CONSTRAINT fk_srat_rule_39
       FOREIGN KEY (rule_code) REFERENCES settlement_contract_rules(rule_code)
       ON DELETE CASCADE
 );
@@ -72,7 +74,7 @@ CREATE TABLE IF NOT EXISTS settlement_rule_transaction_types (
     rule_code VARCHAR(80) NOT NULL,
     transaction_type VARCHAR(80) NOT NULL,
     PRIMARY KEY (rule_code, transaction_type),
-    CONSTRAINT fk_srtt_rule
+    CONSTRAINT fk_srtt_rule_39
       FOREIGN KEY (rule_code) REFERENCES settlement_contract_rules(rule_code)
       ON DELETE CASCADE
 );
@@ -81,7 +83,7 @@ CREATE TABLE IF NOT EXISTS settlement_rule_ticker_prefixes (
     rule_code VARCHAR(80) NOT NULL,
     ticker_prefix VARCHAR(40) NOT NULL,
     PRIMARY KEY (rule_code, ticker_prefix),
-    CONSTRAINT fk_srtp_rule
+    CONSTRAINT fk_srtp_rule_39
       FOREIGN KEY (rule_code) REFERENCES settlement_contract_rules(rule_code)
       ON DELETE CASCADE
 );
