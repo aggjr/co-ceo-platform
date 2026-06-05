@@ -4,6 +4,7 @@ import {
   HOME_BROKER_ANCHOR_REFERENCE,
 } from '../../../src/core/invest/PatrimonyMonthlyAnchorsSeedService';
 import { HOLDING_ORG_ID } from '../../../src/core/invest/btgPatrimonyAnchorReference';
+import { normalizePatrimonyAnchorInput } from '../../../src/core/invest/patrimonyAnchors';
 
 const ctx: UserContext = {
   userId: 'u1',
@@ -55,5 +56,45 @@ describe('PatrimonyMonthlyAnchorsSeedService', () => {
     expect(result.points.some((p) => p.date === '2026-05-29')).toBe(true);
     expect(result.fixedIncomeTotal).toBe(HOME_BROKER_ANCHOR_REFERENCE.fixed_income_total);
     expect(gateway.insert).toHaveBeenCalled();
+  });
+
+  it('normaliza JSON mensal simples do homebroker para aberturas e fechamentos', async () => {
+    const gateway = mockGateway();
+    const svc = new PatrimonyMonthlyAnchorsSeedService(gateway);
+    const anchors = normalizePatrimonyAnchorInput([
+      {
+        mes: '2026-01',
+        patrimonio_inicial: 1212435.41,
+        rendimentos: 108045.81,
+        aportes_retiradas: 18.0,
+        impostos: 0.0,
+        patrimonio_final: 1320481.6,
+      },
+      {
+        mes: '2026-02',
+        patrimonio_inicial: 1320481.6,
+        rendimentos: 23173.38,
+        aportes_retiradas: -10050.55,
+        impostos: 0.0,
+        patrimonio_final: 1333604.43,
+      },
+    ]);
+
+    expect(anchors?.month_ends).toEqual([
+      { date: '2026-01-01', patrimony: 1212435.41 },
+      { date: '2026-01-31', patrimony: 1320481.6 },
+      { date: '2026-02-01', patrimony: 1320481.6 },
+      { date: '2026-02-28', patrimony: 1333604.43 },
+    ]);
+
+    const result = await svc.seedFromFile(ctx, anchors!);
+
+    expect(result.upserted).toBe(4);
+    expect(result.points.map((p) => p.date)).toEqual([
+      '2026-01-01',
+      '2026-01-31',
+      '2026-02-01',
+      '2026-02-28',
+    ]);
   });
 });

@@ -656,7 +656,9 @@ export class InvestController {
             });
 
     const storedDaysRaw = await this.patrimonyStore.loadRange(ctx, from, to);
-    const storedDays = filterStoredDaysForChartMethod(storedDaysRaw, method);
+    const storedDays = useBtgAnchorCurve
+      ? []
+      : filterStoredDaysForChartMethod(storedDaysRaw, method);
     let storedDates: string[] = [];
     if (storedDays.length > 0) {
       const merged = mergeStoredPatrimonySeries(result.series, storedDays);

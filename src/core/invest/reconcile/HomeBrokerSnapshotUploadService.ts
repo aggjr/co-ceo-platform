@@ -5,7 +5,7 @@ import { applyBrokerHoldingSnapshot } from '../applyBrokerHoldingSnapshot';
 import { BrokerCustodySnapshotRepository } from '../BrokerCustodySnapshotRepository';
 import { parseBrokerCustodySnapshotJson } from '../brokerCustodySnapshotImport';
 import { PatrimonyMonthlyAnchorsSeedService } from '../PatrimonyMonthlyAnchorsSeedService';
-import type { PatrimonyAnchorFile } from '../patrimonyAnchors';
+import { normalizePatrimonyAnchorInput } from '../patrimonyAnchors';
 import { logReconcileEvent } from './reconcileErrorDetail';
 
 export type HomeBrokerSnapshotUploadResult = {
@@ -25,18 +25,12 @@ function decodeJsonFile(file: BtgUploadFileInput): unknown {
   return JSON.parse(raw);
 }
 
-function looksLikeAnchorFile(raw: unknown): raw is PatrimonyAnchorFile {
-  if (!raw || typeof raw !== 'object') return false;
-  const doc = raw as Record<string, unknown>;
-  return Array.isArray(doc.month_ends);
-}
-
 /**
  * Importa fechamentos do home broker para a fase de homologacao.
  *
  * Aceita dois formatos JSON:
  * - snapshot detalhado de custodia (`positions[]` + `composition`)
- * - arquivo simples de ancoras mensais (`month_ends[]`)
+ * - arquivo simples de ancoras mensais (`month_ends[]` ou `{ mes, patrimonio_final }`)
  */
 export class HomeBrokerSnapshotUploadService {
   private readonly snapshots: BrokerCustodySnapshotRepository;
@@ -71,8 +65,9 @@ export class HomeBrokerSnapshotUploadService {
     for (const file of files ?? []) {
       try {
         const raw = decodeJsonFile(file);
-        if (looksLikeAnchorFile(raw)) {
-          const seeded = await this.anchors.seedFromFile(ctx, raw);
+        const anchorFile = normalizePatrimonyAnchorInput(raw);
+        if (anchorFile?.month_ends.length) {
+          const seeded = await this.anchors.seedFromFile(ctx, anchorFile);
           result.anchorsUpserted += seeded.upserted;
           logReconcileEvent('info', 'homebroker.file.anchor', ctx.organizationId, {
             fileName: file.name,
