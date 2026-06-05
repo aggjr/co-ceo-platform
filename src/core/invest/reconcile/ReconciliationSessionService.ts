@@ -197,7 +197,11 @@ export class ReconciliationSessionService {
     }
 
     if (input.phase === 'cash') {
-      await this.assertNotesPhaseComplete(ctx);
+      throw new GatewayError(
+        'INVALID_PAYLOAD',
+        'Fase de caixa via sessao legada desativada. Use a Opcao C ou a importacao batch de extratos, que processam LIQ BOLSA e caixa em transito.',
+        400
+      );
     }
     if (input.phase === 'notes' && (!input.files?.length)) {
       throw new GatewayError('INVALID_PAYLOAD', 'Envie ao menos um PDF de notas.', 400);
@@ -453,14 +457,13 @@ export class ReconciliationSessionService {
         completed_at: new Date().toISOString(),
       });
       const audit = await this.audit.run(ctx);
-      return { session: updated, nextPhase: 'cash' as const, audit };
+      return { session: updated, nextPhase: 'option_c' as const, audit };
     }
-    const updated = await this.store.updateSession(ctx, sessionId, {
-      status: 'cash_complete',
-      completed_at: new Date().toISOString(),
-    });
-    const audit = await this.audit.run(ctx);
-    return { session: updated, audit };
+    throw new GatewayError(
+      'INVALID_PAYLOAD',
+      'Fase de caixa via sessao legada desativada. Use a Opcao C ou a importacao batch de extratos.',
+      400
+    );
   }
 
   async runAudit(ctx: UserContext, opts?: { through?: string }) {
@@ -616,21 +619,5 @@ export class ReconciliationSessionService {
       );
     }
     return rt;
-  }
-
-  private async assertNotesPhaseComplete(ctx: UserContext) {
-    const rows = await this.gateway.findWhere(
-      ctx,
-      'invest_reconciliation_sessions',
-      { phase: 'notes', status: 'notes_complete' },
-      { limit: 1 }
-    );
-    if (!rows.length) {
-      throw new GatewayError(
-        'ACCESS_DENIED',
-        'Conclua a fase de notas antes do extrato.',
-        403
-      );
-    }
   }
 }

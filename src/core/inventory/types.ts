@@ -131,10 +131,14 @@ export type RecordMovementInput = {
   impactsValuation?: boolean;
   externalRef?: string | null;
   /** Header canonico (business_events.id) que esta perna pertence. */
-  businessEventId?: string | null;
+  businessEventId: string;
   sourceBatchId?: string | null;
   notes?: string | null;
   metadata?: Record<string, unknown> | null;
+};
+
+export type ValuationMovementInput = Omit<RecordMovementInput, 'businessEventId'> & {
+  businessEventId?: string | null;
 };
 
 /**
@@ -158,5 +162,5 @@ export interface InventoryValuation {
    * Recebe estado atual + movimento; retorna novo estado.
    * As estrategias sao puras: nao tocam no banco.
    */
-  applyMovement(state: PositionState, movement: RecordMovementInput): PositionState;
+  applyMovement(state: PositionState, movement: ValuationMovementInput): PositionState;
 }

@@ -61,21 +61,31 @@ export class ReconciliationAuditService {
     });
     for (const row of orphans.patrimony.slice(0, 20)) {
       issues.push({
-        dimensionId: 1,
+        dimensionId: 20,
         kind: 'orphan_patrimony_leg',
-        severity: 'error',
+        severity: 'critical',
         summaryKey: 'invest.reconcile.audit.orphan_patrimony_leg',
-        context: { legId: row.id, date: row.transaction_date },
+        context: {
+          legId: row.id,
+          ticker: row.asset_ticker,
+          date: row.transaction_date,
+          type: row.transaction_type,
+        },
         rowKeys: row.id ? [`pat:${row.id}`] : undefined,
       });
     }
     for (const row of orphans.financial.slice(0, 20)) {
       issues.push({
-        dimensionId: 1,
+        dimensionId: 21,
         kind: 'orphan_financial_leg',
-        severity: 'error',
+        severity: 'critical',
         summaryKey: 'invest.reconcile.audit.orphan_financial_leg',
-        context: { legId: row.id, date: row.transaction_date },
+        context: {
+          legId: row.id,
+          accountId: row.account_id,
+          date: row.transaction_date,
+          amount: row.amount,
+        },
         rowKeys: row.id ? [`fin:${row.id}`] : undefined,
       });
     }

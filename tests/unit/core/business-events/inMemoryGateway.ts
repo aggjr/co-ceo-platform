@@ -136,13 +136,28 @@ export class InMemoryGateway {
         : queryKey === 'business_event_orphan_financial_legs'
         ? 'financial_ledger_entries'
         : null;
+    if (queryKey === 'market_quotes_latest_date') {
+      const quotes = this.tables.get('market_quotes_daily');
+      let latest = '';
+      if (quotes) {
+        for (const row of quotes.values()) {
+          if (row.deleted_at) continue;
+          const price = Number(row.closing_price ?? 0);
+          const date = String(row.quote_date ?? '').slice(0, 10);
+          if (Number.isFinite(price) && price > 0 && date > latest) latest = date;
+        }
+      }
+      return latest ? [{ id: 'market_quotes_latest_date', quote_date: latest }] : [];
+    }
     if (!table) throw new Error(`[inMemoryGateway] readQuery: ${queryKey} nao suportada`);
     const t = this.tables.get(table);
     if (!t) return [];
     const out: InMemoryRow[] = [];
     for (const row of t.values()) {
       if (row.deleted_at) continue;
-      if (row.business_event_id) continue;
+      if (row.business_event_id && row.business_event_id !== '__legacy_missing_business_event__') {
+        continue;
+      }
       if (row.organization_id !== orgId) continue;
       const date = String(row.transaction_date ?? '');
       if (date < from || date > to) continue;

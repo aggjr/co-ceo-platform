@@ -4,6 +4,7 @@ import { CoCeoDataGateway } from '../core/dal';
 import { GatewayError } from '../core/dal/errors';
 import { HoldingPurgeKeepOpeningService } from '../core/invest/HoldingPurgeKeepOpeningService';
 import { LedgerImportService } from '../core/invest/LedgerImportService';
+import { OpeningBalanceMigrationService } from '../core/invest/OpeningBalanceMigrationService';
 import { PatrimonyDailyRebuildService } from '../core/invest/PatrimonyDailyRebuildService';
 import { DailyCloseMaterializeService } from '../core/invest/reconcile/DailyCloseMaterializeService';
 import { OptionCDailyCloseOrchestrator } from '../core/invest/reconcile/OptionCDailyCloseOrchestrator';
@@ -14,6 +15,7 @@ import { logReconcileEvent, logReconcileFailure } from '../core/invest/reconcile
 
 export class ReconcileController {
   private readonly holdingPurge: HoldingPurgeKeepOpeningService;
+  private readonly openingMigration: OpeningBalanceMigrationService;
   private readonly ledger: LedgerImportService;
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly dailyClose: DailyCloseMaterializeService;
@@ -27,6 +29,7 @@ export class ReconcileController {
     pool: Pool
   ) {
     this.holdingPurge = new HoldingPurgeKeepOpeningService(gateway, pool);
+    this.openingMigration = new OpeningBalanceMigrationService(gateway);
     this.ledger = new LedgerImportService(gateway);
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.dailyClose = new DailyCloseMaterializeService(gateway);
@@ -76,6 +79,35 @@ export class ReconcileController {
       });
     } catch (error: unknown) {
       const detail = logReconcileFailure('reset-holding', orgId ?? undefined, error);
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      return res.status(status).json({
+        success: false,
+        error: detail.message,
+        errorDetail: detail,
+      });
+    }
+  };
+
+  /** POST /api/invest/reconcile/migrate-opening-balance */
+  migrateOpeningBalance = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
+    try {
+      if (!orgId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+
+      const report = await this.openingMigration.migrate(ctx);
+      const hasBlocked = report.blocked.length > 0;
+      return res.status(hasBlocked ? 409 : 200).json({
+        success: !hasBlocked,
+        message: hasBlocked
+          ? `Migracao parcial: ${report.blocked.length} conta(s) bloqueada(s).`
+          : `Migracao concluida: ${report.legsCreated} perna(s) criada(s), ${report.zeroed} conta(s) zerada(s).`,
+        report,
+      });
+    } catch (error: unknown) {
+      const detail = logReconcileFailure('migrate-opening-balance', orgId ?? undefined, error);
       const status = error instanceof GatewayError ? error.httpStatus : 500;
       return res.status(status).json({
         success: false,
@@ -153,6 +185,72 @@ export class ReconcileController {
         error: detail.message,
         errorDetail: detail,
       });
+    }
+  };
+
+  diagnosticsFinancial = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
+    try {
+      if (!orgId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const asOf = req.query.to
+        ? String(req.query.to).slice(0, 10)
+        : req.query.asOf
+        ? String(req.query.asOf).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      const from = req.query.from ? String(req.query.from).slice(0, 10) : '1900-01-01';
+      const rows = await this.diagnostics.getFinancialDiagnostics(ctx, from, asOf);
+      return res.json({ success: true, from, to: asOf, rows });
+    } catch (error: unknown) {
+      const detail = logReconcileFailure('diagnostics.financial', orgId ?? undefined, error);
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      return res.status(status).json({ success: false, error: detail.message, errorDetail: detail });
+    }
+  };
+
+  diagnosticsEvents = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
+    try {
+      if (!orgId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const asOf = req.query.to
+        ? String(req.query.to).slice(0, 10)
+        : req.query.asOf
+        ? String(req.query.asOf).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      const from = req.query.from ? String(req.query.from).slice(0, 10) : '1900-01-01';
+      const rows = await this.diagnostics.getEventsDiagnostics(ctx, from, asOf);
+      return res.json({ success: true, from, to: asOf, rows });
+    } catch (error: unknown) {
+      const detail = logReconcileFailure('diagnostics.events', orgId ?? undefined, error);
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      return res.status(status).json({ success: false, error: detail.message, errorDetail: detail });
+    }
+  };
+
+  diagnosticsPortfolio = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
+    try {
+      if (!orgId) {
+        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
+      }
+      const asOf = req.query.to
+        ? String(req.query.to).slice(0, 10)
+        : req.query.asOf
+        ? String(req.query.asOf).slice(0, 10)
+        : new Date().toISOString().slice(0, 10);
+      const from = req.query.from ? String(req.query.from).slice(0, 10) : '1900-01-01';
+      const rows = await this.diagnostics.getPortfolioDiagnostics(ctx, from, asOf);
+      return res.json({ success: true, from, to: asOf, rows });
+    } catch (error: unknown) {
+      const detail = logReconcileFailure('diagnostics.portfolio', orgId ?? undefined, error);
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      return res.status(status).json({ success: false, error: detail.message, errorDetail: detail });
     }
   };
 

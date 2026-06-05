@@ -67,7 +67,7 @@ export type RecordCashMovementInput = {
   status?: LedgerStatus;
   relatedPatrimonyLedgerId?: string | null;
   /** Header canonico (business_events.id) que esta perna pertence. */
-  businessEventId?: string | null;
+  businessEventId: string;
   externalRef?: string | null;
   sourceBatchId?: string | null;
   metadata?: Record<string, unknown>;

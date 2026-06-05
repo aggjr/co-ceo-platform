@@ -18,6 +18,11 @@ import { LedgerEventProjection } from '../../modules/invest/sync/LedgerEventProj
 import { buildInvestOperations, type InvestOperations } from '../../modules/invest';
 import { syncAutoPendingSettlements } from './AutoPendingSettlementSync';
 import { PatrimonyDailyStore } from './PatrimonyDailyStore';
+import {
+  LiqBolsaSettlementService,
+  type LiqBolsaMatchResult,
+  type LiqBolsaSettlementInput,
+} from './LiqBolsaSettlementService';
 
 /** Abertura de custódia — referência única usada para idempotência. */
 
@@ -33,11 +38,38 @@ export class LedgerImportService {
   private readonly projection: LedgerEventProjection;
   private readonly operations: InvestOperations;
   private readonly patrimonyStore: PatrimonyDailyStore;
+  private readonly liqBolsaSettler: LiqBolsaSettlementService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.projection = new LedgerEventProjection(gateway);
     this.operations = buildInvestOperations(gateway);
     this.patrimonyStore = new PatrimonyDailyStore(gateway);
+    this.liqBolsaSettler = new LiqBolsaSettlementService(gateway);
+  }
+
+  async getOpeningLedgerBalance(ctx: UserContext): Promise<number | null> {
+    const rows = (await this.gateway.findWhere(
+      ctx,
+      'financial_ledger_entries',
+      {},
+      { limit: 1000 }
+    )) as Array<Record<string, unknown>>;
+
+    let total = 0;
+    let found = false;
+    for (const row of rows) {
+      const externalRef = String(row.external_ref ?? '');
+      if (!externalRef.startsWith('OPENING-CASH-')) continue;
+      if (String(row.status ?? '') === 'cancelled') continue;
+
+      const amount = Number(row.amount ?? 0);
+      if (!Number.isFinite(amount)) continue;
+
+      found = true;
+      total += String(row.direction ?? 'in') === 'out' ? -amount : amount;
+    }
+
+    return found ? Math.round(total * 100) / 100 : null;
   }
 
   async importPortfolio(ctx: UserContext, payload: LedgerImportPayload) {
@@ -312,6 +344,13 @@ export class LedgerImportService {
     return syncAutoPendingSettlements(this.gateway, ctx, events, {
       operations: this.operations,
     });
+  }
+
+  async settleLiqBolsa(
+    ctx: UserContext,
+    input: LiqBolsaSettlementInput
+  ): Promise<LiqBolsaMatchResult> {
+    return this.liqBolsaSettler.settle(ctx, input);
   }
 
   /**

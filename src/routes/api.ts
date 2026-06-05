@@ -199,6 +199,13 @@ router.post(
 );
 
 router.post(
+  '/invest/reconcile/migrate-opening-balance',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.migrateOpeningBalance.bind(reconcile)
+);
+
+router.post(
   '/invest/reconcile/recalc-all',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:write'),
@@ -210,6 +217,24 @@ router.get(
   AuthMiddleware.protect,
   requirePermission('invest:ledger:read'),
   reconcile.diagnosticsReport.bind(reconcile)
+);
+router.get(
+  '/invest/reconcile/diagnostics/financial',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  reconcile.diagnosticsFinancial.bind(reconcile)
+);
+router.get(
+  '/invest/reconcile/diagnostics/events',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  reconcile.diagnosticsEvents.bind(reconcile)
+);
+router.get(
+  '/invest/reconcile/diagnostics/portfolio',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  reconcile.diagnosticsPortfolio.bind(reconcile)
 );
 
 router.post(

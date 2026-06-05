@@ -3,7 +3,10 @@ import {
   parseBtgBrokerageNoteBlocks,
   type BtgBrokerageNote,
 } from '../btgBrokerageNoteParser';
-import { brokerageNotesToLedgerLines } from '../btgBrokerageNoteLedgerTranslator';
+import {
+  brokerageNotesToLedgerLines,
+  suppressBrokerageNoteCashLines,
+} from '../btgBrokerageNoteLedgerTranslator';
 import { pdfBufferToLines } from '../btgPdfTextExtract';
 import type { BtgUploadFileInput } from '../btgUploadImportService';
 import type { LedgerImportLine } from '../ledgerTypes';
@@ -57,7 +60,7 @@ export async function buildNotesFileIndex(files: BtgUploadFileInput[]): Promise<
   }
 
   const { kept } = dedupeBrokerageNotes(allNotes);
-  const importLines = brokerageNotesToLedgerLines(kept);
+  const importLines = suppressBrokerageNoteCashLines(brokerageNotesToLedgerLines(kept));
   const linesByRowKey = new Map<string, LedgerImportLine>();
   const noteLinesByDate: Record<string, NoteFilePreviewRow[]> = {};
   const lineNoByNoteDate = new Map<string, number>();

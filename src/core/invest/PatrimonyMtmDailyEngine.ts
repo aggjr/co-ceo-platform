@@ -148,7 +148,7 @@ function economicCashAtDate(
   const slice = entriesForEconomicCash(ledgerThroughDate(entries, date));
   const summary = buildCashInTransitSummary(slice, date);
   return {
-    cash: summary.cashIncludingTransit,
+    cash: summary.settledCashBalance,
     scheduledCashPending: summary.inTransitNet,
   };
 }
@@ -308,7 +308,7 @@ export function buildDailyPatrimonyMtmSeries(
 
     const currentFixedIncome = fixedIncomeDynamic || fixedIncome; // Use dynamic if available, otherwise static
     const base = stocksValue + cash + currentFixedIncome;
-    const pending = Math.round(pendingSettlements * 100) / 100;
+    const pending = Math.round(scheduledCashPending * 100) / 100;
     const lastAnchorDate = anchors.month_ends.length > 0 
       ? anchors.month_ends[anchors.month_ends.length - 1]!.date 
       : '';
@@ -360,6 +360,8 @@ export function buildDailyPatrimonyMtmSeries(
       patrimonyGross: p.patrimonyGross,
       pendingSettlements: p.pendingSettlements,
       scheduledCashPending: p.scheduledCashPending,
+      settledCash: p.cash,
+      cashInTransit: p.scheduledCashPending,
       patrimony: p.patrimony,
       cash: p.cash,
       positionsValue: Math.round((p.stocksValue + p.optionsValue) * 100) / 100,

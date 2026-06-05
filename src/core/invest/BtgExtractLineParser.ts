@@ -311,7 +311,7 @@ const BTC_PRIO3_DESC_RE = /BTC\s*PRIO3|CORRETAGEM\s*BTC|IR\s*-\s*BTC|TAXA.+BTC\s
 const NEG_PENALTY_RE = /JUROS\s+SOBRE\s+SALDO\s+NEGATIVO|IOF\s+SOBRE\s+SALDO\s+NEGATIVO/i;
 
 export type BtgExtractParseOptions = {
-  /** Inclui LIQ BOLSA como caixa (importação mensal com notas só em patrimônio). */
+  /** Inclui LIQ BOLSA como marcador de liquidacao para roteamento pelo LiqBolsaSettlementService. */
   includeLiqBolsa?: boolean;
 };
 
@@ -371,7 +371,7 @@ export function btgLinesToImportEntries(
       out.push({
         date: parsed.date,
         ticker: CASH_TICKER,
-        operation: liqNet >= 0 ? 'capital_deposit' : 'capital_withdrawal',
+        operation: 'pending_settlement',
         quantity: 0,
         unit_price: 0,
         total_net_value: liqNet,

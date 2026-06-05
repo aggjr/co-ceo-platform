@@ -228,6 +228,33 @@ export class ReconciliationDiagnosticsService {
     this.snapshots = new BrokerCustodySnapshotRepository(gateway);
   }
 
+  async getFinancialDiagnostics(
+    ctx: UserContext,
+    from: string,
+    to: string
+  ): Promise<DailyFinancialAuditRow[]> {
+    const report = await this.build(ctx, to);
+    return report.dailyAudit.financial.filter((row) => row.date >= from && row.date <= report.asOf);
+  }
+
+  async getEventsDiagnostics(
+    ctx: UserContext,
+    from: string,
+    to: string
+  ): Promise<DailyBusinessAuditRow[]> {
+    const report = await this.build(ctx, to);
+    return report.dailyAudit.business.filter((row) => row.date >= from && row.date <= report.asOf);
+  }
+
+  async getPortfolioDiagnostics(
+    ctx: UserContext,
+    from: string,
+    to: string
+  ): Promise<DailyPortfolioAuditRow[]> {
+    const report = await this.build(ctx, to);
+    return report.dailyAudit.portfolio.filter((row) => row.date >= from && row.date <= report.asOf);
+  }
+
   async build(ctx: UserContext, asOfInput?: string) {
     if (!ctx.organizationId) {
       throw new GatewayError('INVALID_CONTEXT', 'Personifique a holding para conferir a conciliacao.', 400);
@@ -237,7 +264,7 @@ export class ReconciliationDiagnosticsService {
     const asOf = (asOfInput || latestSnapshot?.referenceDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', asOf);
     const custody = rebuildCustodyFromLedger(events);
-    const threePrices = computeThreePricesByUnderlying(events);
+    const threePrices = computeThreePricesByUnderlying(events, asOf);
     const stored = await this.loadStoredPositions(ctx);
     const broker = this.aggregateBroker(latestSnapshot);
 

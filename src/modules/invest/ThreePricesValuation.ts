@@ -1,10 +1,15 @@
 import type {
   InventoryValuation,
   PositionState,
-  RecordMovementInput,
+  ValuationMovementInput,
 } from '../../core/inventory';
 
 /**
+ * @deprecated Para o modulo INVEST, usar
+ * threePricesEngine.computeThreePricesByUnderlying(events, asOfDate).
+ * Mantido apenas para compatibilidade com estrategias genericas de inventario.
+ * Nao usar em tela INVEST, endpoints, materializacao ou reconstrucao diaria.
+ *
  * Estrategia de valoracao do INVEST: 3 precos paralelos.
  *
  *   pmA = Estrito    : custo de aquisicao puro, sem qualquer abatimento.
@@ -30,7 +35,7 @@ import type {
 export class ThreePricesValuation implements InventoryValuation {
   readonly methodCode = 'three_prices_invest';
 
-  applyMovement(state: PositionState, movement: RecordMovementInput): PositionState {
+  applyMovement(state: PositionState, movement: ValuationMovementInput): PositionState {
     const meta = (movement.metadata ?? {}) as {
       acquired_via_put_exercise?: boolean;
       put_premium_used?: number;

@@ -67,6 +67,23 @@ describe('BtgExtractLineParser', () => {
     expect(entries.some((e) => e.notes?.includes('LIQ BOLSA (Operacoes)'))).toBe(false);
   });
 
+  it('includeLiqBolsa preserva valor assinado sem transformar em aporte', () => {
+    const entries = btgLinesToImportEntries(
+      [
+        'Saldo Inicial 58.758,79',
+        '06/01/2026 LIQ BOLSA (Operacoes)- Pregão:05/01/2026 59.158,27\t399,48',
+      ],
+      58758.79,
+      undefined,
+      { includeLiqBolsa: true }
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.operation).toBe('pending_settlement');
+    expect(entries[0]!.total_net_value).toBeCloseTo(399.48, 2);
+    expect(['capital_deposit', 'capital_withdrawal']).not.toContain(entries[0]!.operation);
+  });
+
   it('getBtgOperationSign maps correctly', () => {
     expect(getBtgOperationSign('cash_yield', 'Rendimento Disponível')).toBe(1);
     expect(getBtgOperationSign('capital_withdrawal', 'TED ENVIADA')).toBe(-1);

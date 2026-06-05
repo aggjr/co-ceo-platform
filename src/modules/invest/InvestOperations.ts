@@ -37,6 +37,20 @@ const CAPITAL_OPS = new Set(['capital_deposit', 'capital_withdrawal']);
 const OPTION_OPS = new Set(['put_sell', 'put_buy', 'call_sell', 'call_buy']);
 const TRADE_OPS = new Set(['buy', 'sell']);
 
+function parseMetadataObject(raw: unknown): Record<string, unknown> {
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw as Record<string, unknown>;
+  if (typeof raw !== 'string') return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object'
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Orquestrador do modulo INVEST: combina o nucleo (inventory + financial) com
  * as extensoes invest_position_ext e invest_option_ext.
@@ -56,7 +70,7 @@ export class InvestOperations {
      * Registry do header canonico (business_events). Opcional pra nao quebrar
      * callers legados, mas todo write novo deveria ja passar.
      */
-    private readonly businessEvents?: BusinessEventRegistry
+    private readonly businessEvents: BusinessEventRegistry
   ) {}
 
   /**
@@ -91,8 +105,7 @@ export class InvestOperations {
   private async resolveOrCreateEvent(
     ctx: UserContext,
     line: LedgerImportLine
-  ): Promise<string | null> {
-    if (!this.businessEvents) return null;
+  ): Promise<string> {
     if (line.business_event_id) return line.business_event_id;
     const kind = InvestOperations.kindOf(String(line.operation));
     const net = Number(line.total_net_value ?? line.quantity * line.unit_price);
@@ -229,6 +242,19 @@ export class InvestOperations {
     });
 
     const brokerRef = input.brokerNoteRef?.trim();
+    const eventId =
+      options.businessEventId ??
+      (await this.resolveOrCreateEvent(ctx, {
+        date: asOfDate,
+        ticker: input.ticker,
+        operation: 'opening_balance',
+        quantity: input.quantity,
+        unit_price: input.unitPrice,
+        total_net_value: input.quantity * input.unitPrice,
+        broker_note_ref: brokerRef,
+        event_source_ref: `OPENING:${asOfDate}`,
+        source_system: 'invest_operations.opening_position',
+      }));
     const { entry, state } = await this.inventoryLedger.recordMovement(ctx, {
       itemId: item.id,
       transactionDate: asOfDate,
@@ -236,7 +262,7 @@ export class InvestOperations {
       quantityDelta: input.quantity,
       unitValue: input.unitPrice,
       notes: input.notes ?? 'Saldo inicial',
-      businessEventId: options.businessEventId ?? null,
+      businessEventId: eventId,
       externalRef: brokerRef ? `BROKER_REF:${brokerRef}` : null,
       metadata: {
         legacy_op: 'opening_balance',
@@ -300,13 +326,47 @@ export class InvestOperations {
       accountType: 'brokerage',
       name,
       externalId: input.externalId ?? input.brokerCode,
-      openingBalance: input.balance,
+      openingBalance: 0,
       openingDate: asOfDate,
       metadata: { broker_code: input.brokerCode },
     });
 
+    const eventId =
+      input.businessEventId ??
+      (await this.resolveOrCreateEvent(ctx, {
+        date: asOfDate,
+        ticker: `CAIXA-${input.brokerCode}`,
+        operation: 'opening_balance',
+        quantity: 1,
+        unit_price: input.balance,
+        total_net_value: input.balance,
+        event_source_ref: `OPENING:${asOfDate}`,
+        source_system: 'invest_operations.opening_cash',
+      }));
+
     if (input.balance === 0) {
       return { accountId: account.id, entryId: null };
+    }
+
+    const existingOpening = (await this.gateway.findWhere(
+      ctx,
+      'financial_ledger_entries',
+      {
+        account_id: account.id,
+        transaction_date: asOfDate,
+        business_event_id: eventId,
+      },
+      { limit: 20 }
+    )) as Array<{ id: string; description?: string | null; metadata?: unknown }>;
+    const existing = existingOpening.find((row) => {
+      const meta = parseMetadataObject(row.metadata);
+      return (
+        meta.legacy_op === 'opening_balance' ||
+        /saldo\s+inicial/i.test(String(row.description || ''))
+      );
+    });
+    if (existing) {
+      return { accountId: account.id, entryId: existing.id };
     }
 
     const entry = await this.financialLedger.record(ctx, {
@@ -317,7 +377,7 @@ export class InvestOperations {
       description: 'Saldo inicial',
       status: 'cleared',
       settlementDate: asOfDate,
-      businessEventId: input.businessEventId ?? null,
+      businessEventId: eventId,
       metadata: { legacy_op: 'opening_balance' },
     });
 

@@ -29,6 +29,7 @@ export type GatewayReadQueryKey =
   | 'invest_ledger_note_refs'
   | 'market_quotes_daily_range'
   | 'market_quotes_daily_on_or_before'
+  | 'market_quotes_latest_date'
   | 'market_index_daily_range'
   | 'market_index_daily_on_or_before'
   | 'market_distinct_tickers_in_use'
@@ -231,7 +232,8 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
   },
   invest_portfolio_daily_range: {
     sql: `SELECT id, organization_id, snapshot_date, patrimony, patrimony_gross, cash,
-                 positions_value, pending_settlements, fixed_income_total, external_flow,
+                 positions_value, pending_settlements, settled_cash, cash_in_transit,
+                 fixed_income_total, external_flow,
                  daily_return_simple, daily_return_twr, cumulative_twr, quotes_as_of, source, metadata
           FROM invest_portfolio_daily
           WHERE organization_id = ?
@@ -241,7 +243,8 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
   },
   invest_portfolio_daily_before: {
     sql: `SELECT id, organization_id, snapshot_date, patrimony, patrimony_gross, cash,
-                 positions_value, pending_settlements, fixed_income_total, external_flow,
+                 positions_value, pending_settlements, settled_cash, cash_in_transit,
+                 fixed_income_total, external_flow,
                  daily_return_simple, daily_return_twr, cumulative_twr, quotes_as_of, source, metadata
           FROM invest_portfolio_daily
           WHERE organization_id = ?
@@ -254,7 +257,7 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
                  quantity_delta, unit_value, total_value, external_ref
           FROM patrimony_ledger_entries
           WHERE organization_id = ?
-            AND business_event_id IS NULL
+            AND (business_event_id IS NULL OR business_event_id = '__legacy_missing_business_event__')
             AND deleted_at IS NULL
             AND transaction_date >= ?
             AND transaction_date <= ?
@@ -266,7 +269,7 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
                  direction, amount, status, description, external_ref
           FROM financial_ledger_entries
           WHERE organization_id = ?
-            AND business_event_id IS NULL
+            AND (business_event_id IS NULL OR business_event_id = '__legacy_missing_business_event__')
             AND deleted_at IS NULL
             AND transaction_date >= ?
             AND transaction_date <= ?
@@ -301,6 +304,12 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
             AND quote_date <= ?
           ORDER BY quote_date DESC
           LIMIT 1`,
+  },
+  market_quotes_latest_date: {
+    sql: `SELECT MAX(quote_date) AS quote_date
+          FROM market_quotes_daily
+          WHERE closing_price IS NOT NULL
+            AND closing_price > 0`,
   },
   market_index_daily_range: {
     sql: `SELECT id, index_code, reference_date, daily_factor, annualized_rate, source

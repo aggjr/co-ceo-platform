@@ -22,6 +22,8 @@ export type DailyPatrimonyPoint = {
   pendingSettlements: number;
   /** Caixa de trades ainda não liquidados (ex.: compra ação D+2). */
   scheduledCashPending: number;
+  settledCash: number;
+  cashInTransit: number;
   patrimony: number;
   cash: number;
   positionsValue: number;
@@ -254,6 +256,8 @@ export function buildDailyPatrimonySeries(
         patrimonyGross: p.patrimonyGross,
         pendingSettlements: p.pendingSettlements,
         scheduledCashPending: p.scheduledCashPending,
+        settledCash: p.cash,
+        cashInTransit: p.scheduledCashPending,
         patrimony: p.patrimony,
         cash: p.cash,
         positionsValue: p.positionsValue,

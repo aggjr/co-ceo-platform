@@ -19,6 +19,12 @@ export type PatrimonyRebuildResult = {
   threePricesUpdated?: number;
 };
 
+export type PatrimonyRebuildOptions = {
+  from?: string;
+  to?: string;
+  lastTrustedDate?: string;
+};
+
 export type PatrimonyRebuildStatus = {
   lastRebuildAt: string | null;
   from: string | null;
@@ -80,7 +86,7 @@ export class PatrimonyDailyRebuildService {
 
   async rebuild(
     ctx: UserContext,
-    opts?: { from?: string; to?: string }
+    opts: PatrimonyRebuildOptions = {}
   ): Promise<PatrimonyRebuildResult> {
     if (!ctx.organizationId) {
       throw new Error('organizationId obrigatório para rebuild de patrimônio diário.');
@@ -90,13 +96,20 @@ export class PatrimonyDailyRebuildService {
     const today = new Date().toISOString().slice(0, 10);
     const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
     const bounds = resolveInvestPeriodBounds(events);
+    const lastTrusted = (
+      opts.lastTrustedDate ??
+      (await this.marketQuotes.getLastQuoteDate(ctx)) ??
+      today
+    ).slice(0, 10);
+    const maxTo = lastTrusted < today ? lastTrusted : today;
+    const effectiveMaxTo = maxTo < bounds.periodMin ? bounds.periodMin : maxTo;
 
     const from = clampDate(
       (opts?.from ?? bounds.periodMin).slice(0, 10),
       bounds.periodMin,
-      today
+      effectiveMaxTo
     );
-    const to = clampDate((opts?.to ?? today).slice(0, 10), from, today);
+    const to = clampDate((opts?.to ?? effectiveMaxTo).slice(0, 10), from, effectiveMaxTo);
 
     statusByOrg.set(orgId, {
       lastRebuildAt: null,
@@ -120,7 +133,12 @@ export class PatrimonyDailyRebuildService {
       }
       if (tickers.length > 0 && daysWithQuotes === 0) {
         warnings.push(
-          'Sem cotações em market_quotes_daily no intervalo — patrimônio usará PM do livro onde faltar preço.'
+          'Sem cotacoes em market_quotes_daily no intervalo; dias uteis com acoes/FIIs abertos serao bloqueados.'
+        );
+      }
+      if ((opts.to ?? today).slice(0, 10) > effectiveMaxTo) {
+        warnings.push(
+          `Rebuild limitado ate ${effectiveMaxTo} por lastTrustedDate/ultima cotacao disponivel.`
         );
       }
 

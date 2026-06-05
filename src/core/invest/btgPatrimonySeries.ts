@@ -39,6 +39,8 @@ export function buildBtgInterpolatedPatrimonySeries(
       patrimonyGross: patrimony,
       pendingSettlements: 0,
       scheduledCashPending: 0,
+      settledCash: 0,
+      cashInTransit: 0,
       cash: 0,
       positionsValue: patrimony,
       dailyReturn,

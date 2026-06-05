@@ -481,9 +481,14 @@ function snapshot(s: UnderlyingState): ThreePrices {
  * Modelo formal documentado em [tasks/wave-2/01-engine-tres-precos.md].
  */
 export function computeThreePricesByUnderlying(
-  entries: LedgerEvent[]
+  entries: LedgerEvent[],
+  asOfDate?: string
 ): Map<string, ThreePrices> {
-  const sorted = sortEntries(entries);
+  const cutoff = asOfDate?.slice(0, 10);
+  const filtered = cutoff
+    ? entries.filter((e) => eventDate(e).slice(0, 10) <= cutoff)
+    : entries;
+  const sorted = sortEntries(filtered);
   const states = new Map<string, UnderlyingState>();
 
   for (const e of sorted) {

@@ -25,6 +25,14 @@ export class FinancialLedger {
     input: RecordCashMovementInput,
     options: { allowZeroAmount?: boolean } = {}
   ): Promise<FinancialLedgerRow> {
+    if (!input.businessEventId) {
+      throw new GatewayError(
+        'FINANCIAL_RULE_VIOLATION',
+        'Lancamento financeiro sem business_event_id. Toda alteracao de caixa precisa de um evento de negocio.',
+        422
+      );
+    }
+
     if (input.amount < 0 || (input.amount === 0 && !options.allowZeroAmount)) {
       throw new GatewayError(
         'FINANCIAL_RULE_VIOLATION',
@@ -54,9 +62,9 @@ export class FinancialLedger {
       currency: input.currency ?? 'BRL',
       description: input.description ?? null,
       counterparty: input.counterparty ?? null,
-      status: input.status ?? 'cleared',
+      status: input.status ?? 'pending',
       related_patrimony_ledger_id: input.relatedPatrimonyLedgerId ?? null,
-      business_event_id: input.businessEventId ?? null,
+      business_event_id: input.businessEventId,
       source_batch_id: input.sourceBatchId ?? null,
       external_ref: input.externalRef ?? null,
       metadata: input.metadata == null
@@ -115,7 +123,23 @@ export class FinancialLedger {
       filters
     )) as FinancialLedgerRow[];
 
-    let balance = Number(account.opening_balance);
+    const hasOpeningLedger = rows.some((r) => {
+      const rawMeta = r.metadata;
+      let meta: Record<string, unknown> = {};
+      if (rawMeta && typeof rawMeta === 'object') meta = rawMeta as Record<string, unknown>;
+      else if (typeof rawMeta === 'string') {
+        try {
+          meta = JSON.parse(rawMeta) as Record<string, unknown>;
+        } catch {
+          meta = {};
+        }
+      }
+      return (
+        meta.legacy_op === 'opening_balance' ||
+        /saldo\s+inicial/i.test(String(r.description || ''))
+      );
+    });
+    let balance = hasOpeningLedger ? 0 : Number(account.opening_balance);
     for (const r of rows) {
       if (r.status === 'cancelled') continue;
       if (r.status === 'pending' && !options.includePending) continue;

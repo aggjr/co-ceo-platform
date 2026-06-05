@@ -169,7 +169,7 @@ export class DailyCloseMaterializeService {
     const limitDate = asOfDate ? asOfDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
     const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', limitDate);
     const { assets } = rebuildCustodyFromLedger(events);
-    const pricesMap = computeThreePricesByUnderlying(events);
+    const pricesMap = computeThreePricesByUnderlying(events, limitDate);
 
     const marketCtx = authBootstrapContext();
     const stockTickers = assets

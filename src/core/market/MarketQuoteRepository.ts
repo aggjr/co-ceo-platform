@@ -26,6 +26,11 @@ export type MarketQuoteRow = {
   metadata: Record<string, unknown> | null;
 };
 
+export type HistoricalCloseQuote = {
+  price: number;
+  source: QuoteSource | null;
+};
+
 export type MarketIndexRow = {
   id: string;
   index_code: string;
@@ -174,6 +179,18 @@ export class MarketQuoteRepository {
       { limit: 1 }
     );
     return rows[0] ? rowToQuote(rows[0]) : null;
+  }
+
+  async getHistoricalClose(
+    ctx: UserContext,
+    ticker: string,
+    quoteDate: string
+  ): Promise<HistoricalCloseQuote | null> {
+    const quote = await this.getQuote(ctx, ticker, quoteDate);
+    if (!quote || !Number.isFinite(quote.closing_price) || quote.closing_price <= 0) {
+      return null;
+    }
+    return { price: quote.closing_price, source: quote.source ?? null };
   }
 
   async getQuoteOnOrBefore(
@@ -360,6 +377,18 @@ export class MarketQuoteRepository {
       return result;
     } catch (err) {
       if (isMissingSchemaError(err)) return new Map();
+      throw err;
+    }
+  }
+
+  async getLastQuoteDate(ctx: UserContext): Promise<string | null> {
+    try {
+      const rows = await this.gateway.readQuery(ctx, 'market_quotes_latest_date', []);
+      const raw = rows[0]?.quote_date;
+      const date = raw ? toIsoDate(raw) : '';
+      return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+    } catch (err) {
+      if (isMissingSchemaError(err)) return null;
       throw err;
     }
   }

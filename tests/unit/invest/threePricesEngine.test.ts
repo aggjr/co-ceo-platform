@@ -223,6 +223,21 @@ describe('threePricesEngine', () => {
     expect(p.gerencial).toBe(45);
   });
 
+  it('asOfDate ignora eventos futuros', () => {
+    const out = computeThreePricesByUnderlying(
+      [
+        buy('PRIO3', 100, 40, '2026-01-10'),
+        buy('PRIO3', 100, 50, '2026-02-10'),
+      ],
+      '2026-01-31'
+    );
+    const p = out.get('PRIO3')!;
+    expect(p.qty).toBe(100);
+    expect(p.estrito).toBe(40);
+    expect(p.b3).toBe(40);
+    expect(p.gerencial).toBe(40);
+  });
+
   it('venda parcial — Estrito e B3 constantes', () => {
     const out = computeThreePricesByUnderlying([
       buy('PRIO3', 200, 40, '2026-01-10'),

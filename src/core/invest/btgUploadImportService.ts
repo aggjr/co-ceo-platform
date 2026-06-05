@@ -10,8 +10,10 @@ import {
   parseBtgBrokerageNoteBlocks,
   type BtgBrokerageNote,
 } from './btgBrokerageNoteParser';
-import { brokerageNotesToLedgerLines } from './btgBrokerageNoteLedgerTranslator';
-import { suppressBrokerageNoteCashLines } from './btgBrokerageNoteLedgerTranslator';
+import {
+  brokerageNotesToLedgerLines,
+  suppressBrokerageNoteCashLines,
+} from './btgBrokerageNoteLedgerTranslator';
 import { normalizeBtgExtractPdfText } from './btgExtractPdfText';
 import { pdfBufferToLines, pdfBufferToText } from './btgPdfTextExtract';
 import { LedgerImportService } from './LedgerImportService';
@@ -30,7 +32,6 @@ import {
 import type { LedgerEvent } from './CustodyEngine';
 import { logReconcileEvent, logReconcileFailure } from './reconcile/reconcileErrorDetail';
 
-const DEFAULT_OPENING_BALANCE = 58_758.79;
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 export type BtgUploadFileInput = {
@@ -241,33 +242,17 @@ function signedCashValue(line: LedgerImportLine): number {
   return Math.round(Number(line.total_net_value ?? 0) * 100) / 100;
 }
 
-function pendingSettlementCandidates(events: LedgerEvent[], date: string, net: number): LedgerEvent[] {
-  const expectedDate = date.slice(0, 10);
-  const expectedSign = Math.sign(net);
-  return events.filter((e) => {
-    if (String(e.transaction_type) !== 'pending_settlement') return false;
-    if (!e.business_event_id) return false;
-    const ref = String(e.broker_note_ref || '');
-    if (!ref.startsWith('AUTO-D2:') || ref.endsWith(':CLEAR')) return false;
-    const settleDate = String(e.settlement_date || e.transaction_date || '').slice(0, 10);
-    if (settleDate !== expectedDate) return false;
-    const value = Number(e.total_net_value ?? 0);
-    if (Math.sign(value) !== expectedSign) return false;
-    return Math.abs(value) >= 0.01;
-  });
-}
-
-function canRepresentAggregate(candidates: LedgerEvent[], net: number): boolean {
-  const total = candidates.reduce((sum, e) => sum + Number(e.total_net_value ?? 0), 0);
-  return Math.abs(Math.round((total - net) * 100) / 100) <= 0.02;
-}
-
-function expandLiqBolsaByBusinessEvent(
-  entries: LedgerImportLine[],
-  events: LedgerEvent[]
-): { entries: LedgerImportLine[]; expanded: number; keptAggregated: number } {
-  let expanded = 0;
-  let keptAggregated = 0;
+async function settleLiqBolsaEntries(
+  ctx: UserContext,
+  ledger: Pick<LedgerImportService, 'settleLiqBolsa'>,
+  entries: LedgerImportLine[]
+): Promise<{
+  entries: LedgerImportLine[];
+  matched: number;
+  unresolved: Array<{ date: string; net: number; notes: string | undefined; reason: string }>;
+}> {
+  let matched = 0;
+  const unresolved: Array<{ date: string; net: number; notes: string | undefined; reason: string }> = [];
   const out: LedgerImportLine[] = [];
 
   for (const line of entries) {
@@ -277,37 +262,32 @@ function expandLiqBolsaByBusinessEvent(
     }
 
     const net = signedCashValue(line);
-    const candidates = pendingSettlementCandidates(events, line.date, net);
-    if (!candidates.length || !canRepresentAggregate(candidates, net)) {
-      keptAggregated += 1;
-      out.push(line);
+    const result = await ledger.settleLiqBolsa(ctx, {
+      extractLineRef: line.broker_note_ref || `BTG-EXT-${line.date}`,
+      settlementDate: line.date,
+      valueSignedCents: Math.round(net * 100),
+    });
+    if (result.status === 'matched') {
+      matched += result.settledEvents.length;
       continue;
     }
-
-    candidates.forEach((candidate, idx) => {
-      const candidateNet = Math.round(Number(candidate.total_net_value ?? 0) * 100) / 100;
-      out.push({
-        ...line,
-        operation: candidateNet >= 0 ? 'capital_deposit' : 'capital_withdrawal',
-        total_net_value: candidateNet,
-        broker_note_ref: `${line.broker_note_ref}:BE${String(idx + 1).padStart(2, '0')}`,
-        business_event_id: candidate.business_event_id ?? undefined,
-        settlement_date: String(candidate.settlement_date || line.date).slice(0, 10),
-        notes: `${line.notes || 'LIQ BOLSA'} - liquidacao vinculada ao evento ${candidate.business_event_id}`,
-      });
-      expanded += 1;
+    unresolved.push({
+      date: line.date,
+      net,
+      notes: line.notes,
+      reason: result.reason,
     });
   }
 
-  return { entries: out, expanded, keptAggregated };
+  return { entries: out, matched, unresolved };
 }
 
 function buildExtractPreview(
   file: BtgUploadFileInput,
   format: BtgExtractFileFormat,
-  lines: string[]
+  lines: string[],
+  openingBalance: number
 ): BtgExtractImportPreview {
-  const openingBalance = extractOpeningBalance(lines) ?? DEFAULT_OPENING_BALANCE;
   const entries = btgLinesToImportEntries(lines, openingBalance);
 
   const byOperation: Record<string, { count: number; total: number }> = {};
@@ -361,7 +341,8 @@ function resultFromParsed(
 }
 
 async function parseBtgExtractFile(
-  file: BtgUploadFileInput
+  file: BtgUploadFileInput,
+  resolvedOpeningBalance?: number | null
 ): Promise<BtgExtractFileResult | ParsedExtractForBatch> {
   const path = file.name;
   const fileName = fileNameFromPath(path);
@@ -377,7 +358,15 @@ async function parseBtgExtractFile(
   try {
     const { raw, format } = await rawTextFromExtractUpload(file);
     const lines = normalizeExtractLines(raw, format);
-    const preview = buildExtractPreview(file, format, lines);
+    const openingBalance = extractOpeningBalance(lines) ?? resolvedOpeningBalance;
+    if (openingBalance == null) {
+      throw new GatewayError(
+        'INVALID_PAYLOAD',
+        'Saldo inicial nao encontrado no extrato nem no livro. Execute a migracao de abertura antes de importar ou envie extrato com Saldo Inicial.',
+        400
+      );
+    }
+    const preview = buildExtractPreview(file, format, lines, openingBalance);
     return { path, fileName, preview };
   } catch (e) {
     return {
@@ -416,12 +405,13 @@ export async function previewBtgExtractBatchUpload(
 
   const today = new Date().toISOString().slice(0, 10);
   const ledgerEvents = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+  const openingLedgerBalance = await ledger.getOpeningLedgerBalance(ctx);
 
   const parsedList: ParsedExtractForBatch[] = [];
   const errors: BtgExtractFileResult[] = [];
 
   for (const file of files) {
-    const parsed = await parseBtgExtractFile(file);
+    const parsed = await parseBtgExtractFile(file, openingLedgerBalance);
     if ('parseOk' in parsed) {
       errors.push(parsed);
     } else {
@@ -479,16 +469,23 @@ export async function applyBtgExtractBatchUpload(
   let totalEnriched = 0;
   let lastBatchId: string | undefined;
   let prevClosing: number | null = null;
-  let hasInjectedAdjustments = false;
+  let hasBlockedChain = false;
 
   for (const item of sorted) {
     const base = preview.fileResults.find((r) => r.path === item.path)!;
     const recon = buildExtractReconcileFields(item, ledgerEvents, prevClosing);
 
-    let injectCashAdjustment = 0;
-    if (recon.openingChainOk === false && recon.openingChainDelta != null && recon.openingChainDelta !== 0) {
-      injectCashAdjustment = recon.openingChainDelta;
-      hasInjectedAdjustments = true;
+    if (recon.openingChainOk === false) {
+      hasBlockedChain = true;
+      fileResults.push({
+        ...base,
+        ...recon,
+        importOk: false,
+        importError:
+          `Cadeia de saldos quebrada no extrato ${item.fileName}: ` +
+          `delta de abertura ${recon.openingChainDelta}. Corrija a origem antes de importar.`,
+      });
+      continue;
     }
 
     if (recon.monthAlreadyImported) {
@@ -505,7 +502,7 @@ export async function applyBtgExtractBatchUpload(
     const applied = await applyBtgExtractUpload(ctx, ledger, {
       name: item.path,
       contentBase64: files.find((f) => f.name === item.path)!.contentBase64,
-    }, { injectCashAdjustment });
+    });
     if (!applied.importOk) {
       logReconcileEvent('warn', 'btg-extract.file.error', ctx.organizationId ?? undefined, {
         fileName: item.fileName,
@@ -569,8 +566,8 @@ export async function applyBtgExtractBatchUpload(
       enriched: totalEnriched,
       reconcile: { positions: reconcile.positions },
     },
-    blockedMessage: hasInjectedAdjustments 
-      ? 'Atenção: Houve quebra na cadeia de saldos e ajustes automáticos foram injetados no livro de caixa para restabelecer a precisão matemática. Revise os itens em vermelho.'
+    blockedMessage: hasBlockedChain
+      ? 'Importacao bloqueada: houve quebra na cadeia de saldos. Corrija a origem antes de gravar novos movimentos.'
       : undefined,
   };
 }
@@ -588,11 +585,19 @@ export async function previewBtgExtractUpload(
 /** Linhas do extrato prontas para import (mesma lógica do apply). */
 export async function parseExtractUploadImportLines(
   file: BtgUploadFileInput,
-  options?: import('./BtgExtractLineParser').BtgExtractParseOptions
+  options?: import('./BtgExtractLineParser').BtgExtractParseOptions,
+  resolvedOpeningBalance?: number
 ): Promise<LedgerImportLine[]> {
   const { raw, format } = await rawTextFromExtractUpload(file);
   const lines = normalizeExtractLines(raw, format);
-  const openingBalance = extractOpeningBalance(lines) ?? DEFAULT_OPENING_BALANCE;
+  const openingBalance = extractOpeningBalance(lines) ?? resolvedOpeningBalance;
+  if (openingBalance == null) {
+    throw new GatewayError(
+      'INVALID_PAYLOAD',
+      'Saldo inicial nao encontrado no extrato nem no livro. Execute POST /invest/reconcile/migrate-opening-balance primeiro.',
+      400
+    );
+  }
   const rawEntries = btgLinesToImportEntries(lines, openingBalance, undefined, options);
   return assignExtractRefs(
     rawEntries.map((e) => ({
@@ -608,52 +613,82 @@ export async function applyBtgExtractUpload(
   file: BtgUploadFileInput,
   options?: { 
     parseOptions?: import('./BtgExtractLineParser').BtgExtractParseOptions;
+    /** Deprecated: nao usar em fluxos novos; cadeia quebrada deve bloquear. */
     injectCashAdjustment?: number;
   }
 ): Promise<BtgExtractFileResult> {
-  const previewResult = await previewBtgExtractUpload(file);
-  if (!previewResult.parseOk || !previewResult.preview) {
+  const path = file.name;
+  const fileName = fileNameFromPath(path);
+  if (!isExtractFileName(fileName)) {
     return {
-      ...previewResult,
+      path,
+      fileName,
+      format: detectExtractFormat(fileName) || 'txt',
+      parseOk: false,
       importOk: false,
-      importError: previewResult.parseError || 'Falha ao interpretar extrato.',
+      parseError: 'Ignorado — use PDF, CSV ou TXT.',
+      importError: 'Ignorado — use PDF, CSV ou TXT.',
     };
   }
 
+  let previewResult: BtgExtractFileResult | null = null;
   try {
+    const { raw, format } = await rawTextFromExtractUpload(file);
+    const lines = normalizeExtractLines(raw, format);
+    const openingBalance = extractOpeningBalance(lines) ?? (await ledger.getOpeningLedgerBalance(ctx));
+    if (openingBalance == null) {
+      throw new GatewayError(
+        'INVALID_PAYLOAD',
+        'Saldo inicial nao encontrado no extrato nem no livro. Execute POST /invest/reconcile/migrate-opening-balance primeiro.',
+        400
+      );
+    }
+    const preview = buildExtractPreview(file, format, lines, openingBalance);
+    previewResult = resultFromParsed({ path, fileName, preview }, null, null);
+
     await ledger.reconcileCustody(ctx);
-    let entries = await parseExtractUploadImportLines(file, options?.parseOptions);
-    const ledgerEventsBeforeExtract = await ledger.listLedgerEvents(
-      ctx,
-      '2000-01-01',
-      new Date().toISOString().slice(0, 10)
-    );
-    const liqBolsaExpansion = expandLiqBolsaByBusinessEvent(entries, ledgerEventsBeforeExtract);
-    entries = liqBolsaExpansion.entries;
-    if (liqBolsaExpansion.expanded || liqBolsaExpansion.keptAggregated) {
-      logReconcileEvent('info', 'btg-extract.liq-bolsa.business-events', ctx.organizationId ?? undefined, {
-        fileName: previewResult.fileName,
-        expanded: liqBolsaExpansion.expanded,
-        keptAggregated: liqBolsaExpansion.keptAggregated,
-      });
+    const parseOptions = { includeLiqBolsa: true, ...(options?.parseOptions ?? {}) };
+    let entries = await parseExtractUploadImportLines(file, parseOptions, openingBalance);
+    const liqBolsaSettlement = await settleLiqBolsaEntries(ctx, ledger, entries);
+    entries = liqBolsaSettlement.entries;
+    if (liqBolsaSettlement.matched || liqBolsaSettlement.unresolved.length) {
+      logReconcileEvent(
+        liqBolsaSettlement.unresolved.length ? 'warn' : 'info',
+        'btg-extract.liq-bolsa.business-events',
+        ctx.organizationId ?? undefined,
+        {
+          fileName: previewResult.fileName,
+          matched: liqBolsaSettlement.matched,
+          unresolved: liqBolsaSettlement.unresolved.length,
+        }
+      );
+    }
+
+    if (liqBolsaSettlement.unresolved.length) {
+      const details = liqBolsaSettlement.unresolved
+        .slice(0, 5)
+        .map((u) => `${u.date}: ${u.net} (${u.reason})`)
+        .join('; ');
+      return {
+        ...previewResult,
+        importOk: false,
+        importError:
+          `LIQ BOLSA sem casamento com eventos de negocio (${liqBolsaSettlement.unresolved.length}). ` +
+          `Corrija notas/eventos pendentes antes de importar. ${details}`,
+      };
     }
 
     if (options?.injectCashAdjustment) {
-      const adj = options.injectCashAdjustment;
-      entries.unshift({
-        date: entries[0]?.date || previewResult.preview.firstDate || new Date().toISOString().slice(0, 10),
-        ticker: 'CAIXA-BTG',
-        operation: adj > 0 ? 'cash_yield' : 'fee',
-        quantity: 1,
-        unit_price: Math.abs(adj),
-        total_net_value: adj,
-        notes: '⚠️ AJUSTE DE DIVERGÊNCIA BTG (Cadeia Quebrada)',
-        source_system: 'invest.extract_adjustment'
-      } as any);
+      return {
+        ...previewResult,
+        importOk: false,
+        importError:
+          'Importacao bloqueada: ajuste automatico de divergencia foi desativado. Corrija a origem antes de gravar.',
+      };
     }
 
     const result = await ledger.importEntriesOnly(ctx, entries, {
-      sourceLabel: `Extrato BTG upload ${previewResult.preview.firstDate ?? ''}->${previewResult.preview.lastDate ?? ''}`,
+      sourceLabel: `Extrato BTG upload ${preview.firstDate ?? ''}->${preview.lastDate ?? ''}`,
     });
     const reconcile = await ledger.reconcileCustody(ctx);
 
@@ -663,9 +698,24 @@ export async function applyBtgExtractUpload(
       inserted: result.inserted,
       skipped: result.skipped,
       batchId: result.batchId,
-      preview: previewResult.preview,
+      preview,
     };
   } catch (e) {
+    const importError = e instanceof Error ? e.message : String(e);
+    if (!previewResult?.preview) {
+      logReconcileFailure('btg-extract.file.apply', ctx.organizationId ?? undefined, e, {
+        fileName,
+      });
+      return {
+        path,
+        fileName,
+        format: detectExtractFormat(fileName) || 'txt',
+        parseOk: false,
+        parseError: importError,
+        importOk: false,
+        importError,
+      };
+    }
     logReconcileFailure('btg-extract.file.apply', ctx.organizationId ?? undefined, e, {
       fileName: previewResult.fileName,
       firstDate: previewResult.preview.firstDate,
@@ -675,7 +725,7 @@ export async function applyBtgExtractUpload(
     return {
       ...previewResult,
       importOk: false,
-      importError: e instanceof Error ? e.message : String(e),
+      importError,
     };
   }
 }
@@ -710,7 +760,7 @@ export async function previewBtgBrokerageUpload(
       const notes = parseBtgBrokerageNoteBlocks(lines, path);
       allNotes.push(...notes);
       const { kept } = dedupeBrokerageNotes(notes);
-      const ledgerLines = brokerageNotesToLedgerLines(kept).length;
+      const ledgerLines = suppressBrokerageNoteCashLines(brokerageNotesToLedgerLines(kept)).length;
       fileResults.push({
         path,
         fileName,
@@ -739,15 +789,14 @@ export async function previewBtgBrokerageUpload(
     filesOk: fileResults.filter((f) => f.parseOk).length,
     notesRaw: allNotes.length,
     notesKept: allKept.length,
-    ledgerLines: brokerageNotesToLedgerLines(allKept).length,
+    ledgerLines: suppressBrokerageNoteCashLines(brokerageNotesToLedgerLines(allKept)).length,
   };
 }
 
 export async function applyBtgBrokerageUpload(
   ctx: UserContext,
   ledger: LedgerImportService,
-  files: BtgUploadFileInput[],
-  options?: { cashFromExtractOnly?: boolean }
+  files: BtgUploadFileInput[]
 ): Promise<{
   fileResults: BtgBrokerageFileResult[];
   totals: BtgImportApplyResult;
@@ -800,10 +849,7 @@ export async function applyBtgBrokerageUpload(
         });
         continue;
       }
-      let entries = brokerageNotesToLedgerLines(kept);
-      if (options?.cashFromExtractOnly) {
-        entries = suppressBrokerageNoteCashLines(entries);
-      }
+      const entries = suppressBrokerageNoteCashLines(brokerageNotesToLedgerLines(kept));
       const result = await ledger.importEntriesOnly(ctx, entries, {
         sourceLabel: `Nota BTG ${fileName}`,
       });

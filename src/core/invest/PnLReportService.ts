@@ -37,7 +37,7 @@ export class PnLReportService {
     });
 
     const { assets } = rebuildCustodyFromLedger(events);
-    const priceMap = computeThreePricesByUnderlying(events);
+    const priceMap = computeThreePricesByUnderlying(events, to);
 
     const extRows = await this.gateway.findWhere(ctx, 'invest_position_ext', {});
     const lastPriceByAssetId = new Map(

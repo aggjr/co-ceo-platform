@@ -10,6 +10,7 @@ export type {
   MovementType,
   EnsureItemInput,
   RecordMovementInput,
+  ValuationMovementInput,
   PositionState,
   InventoryValuation,
 } from './types';

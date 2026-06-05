@@ -33,3 +33,4 @@ scripts/branch-peer.local.env
 check-cash.ts
 *.log
 .DS_Store
+desktop.ini

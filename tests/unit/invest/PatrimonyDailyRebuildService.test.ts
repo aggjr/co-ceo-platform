@@ -6,6 +6,7 @@ const recordDay = jest.fn();
 const listLedgerEvents = jest.fn();
 const reconcileCustody = jest.fn();
 const loadQuoteMapForRange = jest.fn();
+const getLastQuoteDate = jest.fn();
 const listActiveAssets = jest.fn();
 const recalcThreePricesPublic = jest.fn();
 
@@ -37,6 +38,7 @@ jest.mock('../../../src/core/invest/LedgerImportService', () => ({
 jest.mock('../../../src/core/market/MarketQuoteRepository', () => ({
   MarketQuoteRepository: jest.fn().mockImplementation(() => ({
     loadQuoteMapForRange,
+    getLastQuoteDate,
   })),
 }));
 
@@ -87,6 +89,7 @@ describe('PatrimonyDailyRebuildService', () => {
     recordDay.mockResolvedValue({ economicPatrimony: 1000 });
     reconcileCustody.mockResolvedValue({ ok: true });
     loadQuoteMapForRange.mockResolvedValue(new Map());
+    getLastQuoteDate.mockResolvedValue(null);
     listActiveAssets.mockResolvedValue([]);
     invalidateFromDate.mockResolvedValue(undefined);
     recalcThreePricesPublic.mockResolvedValue({ positionsUpdated: 1, positionsZeroed: 0 });
@@ -105,5 +108,32 @@ describe('PatrimonyDailyRebuildService', () => {
     expect(reconcileCustody).toHaveBeenCalledWith(ctx);
     expect(recalcThreePricesPublic).toHaveBeenCalledWith(ctx, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
     expect(result.threePricesUpdated).toBe(1);
+  });
+
+  it('limita rebuild pela ultima cotacao confiavel', async () => {
+    getLastQuoteDate.mockResolvedValue('2026-01-05');
+    const svc = new PatrimonyDailyRebuildService(mockGateway());
+
+    const result = await svc.rebuild(ctx, { from: '2026-01-02', to: '2026-01-10' });
+
+    expect(result.to).toBe('2026-01-05');
+    expect(loadQuoteMapForRange).toHaveBeenCalledWith(ctx, '2026-01-02', '2026-01-05');
+    expect(recalcThreePricesPublic).toHaveBeenCalledWith(ctx, '2026-01-05');
+    expect(result.warnings.some((w) => w.includes('Rebuild limitado ate 2026-01-05'))).toBe(true);
+  });
+
+  it('lastTrustedDate explicito prevalece sobre ultima cotacao automatica', async () => {
+    getLastQuoteDate.mockResolvedValue('2026-01-05');
+    const svc = new PatrimonyDailyRebuildService(mockGateway());
+
+    const result = await svc.rebuild(ctx, {
+      from: '2026-01-02',
+      to: '2026-01-10',
+      lastTrustedDate: '2026-01-06',
+    });
+
+    expect(result.to).toBe('2026-01-06');
+    expect(loadQuoteMapForRange).toHaveBeenCalledWith(ctx, '2026-01-02', '2026-01-06');
+    expect(recalcThreePricesPublic).toHaveBeenCalledWith(ctx, '2026-01-06');
   });
 });

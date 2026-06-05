@@ -399,9 +399,7 @@ export async function applyBtgMonthImport(
     preview.month
   );
 
-  const notesApply = await applyBtgBrokerageUpload(ctx, ledger, noteFiles, {
-    cashFromExtractOnly: true,
-  });
+  const notesApply = await applyBtgBrokerageUpload(ctx, ledger, noteFiles);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
     parseOptions: MONTH_IMPORT_EXTRACT_OPTS,
   });

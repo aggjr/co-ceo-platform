@@ -15,6 +15,8 @@ export type StoredPortfolioDay = {
   cash: number;
   positions_value: number;
   pending_settlements: number;
+  settled_cash?: number | null;
+  cash_in_transit?: number | null;
   fixed_income_total: number;
   external_flow: number;
   daily_return_simple: number | null;
@@ -71,6 +73,8 @@ function rowToStored(row: Record<string, unknown>): StoredPortfolioDay {
     cash: Number(row.cash),
     positions_value: Number(row.positions_value),
     pending_settlements: Number(row.pending_settlements ?? 0),
+    settled_cash: row.settled_cash != null ? Number(row.settled_cash) : null,
+    cash_in_transit: row.cash_in_transit != null ? Number(row.cash_in_transit) : null,
     fixed_income_total: Number(row.fixed_income_total ?? 0),
     external_flow: Number(row.external_flow ?? 0),
     daily_return_simple: row.daily_return_simple != null ? Number(row.daily_return_simple) : null,
@@ -156,6 +160,8 @@ export class PatrimonyDailyStore {
       cash: input.point.cash,
       positions_value: input.point.positionsValue,
       pending_settlements: input.point.pendingSettlements,
+      settled_cash: input.point.settledCash,
+      cash_in_transit: input.point.cashInTransit,
       fixed_income_total: input.fixedIncomeTotal,
       external_flow: input.externalFlow,
       daily_return_simple: input.point.dailyReturn,
@@ -186,6 +192,8 @@ export class PatrimonyDailyStore {
       cash: input.point.cash,
       positions_value: input.point.positionsValue,
       pending_settlements: input.point.pendingSettlements,
+      settled_cash: input.point.settledCash,
+      cash_in_transit: input.point.cashInTransit,
       fixed_income_total: input.fixedIncomeTotal,
       external_flow: input.externalFlow,
       daily_return_simple: input.point.dailyReturn,
@@ -294,6 +302,8 @@ export function mergeStoredPatrimonySeries(
         patrimonyGross: s.patrimony_gross,
         pendingSettlements: s.pending_settlements,
         scheduledCashPending: c?.scheduledCashPending ?? 0,
+        settledCash: s.settled_cash ?? s.cash,
+        cashInTransit: s.cash_in_transit ?? c?.scheduledCashPending ?? s.pending_settlements,
         patrimony: s.patrimony,
         cash: s.cash,
         positionsValue: s.positions_value,

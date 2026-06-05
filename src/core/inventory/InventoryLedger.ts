@@ -112,6 +112,7 @@ export class InventoryLedger {
         quantityDelta: Number(row.quantity_delta),
         unitValue: Number(row.unit_value),
         impactsValuation: Boolean(row.impacts_valuation),
+        businessEventId: row.business_event_id ?? null,
         externalRef: row.external_ref,
         metadata: InventoryLedger.parseMetadata(row.metadata),
       });
@@ -147,6 +148,14 @@ export class InventoryLedger {
     input: RecordMovementInput,
     options: { valuationMethod?: string } = {}
   ): Promise<{ entry: PatrimonyLedgerRow; state: PositionState }> {
+    if (!input.businessEventId) {
+      throw new GatewayError(
+        'FINANCIAL_RULE_VIOLATION',
+        'Movimento patrimonial sem business_event_id. Toda alteracao de carteira precisa de um evento de negocio.',
+        422
+      );
+    }
+
     const item = await this.registry.findById(ctx, input.itemId);
     if (!item) {
       throw new GatewayError(
@@ -169,6 +178,7 @@ export class InventoryLedger {
         quantityDelta: Number(row.quantity_delta),
         unitValue: Number(row.unit_value),
         impactsValuation: Boolean(row.impacts_valuation),
+        businessEventId: row.business_event_id ?? null,
         externalRef: row.external_ref,
         metadata: InventoryLedger.parseMetadata(row.metadata),
       });
@@ -191,7 +201,7 @@ export class InventoryLedger {
       unit_value: input.unitValue,
       total_value: totalValue,
       impacts_valuation: input.impactsValuation ?? true,
-      business_event_id: input.businessEventId ?? null,
+      business_event_id: input.businessEventId,
       source_batch_id: input.sourceBatchId ?? null,
       external_ref: input.externalRef ?? null,
       notes: input.notes ?? null,

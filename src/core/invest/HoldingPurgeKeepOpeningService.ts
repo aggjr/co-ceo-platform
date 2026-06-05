@@ -13,6 +13,7 @@ import {
   clearLedgerCrossLinksForOpeningPurge,
   deleteOrphanPatrimonyItemDependents,
 } from './ledgerPurgeCrossLinks';
+import { INVEST_OPENING_SOURCE_REF } from './OpeningBalanceMigrationService';
 
 const AUX_ORG_TABLES = [
   'patrimony_closings',
@@ -216,8 +217,8 @@ export class HoldingPurgeKeepOpeningService {
         `SELECT COUNT(*) AS n FROM business_events be
          WHERE be.organization_id = ?
            AND be.deleted_at IS NULL
-           AND be.source_ref <> ?`,
-        [orgId, openingRef]
+           AND be.source_ref NOT IN (?, ?)`,
+        [orgId, openingRef, INVEST_OPENING_SOURCE_REF]
       );
 
       const openingLegCount = Number(openingLegCountRow[0]?.n ?? 0);
@@ -299,7 +300,7 @@ export class HoldingPurgeKeepOpeningService {
       `DELETE be FROM business_events be
        WHERE be.organization_id = ?
          AND be.deleted_at IS NULL
-         AND be.source_ref <> ?
+         AND be.source_ref NOT IN (?, ?)
          AND NOT EXISTS (
            SELECT 1 FROM patrimony_ledger_entries ple
            WHERE ple.business_event_id = be.id AND ple.organization_id = ?
@@ -308,7 +309,7 @@ export class HoldingPurgeKeepOpeningService {
            SELECT 1 FROM financial_ledger_entries fle
            WHERE fle.business_event_id = be.id AND fle.organization_id = ?
          )`,
-      [orgId, openingRef, orgId, orgId]
+      [orgId, openingRef, INVEST_OPENING_SOURCE_REF, orgId, orgId]
     );
     log?.(`DELETE business_events: ${be.affectedRows}`, 'purge.business_events');
 
@@ -402,8 +403,8 @@ export class HoldingPurgeKeepOpeningService {
   ): Promise<string[]> {
     const [openingEvents] = await conn.query<RowDataPacket[]>(
       `SELECT id FROM business_events
-       WHERE organization_id = ? AND deleted_at IS NULL AND source_ref = ?`,
-      [orgId, openingRef]
+       WHERE organization_id = ? AND deleted_at IS NULL AND source_ref IN (?, ?)`,
+      [orgId, openingRef, INVEST_OPENING_SOURCE_REF]
     );
     const [openingLegEvents] = await conn.query<RowDataPacket[]>(
       `SELECT DISTINCT business_event_id AS id

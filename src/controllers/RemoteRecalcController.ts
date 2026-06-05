@@ -56,7 +56,7 @@ export class RemoteRecalcController {
       const to = new Date().toISOString().slice(0, 10);
       const events = await this.ledger.listLedgerEvents(ctx, from, to);
       const { assets } = rebuildCustodyFromLedger(events);
-      const pricesMap = computeThreePricesByUnderlying(events);
+      const pricesMap = computeThreePricesByUnderlying(events, to);
 
       const marketQuoteRepo = new MarketQuoteRepository(this.gateway);
       const stockTickers = assets

@@ -210,6 +210,20 @@ describe('ReconciliationSessionService', () => {
     });
   });
 
+  it('bloqueia fase cash legada para evitar extrato sem LIQ BOLSA', async () => {
+    const service = new ReconciliationSessionService(mockGateway());
+
+    await expect(
+      service.startSession(ctx, {
+        phase: 'cash',
+        files: [{ name: 'extrato.txt', contentBase64: 'U2FsZG8gSW5pY2lhbCAwLDAw' }],
+      })
+    ).rejects.toMatchObject({
+      httpStatus: 400,
+      message: expect.stringContaining('Fase de caixa via sessao legada desativada'),
+    });
+  });
+
   it('resolve insert permite close', async () => {
     const service = new ReconciliationSessionService(mockGateway());
     const started = await service.startSession(ctx, {

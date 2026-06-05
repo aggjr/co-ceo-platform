@@ -67,6 +67,7 @@ describe('InventoryLedger — transicoes de status', () => {
         movementType: 'opening_balance',
         quantityDelta: 100,
         unitValue: 50,
+        businessEventId: 'be-opening-a',
       });
 
       await ledger.recordMovement(ctx, {
@@ -75,6 +76,7 @@ describe('InventoryLedger — transicoes de status', () => {
         movementType: 'disposition',
         quantityDelta: -100,
         unitValue: 55,
+        businessEventId: 'be-sale-a',
       });
 
       const snapshot = await registry.findById(ctx, itemId);
@@ -98,6 +100,7 @@ describe('InventoryLedger — transicoes de status', () => {
         movementType: 'opening_balance',
         quantityDelta: 100,
         unitValue: 50,
+        businessEventId: 'be-opening-b',
       });
 
       await ledger.recordMovement(ctx, {
@@ -106,6 +109,7 @@ describe('InventoryLedger — transicoes de status', () => {
         movementType: 'disposition',
         quantityDelta: -100,
         unitValue: 55,
+        businessEventId: 'be-sale-b',
       });
 
       // Confirma estado intermediario: liquidado
@@ -120,6 +124,7 @@ describe('InventoryLedger — transicoes de status', () => {
         movementType: 'acquisition',
         quantityDelta: 50,
         unitValue: 48,
+        businessEventId: 'be-buy-b',
       });
 
       const snapshot = await registry.findById(ctx, itemId);
@@ -144,6 +149,7 @@ describe('InventoryLedger — transicoes de status', () => {
         movementType: 'opening_balance',
         quantityDelta: 100,
         unitValue: 50,
+        businessEventId: 'be-opening-c',
       });
 
       await ledger.recordMovement(ctx, {
@@ -152,6 +158,7 @@ describe('InventoryLedger — transicoes de status', () => {
         movementType: 'acquisition',
         quantityDelta: 50,
         unitValue: 52,
+        businessEventId: 'be-buy-c',
       });
 
       const snapshot = await registry.findById(ctx, itemId);

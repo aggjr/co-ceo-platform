@@ -125,6 +125,14 @@ export class PatrimonyDailyRecorder {
         continue;
       }
 
+      const assetType = String(row.asset_type || inferAssetType(ticker));
+      if (assetType === 'stock' || assetType === 'fii') {
+        continue;
+      }
+      if (!isOptionTicker(ticker)) {
+        continue;
+      }
+
       let meta: { last_price?: number; quote_as_of?: string } = {};
       if (row.metadata) {
         try {

@@ -1,7 +1,7 @@
 import type {
   InventoryValuation,
   PositionState,
-  RecordMovementInput,
+  ValuationMovementInput,
 } from '../types';
 
 /**
@@ -20,7 +20,7 @@ import type {
 export class WeightedAverageValuation implements InventoryValuation {
   readonly methodCode = 'weighted_avg';
 
-  applyMovement(state: PositionState, movement: RecordMovementInput): PositionState {
+  applyMovement(state: PositionState, movement: ValuationMovementInput): PositionState {
     const next: PositionState = {
       quantity: state.quantity + movement.quantityDelta,
       pmA: state.pmA,
