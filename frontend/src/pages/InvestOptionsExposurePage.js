@@ -7,8 +7,16 @@ import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import { getPageTexts } from '../navigation/pageTexts.js';
 import { formatDateBr } from '../lib/dateFormat.js';
 import { filterOptionsRows, uniqueExpiryDates } from '../lib/optionPortfolioModel.js';
-import { buildExposureByUnderlying } from '../lib/optionExposureTables.js';
+import {
+  buildExposureByUnderlying,
+  withCumulativeExposure,
+} from '../lib/optionExposureTables.js';
 import { formatBrl } from '../lib/portfolioDisplay.js';
+import {
+  clearCoCeoExcelMounts,
+  mountCoCeoExcelGrids,
+  registerCoCeoExcelMount,
+} from '../lib/coCeoExcelGrid.js';
 import { fetchOpenOptionsPortfolio } from '../lib/investOptionsShared.js';
 
 function escapeHtml(s) {
@@ -26,9 +34,7 @@ const TEXT_KEYS = [
   'field.invest.options.exposure.pct_near',
   'field.invest.options.exposure.pct_far',
   'screen.invest.options.exposure.put_title',
-  'screen.invest.options.exposure.put_help',
   'screen.invest.options.exposure.call_title',
-  'screen.invest.options.exposure.call_help',
   'column.invest.options.exposure.asset',
   'column.invest.options.exposure.itm',
   'column.invest.options.exposure.band_near_put',
@@ -39,57 +45,93 @@ const TEXT_KEYS = [
   'column.invest.options.exposure.total_row',
 ];
 
-function formatCell(value, approx = true) {
-  if (!value || value <= 0) return '<span class="opt-exposure-zero">R$ 0</span>';
-  const text = formatBrl(value);
-  const cls = approx ? 'opt-exposure-approx' : '';
-  const prefix = approx ? '~' : '';
-  return `<span class="${cls}">${prefix}${escapeHtml(text)}</span>`;
+let exposureTableSeq = 0;
+
+function val(t, key, fallback) {
+  return t[key] && t[key] !== key ? t[key] : fallback;
 }
 
-function renderExposureTable(data, labels, colNearKey, colFarKey) {
-  if (!data.lines.length) {
-    return `<p class="muted">${escapeHtml(labels.empty)}</p>`;
-  }
+function buildExposureColumns(labels) {
+  return [
+    {
+      key: 'underlying',
+      label: labels.asset,
+      type: 'text',
+      width: '120px',
+      sticky: true,
+      render: (row) => {
+        const el = document.createElement('strong');
+        el.textContent = row.underlying || '—';
+        return el;
+      },
+    },
+    {
+      key: 'itm',
+      label: labels.itm,
+      type: 'currency',
+      align: 'right',
+      width: '128px',
+    },
+    {
+      key: 'cumNear',
+      label: labels.bandNear,
+      type: 'currency',
+      align: 'right',
+      width: '148px',
+    },
+    {
+      key: 'cumFar',
+      label: labels.bandFar,
+      type: 'currency',
+      align: 'right',
+      width: '168px',
+    },
+    {
+      key: 'total',
+      label: labels.total,
+      type: 'currency',
+      align: 'right',
+      width: '128px',
+    },
+  ];
+}
 
-  const body = data.lines
-    .map(
-      (line) => `
-      <tr class="hoverable-row">
-        <td>${escapeHtml(line.underlying)}</td>
-        <td>${formatCell(line.itm)}</td>
-        <td>${formatCell(line.bandNear)}</td>
-        <td>${formatCell(line.bandFar)}</td>
-        <td>${formatCell(line.total, false)}</td>
-      </tr>`,
-    )
-    .join('');
+function buildExposureFooterTotals(totals, totalRowLabel) {
+  const fmt = (v) =>
+    `<span class="portfolio-footer-total">${escapeHtml(formatBrl(v || 0))}</span>`;
+  return () => ({
+    underlying: `<span class="portfolio-footer-total">${escapeHtml(totalRowLabel)}</span>`,
+    itm: fmt(totals.itm),
+    cumNear: fmt(totals.cumNear),
+    cumFar: fmt(totals.cumFar),
+    total: fmt(totals.total),
+  });
+}
 
-  return `
-    <div class="table-wrapper opt-exposure-table-wrap">
-      <table class="excel-table opt-exposure-table">
-        <thead>
-          <tr>
-            <th>${escapeHtml(labels.asset)}</th>
-            <th>${escapeHtml(labels.itm)}</th>
-            <th>${escapeHtml(labels.bandNear)}</th>
-            <th>${escapeHtml(labels.bandFar)}</th>
-            <th>${escapeHtml(labels.total)}</th>
-          </tr>
-        </thead>
-        <tbody>${body}</tbody>
-        <tfoot>
-          <tr class="excel-column-totals-row">
-            <td>${escapeHtml(labels.totalRow)}</td>
-            <td>${formatCell(data.totals.itm)}</td>
-            <td>${formatCell(data.totals.bandNear)}</td>
-            <td>${formatCell(data.totals.bandFar)}</td>
-            <td>${formatCell(data.totals.total, false)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  `;
+function registerExposureExcelTable(data, labels, { caption, gridKey, sectionClass }) {
+  const mountId = `opt-exp-${++exposureTableSeq}`;
+  const rows = data.lines.map((line) => ({
+    id: line.underlying,
+    underlying: line.underlying,
+    itm: line.itm,
+    cumNear: line.cumNear,
+    cumFar: line.cumFar,
+    total: line.total,
+  }));
+
+  registerCoCeoExcelMount(mountId, {
+    gridId: `invest-options-exposure-${gridKey}`,
+    coCeoColumns: buildExposureColumns(labels),
+    rows,
+    emptyText: labels.empty,
+    caption,
+    footerColumnTotals: data.lines.length
+      ? buildExposureFooterTotals(data.totals, labels.totalRow)
+      : null,
+    summaryLabels: { total: 'Linhas', selected: '' },
+  });
+
+  return `<section class="${sectionClass}" data-coceo-excel-mount="${mountId}"></section>`;
 }
 
 export async function InvestOptionsExposurePage(container) {
@@ -146,27 +188,40 @@ export async function InvestOptionsExposurePage(container) {
       side === 'put'
         ? 'column.invest.options.exposure.band_far_put'
         : 'column.invest.options.exposure.band_far_call';
-    const val = (k, fallback) => (t[k] && t[k] !== k ? t[k] : fallback);
     return {
-      empty: val('screen.invest.options.exposure.empty', 'Nenhuma posição encontrada.'),
-      asset: val('column.invest.options.exposure.asset', 'Ativo'),
-      itm: val('column.invest.options.exposure.itm', 'ITM'),
-      bandNear: val(nearKey, side === 'put' ? 'Faixa {pct}% abaixo' : 'Faixa {pct}% acima').replace('{pct}', String(params.pctNear)).replace('{pctFar}', String(params.pctFar)),
-      bandFar: val(farKey, side === 'put' ? 'Faixa entre {pctNear}% e {pct}% abaixo' : 'Faixa entre {pctNear}% e {pct}% acima')
+      empty: val(t, 'screen.invest.options.exposure.empty', 'Nenhuma posição encontrada.'),
+      asset: val(t, 'column.invest.options.exposure.asset', 'Ativo'),
+      itm: val(t, 'column.invest.options.exposure.itm', 'ITM'),
+      bandNear: val(nearKey, side === 'put' ? 'Faixa {pct}% abaixo' : 'Faixa {pct}% acima')
+        .replace('{pct}', String(params.pctNear))
+        .replace('{pctFar}', String(params.pctFar)),
+      bandFar: val(
+        farKey,
+        side === 'put'
+          ? 'Faixa entre {pctNear}% e {pct}% abaixo'
+          : 'Faixa entre {pctNear}% e {pct}% acima',
+      )
         .replace('{pct}', String(params.pctFar))
         .replace('{pctNear}', String(params.pctNear)),
-      total: val('column.invest.options.exposure.total', 'Total'),
-      totalRow: val('column.invest.options.exposure.total_row', 'Total Geral'),
+      total: val(t, 'column.invest.options.exposure.total', 'Total'),
+      totalRow: val(t, 'column.invest.options.exposure.total_row', 'Total Geral'),
     };
   }
 
   function paint() {
+    clearCoCeoExcelMounts();
+    exposureTableSeq = 0;
+
     const filtered = params.expiry
       ? filterOptionsRows(allRows, { expiry: params.expiry })
       : [];
 
-    const puts = buildExposureByUnderlying(filtered, 'put', params.pctNear, params.pctFar);
-    const calls = buildExposureByUnderlying(filtered, 'call', params.pctNear, params.pctFar);
+    const puts = withCumulativeExposure(
+      buildExposureByUnderlying(filtered, 'put', params.pctNear, params.pctFar),
+    );
+    const calls = withCumulativeExposure(
+      buildExposureByUnderlying(filtered, 'call', params.pctNear, params.pctFar),
+    );
 
     const expiryOpts = expiries
       .map((d) => {
@@ -175,6 +230,17 @@ export async function InvestOptionsExposurePage(container) {
         return `<option value="${escapeHtml(d)}"${sel}>${escapeHtml(label)}</option>`;
       })
       .join('');
+
+    const putTitle = val(
+      t,
+      'screen.invest.options.exposure.put_title',
+      'PUTs - Valores Necessários no próximo Exercício',
+    );
+    const callTitle = val(
+      t,
+      'screen.invest.options.exposure.call_title',
+      'CALLs - Valores possíveis de serem gerados no proximo Strike',
+    );
 
     root.innerHTML = `
       <div class="portfolio-excel-section opt-exposure-page">
@@ -190,19 +256,25 @@ export async function InvestOptionsExposurePage(container) {
           </label>
         </div>
 
-        <section class="opt-exposure-section opt-exposure-section--put">
-          <h2 class="portfolio-excel-title">${escapeHtml(t['screen.invest.options.exposure.put_title'])}</h2>
-          <p class="opt-exposure-help">${escapeHtml(t['screen.invest.options.exposure.put_help'].replace('{pct}', String(params.pctFar)))}</p>
-          ${renderExposureTable(puts, tableLabels('put'))}
-        </section>
+        <div class="opt-exposure-section opt-exposure-section--put">
+          ${registerExposureExcelTable(puts, tableLabels('put'), {
+            caption: escapeHtml(putTitle),
+            gridKey: 'puts',
+            sectionClass: 'portfolio-excel-section',
+          })}
+        </div>
 
-        <section class="opt-exposure-section opt-exposure-section--call">
-          <h2 class="portfolio-excel-title">${escapeHtml(t['screen.invest.options.exposure.call_title'])}</h2>
-          <p class="opt-exposure-help">${escapeHtml(t['screen.invest.options.exposure.call_help'].replace('{pct}', String(params.pctFar)))}</p>
-          ${renderExposureTable(calls, tableLabels('call'))}
-        </section>
+        <div class="opt-exposure-section opt-exposure-section--call">
+          ${registerExposureExcelTable(calls, tableLabels('call'), {
+            caption: escapeHtml(callTitle),
+            gridKey: 'calls',
+            sectionClass: 'portfolio-excel-section',
+          })}
+        </div>
       </div>
     `;
+
+    mountCoCeoExcelGrids(root);
 
     root.querySelectorAll('[data-filter]').forEach((el) => {
       el.addEventListener('change', () => {
