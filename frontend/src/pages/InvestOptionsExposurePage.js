@@ -192,10 +192,11 @@ export async function InvestOptionsExposurePage(container) {
       empty: val(t, 'screen.invest.options.exposure.empty', 'Nenhuma posição encontrada.'),
       asset: val(t, 'column.invest.options.exposure.asset', 'Ativo'),
       itm: val(t, 'column.invest.options.exposure.itm', 'ITM'),
-      bandNear: val(nearKey, side === 'put' ? 'Faixa {pct}% abaixo' : 'Faixa {pct}% acima')
+      bandNear: val(t, nearKey, side === 'put' ? 'Faixa {pct}% abaixo' : 'Faixa {pct}% acima')
         .replace('{pct}', String(params.pctNear))
         .replace('{pctFar}', String(params.pctFar)),
       bandFar: val(
+        t,
         farKey,
         side === 'put'
           ? 'Faixa entre {pctNear}% e {pct}% abaixo'
@@ -245,13 +246,13 @@ export async function InvestOptionsExposurePage(container) {
     root.innerHTML = `
       <div class="portfolio-excel-section opt-exposure-page">
         <div class="table-period-toolbar" id="opt-exposure-filters">
-          <label>${escapeHtml(t['filter.invest.options.expiry'])}
+          <label>${escapeHtml(val(t, 'filter.invest.options.expiry', 'Vencimento'))}
             <select data-filter="expiry">${expiryOpts || `<option value="">—</option>`}</select>
           </label>
-          <label>${escapeHtml(t['field.invest.options.exposure.pct_near'])}
+          <label>${escapeHtml(val(t, 'field.invest.options.exposure.pct_near', 'Faixa próxima (%)'))}
             <input type="number" data-filter="pctNear" min="0.5" max="50" step="0.5" value="${params.pctNear}" />
           </label>
-          <label>${escapeHtml(t['field.invest.options.exposure.pct_far'])}
+          <label>${escapeHtml(val(t, 'field.invest.options.exposure.pct_far', 'Faixa intermediária até (%)'))}
             <input type="number" data-filter="pctFar" min="1" max="80" step="0.5" value="${params.pctFar}" />
           </label>
         </div>
