@@ -12,6 +12,7 @@ import { InvestAssetProjection } from '../../../modules/invest/sync/InvestAssetP
 import type { SecurePayload } from '../../dal/types';
 import { inferAssetType } from '../assetClassifier';
 import { logReconcileEvent, logReconcileFailure } from './reconcileErrorDetail';
+import { ModuleCategories } from '../../module-registry';
 
 export type QuoteSyncDayReport = {
   date: string;
@@ -49,6 +50,7 @@ export class DailyCloseMaterializeService {
   private readonly ledger: LedgerImportService;
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly assetProjection: InvestAssetProjection;
+  private readonly categories: ModuleCategories;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.quoteSync = new InvestQuoteSyncService(gateway);
@@ -58,6 +60,7 @@ export class DailyCloseMaterializeService {
     this.ledger = new LedgerImportService(gateway);
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
+    this.categories = new ModuleCategories(gateway);
   }
 
   async syncQuotesForDate(ctx: UserContext, date: string): Promise<QuoteSyncDayReport> {
@@ -172,11 +175,16 @@ export class DailyCloseMaterializeService {
     const pricesMap = computeThreePricesByUnderlying(events, limitDate);
 
     const marketCtx = authBootstrapContext();
-    const stockTickers = assets
-      .filter((a) => (a.assetType === 'stock' || a.assetType === 'fii') && a.ticker)
-      .map((a) => String(a.ticker).trim().toUpperCase());
-    const marketQuoteMap = stockTickers.length
-      ? await this.marketQuotes.loadLatestQuoteMap(marketCtx, stockTickers, limitDate)
+    const quoteTickers: string[] = [];
+    for (const asset of assets) {
+      const ticker = String(asset.ticker ?? '').trim().toUpperCase();
+      if (!ticker || ticker.startsWith('CAIXA-')) continue;
+      if (await this.categories.requiresMarketQuote(ctx, String(asset.assetType))) {
+        quoteTickers.push(ticker);
+      }
+    }
+    const marketQuoteMap = quoteTickers.length
+      ? await this.marketQuotes.loadLatestQuoteMap(marketCtx, quoteTickers, limitDate)
       : new Map<string, { price: number; date: string }>();
 
     const openAssetIds = new Set(assets.map((a) => a.assetId));
@@ -216,7 +224,8 @@ export class DailyCloseMaterializeService {
         pm_b3: pmB,
         pm_gerencial: pmC,
         last_price:
-          lastPrice != null && (asset.assetType === 'stock' || asset.assetType === 'fii')
+          lastPrice != null &&
+          (await this.categories.requiresMarketQuote(ctx, String(asset.assetType)))
             ? lastPrice
             : undefined,
       });

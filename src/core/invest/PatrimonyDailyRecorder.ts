@@ -282,11 +282,20 @@ export class PatrimonyDailyRecorder {
     }
 
     const positions = mtm.positionSnapshots ?? [];
+    const fixedIncomePositions = positions.filter(
+      (p) => String(p.assetType) === 'fixed_income'
+    );
+    const markedFixedIncomeTotal =
+      fixedIncomePositions.length > 0
+        ? Math.round(
+            fixedIncomePositions.reduce((sum, p) => sum + Number(p.marketValue ?? 0), 0) * 100
+          ) / 100
+        : rfForEconomic;
     const recorded = await this.store.upsertPortfolioDay(ctx, {
       snapshotDate: date,
       point: recordPoint,
       patrimonyGross,
-      fixedIncomeTotal: rfForEconomic,
+      fixedIncomeTotal: markedFixedIncomeTotal,
       externalFlow,
       dailyReturnTwr,
       cumulativeTwr,
@@ -303,6 +312,7 @@ export class PatrimonyDailyRecorder {
         pending_settlements: economicPoint.pendingSettlements,
         rf_ledger: rfLedger,
         rf_anchor: rfAnchor,
+        rf_marked: markedFixedIncomeTotal,
       },
     });
 
