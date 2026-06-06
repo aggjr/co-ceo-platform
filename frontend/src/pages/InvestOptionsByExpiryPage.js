@@ -60,7 +60,6 @@ const AMP_COLORS = {
 };
 
 let currentChartQty = null;
-let currentChartNotional = null;
 
 /** Eixo X numérico (R$ strike) — distância visual proporcional ao valor do strike. */
 function buildXScale(activeStrikes, underlyingQuote, priceReferences = []) {
@@ -96,10 +95,11 @@ function buildXScale(activeStrikes, underlyingQuote, priceReferences = []) {
   };
 }
 
-function ampBarDataset(label, activeStrikes, volumeByStrike, field, color) {
+function ampBarDataset(label, activeStrikes, volumeByStrike, field, color, notionalField) {
   const data = activeStrikes.map((s) => ({
     x: s,
     y: volumeByStrike.get(s)[field],
+    _notional: notionalField ? volumeByStrike.get(s)[notionalField] : 0,
   }));
   if (!data.some((p) => p.y > 0)) return null;
   return {
@@ -270,12 +270,9 @@ export async function InvestOptionsByExpiryPage(container) {
         </label>
       </div>
       <h2 id="amp-hint" style="color: var(--color-accent, #dab177); font-size: 1rem; font-weight: 600; text-align: left; margin: 0 0 16px 0; text-transform: uppercase;"></h2>
-      <div class="amp-charts-wrapper" style="display: flex; flex-direction: column; gap: 40px; height: calc(100vh - 240px); min-height: 700px;">
+      <div class="amp-charts-wrapper" style="display: flex; flex-direction: column; gap: 40px; height: calc(100vh - 240px); min-height: 400px;">
         <div class="amp-chart-container" style="flex: 1; position: relative;">
           <canvas id="amp-chart-qty"></canvas>
-        </div>
-        <div class="amp-chart-container" style="flex: 1; position: relative;">
-          <canvas id="amp-chart-notional"></canvas>
         </div>
       </div>
     `;
@@ -392,9 +389,7 @@ export async function InvestOptionsByExpiryPage(container) {
         hint.textContent = 'Não há opções com quantidade ou notional operados para este ativo e vencimento.';
       }
       if (currentChartQty) currentChartQty.destroy();
-      if (currentChartNotional) currentChartNotional.destroy();
       currentChartQty = null;
-      currentChartNotional = null;
       return;
     }
 
@@ -409,31 +404,16 @@ export async function InvestOptionsByExpiryPage(container) {
         activeStrikes,
         volumeByStrike,
         'callQty',
-        AMP_COLORS.call
+        AMP_COLORS.call,
+        'callNotional'
       ),
       ampBarDataset(
         `${underlying} Put Qtd`,
         activeStrikes,
         volumeByStrike,
         'putQty',
-        AMP_COLORS.put
-      ),
-    ].filter(Boolean);
-
-    const datasetsNotional = [
-      ampBarDataset(
-        `${underlying} Call Notional`,
-        activeStrikes,
-        volumeByStrike,
-        'callNotional',
-        AMP_COLORS.call
-      ),
-      ampBarDataset(
-        `${underlying} Put Notional`,
-        activeStrikes,
-        volumeByStrike,
-        'putNotional',
-        AMP_COLORS.put
+        AMP_COLORS.put,
+        'putNotional'
       ),
     ].filter(Boolean);
 
@@ -480,11 +460,9 @@ export async function InvestOptionsByExpiryPage(container) {
     }));
 
     const canvasQty = document.getElementById('amp-chart-qty');
-    const canvasNotional = document.getElementById('amp-chart-notional');
-    if (!canvasQty || !canvasNotional) return;
+    if (!canvasQty) return;
 
     if (currentChartQty) currentChartQty.destroy();
-    if (currentChartNotional) currentChartNotional.destroy();
 
     const commonOptions = {
       responsive: true,
@@ -505,8 +483,9 @@ export async function InvestOptionsByExpiryPage(container) {
             }
           },
           labels: {
-            color: '#cbd5e1',
-            usePointStyle: true,
+            color: '#94A3B8',
+            boxWidth: 12,
+            padding: 16,
             generateLabels: (chart) => {
               const datasets = chart.data.datasets;
               const defaultLabels = datasets.map((ds, i) => ({
@@ -527,11 +506,42 @@ export async function InvestOptionsByExpiryPage(container) {
       },
     };
 
+    const drawNotionalPlugin = {
+      id: 'drawNotionalPlugin',
+      afterDatasetsDraw(chart) {
+        const { ctx, data } = chart;
+        ctx.save();
+        ctx.font = '11px "Inter", sans-serif';
+        ctx.fillStyle = '#94A3B8';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+
+        data.datasets.forEach((dataset, i) => {
+          const meta = chart.getDatasetMeta(i);
+          if (!meta.hidden) {
+            meta.data.forEach((element, index) => {
+              const point = dataset.data[index];
+              if (point && point.y > 0 && point._notional > 0) {
+                const formatted = formatBrl(point._notional).replace(',00', '');
+                ctx.fillText(formatted, element.x, element.y - 4);
+              }
+            });
+          }
+        });
+        ctx.restore();
+      }
+    };
+
     currentChartQty = new Chart(canvasQty, {
       type: 'bar',
       data: { datasets: datasetsQty },
       options: {
         ...commonOptions,
+        layout: {
+          padding: {
+            top: 20
+          }
+        },
         plugins: {
           ...commonOptions.plugins,
           title: {
@@ -557,41 +567,7 @@ export async function InvestOptionsByExpiryPage(container) {
           },
         },
       },
-    });
-
-    currentChartNotional = new Chart(canvasNotional, {
-      type: 'bar',
-      data: { datasets: datasetsNotional },
-      options: {
-        ...commonOptions,
-        plugins: {
-          ...commonOptions.plugins,
-          title: {
-            display: true,
-            text: 'Notional (R$) por Strike',
-            color: '#fff',
-            font: { size: 16, weight: 'normal' },
-            padding: { top: 10, bottom: 20 },
-          },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ampTooltipLabel(ctx, (v) => formatBrl(v)),
-            },
-          },
-        },
-        scales: {
-          ...commonOptions.scales,
-          y: {
-            type: 'linear',
-            display: true,
-            ticks: {
-              color: '#94a3b8',
-              callback: (value) => formatBrl(value),
-            },
-            grid: { color: 'rgba(148, 163, 184, 0.1)' },
-          },
-        },
-      },
+      plugins: [drawNotionalPlugin]
     });
   }
 
