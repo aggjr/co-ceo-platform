@@ -457,6 +457,7 @@ export async function InvestOptionsByExpiryPage(container) {
       lineWidth: 0,
       hidden: false,
       datasetIndex: -1,
+      fontColor: '#94A3B8',
     }));
 
     const canvasQty = document.getElementById('amp-chart-qty');
@@ -494,6 +495,7 @@ export async function InvestOptionsByExpiryPage(container) {
                 strokeStyle: ds.borderColor || ds.backgroundColor,
                 hidden: !chart.isDatasetVisible(i),
                 datasetIndex: i,
+                fontColor: '#94A3B8',
               }));
               return [...defaultLabels, ...customLegendLabels];
             },
