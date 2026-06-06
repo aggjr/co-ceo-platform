@@ -269,7 +269,7 @@ export async function InvestOptionsByExpiryPage(container) {
           <select data-filter="expiry" class="amp-filter-select"${dates.length ? '' : ' disabled'}>${expiryOpts || '<option value="">—</option>'}</select>
         </label>
       </div>
-      <p class="amp-chart-hint muted" id="amp-hint"></p>
+      <h2 id="amp-hint" style="color: var(--color-accent, #dab177); font-size: 1rem; font-weight: 600; text-align: left; margin: 0 0 16px 0; text-transform: uppercase;"></h2>
       <div class="amp-charts-wrapper" style="display: flex; flex-direction: column; gap: 40px; height: calc(100vh - 240px); min-height: 700px;">
         <div class="amp-chart-container" style="flex: 1; position: relative;">
           <canvas id="amp-chart-qty"></canvas>
@@ -300,7 +300,8 @@ export async function InvestOptionsByExpiryPage(container) {
 
     if (!underlying || !expiry) {
       if (hint) {
-        hint.textContent = 'Selecione ação e data do strike para exibir os gráficos.';
+        hint.innerHTML = 'Selecione ação e data do strike para exibir os gráficos.';
+        hint.style.color = '#94a3b8'; // reset to muted
       }
       return;
     }
@@ -398,7 +399,8 @@ export async function InvestOptionsByExpiryPage(container) {
     }
 
     if (hint) {
-      hint.textContent = `${underlying} · vencimento ${formatDateBr(expiry)} · ${activeStrikes.length} strikes com movimento`;
+      hint.style.color = 'var(--color-accent, #dab177)';
+      hint.innerHTML = `${underlying} <span style="color: #94a3b8; font-size: 0.85rem; font-weight: normal; text-transform: none; margin-left: 12px; letter-spacing: normal;">Vencimento ${formatDateBr(expiry)} · ${activeStrikes.length} strikes com movimento</span>`;
     }
 
     const datasetsQty = [
