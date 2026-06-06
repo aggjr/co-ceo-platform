@@ -80,4 +80,42 @@ describe('cashInTransit', () => {
     const s = buildCashInTransitSummary(entries, '2026-05-12');
     expect(s.inTransitNet).toBe(-4000);
   });
+
+  it('keeps overdue pending settlement open until clear leg exists', () => {
+    const tradeId = 'trade-overdue-1';
+    const entries: LedgerEvent[] = [
+      {
+        id: tradeId,
+        asset_id: 'a-prio',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'buy',
+        transaction_date: '2026-05-12',
+        quantity: 100,
+        unit_price: 40,
+        total_net_value: -4000,
+      },
+      {
+        id: 'cash-open-overdue',
+        asset_id: 'a-caixa',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'pending_settlement',
+        transaction_date: '2026-05-12',
+        settlement_date: '2026-05-14',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: -4000,
+        broker_note_ref: `${AUTO_D2_REF_PREFIX}${tradeId}`,
+        notes: 'Valor em transito',
+      },
+    ];
+
+    const s = buildCashInTransitSummary(entries, '2026-05-20');
+
+    expect(s.inTransitNet).toBe(-4000);
+    expect(s.settledCashBalance).toBe(0);
+    expect(s.lines).toHaveLength(1);
+    expect(s.lines[0]!.settleDate).toBe('2026-05-14');
+  });
 });

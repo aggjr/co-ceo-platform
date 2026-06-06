@@ -2,13 +2,9 @@ import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
 import type { LedgerEvent } from './CustodyEngine';
 import type { InvestOperations } from '../../modules/invest';
-import {
-  cashSettlementDate,
-  cashSettlementRuleLabel,
-  defersCashSettlement,
-  resolveAssetTypeForSettlement,
-} from './settlementCalendar';
+import { inferAssetType } from './assetClassifier';
 import { MAIN_CASH_TICKER } from './ledgerTypes';
+import { SettlementRulesService } from './SettlementRulesService';
 
 export const AUTO_D2_REF_PREFIX = 'AUTO-D2:';
 
@@ -16,17 +12,62 @@ export function autoD2Ref(ledgerEntryId: string): string {
   return `${AUTO_D2_REF_PREFIX}${ledgerEntryId}`;
 }
 
-function defersCashSettlementEvent(e: LedgerEvent): boolean {
-  const ticker = String(e.asset_ticker || '');
-  const assetType = resolveAssetTypeForSettlement(ticker, String(e.asset_type));
-  return defersCashSettlement(assetType, String(e.transaction_type), ticker);
-}
-
 export type AutoPendingSyncResult = {
   created: number;
   cleared: number;
   skipped: number;
 };
+
+type AutoPendingSettlementResolution = {
+  ticker: string;
+  assetType: string;
+  txType: string;
+  tradeDate: string;
+  settleOn: string;
+  ruleLabel: string;
+};
+
+async function resolveAutoPendingSettlement(
+  rules: SettlementRulesService,
+  ctx: UserContext,
+  e: LedgerEvent
+): Promise<AutoPendingSettlementResolution | null> {
+  const ticker = String(e.asset_ticker || '').trim().toUpperCase();
+  const tradeDate = String(e.transaction_date || '').slice(0, 10);
+  const txType = String(e.transaction_type || '').trim().toLowerCase();
+  const assetType = String(e.asset_type || inferAssetType(ticker)).trim().toLowerCase();
+  if (!ticker || !tradeDate || !txType || !assetType) return null;
+
+  const rule = await rules.resolveRule(
+    {
+      tradeDate,
+      assetType,
+      transactionType: txType,
+      ticker,
+    },
+    ctx
+  );
+  if (!rule || rule.daysOffset <= 0) return null;
+
+  const settleOn = await rules.resolveSettlementDate(
+    {
+      tradeDate,
+      assetType,
+      transactionType: txType,
+      ticker,
+    },
+    ctx
+  );
+
+  return {
+    ticker,
+    assetType,
+    txType,
+    tradeDate,
+    settleOn,
+    ruleLabel: rule.label || rule.ruleCode,
+  };
+}
 
 /**
  * Gera a perna financeira em transicao para operacoes D+n.
@@ -37,7 +78,7 @@ export type AutoPendingSyncResult = {
  * manter a ligacao entre ativo e financeiro pelo mesmo business_event_id.
  */
 export async function syncAutoPendingSettlements(
-  _gateway: CoCeoDataGateway,
+  gateway: CoCeoDataGateway,
   ctx: UserContext,
   events: LedgerEvent[],
   options: {
@@ -61,20 +102,15 @@ export async function syncAutoPendingSettlements(
   let created = 0;
   let cleared = 0;
   let skipped = 0;
+  const settlementRules = new SettlementRulesService(gateway);
 
   for (const e of events) {
-    if (!e.id || !defersCashSettlementEvent(e)) continue;
+    if (!e.id) continue;
+    const settlement = await resolveAutoPendingSettlement(settlementRules, ctx, e);
+    if (!settlement) continue;
 
     const ref = autoD2Ref(e.id);
-    const tradeDate = String(e.transaction_date || '').slice(0, 10);
-    if (!tradeDate) continue;
-
-    const ticker = String(e.asset_ticker || '');
-    const assetType = resolveAssetTypeForSettlement(ticker, String(e.asset_type));
-    const txType = String(e.transaction_type);
-    const settleOn = cashSettlementDate(tradeDate, assetType, txType, ticker);
     const net = Number(e.total_net_value ?? 0);
-    const rule = cashSettlementRuleLabel(assetType, txType, ticker, tradeDate);
     let open = pendingByRef.get(ref) ?? 0;
 
     if (!settlementRefs.has(ref)) {
@@ -82,16 +118,16 @@ export async function syncAutoPendingSettlements(
         skipped += 1;
       } else {
         const result = await options.operations.recordOperation(ctx, {
-          date: tradeDate,
+          date: settlement.tradeDate,
           ticker: MAIN_CASH_TICKER,
           operation: 'pending_settlement',
           quantity: 0,
           unit_price: 0,
           total_net_value: net,
-          settlement_date: settleOn,
+          settlement_date: settlement.settleOn,
           broker_note_ref: ref,
           business_event_id: e.business_event_id ?? undefined,
-          notes: `Valor em transito - ${rule} - liquidacao prevista ${settleOn} - ${ticker} (${txType})`,
+          notes: `Valor em transito - ${settlement.ruleLabel} - liquidacao prevista ${settlement.settleOn} - ${settlement.ticker} (${settlement.txType})`,
           asset_type: 'cash',
         });
         if (!result.skipped) {
@@ -105,20 +141,20 @@ export async function syncAutoPendingSettlements(
       }
     }
 
-    if (settleOn > today) continue;
+    if (settlement.settleOn > today) continue;
 
     if (Math.abs(open) >= 0.01) {
       const result = await options.operations.recordOperation(ctx, {
-        date: settleOn,
+        date: settlement.settleOn,
         ticker: MAIN_CASH_TICKER,
         operation: 'pending_settlement',
         quantity: 0,
         unit_price: 0,
         total_net_value: -open,
-        settlement_date: settleOn,
+        settlement_date: settlement.settleOn,
         broker_note_ref: `${ref}:CLEAR`,
         business_event_id: e.business_event_id ?? undefined,
-        notes: `Liquidacao na conta - ${rule} - ${ticker} (${settleOn})`,
+        notes: `Liquidacao na conta - ${settlement.ruleLabel} - ${settlement.ticker} (${settlement.settleOn})`,
         asset_type: 'cash',
       });
       if (!result.skipped) {

@@ -10,6 +10,7 @@ import {
 } from './tesouroDirectLedger';
 import {
   LEDGER_TRANSACTION_TYPES,
+  type LedgerImportLine,
   type LedgerImportPayload,
   type OpeningImportPayload,
 } from './ledgerTypes';
@@ -23,6 +24,7 @@ import {
   type LiqBolsaMatchResult,
   type LiqBolsaSettlementInput,
 } from './LiqBolsaSettlementService';
+import { SettlementRulesService } from './SettlementRulesService';
 
 /** Abertura de custódia — referência única usada para idempotência. */
 
@@ -39,12 +41,54 @@ export class LedgerImportService {
   private readonly operations: InvestOperations;
   private readonly patrimonyStore: PatrimonyDailyStore;
   private readonly liqBolsaSettler: LiqBolsaSettlementService;
+  private readonly settlementRules: SettlementRulesService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.projection = new LedgerEventProjection(gateway);
     this.operations = buildInvestOperations(gateway);
     this.patrimonyStore = new PatrimonyDailyStore(gateway);
     this.liqBolsaSettler = new LiqBolsaSettlementService(gateway);
+    this.settlementRules = new SettlementRulesService(gateway);
+  }
+
+  private async enrichSettlementForLine(
+    ctx: UserContext,
+    line: LedgerImportLine,
+    ticker: string,
+    assetType: string,
+    date: string
+  ): Promise<LedgerImportLine> {
+    const transactionType = String(line.operation || '').trim().toLowerCase();
+    if (!transactionType || transactionType === 'opening_balance') return line;
+    const rule = await this.settlementRules
+      .resolveRule(
+        {
+          tradeDate: date,
+          assetType,
+          transactionType,
+          ticker,
+        },
+        ctx
+      )
+      .catch(() => null);
+    if (!rule) return line;
+    const settlementDate =
+      rule.daysOffset > 0
+        ? await this.settlementRules.resolveSettlementDate(
+            {
+              tradeDate: date,
+              assetType,
+              transactionType,
+              ticker,
+            },
+            ctx
+          )
+        : date;
+    return {
+      ...line,
+      settlement_date: settlementDate,
+      settlement_status: rule.defaultStatus,
+    };
   }
 
   async getOpeningLedgerBalance(ctx: UserContext): Promise<number | null> {
@@ -157,13 +201,21 @@ export class LedgerImportService {
         quantity: line.quantity,
         unit_price: line.unit_price,
       });
+      const parsedDate = parseDate(line.date);
+      const enrichedLine = await this.enrichSettlementForLine(
+        ctx,
+        line,
+        ticker,
+        assetType,
+        parsedDate
+      );
       const result = await this.operations.recordOperation(ctx, {
-        ...line,
+        ...enrichedLine,
         ticker,
         asset_type: assetType,
         quantity: norm.quantity,
         unit_price: norm.unit_price,
-        date: parseDate(line.date),
+        date: parsedDate,
       });
       if (!result.skipped) inserted += 1;
     }
@@ -301,15 +353,23 @@ export class LedgerImportService {
         quantity: line.quantity,
         unit_price: line.unit_price,
       });
+      const parsedDate = parseDate(line.date);
+      const enrichedLine = await this.enrichSettlementForLine(
+        ctx,
+        line,
+        ticker,
+        assetType,
+        parsedDate
+      );
       const result = await this.operations.recordOperation(
         ctx,
         {
-          ...line,
+          ...enrichedLine,
           ticker,
           asset_type: assetType,
           quantity: norm.quantity,
           unit_price: norm.unit_price,
-          date: parseDate(line.date),
+          date: parsedDate,
           notes: line.notes
             ? meta?.sourceLabel
               ? `${line.notes} (${meta.sourceLabel})`

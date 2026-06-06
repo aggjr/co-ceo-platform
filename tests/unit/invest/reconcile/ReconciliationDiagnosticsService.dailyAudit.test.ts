@@ -3,7 +3,7 @@ import { AUTO_D2_REF_PREFIX } from '../../../../src/core/invest/AutoPendingSettl
 import type { LedgerEvent } from '../../../../src/core/invest/CustodyEngine';
 
 describe('ReconciliationDiagnosticsService daily audit', () => {
-  it('trata abertura como estado inicial e liquida transito vencido sem anular caixa', () => {
+  it('trata abertura como estado inicial e baixa transito somente pela perna clear', () => {
     const service = new ReconciliationDiagnosticsService({} as any);
     const tradeId = 'trade-prio-1';
     const events: LedgerEvent[] = [
@@ -95,7 +95,9 @@ describe('ReconciliationDiagnosticsService daily audit', () => {
     expect(jan7Business.status).toBe('ok');
     expect(jan7Business.businessEvents).toBe(0);
     expect(jan6Financial.openingTransit).toBeCloseTo(-400, 2);
-    expect(jan7Financial.openingTransit).toBeCloseTo(0, 2);
-    expect(jan7Financial.openingCash).toBeCloseTo(58_358.79, 2);
+    expect(jan7Financial.openingTransit).toBeCloseTo(-400, 2);
+    expect(jan7Financial.closingTransit).toBeCloseTo(0, 2);
+    expect(jan7Financial.openingCash).toBeCloseTo(58_758.79, 2);
+    expect(jan7Financial.closingCash).toBeCloseTo(58_358.79, 2);
   });
 });

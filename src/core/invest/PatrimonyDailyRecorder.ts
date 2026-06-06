@@ -231,7 +231,7 @@ export class PatrimonyDailyRecorder {
 
     const rfLedger = fixedIncomeTotalFromLedger(events);
     const rfAnchor = Number(anchors.fixed_income_total ?? 0);
-    const rfForEconomic = hasAnchors && rfAnchor > 0 ? rfAnchor : rfLedger;
+    const rfForEconomic = rfLedger;
 
     const useCalibration =
       !opts?.economicOnly && hasAnchors && shouldUseBtgAnchorCalibration(events);
@@ -333,6 +333,7 @@ export class PatrimonyDailyRecorder {
         rf_ledger: rfLedger,
         rf_anchor: rfAnchor,
         rf_marked: markedFixedIncomeTotal,
+        rf_anchor_delta: Math.round((markedFixedIncomeTotal - rfAnchor) * 100) / 100,
       },
     });
 
