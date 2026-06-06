@@ -73,7 +73,6 @@ import {
   enrichPortfolioRow,
   attachUnderlyingMarketData,
   buildLongEquityPmMapFromAssetRows,
-  consolidateTesouroPortfolioItems,
   mergeLedgerCustodyIntoAssetRows,
   mergeOptionStrikeIntoAssetRow,
   partitionPortfolioPositions,
@@ -432,9 +431,7 @@ export class InvestController {
     );
     withUnderlyingQuotes.sort((a, b) => b.marketValue - a.marketValue);
     const { open, closedOptions } = partitionPortfolioPositions(withUnderlyingQuotes);
-    const consolidated = optionsOnly
-      ? open
-      : consolidateTesouroPortfolioItems(open);
+    const consolidated = open;
     const withAllocation = applyAllocationPercents(consolidated);
 
     let responseItems = withAllocation;

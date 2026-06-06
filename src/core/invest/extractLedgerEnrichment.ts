@@ -94,9 +94,8 @@ export function inferFromCashDescription(
 
   if (/LFT|TESOURO\s+DIRETO|TESOURO\b/i.test(upper)) {
     const m = upper.match(/LFT[-\s]?(\d{2})\/(\d{2})\/(\d{4})/);
-    const ticker = m
-      ? `LFT-${m[3]}${m[2]}${m[1]}`
-      : 'LFT-20310301';
+    if (!m) return null;
+    const ticker = `LFT-${m[3]}${m[2]}${m[1]}`;
     const pregao = d.match(/Preg[aã]o:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
     const originDate = pregao
       ? `${pregao[3]}-${pregao[2]}-${pregao[1]}`

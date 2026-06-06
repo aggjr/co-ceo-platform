@@ -16,10 +16,6 @@ import { resolveOptionStrike, type OptionStrikeSource } from './optionStrike';
 import type { ThreePricesValidation } from './threePricesValidation';
 import type { ThreeAvgPrices } from './portfolioThreePrices';
 import { isCashInvestTicker } from './cashInvestLedger';
-import {
-  isTesouroDiretoTicker,
-  TESOURO_SELIC_2031_TICKER,
-} from './tesouroDirectLedger';
 import { MAIN_CASH_TICKER, MAIN_CASH_NAME } from './ledgerTypes';
 
 const OPTION_ASSET_TYPES = new Set(['option_call', 'option_put']);
@@ -590,50 +586,6 @@ export function mergeLedgerCustodyIntoAssetRows(
   return merged;
 }
 
-/** Une LFT-20310301 + TESOURO-SELIC-2031 numa única linha de Tesouro Selic 2031. */
-export function consolidateTesouroPortfolioItems(
-  items: PortfolioItemDto[]
-): PortfolioItemDto[] {
-  const rest: PortfolioItemDto[] = [];
-  const tesouro: PortfolioItemDto[] = [];
-  for (const item of items) {
-    if (isTesouroDiretoTicker(item.ticker)) tesouro.push(item);
-    else rest.push(item);
-  }
-  if (tesouro.length === 0) return items;
-
-  let totalQty = 0;
-  let costSum = 0;
-  let best = tesouro[0]!;
-  for (const t of tesouro) {
-    totalQty += t.quantity;
-    costSum += t.quantity * t.avgPrice;
-    if (Math.abs(t.quantity) > Math.abs(best.quantity)) best = t;
-  }
-  if (totalQty <= 1e-9) return rest;
-
-  const avgPrice = costSum / totalQty;
-  const lastPrice = best.lastPrice > 0 ? best.lastPrice : avgPrice;
-  const marketValue = Math.round(totalQty * lastPrice * 100) / 100;
-  const costBasis = Math.round(totalQty * avgPrice * 100) / 100;
-  const pnl = Math.round((marketValue - costBasis) * 100) / 100;
-
-  rest.push({
-    ...best,
-    ticker: TESOURO_SELIC_2031_TICKER,
-    assetType: 'fixed_income',
-    name: best.name || 'Tesouro Selic 2031 (LFT)',
-    quantity: Math.round(totalQty * 10000) / 10000,
-    avgPrice: Math.round(avgPrice * 10000) / 10000,
-    lastPrice,
-    marketValue,
-    costBasis,
-    pnl,
-    pnlPct: costBasis !== 0 ? Math.round((pnl / costBasis) * 10000) / 100 : 0,
-  });
-  return rest;
-}
-
 export function applyCashInvestBalanceToItems(
   items: PortfolioItemDto[],
   balance: number
@@ -664,14 +616,8 @@ export function applyCashInvestBalanceToItems(
 export function applyAllocationPercents(items: PortfolioItemDto[]): PortfolioItemDto[] {
   const total = items.reduce((s, i) => {
     if (Math.abs(i.quantity) < QTY_ZERO_EPS) return s;
-    if (
-      i.assetType === 'stock' ||
-      i.assetType === 'fii' ||
-      isPortfolioOptionItem(i)
-    ) {
-      return s + Math.abs(i.marketValue);
-    }
-    return s;
+    if (i.assetType === 'cash' || isCashInvestTicker(i.ticker)) return s;
+    return s + Math.abs(i.marketValue);
   }, 0);
   if (total <= 0) return items;
   return items.map((item) => ({
@@ -679,9 +625,7 @@ export function applyAllocationPercents(items: PortfolioItemDto[]): PortfolioIte
     allocationPct:
       item.allocationPct != null
         ? item.allocationPct
-        : item.assetType === 'stock' ||
-            item.assetType === 'fii' ||
-            isPortfolioOptionItem(item)
+        : item.assetType !== 'cash' && !isCashInvestTicker(item.ticker)
           ? Math.round((Math.abs(item.marketValue) / total) * 1000) / 10
           : null,
   }));

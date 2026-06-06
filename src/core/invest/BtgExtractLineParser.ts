@@ -97,10 +97,11 @@ export type BtgLedgerMapping = {
 };
 
 const CASH_TICKER = MAIN_CASH_TICKER;
+const UNKNOWN_TESOURO_DIRETO_TICKER = 'TD-TESOURO-DIRETO';
 
 function parseLftTicker(description: string): string {
   const match = description.match(LFT_TICKER_RE);
-  if (!match) return 'LFT-20310301';
+  if (!match) return UNKNOWN_TESOURO_DIRETO_TICKER;
   const [, dd, mm, yyyy] = match;
   return `LFT-${yyyy}${mm}${dd}`;
 }
