@@ -77,3 +77,19 @@ export function buildExposureByUnderlying(rows, side, pctNear, pctFar) {
 
   return { lines, totals };
 }
+
+/** Acrescenta colunas cumulativas: até pctNear e até pctFar (total permanece o notional integral). */
+export function withCumulativeExposure(data) {
+  const lines = data.lines.map((line) => ({
+    ...line,
+    cumNear: line.itm + line.bandNear,
+    cumFar: line.itm + line.bandNear + line.bandFar,
+  }));
+  const totals = {
+    itm: data.totals.itm,
+    cumNear: data.totals.itm + data.totals.bandNear,
+    cumFar: data.totals.itm + data.totals.bandNear + data.totals.bandFar,
+    total: data.totals.total,
+  };
+  return { lines, totals };
+}
