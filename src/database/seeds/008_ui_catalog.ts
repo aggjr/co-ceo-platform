@@ -594,7 +594,7 @@ export const TEXTS: TextSeed[] = [
     text_key: 'screen.invest.options.exposure.put_title',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'PUTs — dinheiro possível no exercício',
+    default_text: 'PUTs - Valores Necessários no próximo Exercício',
   },
   {
     id: '00000000-0000-4003-8000-000000000189',
@@ -609,7 +609,7 @@ export const TEXTS: TextSeed[] = [
     text_key: 'screen.invest.options.exposure.call_title',
     module_code: 'INVEST',
     kind: 'field_label',
-    default_text: 'CALLs — notional por proximidade do strike',
+    default_text: 'CALLs - Valores possíveis de serem gerados no proximo Strike',
   },
   {
     id: '00000000-0000-4003-8000-000000000191',

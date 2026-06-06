@@ -35,27 +35,14 @@
   margin-bottom: 0;
 }
 
-.opt-exposure-section--put .portfolio-excel-title {
-  color: var(--invest-option-put-color, #fb923c);
+.opt-exposure-section--put .excel-table-caption,
+.opt-exposure-section--call .excel-table-caption {
+  color: var(--color-accent, #dab177);
 }
 
-.opt-exposure-section--call .portfolio-excel-title {
-  color: var(--invest-option-call-color, #60a5fa);
-}
-
-.opt-exposure-section .portfolio-excel-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin: 0 0 6px;
-  letter-spacing: 0.03em;
-}
-
-.opt-exposure-help {
-  margin: 0 0 12px;
-  font-size: 12px;
-  color: var(--color-text-muted, #94a3b8);
-  line-height: 1.45;
-  max-width: 72ch;
+.opt-exposure-section--put .portfolio-excel-section,
+.opt-exposure-section--call .portfolio-excel-section {
+  margin-bottom: 0;
 }
 
 .invest-table-card .opt-exposure-page .table-wrapper {

@@ -2,6 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import {
   classifyExposureBand,
   buildExposureByUnderlying,
+  withCumulativeExposure,
 } from '../../../frontend/src/lib/optionExposureTables.js';
 
 describe('optionExposureTables', () => {
@@ -34,5 +35,15 @@ describe('optionExposureTables', () => {
     expect(lines[0].bandNear).toBe(1000 * 100);
     expect(lines[0].total).toBe(150000);
     expect(totals.total).toBe(150000);
+  });
+
+  it('acumula faixas até pctNear e pctFar', () => {
+    const raw = buildExposureByUnderlying([putItm, putOtmNear], 'put', 5, 10);
+    const { lines, totals } = withCumulativeExposure(raw);
+    expect(lines[0].cumNear).toBe(50000 + 100000);
+    expect(lines[0].cumFar).toBe(150000);
+    expect(lines[0].total).toBe(150000);
+    expect(totals.cumNear).toBe(150000);
+    expect(totals.cumFar).toBe(150000);
   });
 });
