@@ -8,6 +8,7 @@ import { logReconcileFailure } from './reconcile/reconcileErrorDetail';
 import { DailyCloseMaterializeService } from './reconcile/DailyCloseMaterializeService';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
+import { ModuleCategories } from '../module-registry';
 
 export type PatrimonyRebuildResult = {
   from: string;
@@ -62,6 +63,7 @@ export class PatrimonyDailyRebuildService {
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly assetProjection: InvestAssetProjection;
   private readonly dailyClose: DailyCloseMaterializeService;
+  private readonly categories: ModuleCategories;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -70,6 +72,7 @@ export class PatrimonyDailyRebuildService {
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
     this.dailyClose = new DailyCloseMaterializeService(gateway);
+    this.categories = new ModuleCategories(gateway);
   }
 
   getStatus(ctx: UserContext): PatrimonyRebuildStatus {
@@ -125,7 +128,7 @@ export class PatrimonyDailyRebuildService {
     try {
       await this.store.invalidateFromDate(ctx, from);
 
-      const tickers = await this.listEquityTickers(ctx);
+      const tickers = await this.listQuotedAssetTickers(ctx);
       const quoteMap = await this.marketQuotes.loadQuoteMapForRange(ctx, from, to);
       let daysWithQuotes = 0;
       for (const byDate of quoteMap.values()) {
@@ -133,7 +136,7 @@ export class PatrimonyDailyRebuildService {
       }
       if (tickers.length > 0 && daysWithQuotes === 0) {
         warnings.push(
-          'Sem cotacoes em market_quotes_daily no intervalo; dias uteis com acoes/FIIs abertos serao bloqueados.'
+          'Sem cotacoes em market_quotes_daily no intervalo; dias uteis com ativos cotaveis abertos serao bloqueados.'
         );
       }
       if ((opts.to ?? today).slice(0, 10) > effectiveMaxTo) {
@@ -191,22 +194,14 @@ export class PatrimonyDailyRebuildService {
     }
   }
 
-  private async listEquityTickers(ctx: UserContext): Promise<string[]> {
+  private async listQuotedAssetTickers(ctx: UserContext): Promise<string[]> {
     const assets = await this.assetProjection.listActiveAssets(ctx);
     const tickers: string[] = [];
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
       const type = String(row.asset_type ?? '');
-      if (
-        type === 'fixed_income' ||
-        ticker.startsWith('TESOURO-') ||
-        ticker.startsWith('CDB-') ||
-        ticker.startsWith('LFT-') ||
-        ticker.startsWith('TD-')
-      ) {
-        continue;
-      }
+      if (!(await this.categories.requiresMarketQuote(ctx, type))) continue;
       tickers.push(ticker);
     }
     return tickers;

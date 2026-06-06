@@ -436,6 +436,8 @@ export async function InvestOptionsByExpiryPage(container) {
     ].filter(Boolean);
 
     const annotations = {};
+    const legendItems = [];
+
     if (quote != null) {
       annotations['quote-line'] = {
         type: 'line',
@@ -444,16 +446,11 @@ export async function InvestOptionsByExpiryPage(container) {
         borderColor: AMP_COLORS.quoteLine,
         borderWidth: 2,
         borderDash: [4, 4],
-        label: {
-          display: true,
-          content: `⚡ Cotação ${underlying}: ${formatBrl(quote)}`,
-          position: 'start',
-          backgroundColor: 'rgba(15, 23, 42, 0.9)',
-          color: AMP_COLORS.quoteLine,
-          font: { size: 12, weight: 'bold' },
-          padding: 6,
-        },
       };
+      legendItems.push({
+        color: AMP_COLORS.quoteLine,
+        label: `⚡ Cotação ${underlying}: ${formatBrl(quote)}`,
+      });
     }
 
     for (const ref of priceReferences) {
@@ -464,18 +461,21 @@ export async function InvestOptionsByExpiryPage(container) {
         borderColor: ref.color,
         borderWidth: 2,
         borderDash: ref.dash,
-        label: {
-          display: true,
-          content: `${ref.label} ${ref.underlying}: ${formatBrl(ref.value)}`,
-          position: 'start',
-          backgroundColor: 'rgba(15, 23, 42, 0.9)',
-          color: ref.color,
-          font: { size: 12, weight: 'bold' },
-          padding: 6,
-          yAdjust: ref.yAdjust,
-        },
       };
+      legendItems.push({
+        color: ref.color,
+        label: `${ref.label} ${ref.underlying}: ${formatBrl(ref.value)}`,
+      });
     }
+
+    const customLegendLabels = legendItems.map((item) => ({
+      text: item.label,
+      fillStyle: item.color,
+      strokeStyle: item.color,
+      lineWidth: 0,
+      hidden: false,
+      datasetIndex: -1,
+    }));
 
     const canvasQty = document.getElementById('amp-chart-qty');
     const canvasNotional = document.getElementById('amp-chart-notional');
@@ -489,7 +489,35 @@ export async function InvestOptionsByExpiryPage(container) {
       maintainAspectRatio: false,
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       plugins: {
-        legend: { position: 'top', labels: { color: '#cbd5e1' } },
+        legend: {
+          position: 'bottom',
+          onClick: (e, legendItem, legend) => {
+            const index = legendItem.datasetIndex;
+            if (index >= 0) {
+              const chart = legend.chart;
+              if (chart.isDatasetVisible(index)) {
+                chart.hide(index);
+              } else {
+                chart.show(index);
+              }
+            }
+          },
+          labels: {
+            color: '#cbd5e1',
+            usePointStyle: true,
+            generateLabels: (chart) => {
+              const datasets = chart.data.datasets;
+              const defaultLabels = datasets.map((ds, i) => ({
+                text: ds.label,
+                fillStyle: ds.backgroundColor,
+                strokeStyle: ds.borderColor || ds.backgroundColor,
+                hidden: !chart.isDatasetVisible(i),
+                datasetIndex: i,
+              }));
+              return [...defaultLabels, ...customLegendLabels];
+            },
+          },
+        },
         annotation: { annotations },
       },
       scales: {

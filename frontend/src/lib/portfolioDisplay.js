@@ -280,7 +280,10 @@ function emptyFooterCells(columns) {
 
 function sumPortfolioTotals(list) {
   const totalValue = list.reduce((s, r) => s + Number(r.marketValue ?? 0), 0);
-  const totalPnl = list.reduce((s, r) => s + Number(r.pnl ?? 0), 0);
+  const totalPnl = list.reduce((s, r) => {
+    if (isOptionLike(r)) return s + optionPnl(r);
+    return s + Number(r.pnl ?? 0);
+  }, 0);
   const totalCost = list.reduce((s, r) => s + Number(r.costBasis ?? 0), 0);
   const totalPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
   return { totalValue, totalPnl, totalPct };
@@ -390,7 +393,21 @@ export function optionPriceReturnPct(row) {
   const pm = Number(row.avgPrice);
   const last = Number(row.lastPrice);
   if (!Number.isFinite(pm) || pm <= 0 || !Number.isFinite(last)) return null;
-  return ((last - pm) / pm) * 100;
+  const ret = ((last - pm) / pm) * 100;
+  return Number(row.quantity) < 0 ? ret * -1 : ret;
+}
+
+export function optionPnl(row) {
+  const val = Number(row.pnl ?? 0);
+  return Number(row.quantity) < 0 ? val * -1 : val;
+}
+
+export function optionPnlPct(row) {
+  const calc = optionPriceReturnPct(row);
+  if (calc != null) return calc;
+  const fallback = Number(row.pnlPct);
+  if (!Number.isFinite(fallback)) return null;
+  return Number(row.quantity) < 0 ? fallback * -1 : fallback;
 }
 
 function optionPremiumReceived(row) {
@@ -630,6 +647,14 @@ export function buildInvestOptionsColumns() {
       align: 'right',
       width: '112px',
       colorLogic: 'inflow',
+      filterValue: (row) => optionPnl(row),
+      render: (row) => {
+        const val = optionPnl(row);
+        const span = document.createElement('span');
+        span.className = pnlClass(val);
+        span.textContent = formatBrl(val);
+        return span;
+      },
     },
     {
       key: 'pnlPct',
@@ -638,10 +663,10 @@ export function buildInvestOptionsColumns() {
       numberFormat: 'percent',
       align: 'right',
       width: '96px',
-      filterValue: (row) => optionPriceReturnPct(row) ?? row.pnlPct,
+      filterValue: (row) => optionPnlPct(row),
       render: (row) => {
         const span = document.createElement('span');
-        const pct = optionPriceReturnPct(row) ?? row.pnlPct;
+        const pct = optionPnlPct(row);
         span.className = pnlClass(Number(pct));
         span.style.fontWeight = '600';
         span.textContent = formatPct(pct);
@@ -685,7 +710,7 @@ function optionFooterWeightedReturnPct(list) {
 export function buildOptionsTableFooterColumnTotals(rows) {
   return ({ formatCurrency, currentData, columns }) => {
     const list = currentData?.length ? currentData : rows || [];
-    const totalPnl = list.reduce((s, r) => s + Number(r.pnl ?? 0), 0);
+    const totalPnl = list.reduce((s, r) => s + optionPnl(r), 0);
     const totalPct = optionFooterWeightedReturnPct(list);
     const totalPremium = list.reduce((s, r) => s + optionPremiumReceived(r), 0);
     const totalNotional = list.reduce((s, r) => s + (optionNotional(r) ?? 0), 0);

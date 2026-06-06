@@ -29,12 +29,28 @@ describe('ModuleCategories quote and patrimony flags', () => {
       valuation_mode: 'market_price',
       is_active: 1,
     });
+    await gw.insert(ctx, 'module_categories', {
+      module_code: 'INVEST',
+      category: 'financial_asset',
+      subcategory: 'fixed_income',
+      canonical_name: 'Renda fixa',
+      default_quantity_unit: 'un',
+      default_valuation_method: 'three_prices_invest',
+      default_settlement_profile: 'B3_D1',
+      contributes_to_patrimony: 1,
+      requires_market_quote: 1,
+      default_quote_source: 'tesouro_direto',
+      valuation_mode: 'market_price',
+      is_active: 1,
+    });
 
     const categories = new ModuleCategories(castGateway(gw));
 
     await expect(categories.contributesToPatrimony(ctx, 'etf')).resolves.toBe(true);
     await expect(categories.requiresMarketQuote(ctx, 'etf')).resolves.toBe(true);
     await expect(categories.defaultQuoteSource(ctx, 'etf')).resolves.toBe('brapi');
+    await expect(categories.requiresMarketQuote(ctx, 'fixed_income')).resolves.toBe(true);
+    await expect(categories.defaultQuoteSource(ctx, 'fixed_income')).resolves.toBe('tesouro_direto');
     await expect(categories.requiresMarketQuote(ctx, 'unknown_subcategory')).resolves.toBe(false);
   });
 });
