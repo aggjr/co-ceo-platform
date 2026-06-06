@@ -278,7 +278,6 @@ export async function InvestOptionsByExpiryPage(container) {
           <canvas id="amp-chart-notional"></canvas>
         </div>
       </div>
-      <div id="amp-custom-legend" style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 20px; margin-bottom: 20px;"></div>
     `;
 
     root.querySelector('[data-filter="underlying"]').addEventListener('change', (e) => {
@@ -391,8 +390,6 @@ export async function InvestOptionsByExpiryPage(container) {
       if (hint) {
         hint.textContent = 'Não há opções com quantidade ou notional operados para este ativo e vencimento.';
       }
-      const legendContainer = root.querySelector('#amp-custom-legend');
-      if (legendContainer) legendContainer.innerHTML = '';
       if (currentChartQty) currentChartQty.destroy();
       if (currentChartNotional) currentChartNotional.destroy();
       currentChartQty = null;
@@ -471,19 +468,14 @@ export async function InvestOptionsByExpiryPage(container) {
       });
     }
 
-    const legendContainer = root.querySelector('#amp-custom-legend');
-    if (legendContainer) {
-      legendContainer.innerHTML = legendItems
-        .map(
-          (item) => `
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #cbd5e1; background-color: rgba(15, 23, 42, 0.5); padding: 4px 12px; border-radius: 4px;">
-          <div style="width: 16px; height: 16px; border-radius: 4px; background-color: ${item.color};"></div>
-          <span>${item.label}</span>
-        </div>
-      `
-        )
-        .join('');
-    }
+    const customLegendLabels = legendItems.map((item) => ({
+      text: item.label,
+      fillStyle: item.color,
+      strokeStyle: item.color,
+      lineWidth: 0,
+      hidden: false,
+      datasetIndex: -1,
+    }));
 
     const canvasQty = document.getElementById('amp-chart-qty');
     const canvasNotional = document.getElementById('amp-chart-notional');
@@ -497,7 +489,35 @@ export async function InvestOptionsByExpiryPage(container) {
       maintainAspectRatio: false,
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
       plugins: {
-        legend: { position: 'top', labels: { color: '#cbd5e1' } },
+        legend: {
+          position: 'bottom',
+          onClick: (e, legendItem, legend) => {
+            const index = legendItem.datasetIndex;
+            if (index >= 0) {
+              const chart = legend.chart;
+              if (chart.isDatasetVisible(index)) {
+                chart.hide(index);
+              } else {
+                chart.show(index);
+              }
+            }
+          },
+          labels: {
+            color: '#cbd5e1',
+            usePointStyle: true,
+            generateLabels: (chart) => {
+              const datasets = chart.data.datasets;
+              const defaultLabels = datasets.map((ds, i) => ({
+                text: ds.label,
+                fillStyle: ds.backgroundColor,
+                strokeStyle: ds.borderColor || ds.backgroundColor,
+                hidden: !chart.isDatasetVisible(i),
+                datasetIndex: i,
+              }));
+              return [...defaultLabels, ...customLegendLabels];
+            },
+          },
+        },
         annotation: { annotations },
       },
       scales: {
