@@ -8,6 +8,8 @@ import {
   formatNumber,
   formatPct,
   optionPriceReturnPct,
+  optionPnl,
+  optionPnlPct,
   resolveOptionSide,
   formatOptionTypeLabel,
 } from './portfolioDisplay.js';
@@ -158,7 +160,6 @@ export function cardFieldRows(row) {
   const dist = computeStrikeDistance(row);
   const band = optionMoneynessBand(row, 5);
   const side = resolveOptionSide(row);
-  const pnlPct = optionPriceReturnPct(row) ?? row.pnlPct;
   const distanceBrl = dist?.brl ?? null;
   return {
     ticker: row.ticker,
@@ -177,10 +178,10 @@ export function cardFieldRows(row) {
     distanceBand: band,
     band,
     notional: optionNotionalValue(row),
-    pnl: Number(row.pnl),
-    pnlPct,
-    pnlFormatted: formatBrl(row.pnl),
-    pnlPctFormatted: formatPct(pnlPct),
+    pnl: optionPnl(row),
+    pnlPct: optionPnlPct(row),
+    pnlFormatted: formatBrl(optionPnl(row)),
+    pnlPctFormatted: formatPct(optionPnlPct(row)),
   };
 }
 
