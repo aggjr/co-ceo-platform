@@ -7,6 +7,11 @@ import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { ModuleCategories } from '../core/module-registry';
+import {
+  AssetValuationContext,
+  contributesToMarketPricedPatrimony,
+  isOptionCategory,
+} from '../core/invest/valuation/AssetValuationContext';
 import type { CoCeoDataGateway } from '../core/dal';
 import type { SecurePayload } from '../core/dal/types';
 
@@ -14,11 +19,13 @@ export class RemoteRecalcController {
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly ledger: LedgerImportService;
   private readonly categories: ModuleCategories;
+  private readonly valuation: AssetValuationContext;
 
   constructor(private gateway: CoCeoDataGateway) {
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.ledger = new LedgerImportService(gateway);
     this.categories = new ModuleCategories(gateway);
+    this.valuation = new AssetValuationContext(gateway);
   }
 
   /** @deprecated Prefer POST /api/invest/patrimony-daily/rebuild ou /reconcile/recalc-all */
@@ -59,7 +66,43 @@ export class RemoteRecalcController {
       const to = new Date().toISOString().slice(0, 10);
       const events = await this.ledger.listLedgerEvents(ctx, from, to);
       const { assets } = rebuildCustodyFromLedger(events);
-      const pricesMap = computeThreePricesByUnderlying(events, to);
+      this.valuation.clear();
+      const valuationSnapshot = await this.valuation.load(ctx);
+      const baseAssetTypes = new Set(
+        [...valuationSnapshot.categories.values()]
+          .filter((category) =>
+            contributesToMarketPricedPatrimony(
+              valuationSnapshot,
+              category.subcategory
+            )
+          )
+          .map((category) => category.subcategory)
+      );
+      const optionAssetTypes = new Set(
+        [...valuationSnapshot.categories.values()]
+          .filter((category) => isOptionCategory(valuationSnapshot, category.subcategory))
+          .map((category) => category.subcategory)
+      );
+      for (const event of events) {
+        const assetType = String(event.asset_type ?? '').toLowerCase();
+        if (!assetType) continue;
+        if (
+          contributesToMarketPricedPatrimony(
+            valuationSnapshot,
+            assetType,
+            String(event.asset_ticker ?? '')
+          )
+        ) {
+          baseAssetTypes.add(assetType);
+        }
+        if (isOptionCategory(valuationSnapshot, assetType)) {
+          optionAssetTypes.add(assetType);
+        }
+      }
+      const pricesMap = computeThreePricesByUnderlying(events, to, {
+        baseAssetTypes,
+        optionAssetTypes,
+      });
 
       const marketQuoteRepo = new MarketQuoteRepository(this.gateway);
       const quoteTickers = new Set<string>();
@@ -86,7 +129,7 @@ export class RemoteRecalcController {
         let pmB: number | null = null;
         let pmC: number | null = null;
 
-        if (asset.assetType === 'stock' || asset.assetType === 'fii') {
+        if (baseAssetTypes.has(String(asset.assetType).toLowerCase())) {
           const tp = pricesMap.get(ticker);
           if (tp && tp.estrito > 0) {
             pmA = tp.estrito;

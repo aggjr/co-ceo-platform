@@ -30,6 +30,9 @@ export type GatewayReadQueryKey =
   | 'market_quotes_daily_range'
   | 'market_quotes_daily_on_or_before'
   | 'market_quotes_latest_date'
+  | 'fx_rate_on_or_before'
+  | 'market_quote_source_mapping'
+  | 'settlement_rule_candidates'
   | 'market_index_daily_range'
   | 'market_index_daily_on_or_before'
   | 'market_distinct_tickers_in_use'
@@ -310,6 +313,49 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
           FROM market_quotes_daily
           WHERE closing_price IS NOT NULL
             AND closing_price > 0`,
+  },
+  fx_rate_on_or_before: {
+    requiresGlobalScope: true,
+    sql: `SELECT id, from_currency, to_currency, rate_date, closing_rate, source, metadata
+          FROM fx_rates
+          WHERE from_currency = ?
+            AND to_currency = ?
+            AND rate_date <= ?
+          ORDER BY rate_date DESC
+          LIMIT 1`,
+  },
+  market_quote_source_mapping: {
+    requiresGlobalScope: true,
+    sql: `SELECT source_code, ticker, provider_symbol, provider_currency, metadata
+          FROM market_quote_source_mappings
+          WHERE source_code = ?
+            AND ticker = ?
+            AND is_active = TRUE`,
+  },
+  settlement_rule_candidates: {
+    requiresGlobalScope: true,
+    sql: `SELECT r.rule_code, r.contract_type_code, r.valid_from, r.valid_to,
+                 r.days_offset, r.calendar_unit, r.business_calendar_code,
+                 r.default_status, r.label, r.priority,
+                 srat.asset_type,
+                 srtt.transaction_type,
+                 srtp.ticker_prefix
+          FROM settlement_contract_rules r
+          INNER JOIN settlement_rule_asset_types srat
+            ON srat.rule_code = r.rule_code
+           AND srat.asset_type IN (?, '*')
+          INNER JOIN settlement_rule_transaction_types srtt
+            ON srtt.rule_code = r.rule_code
+           AND srtt.transaction_type IN (?, '*')
+          LEFT JOIN settlement_rule_ticker_prefixes srtp
+            ON srtp.rule_code = r.rule_code
+          WHERE r.is_active = TRUE
+            AND r.valid_from <= ?
+            AND (r.valid_to IS NULL OR r.valid_to >= ?)
+          ORDER BY
+            CASE WHEN srtp.ticker_prefix IS NULL THEN 1 ELSE 0 END ASC,
+            r.priority ASC,
+            r.valid_from DESC`,
   },
   market_index_daily_range: {
     sql: `SELECT id, index_code, reference_date, daily_factor, annualized_rate, source

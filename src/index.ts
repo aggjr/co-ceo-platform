@@ -7,10 +7,13 @@ import { APP_VERSION } from './generated/version';
 import { ensureCoreSchema } from './core/db/ensureCoreSchema';
 import { applyUiCatalog } from './core/ui/UiCatalogApplyService';
 import { startInvestMarketCron } from './jobs/investMarketCron';
+import { registerDefaultBrokerParsers } from './core/invest/parsers';
 
 const app = express();
 const port = process.env.PORT || 3001;
 const webDist = path.join(__dirname, '../frontend/dist');
+
+registerDefaultBrokerParsers();
 
 app.use(express.json({ limit: '30mb' }));
 app.use('/api', apiRoutes);

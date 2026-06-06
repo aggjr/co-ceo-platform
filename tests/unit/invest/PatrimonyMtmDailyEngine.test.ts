@@ -1,5 +1,6 @@
 import { buildDailyPatrimonyMtmSeries } from '../../../src/core/invest/PatrimonyMtmDailyEngine';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
+import { emptyAssetValuationSnapshot } from '../../../src/core/invest/valuation/AssetValuationContext';
 
 const anchors = {
   month_ends: [
@@ -158,5 +159,51 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(day2?.patrimony).toBeCloseTo(11_000, 0);
     expect(snapshot?.closingPrice).toBeCloseTo(1100, 0);
     expect(snapshot?.marketValue).toBeCloseTo(11_000, 0);
+  });
+
+  it('valoriza qualquer subcategoria market_price configurada no catalogo com conversao FX', () => {
+    const valuation = emptyAssetValuationSnapshot();
+    valuation.categories.set('stock_us', {
+      moduleCode: 'INVEST',
+      category: 'financial_asset',
+      subcategory: 'stock_us',
+      contributesToPatrimony: true,
+      requiresMarketQuote: true,
+      quoteSource: 'yahoo_finance',
+      valuationMode: 'market_price',
+      exchangeCode: 'NASDAQ_US',
+      currencyCode: 'USD',
+      settlementCounterpartyCode: 'NASDAQ_US',
+      settlementContractTypeCode: 'US_EQUITY_SPOT',
+      affectsPortfolio: true,
+      affectsFinancial: true,
+    });
+    valuation.contributesToPatrimony.add('stock_us');
+    valuation.requiresMarketQuote.add('stock_us');
+    valuation.currencyByType.set('stock_us', 'USD');
+
+    const entries: LedgerEvent[] = [
+      {
+        asset_id: 'us1',
+        asset_ticker: 'AAPL',
+        asset_type: 'stock_us',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-01',
+        quantity: 10,
+        unit_price: 100,
+        total_net_value: 1000,
+        impacts_managerial_price: true,
+      },
+    ];
+
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-01', {
+      fixedIncomeTotal: 0,
+      valuationContext: valuation,
+      quoteForDate: () => 100,
+      fxRateForDate: (from, to) => from === 'USD' && to === 'BRL' ? 5 : undefined,
+    });
+
+    expect(r.series[0]?.patrimony).toBeCloseTo(5000, 0);
+    expect(r.positionSnapshots?.[0]?.marketValue).toBeCloseTo(5000, 0);
   });
 });

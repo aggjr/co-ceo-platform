@@ -16,6 +16,7 @@ import {
 } from '../market/ExternalStockQuoteProvider';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 import { ModuleCategories } from '../module-registry';
+import { FxRateRepository } from '../market/FxRateRepository';
 
 export type QuoteSyncQuote = {
   ticker: string;
@@ -46,11 +47,13 @@ export class InvestQuoteSyncService {
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly categories: ModuleCategories;
+  private readonly fxRates: FxRateRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.categories = new ModuleCategories(gateway);
+    this.fxRates = new FxRateRepository(gateway);
   }
 
   private addQuoteTarget(targets: Map<string, Set<string>>, source: string | null, ticker: string): void {
@@ -170,6 +173,28 @@ export class InvestQuoteSyncService {
           source: this.quoteSourceForStorage(q.source),
           kind: q.kind,
           provider: q.source,
+        });
+      }
+      return out;
+    }
+    if (source === 'coingecko') {
+      const { fetchCoinGeckoQuote } = await import('./coinGeckoQuotes');
+      const out: QuoteSyncQuote[] = [];
+      if (!asOfDate) return out;
+      const usdBrl = await this.fxRates.getClosingRate('USD', 'BRL', asOfDate).catch(() => null);
+      if (usdBrl == null || !Number.isFinite(usdBrl) || usdBrl <= 0) {
+        return out;
+      }
+      for (const ticker of tickers) {
+        const q = await fetchCoinGeckoQuote(this.gateway, ticker, asOfDate).catch(() => null);
+        if (!q) continue;
+        out.push({
+          ticker: q.ticker,
+          price: Math.round(q.priceUsd * usdBrl * 1000000) / 1000000,
+          asOf: q.asOf,
+          source: 'coingecko',
+          kind: 'crypto_close',
+          provider: `coingecko:${q.providerSymbol}`,
         });
       }
       return out;

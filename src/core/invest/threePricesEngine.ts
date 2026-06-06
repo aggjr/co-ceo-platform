@@ -31,8 +31,8 @@ type UnderlyingState = {
   optionSeries: Map<string, OptionSeriesState>;
 };
 
-const STOCK_LIKE = new Set(['stock', 'fii']);
-const OPTION_LIKE = new Set(['option_call', 'option_put']);
+const DEFAULT_BASE_ASSET_TYPES = ['stock', 'fii'];
+const DEFAULT_OPTION_ASSET_TYPES = ['option_call', 'option_put'];
 
 const OPTION_SELL_TX = new Set(['put_sell', 'call_sell']);
 const OPTION_BUY_TX = new Set(['put_buy', 'call_buy']);
@@ -396,13 +396,39 @@ function applyOptionExercise(s: UnderlyingState, e: LedgerEvent): void {
   }
 }
 
-function applyEvent(s: UnderlyingState, e: LedgerEvent): void {
+type ThreePricesClassification = {
+  baseAssetTypes: Set<string>;
+  optionAssetTypes: Set<string>;
+};
+
+export type ThreePricesOptions = {
+  baseAssetTypes?: Iterable<string>;
+  optionAssetTypes?: Iterable<string>;
+};
+
+function normalizeTypeSet(values: Iterable<string> | undefined, defaults: string[]): Set<string> {
+  const source = values ?? defaults;
+  return new Set([...source].map((v) => String(v).toLowerCase()));
+}
+
+function buildClassification(options?: ThreePricesOptions): ThreePricesClassification {
+  return {
+    baseAssetTypes: normalizeTypeSet(options?.baseAssetTypes, DEFAULT_BASE_ASSET_TYPES),
+    optionAssetTypes: normalizeTypeSet(options?.optionAssetTypes, DEFAULT_OPTION_ASSET_TYPES),
+  };
+}
+
+function applyEvent(
+  s: UnderlyingState,
+  e: LedgerEvent,
+  classification: ThreePricesClassification
+): void {
   const type = String(e.transaction_type);
   if (IGNORED_TX.has(type)) return;
 
   const assetType = effectiveAssetType(e);
 
-  if (STOCK_LIKE.has(assetType)) {
+  if (classification.baseAssetTypes.has(assetType)) {
     if (!impactsPrice(e.impacts_managerial_price)) return;
     if (type === 'buy' || type === 'opening_balance' || type === 'bonus') {
       applyStockBuy(s, e);
@@ -419,7 +445,7 @@ function applyEvent(s: UnderlyingState, e: LedgerEvent): void {
     return;
   }
 
-  if (OPTION_LIKE.has(assetType)) {
+  if (classification.optionAssetTypes.has(assetType)) {
     // option_exercise sempre processa — engine calcula o ajuste pelo histórico
     // da série, então o flag impacts_managerial_price=false (resíduo de
     // marcadores contábeis antigos) não deve ignorar o exercício.
@@ -482,8 +508,10 @@ function snapshot(s: UnderlyingState): ThreePrices {
  */
 export function computeThreePricesByUnderlying(
   entries: LedgerEvent[],
-  asOfDate?: string
+  asOfDate?: string,
+  options?: ThreePricesOptions
 ): Map<string, ThreePrices> {
+  const classification = buildClassification(options);
   const cutoff = asOfDate?.slice(0, 10);
   const filtered = cutoff
     ? entries.filter((e) => eventDate(e).slice(0, 10) <= cutoff)
@@ -494,7 +522,10 @@ export function computeThreePricesByUnderlying(
   for (const e of sorted) {
     const ticker = String(e.asset_ticker || '');
     const assetType = effectiveAssetType(e);
-    if (!STOCK_LIKE.has(assetType) && !OPTION_LIKE.has(assetType)) continue;
+    if (
+      !classification.baseAssetTypes.has(assetType) &&
+      !classification.optionAssetTypes.has(assetType)
+    ) continue;
 
     const underlying = inferUnderlyingTicker(
       ticker,
@@ -507,7 +538,7 @@ export function computeThreePricesByUnderlying(
       state = emptyState(underlying);
       states.set(underlying, state);
     }
-    applyEvent(state, e);
+    applyEvent(state, e, classification);
   }
 
   const out = new Map<string, ThreePrices>();

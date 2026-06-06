@@ -13,6 +13,8 @@ import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { ExternalOptionQuoteFetcher } from './ExternalOptionQuoteFetcher';
 import { inferAssetType, isOptionTicker } from './assetClassifier';
 import { ModuleCategories } from '../module-registry';
+import { AssetValuationContext } from './valuation/AssetValuationContext';
+import { FxRateRepository } from '../market/FxRateRepository';
 
 export type RecordDailyPatrimonyResult = {
   snapshotDate: string;
@@ -31,6 +33,8 @@ export class PatrimonyDailyRecorder {
   private readonly anchorsRepo: PatrimonyMonthlyAnchorsRepository;
   private readonly externalOptionFetcher: ExternalOptionQuoteFetcher;
   private readonly categories: ModuleCategories;
+  private readonly valuationContext: AssetValuationContext;
+  private readonly fxRates: FxRateRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -40,6 +44,8 @@ export class PatrimonyDailyRecorder {
     this.anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
     this.externalOptionFetcher = new ExternalOptionQuoteFetcher(gateway);
     this.categories = new ModuleCategories(gateway);
+    this.valuationContext = new AssetValuationContext(gateway);
+    this.fxRates = new FxRateRepository(gateway);
   }
 
   private isWeekend(iso: string): boolean {
@@ -229,6 +235,17 @@ export class PatrimonyDailyRecorder {
 
     const useCalibration =
       !opts?.economicOnly && hasAnchors && shouldUseBtgAnchorCalibration(events);
+    const valuationSnapshot = await this.valuationContext.load(ctx);
+    const fxByPair = new Map<string, number>();
+    const foreignCurrencies = new Set(
+      [...valuationSnapshot.currencyByType.values()].filter((currency) => currency !== 'BRL')
+    );
+    for (const currency of foreignCurrencies) {
+      const rate = await this.fxRates.getClosingRate(currency, 'BRL', date).catch(() => null);
+      if (rate != null && Number.isFinite(rate) && rate > 0) {
+        fxByPair.set(`${currency}/BRL`, rate);
+      }
+    }
 
     const mtmOpts = {
       anchors,
@@ -236,6 +253,9 @@ export class PatrimonyDailyRecorder {
       fixedIncomeTotal: rfForEconomic,
       calibrateToAnchors: useCalibration,
       quoteForDate: augmentedQuoteForDate,
+      valuationContext: valuationSnapshot,
+      fxRateForDate: (fromCurrency: string, toCurrency: string) =>
+        fxByPair.get(`${fromCurrency.toUpperCase()}/${toCurrency.toUpperCase()}`),
     };
 
     const mtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, mtmOpts);

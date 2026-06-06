@@ -129,6 +129,73 @@ export class InMemoryGateway {
     queryKey: string,
     params: unknown[]
   ): Promise<InMemoryRow[]> {
+    if (queryKey === 'settlement_rule_candidates') {
+      const [assetType, transactionType, tradeDate] = params as [string, string, string, string];
+      const day = String(tradeDate ?? '').slice(0, 10);
+      const defaults: InMemoryRow[] = [
+        {
+          id: 'B3_OPTION_PREMIUM_D1',
+          rule_code: 'B3_OPTION_PREMIUM_D1',
+          contract_type_code: 'B3_OPTION_PREMIUM',
+          asset_type: assetType,
+          transaction_type: transactionType,
+          valid_from: '1900-01-01',
+          valid_to: null,
+          days_offset: 1,
+          calendar_unit: 'business_days',
+          business_calendar_code: 'B3',
+          default_status: 'pending',
+          label: 'Opcao - premio D+1 util',
+          priority: 10,
+          ticker_prefix: null,
+        },
+        {
+          id: 'B3_EQUITY_D3_LEGACY',
+          rule_code: 'B3_EQUITY_D3_LEGACY',
+          contract_type_code: 'B3_EQUITY_SPOT',
+          asset_type: assetType,
+          transaction_type: transactionType,
+          valid_from: '1900-01-01',
+          valid_to: '2019-05-26',
+          days_offset: 3,
+          calendar_unit: 'business_days',
+          business_calendar_code: 'B3',
+          default_status: 'pending',
+          label: 'Acao/FII - D+3 util',
+          priority: 10,
+          ticker_prefix: null,
+        },
+        {
+          id: 'B3_EQUITY_D2',
+          rule_code: 'B3_EQUITY_D2',
+          contract_type_code: 'B3_EQUITY_SPOT',
+          asset_type: assetType,
+          transaction_type: transactionType,
+          valid_from: '2019-05-27',
+          valid_to: null,
+          days_offset: 2,
+          calendar_unit: 'business_days',
+          business_calendar_code: 'B3',
+          default_status: 'pending',
+          label: 'Acao/FII - D+2 util',
+          priority: 10,
+          ticker_prefix: null,
+        },
+      ];
+      const equityTypes = new Set(['stock', 'fii', 'etf', 'bdr']);
+      const optionTypes = new Set(['option_call', 'option_put']);
+      const optionTx = new Set(['call_sell', 'put_sell', 'call_buy', 'put_buy']);
+      return defaults.filter((row) => {
+        const rule = String(row.rule_code);
+        const from = String(row.valid_from);
+        const to = row.valid_to ? String(row.valid_to) : null;
+        if (day < from || (to && day > to)) return false;
+        if (rule === 'B3_OPTION_PREMIUM_D1') {
+          return optionTypes.has(String(assetType)) && optionTx.has(String(transactionType));
+        }
+        return equityTypes.has(String(assetType)) && ['buy', 'sell'].includes(String(transactionType));
+      });
+    }
     const [orgId, from, to, limit] = params as [string, string, string, number];
     const table =
       queryKey === 'business_event_orphan_patrimony_legs'

@@ -16,6 +16,12 @@ export type ModuleCategoryRow = {
   requires_market_quote?: boolean | number;
   default_quote_source?: string | null;
   valuation_mode?: 'market_price' | 'computed' | 'historical_cost';
+  exchange_code?: string | null;
+  currency_code?: string | null;
+  default_settlement_counterparty_code?: string | null;
+  default_settlement_contract_type_code?: string | null;
+  affects_portfolio?: boolean | number;
+  affects_financial?: boolean | number;
   is_active: boolean | number;
 };
 

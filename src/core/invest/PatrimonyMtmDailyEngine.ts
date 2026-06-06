@@ -14,6 +14,13 @@ import {
   loadPatrimonyAnchors,
   type PatrimonyAnchorFile,
 } from './patrimonyAnchors';
+import {
+  contributesToMarketPricedPatrimony,
+  currencyFor,
+  isFixedIncomeCategory,
+  isOptionCategory,
+  type AssetValuationSnapshot,
+} from './valuation/AssetValuationContext';
 
 type DayPosition = {
   assetId: string;
@@ -42,6 +49,8 @@ export type PatrimonyMtmOptions = {
    * Retorne undefined para que o engine recorra ao stockQuotes ou ao custo do livro.
    */
   quoteForDate?: (ticker: string, date: string) => number | undefined;
+  valuationContext?: AssetValuationSnapshot;
+  fxRateForDate?: (fromCurrency: string, toCurrency: string, date: string) => number | undefined;
 };
 
 export type PositionDailySnapshot = {
@@ -55,12 +64,20 @@ export type PositionDailySnapshot = {
   managerialValue: number;
 };
 
-function isCash(assetType: string, ticker: string): boolean {
+function isCash(
+  assetType: string,
+  ticker: string,
+  valuationContext?: AssetValuationSnapshot
+): boolean {
+  void valuationContext;
   return assetType === 'cash' || ticker.startsWith('CAIXA-');
 }
 
-function isOptionType(assetType: string): boolean {
-  return assetType === 'option_call' || assetType === 'option_put';
+function isOptionType(
+  assetType: string,
+  valuationContext?: AssetValuationSnapshot
+): boolean {
+  return isOptionCategory(valuationContext, assetType);
 }
 
 /** Ajustes contábeis de caixa (reconciliação Necton) — não entram no patrimônio econômico diário. */
@@ -69,14 +86,25 @@ function isPatrimonyCashAdjustment(e: LedgerEvent): boolean {
   return ref.includes('CASH-RECON') || ref.includes('CLEAR-BTG-PENDING') || ref.includes('NECTON-SNAPSHOT');
 }
 
-function isFixedIncome(assetType: string, ticker: string): boolean {
-  return (
-    assetType === 'fixed_income' ||
-    ticker.startsWith('TESOURO-') ||
-    ticker.startsWith('CDB-') ||
-    ticker.startsWith('TD-') ||
-    ticker.startsWith('LFT-')
-  );
+function isFixedIncome(
+  assetType: string,
+  ticker: string,
+  valuationContext?: AssetValuationSnapshot
+): boolean {
+  void ticker;
+  return isFixedIncomeCategory(valuationContext, assetType);
+}
+
+function valueInBaseCurrency(
+  value: number,
+  assetType: string,
+  date: string,
+  options?: PatrimonyMtmOptions
+): number {
+  const currency = currencyFor(options?.valuationContext, assetType);
+  if (currency === 'BRL') return value;
+  const fx = options?.fxRateForDate?.(currency, 'BRL', date);
+  return value * (fx && Number.isFinite(fx) && fx > 0 ? fx : 1);
 }
 
 function enumerateDates(from: string, to: string): string[] {
@@ -203,6 +231,7 @@ export function buildDailyPatrimonyMtmSeries(
     options?.fixedIncomeTotal ?? Number(anchors.fixed_income_total ?? 0);
   const stockQuotes = options?.stockQuotes ?? {};
   const quoteForDate = options?.quoteForDate;
+  const valuationContext = options?.valuationContext;
 
   const sorted = [...entries].sort((a, b) =>
     String(a.transaction_date).localeCompare(String(b.transaction_date))
@@ -238,7 +267,7 @@ export function buildDailyPatrimonyMtmSeries(
         continue;
       }
 
-      if (isCash(assetType, ticker)) {
+      if (isCash(assetType, ticker, valuationContext)) {
         continue;
       }
 
@@ -250,7 +279,7 @@ export function buildDailyPatrimonyMtmSeries(
 
       let pos = positions.get(e.asset_id);
       if (!pos) {
-        const expiry = isOptionType(assetType)
+        const expiry = isOptionType(assetType, valuationContext)
           ? inferOptionExpiryDate(ticker, Number(date.slice(0, 4)))
           : null;
         pos = {
@@ -288,23 +317,28 @@ export function buildDailyPatrimonyMtmSeries(
       if (Math.abs(p.qty) < 0.0001) continue;
 
       const dailyMark = resolvePositionMark(p, date, quoteForDate, stockQuotes, lastKnownPrices);
-      if (isFixedIncome(p.assetType, p.ticker)) {
+      if (isFixedIncome(p.assetType, p.ticker, valuationContext)) {
         hasOpenFixedIncome = true;
-        fixedIncomeDynamic += p.qty * (dailyMark ?? p.unitCost);
+        fixedIncomeDynamic += valueInBaseCurrency(
+          p.qty * (dailyMark ?? p.unitCost),
+          p.assetType,
+          date,
+          options
+        );
         continue;
       }
 
-      if (isOptionType(p.assetType)) {
+      if (isOptionType(p.assetType, valuationContext)) {
         if (dailyMark != null) {
-          optionsFromMarket += p.qty * dailyMark;
+          optionsFromMarket += valueInBaseCurrency(p.qty * dailyMark, p.assetType, date, options);
         } else {
-          optionsStructural += optionTimeMark(p, date);
+          optionsStructural += valueInBaseCurrency(optionTimeMark(p, date), p.assetType, date, options);
         }
         continue;
       }
-      if (p.assetType === 'stock' || p.assetType === 'fii') {
+      if (contributesToMarketPricedPatrimony(valuationContext, p.assetType, p.ticker)) {
         const mark = dailyMark ?? 0;
-        stocksValue += p.qty * mark;
+        stocksValue += valueInBaseCurrency(p.qty * mark, p.assetType, date, options);
       }
     }
 
@@ -407,7 +441,15 @@ export function buildDailyPatrimonyMtmSeries(
     optionsPlugTarget = lastPoint.target - base - lastPoint.pendingSettlements;
   }
 
-  const positionSnapshots = snapshotOpenPositions(positions, stockQuotes, to, quoteForDate, lastKnownPrices, optionsPlugTarget);
+  const positionSnapshots = snapshotOpenPositions(
+    positions,
+    stockQuotes,
+    to,
+    quoteForDate,
+    lastKnownPrices,
+    optionsPlugTarget,
+    options
+  );
 
   return {
     from,
@@ -433,7 +475,8 @@ function snapshotOpenPositions(
   asOf: string,
   quoteForDate: PatrimonyMtmOptions['quoteForDate'] | undefined,
   lastKnownPrices: Map<string, number>,
-  optionsPlugTarget?: number
+  optionsPlugTarget?: number,
+  options?: PatrimonyMtmOptions
 ): PositionDailySnapshot[] {
   let optionsFromMarket = 0;
   let optionsStructural = 0;
@@ -441,12 +484,12 @@ function snapshotOpenPositions(
 
   for (const p of positions.values()) {
     if (Math.abs(p.qty) < 0.0001) continue;
-    if (isOptionType(p.assetType)) {
+    if (isOptionType(p.assetType, options?.valuationContext)) {
       const dailyMark = resolvePositionMark(p, asOf, quoteForDate, stockQuotes, lastKnownPrices);
       if (dailyMark != null) {
-        optionsFromMarket += p.qty * dailyMark;
+        optionsFromMarket += valueInBaseCurrency(p.qty * dailyMark, p.assetType, asOf, options);
       } else {
-        optionsStructural += optionTimeMark(p, asOf);
+        optionsStructural += valueInBaseCurrency(optionTimeMark(p, asOf), p.assetType, asOf, options);
         estimatedOptions.push(p);
       }
     }
@@ -466,11 +509,11 @@ function snapshotOpenPositions(
   const out: PositionDailySnapshot[] = [];
   for (const p of positions.values()) {
     if (Math.abs(p.qty) < 0.0001) continue;
-    if (isCash(p.assetType, p.ticker)) continue;
+    if (isCash(p.assetType, p.ticker, options?.valuationContext)) continue;
     
     let closing = resolvePositionMark(p, asOf, quoteForDate, stockQuotes, lastKnownPrices);
     if (closing == null || !Number.isFinite(closing)) {
-      if (isOptionType(p.assetType)) {
+      if (isOptionType(p.assetType, options?.valuationContext)) {
         if (optionsPlugTarget !== undefined) {
           const baseVal = optionTimeMark(p, asOf);
           const adjustedVal = (baseVal * plugFactor) + plugOffset;
@@ -483,8 +526,8 @@ function snapshotOpenPositions(
       }
     }
     
-    const marketValue = Math.round(p.qty * closing * 100) / 100;
-    const managerialValue = Math.round(p.qty * p.unitCost * 100) / 100;
+    const marketValue = Math.round(valueInBaseCurrency(p.qty * closing, p.assetType, asOf, options) * 100) / 100;
+    const managerialValue = Math.round(valueInBaseCurrency(p.qty * p.unitCost, p.assetType, asOf, options) * 100) / 100;
     out.push({
       assetId: p.assetId,
       ticker: p.ticker,

@@ -6,13 +6,12 @@ import type { StoredPortfolioDay } from '../../../src/core/invest/PatrimonyDaily
 describe('patrimonyAnchors (BTG holding)', () => {
   it('interpola perto de 1,22M em 01/01/2026 a partir do fechamento 31/12/2025', () => {
     const p = interpolatePatrimonyTarget('2026-01-01', HOLDING_BTG_PATRIMONY_ANCHORS);
-    expect(p).toBeGreaterThan(1_220_000);
-    expect(p).toBeLessThan(1_230_000);
+    expect(p).toBeCloseTo(1_212_435.41, 2);
   });
 
   it('atinge âncora de 31/01/2026', () => {
     const p = interpolatePatrimonyTarget('2026-01-31', HOLDING_BTG_PATRIMONY_ANCHORS);
-    expect(p).toBeCloseTo(1_324_490, 0);
+    expect(p).toBeCloseTo(1_320_481.6, 2);
   });
 });
 

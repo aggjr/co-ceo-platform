@@ -13,6 +13,13 @@ import type { SecurePayload } from '../../dal/types';
 import { inferAssetType } from '../assetClassifier';
 import { logReconcileEvent, logReconcileFailure } from './reconcileErrorDetail';
 import { ModuleCategories } from '../../module-registry';
+import { FxRateRepository } from '../../market/FxRateRepository';
+import { fetchPtaxUsdBrl } from '../../market/PtaxFxProvider';
+import {
+  AssetValuationContext,
+  contributesToMarketPricedPatrimony,
+  isOptionCategory,
+} from '../valuation/AssetValuationContext';
 
 export type QuoteSyncDayReport = {
   date: string;
@@ -51,6 +58,8 @@ export class DailyCloseMaterializeService {
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly assetProjection: InvestAssetProjection;
   private readonly categories: ModuleCategories;
+  private readonly fxRates: FxRateRepository;
+  private readonly valuation: AssetValuationContext;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.quoteSync = new InvestQuoteSyncService(gateway);
@@ -61,6 +70,8 @@ export class DailyCloseMaterializeService {
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
     this.categories = new ModuleCategories(gateway);
+    this.fxRates = new FxRateRepository(gateway);
+    this.valuation = new AssetValuationContext(gateway);
   }
 
   async syncQuotesForDate(ctx: UserContext, date: string): Promise<QuoteSyncDayReport> {
@@ -72,6 +83,19 @@ export class DailyCloseMaterializeService {
 
     if (isWeekend(day)) {
       warnings.push(`${day} é fim de semana — cotações de pregão podem repetir último dia útil.`);
+    }
+
+    const ptax = await fetchPtaxUsdBrl(day).catch(() => null);
+    if (ptax != null && Number.isFinite(ptax) && ptax > 0) {
+      await this.fxRates.upsertRate({
+        fromCurrency: 'USD',
+        toCurrency: 'BRL',
+        rateDate: day,
+        closingRate: ptax,
+        source: 'ptax',
+      });
+    } else {
+      warnings.push(`PTAX USD/BRL indisponivel em ${day}; ativos em moeda estrangeira podem ficar sem cotacao em BRL.`);
     }
 
     const stockResult = await this.quoteSync.syncFromBrapi(ctx, day);
@@ -172,7 +196,43 @@ export class DailyCloseMaterializeService {
     const limitDate = asOfDate ? asOfDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
     const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', limitDate);
     const { assets } = rebuildCustodyFromLedger(events);
-    const pricesMap = computeThreePricesByUnderlying(events, limitDate);
+    this.valuation.clear();
+    const valuationSnapshot = await this.valuation.load(ctx);
+    const baseAssetTypes = new Set(
+      [...valuationSnapshot.categories.values()]
+        .filter((category) =>
+          contributesToMarketPricedPatrimony(
+            valuationSnapshot,
+            category.subcategory
+          )
+        )
+        .map((category) => category.subcategory)
+    );
+    const optionAssetTypes = new Set(
+      [...valuationSnapshot.categories.values()]
+        .filter((category) => isOptionCategory(valuationSnapshot, category.subcategory))
+        .map((category) => category.subcategory)
+    );
+    for (const event of events) {
+      const assetType = String(event.asset_type ?? '').toLowerCase();
+      if (!assetType) continue;
+      if (
+        contributesToMarketPricedPatrimony(
+          valuationSnapshot,
+          assetType,
+          String(event.asset_ticker ?? '')
+        )
+      ) {
+        baseAssetTypes.add(assetType);
+      }
+      if (isOptionCategory(valuationSnapshot, assetType)) {
+        optionAssetTypes.add(assetType);
+      }
+    }
+    const pricesMap = computeThreePricesByUnderlying(events, limitDate, {
+      baseAssetTypes,
+      optionAssetTypes,
+    });
 
     const marketCtx = authBootstrapContext();
     const quoteTickers = new Set<string>();
@@ -200,7 +260,7 @@ export class DailyCloseMaterializeService {
       let pmB: number | null = null;
       let pmC: number | null = null;
 
-      if (asset.assetType === 'stock' || asset.assetType === 'fii') {
+      if (baseAssetTypes.has(String(asset.assetType).toLowerCase())) {
         const tp = pricesMap.get(ticker);
         if (tp && tp.qty > 0 && tp.estrito > 0) {
           pmA = tp.estrito;

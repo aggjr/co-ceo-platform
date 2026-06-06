@@ -187,7 +187,7 @@ function bindPage(container, initialBounds, uiTexts) {
           data.recalculated && data.recalculatedAt
             ? ` · recalculado ${new Date(data.recalculatedAt).toLocaleString('pt-BR')}`
             : '';
-        summaryHost.innerHTML = `<p class="muted">Período <strong>${pivot.from}</strong> a <strong>${pivot.to}</strong> — resultado total: <strong class="${netCls}">${formatBrl(net)}</strong> · taxas: <strong>${formatBrl(pivot.totals.taxas)}</strong>${recalcNote}</p>`;
+        summaryHost.innerHTML = `<p class="muted">Período <strong>${pivot.from}</strong> a <strong>${pivot.to}</strong> — resultado total: <strong class="${netCls}">${formatBrl(net)}</strong> · taxas: <strong>${numCell(pivot.totals.taxas)}</strong>${recalcNote}</p>`;
       }
 
       const rows = [...(pivot?.rows || [])];

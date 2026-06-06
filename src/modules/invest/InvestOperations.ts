@@ -20,7 +20,7 @@ import type {
   OpeningPositionInput,
 } from './types';
 import { inferAssetType, inferUnderlyingTicker } from '../../core/invest/assetClassifier';
-import { defersCashSettlement } from '../../core/invest/settlementCalendar';
+import { SettlementRulesService } from '../../core/invest/SettlementRulesService';
 import { inferOptionExpiryDate } from '../../core/invest/optionExpiry';
 import type { LedgerImportLine } from '../../core/invest/ledgerTypes';
 import {
@@ -60,6 +60,8 @@ function parseMetadataObject(raw: unknown): Record<string, unknown> {
  * (que sera reconstruido como camada de compatibilidade chamando isto aqui).
  */
 export class InvestOperations {
+  private readonly settlementRules: SettlementRulesService;
+
   constructor(
     private readonly gateway: CoCeoDataGateway,
     private readonly inventoryRegistry: InventoryRegistry,
@@ -71,7 +73,9 @@ export class InvestOperations {
      * callers legados, mas todo write novo deveria ja passar.
      */
     private readonly businessEvents: BusinessEventRegistry
-  ) {}
+  ) {
+    this.settlementRules = new SettlementRulesService(gateway);
+  }
 
   /**
    * Mapeia operacao de import (LedgerTransactionType) para event_kind canonico.
@@ -1050,7 +1054,12 @@ export class InvestOperations {
         (line.brokerage_fee ?? 0) + (line.b3_fees ?? 0) + (line.irrf_tax ?? 0)
       );
       if (totalCash > 0) {
-        const cashDefers = defersCashSettlement(assetClass, op, ticker);
+        const cashDefers = await this.settlementRules.defersCashSettlement({
+          tradeDate: line.date,
+          assetType: assetClass,
+          transactionType: op,
+          ticker,
+        });
         const cashTxnDate = cashDefers
           ? String(line.settlement_date ?? line.date).slice(0, 10)
           : line.date;

@@ -51,7 +51,7 @@ function pivotColumnForEntry(e: LedgerEvent, avgCostBeforeSell: number): PivotCe
     case 'securities_lending':
       return { column: 'locacao', amount: net };
     case 'fee':
-      return { column: 'despesas', amount: Math.abs(net) };
+      return { column: 'despesas', amount: -Math.abs(net) };
     case 'capital_deposit':
       return { column: 'capital_entrada', amount: Math.abs(net) };
     case 'capital_withdrawal':
@@ -146,7 +146,7 @@ export function buildPnLPivot(
 
     const exp = expenseAmount(e as LedgerEvent & { brokerage_fee?: number });
     if (exp > 0 && String(e.transaction_type) !== 'fee') {
-      row.despesas = Math.round((row.despesas + exp) * 100) / 100;
+      row.despesas = Math.round((row.despesas - exp) * 100) / 100;
     }
 
     applyCustody(e);
