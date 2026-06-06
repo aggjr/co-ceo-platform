@@ -278,6 +278,7 @@ export async function InvestOptionsByExpiryPage(container) {
           <canvas id="amp-chart-notional"></canvas>
         </div>
       </div>
+      <div id="amp-custom-legend" style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin-top: 20px; margin-bottom: 20px;"></div>
     `;
 
     root.querySelector('[data-filter="underlying"]').addEventListener('change', (e) => {
@@ -390,6 +391,8 @@ export async function InvestOptionsByExpiryPage(container) {
       if (hint) {
         hint.textContent = 'Não há opções com quantidade ou notional operados para este ativo e vencimento.';
       }
+      const legendContainer = root.querySelector('#amp-custom-legend');
+      if (legendContainer) legendContainer.innerHTML = '';
       if (currentChartQty) currentChartQty.destroy();
       if (currentChartNotional) currentChartNotional.destroy();
       currentChartQty = null;
@@ -436,6 +439,8 @@ export async function InvestOptionsByExpiryPage(container) {
     ].filter(Boolean);
 
     const annotations = {};
+    const legendItems = [];
+
     if (quote != null) {
       annotations['quote-line'] = {
         type: 'line',
@@ -444,16 +449,11 @@ export async function InvestOptionsByExpiryPage(container) {
         borderColor: AMP_COLORS.quoteLine,
         borderWidth: 2,
         borderDash: [4, 4],
-        label: {
-          display: true,
-          content: `⚡ Cotação ${underlying}: ${formatBrl(quote)}`,
-          position: 'start',
-          backgroundColor: 'rgba(15, 23, 42, 0.9)',
-          color: AMP_COLORS.quoteLine,
-          font: { size: 12, weight: 'bold' },
-          padding: 6,
-        },
       };
+      legendItems.push({
+        color: AMP_COLORS.quoteLine,
+        label: `⚡ Cotação ${underlying}: ${formatBrl(quote)}`,
+      });
     }
 
     for (const ref of priceReferences) {
@@ -464,17 +464,25 @@ export async function InvestOptionsByExpiryPage(container) {
         borderColor: ref.color,
         borderWidth: 2,
         borderDash: ref.dash,
-        label: {
-          display: true,
-          content: `${ref.label} ${ref.underlying}: ${formatBrl(ref.value)}`,
-          position: 'start',
-          backgroundColor: 'rgba(15, 23, 42, 0.9)',
-          color: ref.color,
-          font: { size: 12, weight: 'bold' },
-          padding: 6,
-          yAdjust: ref.yAdjust,
-        },
       };
+      legendItems.push({
+        color: ref.color,
+        label: `${ref.label} ${ref.underlying}: ${formatBrl(ref.value)}`,
+      });
+    }
+
+    const legendContainer = root.querySelector('#amp-custom-legend');
+    if (legendContainer) {
+      legendContainer.innerHTML = legendItems
+        .map(
+          (item) => `
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #cbd5e1; background-color: rgba(15, 23, 42, 0.5); padding: 4px 12px; border-radius: 4px;">
+          <div style="width: 16px; height: 16px; border-radius: 4px; background-color: ${item.color};"></div>
+          <span>${item.label}</span>
+        </div>
+      `
+        )
+        .join('');
     }
 
     const canvasQty = document.getElementById('amp-chart-qty');
