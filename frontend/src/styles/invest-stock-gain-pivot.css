@@ -5,14 +5,8 @@
   gap: 10px 14px;
 }
 
-.sgp-recalc-btn {
-  margin-left: 4px;
-}
-
-.sgp-recalc-hint {
-  font-size: 0.82rem;
-  max-width: 280px;
-  line-height: 1.35;
+.sgp-refresh-btn {
+  margin-left: 2px;
 }
 
 .sgp-up {

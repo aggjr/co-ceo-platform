@@ -4,8 +4,7 @@ import { getActiveContext } from '../../auth/session.js';
 
 type SyncStatus = 'idle' | 'loading';
 
-const QUOTES_TITLE =
-  'Atualizar cotações diárias presentes no sistema (ações e FIIs via brapi).';
+const SYNC_TITLE = 'Refaz todos os cálculos de todas as telas';
 
 function RefreshIcon() {
   return (
@@ -44,17 +43,7 @@ export function MarketQuotesSyncButton() {
     return Boolean(ctx.organizationId);
   };
 
-  const hint = () => {
-    const ctx = getActiveContext();
-    if (!ctx) return QUOTES_TITLE;
-    if (ctx.scope === 'global') {
-      return `${QUOTES_TITLE} Escopo: todas as organizações.`;
-    }
-    if (ctx.organizationId) {
-      return `${QUOTES_TITLE} Escopo: organização personificada.`;
-    }
-    return `${QUOTES_TITLE} Personifique a holding para sincronizar.`;
-  };
+  const hint = () => SYNC_TITLE;
 
   let flashTimer: ReturnType<typeof setTimeout> | undefined;
 
