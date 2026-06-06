@@ -6,16 +6,19 @@ import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
+import { ModuleCategories } from '../core/module-registry';
 import type { CoCeoDataGateway } from '../core/dal';
 import type { SecurePayload } from '../core/dal/types';
 
 export class RemoteRecalcController {
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly ledger: LedgerImportService;
+  private readonly categories: ModuleCategories;
 
   constructor(private gateway: CoCeoDataGateway) {
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.ledger = new LedgerImportService(gateway);
+    this.categories = new ModuleCategories(gateway);
   }
 
   /** @deprecated Prefer POST /api/invest/patrimony-daily/rebuild ou /reconcile/recalc-all */
@@ -59,12 +62,16 @@ export class RemoteRecalcController {
       const pricesMap = computeThreePricesByUnderlying(events, to);
 
       const marketQuoteRepo = new MarketQuoteRepository(this.gateway);
-      const stockTickers = assets
-        .filter((a) => (a.assetType === 'stock' || a.assetType === 'fii') && a.ticker)
-        .map((a) => String(a.ticker).trim().toUpperCase());
+      const quoteTickers = new Set<string>();
+      for (const asset of assets) {
+        if (!asset.ticker) continue;
+        if (!(await this.categories.requiresMarketQuote(ctx, String(asset.assetType)))) continue;
+        quoteTickers.add(String(asset.ticker).trim().toUpperCase());
+      }
       const marketCtx = authBootstrapContext();
-      const marketQuoteMap = stockTickers.length
-        ? await marketQuoteRepo.loadLatestQuoteMap(marketCtx, stockTickers)
+      const marketQuoteList = Array.from(quoteTickers);
+      const marketQuoteMap = marketQuoteList.length
+        ? await marketQuoteRepo.loadLatestQuoteMap(marketCtx, marketQuoteList)
         : new Map<string, { price: number; date: string }>();
 
       const assetProjection = new InvestAssetProjection(this.gateway);
@@ -110,13 +117,14 @@ export class RemoteRecalcController {
         const lastPrice =
           marketQuoteMap.get(ticker)?.price ??
           (pmC && pmC > 0 ? pmC : null);
+        const requiresQuote = await this.categories.requiresMarketQuote(ctx, String(asset.assetType));
 
         const payload: SecurePayload = {
           pm_estrito: pmA,
           pm_b3: pmB,
           pm_gerencial: pmC,
         };
-        if (lastPrice != null && (asset.assetType === 'stock' || asset.assetType === 'fii')) {
+        if (lastPrice != null && requiresQuote) {
           payload.last_price = lastPrice;
         }
 

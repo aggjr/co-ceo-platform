@@ -175,16 +175,17 @@ export class DailyCloseMaterializeService {
     const pricesMap = computeThreePricesByUnderlying(events, limitDate);
 
     const marketCtx = authBootstrapContext();
-    const quoteTickers: string[] = [];
+    const quoteTickers = new Set<string>();
     for (const asset of assets) {
       const ticker = String(asset.ticker ?? '').trim().toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
       if (await this.categories.requiresMarketQuote(ctx, String(asset.assetType))) {
-        quoteTickers.push(ticker);
+        quoteTickers.add(ticker);
       }
     }
-    const marketQuoteMap = quoteTickers.length
-      ? await this.marketQuotes.loadLatestQuoteMap(marketCtx, quoteTickers, limitDate)
+    const marketQuoteList = Array.from(quoteTickers);
+    const marketQuoteMap = marketQuoteList.length
+      ? await this.marketQuotes.loadLatestQuoteMap(marketCtx, marketQuoteList, limitDate)
       : new Map<string, { price: number; date: string }>();
 
     const openAssetIds = new Set(assets.map((a) => a.assetId));
@@ -218,16 +219,13 @@ export class DailyCloseMaterializeService {
 
       const mq = marketQuoteMap.get(ticker);
       const lastPrice = mq?.price ?? null;
+      const requiresQuote = await this.categories.requiresMarketQuote(ctx, String(asset.assetType));
 
       await this.upsertPositionExt(ctx, asset.assetId, asset.assetType, {
         pm_estrito: pmA,
         pm_b3: pmB,
         pm_gerencial: pmC,
-        last_price:
-          lastPrice != null &&
-          (await this.categories.requiresMarketQuote(ctx, String(asset.assetType)))
-            ? lastPrice
-            : undefined,
+        last_price: lastPrice != null && requiresQuote ? lastPrice : undefined,
       });
       positionsUpdated += 1;
     }
