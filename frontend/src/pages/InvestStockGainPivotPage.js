@@ -16,7 +16,9 @@ import { loadInvestUiContext, periodDefaults } from '../lib/investUiContext.js';
 
 const TABLE_ID = 'stock-gain-pivot';
 
-const REFRESH_ICON_SVG = `<svg class="header-sync-icon__svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08a5.99 5.99 0 0 1-5.65 4.13 5.99 5.99 0 0 1-5.65-4.13H4v2h7.99c4.42 0 7.99-3.58 7.99-8 0-1.74-.56-3.35-1.51-4.65l1.42-1.42L20 4v6h-6l2.65-2.65z"/></svg>`;
+const REFRESH_ICON_SVG = `<svg class="header-sync-icon__svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>`;
+
+const PIVOT_REFRESH_TITLE = 'Atualizando dados da tabela Pivot';
 
 function numCell(v) {
   const n = Number(v ?? 0);
@@ -145,25 +147,24 @@ function bindPage(container, initialBounds, uiTexts) {
   let bounds = initialBounds;
   const fromInput = container.querySelector('#sgp-from');
   const toInput = container.querySelector('#sgp-to');
-  const reloadBtn = container.querySelector('#sgp-reload');
-  const recalcBtn = container.querySelector('#sgp-recalc');
+  const refreshBtn = container.querySelector('#sgp-refresh');
   const host = container.querySelector('#sgp-table-host');
   const summaryHost = container.querySelector('#sgp-summary');
 
-  const setRecalcLoading = (loading) => {
-    recalcBtn?.classList.toggle('btn-header-icon-sync--loading', loading);
+  const setRefreshLoading = (loading) => {
+    refreshBtn?.classList.toggle('btn-header-icon-sync--loading', loading);
     if (loading) {
-      recalcBtn?.setAttribute('aria-busy', 'true');
-      recalcBtn?.setAttribute('disabled', 'disabled');
+      refreshBtn?.setAttribute('aria-busy', 'true');
+      refreshBtn?.setAttribute('disabled', 'disabled');
     } else {
-      recalcBtn?.removeAttribute('aria-busy');
-      recalcBtn?.removeAttribute('disabled');
+      refreshBtn?.removeAttribute('aria-busy');
+      refreshBtn?.removeAttribute('disabled');
     }
   };
 
-  const load = async ({ recalculate = false } = {}) => {
+  const load = async ({ recalculate = true } = {}) => {
     if (!host) return;
-    if (recalculate) setRecalcLoading(true);
+    setRefreshLoading(true);
     host.innerHTML = '<p class="muted">Calculando pivot por ação…</p>';
     clearExcelTableRegistry();
 
@@ -209,13 +210,12 @@ function bindPage(container, initialBounds, uiTexts) {
     } catch (err) {
       host.innerHTML = `<div class="error-banner">${err.message || 'Erro ao carregar pivot.'}</div>`;
     } finally {
-      if (recalculate) setRecalcLoading(false);
+      setRefreshLoading(false);
     }
   };
 
-  reloadBtn?.addEventListener('click', () => load({ recalculate: false }));
-  recalcBtn?.addEventListener('click', () => load({ recalculate: true }));
-  load({ recalculate: false });
+  refreshBtn?.addEventListener('click', () => load({ recalculate: true }));
+  load({ recalculate: true });
 }
 
 export async function InvestStockGainPivotPage(container) {
@@ -254,15 +254,13 @@ export async function InvestStockGainPivotPage(container) {
       <div class="table-period-toolbar sgp-toolbar">
         <label>${t['label.common.period_from']} <input type="date" id="sgp-from" value="${bounds.defaultFrom}" min="${bounds.periodMin}" /></label>
         <label>${t['label.common.period_to']} <input type="date" id="sgp-to" value="${bounds.today}" min="${bounds.periodMin}" max="${bounds.today}" /></label>
-        <button type="button" id="sgp-reload" class="btn btn-secondary btn-sm">Aplicar período</button>
         <button
           type="button"
-          id="sgp-recalc"
-          class="btn-header-icon-sync sgp-recalc-btn"
-          title="Recalcular lucros e prejuízos por ação (após conciliação)"
-          aria-label="Recalcular lucros e prejuízos por ação"
+          id="sgp-refresh"
+          class="btn-header-icon-sync sgp-refresh-btn"
+          title="${PIVOT_REFRESH_TITLE}"
+          aria-label="${PIVOT_REFRESH_TITLE}"
         >${REFRESH_ICON_SVG}</button>
-        <span class="muted sgp-recalc-hint">Use após conciliar notas — relê o livro e atualiza o pivot.</span>
       </div>
       <div id="sgp-summary" class="table-period-summary"></div>
       <div id="sgp-table-host"><p class="muted">Carregando…</p></div>
