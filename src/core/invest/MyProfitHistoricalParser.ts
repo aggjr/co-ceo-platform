@@ -37,9 +37,12 @@ function excelDateToIso(value: unknown): string {
 function normalizeTicker(asset: string, group: string): string {
   const t = asset.trim().toUpperCase();
   if (group === 'Tesouro Direto') {
-    if (/SELIC\s*2031/i.test(asset)) return canonicalTesouroTicker('TESOURO-SELIC-2031');
-    if (/LFT/i.test(asset)) return canonicalTesouroTicker('LFT-20310301');
-    return canonicalTesouroTicker(`TD-${t.replace(/\s+/g, '-')}`);
+    const normalizedName = t
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return canonicalTesouroTicker(`TD-${normalizedName}`);
   }
   return t;
 }

@@ -5,17 +5,12 @@
  * "estimado" no código (hardcode de domínio proibido). PU vem do lançamento
  * que o usuário/translator importou — ou do extrato/nota da corretora.
  *
- * Esta camada hoje só fornece:
- *   - reconhecimento de família ("é Tesouro Direto?")
- *   - constante histórica do ticker consolidado "Tesouro Selic 2031" usada
- *     em views de portfólio (`portfolioMapper.consolidateTesouroPortfolioItems`).
+ * Esta camada hoje só fornece reconhecimento de família ("é Tesouro Direto?")
+ * como fallback de importação/classificação.
  *
  * `canonicalTesouroTicker` e `normalizeLedgerLineQuantity` ficam como
  * identidade: o que entra no livro razão sai como veio.
  */
-
-/** Ticker consolidado histórico — usado por views, não pela engine. */
-export const TESOURO_SELIC_2031_TICKER = 'TESOURO-SELIC-2031';
 
 export function isTesouroDiretoTicker(ticker: string): boolean {
   const t = ticker.trim().toUpperCase();

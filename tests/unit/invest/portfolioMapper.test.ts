@@ -2,7 +2,6 @@ import {
   applyAllocationPercents,
   attachUnderlyingMarketData,
   buildLongEquityPmMapFromAssetRows,
-  consolidateTesouroPortfolioItems,
   enrichPortfolioRow,
   equityResultFromB3Quote,
   optionPriceReturnPct,
@@ -154,7 +153,7 @@ describe('portfolioMapper', () => {
     expect(opt.strikeDistancePct).toBeCloseTo(4.29, 1);
   });
 
-  it('consolida aliases de Tesouro numa linha', () => {
+  it('mantem papeis de Tesouro separados e inclui renda fixa na alocacao', () => {
     const lft = enrichPortfolioRow({
       id: 'lft',
       asset_ticker: 'LFT-20310301',
@@ -173,10 +172,11 @@ describe('portfolioMapper', () => {
       metadata: { last_price: 17236 },
       status: 'active',
     });
-    const merged = consolidateTesouroPortfolioItems([lft, selic]);
-    expect(merged).toHaveLength(1);
-    expect(merged[0]!.ticker).toBe('TESOURO-SELIC-2031');
-    expect(merged[0]!.quantity).toBe(11);
+    const items = applyAllocationPercents([lft, selic]);
+    expect(items).toHaveLength(2);
+    expect(items.map((i) => i.ticker)).toEqual(['LFT-20310301', 'TESOURO-SELIC-2031']);
+    expect(items[0]!.allocationPct).toBe(100);
+    expect(items[1]!.allocationPct).toBe(0);
   });
 
   it('exclui renda fixa com quantidade negativa da custódia aberta', () => {
