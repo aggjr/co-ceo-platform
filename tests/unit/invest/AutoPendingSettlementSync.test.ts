@@ -4,6 +4,7 @@ import {
 } from '../../../src/core/invest/AutoPendingSettlementSync';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 import type { InvestOperations } from '../../../src/modules/invest';
+import { castGateway, InMemoryGateway } from '../core/business-events/inMemoryGateway';
 
 describe('AutoPendingSettlementSync', () => {
   it('autoD2Ref is stable', () => {
@@ -11,6 +12,7 @@ describe('AutoPendingSettlementSync', () => {
   });
 
   it('creates pending_settlement for open stock buy', async () => {
+    const gw = new InMemoryGateway();
     const calls: Array<{ ticker: string; operation: string; total_net_value?: number }> = [];
     const operations = {
       recordOperation: async (_ctx: unknown, line: { ticker: string; operation: string; total_net_value?: number }) => {
@@ -34,7 +36,7 @@ describe('AutoPendingSettlementSync', () => {
     ];
 
     const result = await syncAutoPendingSettlements(
-      {} as never,
+      castGateway(gw),
       {} as never,
       events,
       {

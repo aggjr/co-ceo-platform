@@ -10,7 +10,11 @@ import { buildCashInTransitSummary } from '../cashInTransit';
 import { cashBalanceFromLedger, settledCashBalanceFromLedger } from '../cashInvestLedger';
 import { fixedIncomeTotalFromLedger } from '../patrimonyLedgerGates';
 import { AUTO_D2_REF_PREFIX } from '../AutoPendingSettlementSync';
-import { cashSettlementDate, resolveAssetTypeForSettlement } from '../settlementCalendar';
+import {
+  AssetValuationContext,
+  categoryFor,
+  type AssetValuationSnapshot,
+} from '../valuation/AssetValuationContext';
 
 type StoredPosition = {
   ticker: string;
@@ -241,10 +245,12 @@ function assetQuantityDelta(e: LedgerEvent, currentQty: number): number | null {
 export class ReconciliationDiagnosticsService {
   private readonly ledger: LedgerImportService;
   private readonly snapshots: BrokerCustodySnapshotRepository;
+  private readonly valuationContext: AssetValuationContext;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
     this.snapshots = new BrokerCustodySnapshotRepository(gateway);
+    this.valuationContext = new AssetValuationContext(gateway);
   }
 
   async getFinancialDiagnostics(
@@ -284,6 +290,7 @@ export class ReconciliationDiagnosticsService {
     const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', asOf);
     const custody = rebuildCustodyFromLedger(events);
     const threePrices = computeThreePricesByUnderlying(events, asOf);
+    const valuation = await this.valuationContext.load(ctx);
     const stored = await this.loadStoredPositions(ctx);
     const broker = this.aggregateBroker(latestSnapshot);
 
@@ -292,6 +299,7 @@ export class ReconciliationDiagnosticsService {
       stored,
       broker,
       threePrices,
+      valuation,
       Boolean(latestSnapshot)
     );
     const eventRows = this.buildBusinessEventRows(events);
@@ -403,6 +411,7 @@ export class ReconciliationDiagnosticsService {
     stored: Map<string, StoredPosition>,
     broker: Map<string, BrokerQty>,
     threePrices: ReturnType<typeof computeThreePricesByUnderlying>,
+    valuation: AssetValuationSnapshot,
     hasSnapshot: boolean
   ) {
     const tickers = new Set<string>();
@@ -449,10 +458,13 @@ export class ReconciliationDiagnosticsService {
       }
       const und = inferUnderlyingTicker(ticker);
       const prices = threePrices.get(und) ?? threePrices.get(ticker);
-      const isEquity = assetType === 'stock' || assetType === 'fii';
-      if (isEquity && (!prices || prices.qty <= 0 || prices.estrito <= 0)) {
+      const category = categoryFor(valuation, assetType);
+      const requiresThreePrices =
+        category?.valuationMode === 'market_price' &&
+        category.settlementContractTypeCode === 'B3_EQUITY_SPOT';
+      if (requiresThreePrices && (!prices || prices.qty <= 0 || prices.estrito <= 0)) {
         status = 'error';
-        notes.push('3 precos ausentes/zerados para acao com posicao');
+        notes.push('3 precos ausentes/zerados para ativo com precificacao B3_EQUITY_SPOT');
       }
       const avgDelta =
         br.avgPrice != null && prices?.estrito != null && prices.estrito > 0
@@ -665,34 +677,12 @@ export class ReconciliationDiagnosticsService {
 
     let grossCash = 0;
     const pendingByRef = new Map<string, AuditPendingCashState>();
-    const tradeById = new Map<string, LedgerEvent>();
-    for (const e of sorted) {
-      if (e.id) tradeById.set(String(e.id), e);
-    }
     const positions = new Map<string, AuditPositionState>();
     const financial: DailyFinancialAuditRow[] = [];
     const business: DailyBusinessAuditRow[] = [];
     const portfolio: DailyPortfolioAuditRow[] = [];
 
     const transitTotal = () => money([...pendingByRef.values()].reduce((sum, row) => sum + row.amount, 0));
-    const pendingSettleDate = (baseRef: string, fallbackDate: string): string | null => {
-      if (!baseRef.startsWith(AUTO_D2_REF_PREFIX)) return fallbackDate;
-      const trade = tradeById.get(baseRef.slice(AUTO_D2_REF_PREFIX.length));
-      if (!trade) return fallbackDate;
-      const ticker = String(trade.asset_ticker || '').toUpperCase();
-      const assetType = resolveAssetTypeForSettlement(ticker, String(trade.asset_type || ''));
-      return cashSettlementDate(
-        String(trade.transaction_date || '').slice(0, 10),
-        assetType,
-        String(trade.transaction_type || ''),
-        ticker
-      );
-    };
-    const releaseMaturedTransit = (date: string) => {
-      for (const [ref, row] of [...pendingByRef.entries()]) {
-        if (row.settleDate && row.settleDate <= date) pendingByRef.delete(ref);
-      }
-    };
     const portfolioTotal = () =>
       money(
         [...positions.values()].reduce((sum, p) => {
@@ -744,7 +734,7 @@ export class ReconciliationDiagnosticsService {
           const prev = pendingByRef.get(baseRef);
           pendingByRef.set(baseRef, {
             amount: money((prev?.amount ?? 0) + value),
-            settleDate: prev?.settleDate ?? pendingSettleDate(baseRef, String(e.settlement_date || date).slice(0, 10)),
+            settleDate: prev?.settleDate ?? String(e.settlement_date || date).slice(0, 10),
           });
           if (mode === 'movement' && dayState) {
             dayState.transitChange.value += value;
@@ -808,7 +798,6 @@ export class ReconciliationDiagnosticsService {
           applyLedgerEventToAuditState(e, date, 'opening');
         }
       }
-      releaseMaturedTransit(date);
       const openingTransit = transitTotal();
       const openingCash = money(grossCash - openingTransit);
       const openingPortfolioValue = portfolioTotal();

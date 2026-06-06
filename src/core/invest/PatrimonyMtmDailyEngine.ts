@@ -6,7 +6,6 @@ import {
   computeTwrFromMonthEndAnchors,
 } from './portfolioPerformance';
 import { buildCashInTransitSummary } from './cashInTransit';
-import { B3_STOCK_PAYMENT_BUSINESS_DAYS } from './settlementCalendar';
 import { computeSharpeRatio, dailyReturnsFromPatrimony } from './sharpeRatio';
 import { inferOptionExpiryDate } from './optionExpiry';
 import {
@@ -40,6 +39,7 @@ export type PatrimonyMtmOptions = {
   anchors?: PatrimonyAnchorFile;
   /** Cotações de mercado para o dia atual (fallback quando quoteForDate não existe). */
   stockQuotes?: StockQuoteMap;
+  /** Fallback legado para bases sem posicao RF detalhada; a fonte primaria eh qty x cotacao no livro. */
   fixedIncomeTotal?: number;
   /** Se false, patrimônio econômico real (sem ajuste às âncoras BTG). Usado na gravação diária. */
   calibrateToAnchors?: boolean;
@@ -460,11 +460,11 @@ export function buildDailyPatrimonyMtmSeries(
     positionSnapshots,
     meta: {
       method: calibrate ? 'mtm_btg_calibrated' : 'mtm_economic',
-      stock_cash_settlement_days: B3_STOCK_PAYMENT_BUSINESS_DAYS,
+      settlement_rules: 'configured_contract_rules',
       note: calibrate
-        ? 'Patrimônio econômico: posições × cotação atual + caixa liquidado e trânsito (D+2 ações). ' +
+        ? 'Patrimônio econômico: posições × cotação atual + caixa liquidado e trânsito conforme regras contratuais configuradas. ' +
           'TWR diário: só capital_deposit/withdrawal como fluxo externo.'
-        : 'Patrimônio econômico do dia (cotações do fechamento, caixa liquidado + trânsito D+2/D+1).',
+        : 'Patrimônio econômico do dia (cotações do fechamento, caixa liquidado + trânsito conforme regras contratuais configuradas).',
     },
   };
 }

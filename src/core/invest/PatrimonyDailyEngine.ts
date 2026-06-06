@@ -1,7 +1,7 @@
 import type { LedgerEvent } from './CustodyEngine';
 import { computePortfolioPerformance, type PortfolioPerformanceResult } from './portfolioPerformance';
 import { computeSharpeRatio, dailyReturnsFromPatrimony } from './sharpeRatio';
-import { B3_STOCK_PAYMENT_BUSINESS_DAYS, cashSettlementDate } from './settlementCalendar';
+import { cashSettlementDate } from './settlementCalendar';
 
 type PositionState = {
   ticker: string;
@@ -41,7 +41,8 @@ export type PatrimonyDailyResult = {
   meta: {
     method: 'mtm_replay' | 'mtm_btg_calibrated' | 'mtm_economic';
     note: string;
-    stock_cash_settlement_days: number;
+    stock_cash_settlement_days?: number;
+    settlement_rules?: string;
   };
 };
 
@@ -54,10 +55,13 @@ function scheduleCash(
   tradeDate: string,
   assetType: string,
   transactionType: string,
-  amount: number
+  amount: number,
+  explicitSettlementDate?: string | null
 ): void {
   if (!amount || Number.isNaN(amount)) return;
-  const settleOn = cashSettlementDate(tradeDate, assetType, transactionType);
+  const settleOn = explicitSettlementDate
+    ? String(explicitSettlementDate).slice(0, 10)
+    : cashSettlementDate(tradeDate, assetType, transactionType);
   scheduled.push({ settleOn, amount });
 }
 
@@ -112,7 +116,7 @@ function applyEntry(
 
   if (['buy', 'put_buy', 'call_buy', 'bonus'].includes(type)) {
     pos.qty += Math.abs(qty);
-    scheduleCash(scheduled, tradeDate, assetType, type, net);
+    scheduleCash(scheduled, tradeDate, assetType, type, net, e.settlement_date);
     return;
   }
 
@@ -122,7 +126,7 @@ function applyEntry(
     } else {
       pos.qty += qty < 0 ? qty : -Math.abs(qty);
     }
-    scheduleCash(scheduled, tradeDate, assetType, type, net);
+    scheduleCash(scheduled, tradeDate, assetType, type, net, e.settlement_date);
     return;
   }
 
@@ -284,9 +288,9 @@ export function buildDailyPatrimonySeries(
     performance,
     meta: {
       method: 'mtm_replay',
-      stock_cash_settlement_days: B3_STOCK_PAYMENT_BUSINESS_DAYS,
+      settlement_rules: 'configured_contract_rules',
       note:
-        'Compra/venda de ação: papel no pregão (D0); pagamento na conta em D+2 úteis. Rentabilidade acumulada ajusta apenas aportes/retiradas (capital_deposit/withdrawal); proventos e operações entram no rendimento.',
+        'Compra/venda: ativo no pregao (D0); pagamento na conta conforme regras contratuais configuradas. Rentabilidade acumulada ajusta apenas aportes/retiradas (capital_deposit/withdrawal); proventos e operacoes entram no rendimento.',
     },
   };
 }

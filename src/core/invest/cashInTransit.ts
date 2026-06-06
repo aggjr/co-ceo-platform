@@ -59,7 +59,13 @@ function collectOpenPendingLines(
 ): CashInTransitLine[] {
   const byRef = new Map<
     string,
-    { amount: number; tradeDate: string; notes: string; ledgerEntryId: string | null }
+    {
+      amount: number;
+      tradeDate: string;
+      settleDate: string;
+      notes: string;
+      ledgerEntryId: string | null;
+    }
   >();
 
   for (const e of entries) {
@@ -70,6 +76,7 @@ function collectOpenPendingLines(
     if (!base) continue;
 
     const tradeDate = String(e.transaction_date || '').slice(0, 10);
+    const settleDate = e.settlement_date ? String(e.settlement_date).slice(0, 10) : '';
     if (tradeDate && tradeDate > asOfDate) continue;
 
     if (ref.endsWith(':CLEAR')) {
@@ -82,6 +89,7 @@ function collectOpenPendingLines(
     byRef.set(base, {
       amount: (prev?.amount ?? 0) + net,
       tradeDate: prev?.tradeDate || tradeDate,
+      settleDate: prev?.settleDate || settleDate,
       notes: String(e.notes || prev?.notes || ''),
       ledgerEntryId: base.slice(AUTO_D2_REF_PREFIX.length) || null,
     });
@@ -102,16 +110,16 @@ function collectOpenPendingLines(
       ? resolveAssetTypeForSettlement(ticker, String(trade.asset_type))
       : 'cash';
     const txType = trade ? String(trade.transaction_type) : 'pending_settlement';
-    const settleDate = trade
-      ? cashSettlementDate(
-          String(trade.transaction_date).slice(0, 10),
-          assetType,
-          txType,
-          ticker
-        )
-      : row.tradeDate;
-
-    if (settleDate <= asOfDate) continue;
+    const settleDate =
+      row.settleDate ||
+      (trade
+        ? cashSettlementDate(
+            String(trade.transaction_date).slice(0, 10),
+            assetType,
+            txType,
+            ticker
+          )
+        : row.tradeDate);
 
     lines.push({
       tradeDate: trade ? String(trade.transaction_date).slice(0, 10) : row.tradeDate,

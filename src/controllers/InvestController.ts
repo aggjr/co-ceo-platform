@@ -113,6 +113,11 @@ import pool from '../config/database';
 import { isMissingSchemaError } from '../core/dal/mysqlErrors';
 import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
 import { StockMarketSyncService } from '../core/market/StockMarketSyncService';
+import {
+  AssetValuationContext,
+  categoryFor,
+} from '../core/invest/valuation/AssetValuationContext';
+import { FxRateRepository } from '../core/market/FxRateRepository';
 
 type ThreePricesRow = {
   ticker: string;
@@ -152,6 +157,16 @@ type PatrimonyChartPoint = {
   source: string;
 };
 
+function enumerateIsoDates(from: string, to: string): string[] {
+  const out: string[] = [];
+  const start = new Date(`${from}T12:00:00Z`);
+  const end = new Date(`${to}T12:00:00Z`);
+  for (let d = start; d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
 function portfolioRowMatchesAssetClass(
   row: Record<string, unknown>,
   assetClass: string
@@ -180,6 +195,8 @@ export class InvestController {
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuoteRepo: MarketQuoteRepository;
   private readonly patrimonyAnchorsRepo: PatrimonyMonthlyAnchorsRepository;
+  private readonly valuationContext: AssetValuationContext;
+  private readonly fxRates: FxRateRepository;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -192,6 +209,8 @@ export class InvestController {
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuoteRepo = new MarketQuoteRepository(gateway);
     this.patrimonyAnchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
+    this.valuationContext = new AssetValuationContext(gateway);
+    this.fxRates = new FxRateRepository(gateway);
   }
 
   private async periodBoundsFor(ctx: UserContext) {
@@ -271,13 +290,16 @@ export class InvestController {
       ctx.organizationId!
     );
     const strikeHints = { ledgerStrikeByTicker, marketCatalog };
+    const valuationSnapshot = await this.valuationContext.load(ctx);
+    const isB3EquitySpotType = (assetType: string): boolean =>
+      categoryFor(valuationSnapshot, assetType)?.settlementContractTypeCode === 'B3_EQUITY_SPOT';
 
     const quoteTickers = new Set<string>();
     for (const r of rowsMerged) {
       const t = String(r.asset_ticker ?? '').trim().toUpperCase();
       if (!t || t.startsWith('CAIXA-')) continue;
       const type = String(r.asset_type ?? '').toLowerCase();
-      if (type === 'stock' || type === 'fii') {
+      if (isB3EquitySpotType(type)) {
         quoteTickers.add(t);
         continue;
       }
@@ -368,7 +390,7 @@ export class InvestController {
           : (filtered.metadata as { underlying_ticker?: string }) || {};
       const assetTypeForPm = String(filtered.asset_type ?? '');
       const three =
-        assetTypeForPm === 'stock' || assetTypeForPm === 'fii'
+        isB3EquitySpotType(assetTypeForPm)
           ? resolveEquityThreePricesForPortfolioRow(
               filtered,
               threeByUnderlying,
@@ -387,7 +409,7 @@ export class InvestController {
         ? { price: mq.price, asOf: mq.date }
         : null;
 
-      if ((assetTypeForPm === 'stock' || assetTypeForPm === 'fii') && three.strict <= 0 && marketQuote && marketQuote.price > 0) {
+      if (isB3EquitySpotType(assetTypeForPm) && three.strict <= 0 && marketQuote && marketQuote.price > 0) {
         three.strict = marketQuote.price;
         three.b3 = marketQuote.price;
         three.managerial = marketQuote.price;
@@ -396,7 +418,7 @@ export class InvestController {
       const item = enrichPortfolioRow(filtered, three, strikeHints, marketQuote);
       const assetType = String(item.assetType ?? '');
       if (
-        (assetType === 'stock' || assetType === 'fii') &&
+        isB3EquitySpotType(assetType) &&
         Math.abs(item.quantity) > 1e-6
       ) {
         const und = String(
@@ -643,9 +665,22 @@ export class InvestController {
     const anchors = await this.patrimonyAnchorsRepo.loadForOrganization(ctx);
     const useBtgAnchorCurve = method === 'mtm_btg' && anchors.month_ends.length > 0;
     const calibrateToAnchors = useBtgAnchorCurve;
-    const fixedIncomeTotal = calibrateToAnchors
-      ? Number(anchors.fixed_income_total ?? 0)
-      : fixedIncomeTotalFromLedger(events);
+    const fixedIncomeTotal = fixedIncomeTotalFromLedger(events);
+    const valuationSnapshot = await this.valuationContext.load(ctx);
+    const fxByPairDate = new Map<string, number>();
+    const foreignCurrencies = [
+      ...new Set([...valuationSnapshot.currencyByType.values()].filter((currency) => currency !== 'BRL')),
+    ];
+    if (foreignCurrencies.length) {
+      for (const date of enumerateIsoDates(from, to)) {
+        for (const currency of foreignCurrencies) {
+          const rate = await this.fxRates.getClosingRate(currency, 'BRL', date).catch(() => null);
+          if (rate != null && Number.isFinite(rate) && rate > 0) {
+            fxByPairDate.set(`${currency}/BRL/${date}`, rate);
+          }
+        }
+      }
+    }
 
     const riskFree = Number.isFinite(riskFreeAnnual) ? riskFreeAnnual : 0;
     let result =
@@ -660,6 +695,11 @@ export class InvestController {
               fixedIncomeTotal,
               calibrateToAnchors: false,
               quoteForDate,
+              valuationContext: valuationSnapshot,
+              fxRateForDate: (fromCurrency: string, toCurrency: string, date: string) =>
+                fxByPairDate.get(
+                  `${fromCurrency.toUpperCase()}/${toCurrency.toUpperCase()}/${date.slice(0, 10)}`
+                ),
             });
 
     const storedDaysRaw = await this.patrimonyStore.loadRange(ctx, from, to);
