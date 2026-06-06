@@ -78,8 +78,10 @@ describe('InvestQuoteSyncService catalog routing', () => {
     await seedCategory(gw, 'stock', 'brapi');
     await seedCategory(gw, 'etf', 'brapi');
     await seedCategory(gw, 'option_call', 'opcoes_net');
+    await seedCategory(gw, 'fixed_income', 'tesouro_direto');
     await seedAsset(gw, 'BOVA11', 'etf');
     await seedAsset(gw, 'ITUBF420', 'option_call');
+    await seedAsset(gw, 'LFT-20310301', 'fixed_income');
 
     jest.mocked(fetchB3Quotes).mockResolvedValue([
       { ticker: 'BOVA11', price: 120, asOf: '2026-06-05', source: 'brapi', kind: 'close' },
@@ -102,8 +104,8 @@ describe('InvestQuoteSyncService catalog routing', () => {
       ['ITUBF420'],
       { asOfDate: '2026-06-05' }
     );
-    expect(report.requested).toBe(3);
-    expect(report.missing).toEqual([]);
+    expect(report.requested).toBe(4);
+    expect(report.missing).toEqual(['LFT-20310301:tesouro_direto']);
     expect(gw.dump('market_quotes_daily').map((r) => r.ticker).sort()).toEqual([
       'BOVA11',
       'ITUB4',

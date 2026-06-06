@@ -12,6 +12,7 @@ import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProj
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { ExternalOptionQuoteFetcher } from './ExternalOptionQuoteFetcher';
 import { inferAssetType, isOptionTicker } from './assetClassifier';
+import { ModuleCategories } from '../module-registry';
 
 export type RecordDailyPatrimonyResult = {
   snapshotDate: string;
@@ -29,6 +30,7 @@ export class PatrimonyDailyRecorder {
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly anchorsRepo: PatrimonyMonthlyAnchorsRepository;
   private readonly externalOptionFetcher: ExternalOptionQuoteFetcher;
+  private readonly categories: ModuleCategories;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -37,6 +39,7 @@ export class PatrimonyDailyRecorder {
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
     this.externalOptionFetcher = new ExternalOptionQuoteFetcher(gateway);
+    this.categories = new ModuleCategories(gateway);
   }
 
   private isWeekend(iso: string): boolean {
@@ -44,7 +47,11 @@ export class PatrimonyDailyRecorder {
     return dow === 0 || dow === 6;
   }
 
-  private equityTickersOpenOnDate(events: Array<Record<string, unknown>>, date: string): string[] {
+  private async quotedTickersOpenOnDate(
+    ctx: UserContext,
+    events: Array<Record<string, unknown>>,
+    date: string
+  ): Promise<string[]> {
     const qtyByTicker = new Map<string, number>();
     const sorted = [...events].sort((a, b) =>
       String(a.transaction_date ?? '').localeCompare(String(b.transaction_date ?? ''))
@@ -55,7 +62,7 @@ export class PatrimonyDailyRecorder {
       const ticker = String(e.asset_ticker ?? '').trim().toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
       const assetType = String(e.asset_type || inferAssetType(ticker));
-      if (assetType !== 'stock' && assetType !== 'fii') continue;
+      if (!(await this.categories.requiresMarketQuote(ctx, assetType))) continue;
       const type = String(e.transaction_type ?? '');
       const qty = Math.abs(Number(e.quantity ?? 0));
       if (!Number.isFinite(qty) || qty <= 0) continue;
@@ -72,21 +79,22 @@ export class PatrimonyDailyRecorder {
       .sort();
   }
 
-  private assertEquityQuotesForBusinessDay(
+  private async assertRequiredQuotesForBusinessDay(
+    ctx: UserContext,
     quoteMap: Map<string, Map<string, number>>,
     events: Array<Record<string, unknown>>,
     date: string
-  ): void {
+  ): Promise<void> {
     if (this.isWeekend(date)) return;
-    const openEquities = this.equityTickersOpenOnDate(events, date);
-    const missing = openEquities.filter((ticker) => {
+    const openQuotedAssets = await this.quotedTickersOpenOnDate(ctx, events, date);
+    const missing = openQuotedAssets.filter((ticker) => {
       const exact = quoteMap.get(ticker)?.get(date);
       return !(exact != null && Number.isFinite(exact) && exact > 0);
     });
     if (missing.length) {
       throw new Error(
         `Cotacao diaria obrigatoria ausente em ${date}: ${missing.join(', ')}. ` +
-          'Busque via brapi/web antes de gravar patrimonio.'
+          'Busque via fonte de cotacao configurada antes de gravar patrimonio.'
       );
     }
   }
@@ -103,9 +111,8 @@ export class PatrimonyDailyRecorder {
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
-      const type = String(row.asset_type ?? '');
-      if (type === 'fixed_income' || ticker.startsWith('TESOURO-') ||
-          ticker.startsWith('CDB-') || ticker.startsWith('LFT-') || ticker.startsWith('TD-')) continue;
+      const type = String(row.asset_type || inferAssetType(ticker));
+      if (!(await this.categories.requiresMarketQuote(ctx, type))) continue;
       tickers.push(ticker);
     }
 
@@ -126,7 +133,7 @@ export class PatrimonyDailyRecorder {
       }
 
       const assetType = String(row.asset_type || inferAssetType(ticker));
-      if (assetType === 'stock' || assetType === 'fii') {
+      if (await this.categories.requiresMarketQuote(ctx, assetType)) {
         continue;
       }
       if (!isOptionTicker(ticker)) {
@@ -171,7 +178,12 @@ export class PatrimonyDailyRecorder {
     const ledgerFrom = bounds.periodMin || date;
 
     const quoteMap = await this.marketQuotes.loadQuoteMapForRange(ctx, ledgerFrom, date);
-    this.assertEquityQuotesForBusinessDay(quoteMap, events as unknown as Array<Record<string, unknown>>, date);
+    await this.assertRequiredQuotesForBusinessDay(
+      ctx,
+      quoteMap,
+      events as unknown as Array<Record<string, unknown>>,
+      date
+    );
     const quoteForDate =
       quoteMap.size > 0 ? this.marketQuotes.buildQuoteForDateFn(quoteMap) : undefined;
     const { quotes: stockQuotesLatest, quotesAsOf } = await this.loadStockQuotes(ctx, date);

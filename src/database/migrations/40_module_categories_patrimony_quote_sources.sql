@@ -64,8 +64,8 @@ WHERE module_code = 'INVEST'
 
 UPDATE module_categories SET
   contributes_to_patrimony = TRUE,
-  requires_market_quote = FALSE,
-  default_quote_source = 'computed_cdi',
-  valuation_mode = 'computed'
+  requires_market_quote = TRUE,
+  default_quote_source = 'tesouro_direto',
+  valuation_mode = 'market_price'
 WHERE module_code = 'INVEST'
   AND subcategory = 'fixed_income';

@@ -131,4 +131,32 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(day.patrimony).toBeCloseTo(5000, 0);
     expect(day.scheduledCashPending).toBeCloseTo(-4000, 0);
   });
+
+  it('marca renda fixa pelo preço diário quando houver cotação', () => {
+    const entries: LedgerEvent[] = [
+      {
+        asset_id: 'rf1',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-01',
+        quantity: 10,
+        unit_price: 1000,
+        total_net_value: 10_000,
+        impacts_managerial_price: true,
+      },
+    ];
+
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-02', {
+      fixedIncomeTotal: 0,
+      quoteForDate: (_ticker, date) => (date === '2026-01-02' ? 1100 : 1000),
+    });
+
+    const day2 = r.series.find((p) => p.date === '2026-01-02');
+    const snapshot = r.positionSnapshots?.find((p) => p.ticker === 'LFT-20310301');
+
+    expect(day2?.patrimony).toBeCloseTo(11_000, 0);
+    expect(snapshot?.closingPrice).toBeCloseTo(1100, 0);
+    expect(snapshot?.marketValue).toBeCloseTo(11_000, 0);
+  });
 });

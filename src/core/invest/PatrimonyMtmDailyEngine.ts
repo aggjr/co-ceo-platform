@@ -282,16 +282,18 @@ export function buildDailyPatrimonyMtmSeries(
     let optionsFromMarket = 0;
     let optionsStructural = 0;
     let fixedIncomeDynamic = 0;
+    let hasOpenFixedIncome = false;
 
     for (const p of positions.values()) {
       if (Math.abs(p.qty) < 0.0001) continue;
 
+      const dailyMark = resolvePositionMark(p, date, quoteForDate, stockQuotes, lastKnownPrices);
       if (isFixedIncome(p.assetType, p.ticker)) {
-        fixedIncomeDynamic += p.qty * p.unitCost;
+        hasOpenFixedIncome = true;
+        fixedIncomeDynamic += p.qty * (dailyMark ?? p.unitCost);
         continue;
       }
 
-      const dailyMark = resolvePositionMark(p, date, quoteForDate, stockQuotes, lastKnownPrices);
       if (isOptionType(p.assetType)) {
         if (dailyMark != null) {
           optionsFromMarket += p.qty * dailyMark;
@@ -306,7 +308,7 @@ export function buildDailyPatrimonyMtmSeries(
       }
     }
 
-    const currentFixedIncome = fixedIncomeDynamic || fixedIncome; // Use dynamic if available, otherwise static
+    const currentFixedIncome = hasOpenFixedIncome ? fixedIncomeDynamic : fixedIncome;
     const base = stocksValue + cash + currentFixedIncome;
     const pending = Math.round(scheduledCashPending * 100) / 100;
     const lastAnchorDate = anchors.month_ends.length > 0 
@@ -464,7 +466,7 @@ function snapshotOpenPositions(
   const out: PositionDailySnapshot[] = [];
   for (const p of positions.values()) {
     if (Math.abs(p.qty) < 0.0001) continue;
-    if (isCash(p.assetType, p.ticker) || isFixedIncome(p.assetType, p.ticker)) continue;
+    if (isCash(p.assetType, p.ticker)) continue;
     
     let closing = resolvePositionMark(p, asOf, quoteForDate, stockQuotes, lastKnownPrices);
     if (closing == null || !Number.isFinite(closing)) {
