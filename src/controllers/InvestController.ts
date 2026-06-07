@@ -84,6 +84,7 @@ import {
   resolveThreePricesForAsset,
 } from '../core/invest/portfolioThreePrices';
 import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
+import { ThreePricesContextFactory } from '../core/invest/ThreePricesContextFactory';
 import { computeSharpeRatio } from '../core/invest/sharpeRatio';
 import { PnLReportService } from '../core/invest/PnLReportService';
 import { validateEquityThreePrices } from '../core/invest/threePricesValidation';
@@ -197,6 +198,7 @@ export class InvestController {
   private readonly patrimonyAnchorsRepo: PatrimonyMonthlyAnchorsRepository;
   private readonly valuationContext: AssetValuationContext;
   private readonly fxRates: FxRateRepository;
+  private readonly threePricesFactory: ThreePricesContextFactory;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -211,6 +213,7 @@ export class InvestController {
     this.patrimonyAnchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
     this.valuationContext = new AssetValuationContext(gateway);
     this.fxRates = new FxRateRepository(gateway);
+    this.threePricesFactory = new ThreePricesContextFactory(gateway);
   }
 
   private async periodBoundsFor(ctx: UserContext) {
@@ -282,8 +285,10 @@ export class InvestController {
       );
     }
 
-    const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents);
-    const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents, today);
+    const threeCtx = await this.threePricesFactory.build(ctx);
+    const threeOpts = { ctx: threeCtx };
+    const threeByUnderlying = buildThreeAvgPricesByUnderlying(ledgerEvents, threeOpts);
+    const engineSnapshots = computeThreePricesByUnderlying(ledgerEvents, threeOpts, today);
     const ledgerStrikeByTicker = buildOptionStrikeMapFromLedgerEvents(ledgerEvents);
     const marketCatalog = await loadOptionMarketCatalog(
       this.gateway,
@@ -557,7 +562,8 @@ export class InvestController {
       const mq = quoteMap.get(underlying);
       const today = new Date().toISOString().slice(0, 10);
       const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
-      const threePrices = computeThreePricesByUnderlying(events, today).get(underlying);
+      const threeCtx = await this.threePricesFactory.build(ctx);
+      const threePrices = computeThreePricesByUnderlying(events, { ctx: threeCtx }, today).get(underlying);
       return res.json({
         success: true,
         underlying,
@@ -1724,7 +1730,8 @@ export class InvestController {
       }
       const today = new Date().toISOString().slice(0, 10);
       const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
-      const priceMap = computeThreePricesByUnderlying(events, today);
+      const threeCtx = await this.threePricesFactory.build(ctx);
+      const priceMap = computeThreePricesByUnderlying(events, { ctx: threeCtx }, today);
 
       const rows: ThreePricesRow[] = [];
       for (const [ticker, p] of priceMap) {
@@ -1756,7 +1763,8 @@ export class InvestController {
       const today = new Date().toISOString().slice(0, 10);
       const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
       const { assets } = rebuildCustodyFromLedger(events);
-      const priceMap = computeThreePricesByUnderlying(events, today);
+      const threeCtx = await this.threePricesFactory.build(ctx);
+      const priceMap = computeThreePricesByUnderlying(events, { ctx: threeCtx }, today);
 
       const extRows = await this.gateway.findWhere(ctx, 'invest_position_ext', {});
       const lastPriceByAssetId = new Map(

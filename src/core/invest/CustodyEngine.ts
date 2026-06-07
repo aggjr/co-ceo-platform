@@ -60,6 +60,8 @@ export type LedgerEvent = {
   irrf_tax?: number | null;
   impacts_managerial_price?: boolean | number | null;
   skip_financial_ledger?: boolean | number | null;
+  /** Dados arbitrários propagados pela camada de importação ao engine. */
+  metadata?: Record<string, unknown> | null;
 };
 
 export type AssetCustodyState = {

@@ -218,6 +218,25 @@ const TABLES: TableDefinition[] = [
     primaryKey: 'ticker',
     countsTowardStorage: false,
   }),
+  def('invest_import_rules', 'global', {
+    softDelete: false,
+    primaryKey: 'rule_code',
+    primaryKeyColumns: ['rule_code', 'broker_id'],
+    allowHardDelete: true,
+    countsTowardStorage: false,
+  }),
+  def('invest_asset_type_config', 'global', {
+    softDelete: false,
+    primaryKey: 'asset_type',
+    allowHardDelete: false,
+    countsTowardStorage: false,
+  }),
+  def('invest_ignored_tx_config', 'global', {
+    softDelete: false,
+    primaryKey: 'operation_type',
+    allowHardDelete: false,
+    countsTowardStorage: false,
+  }),
   // ===== Mercado (cotações e índices compartilhados, ver migration 20) =====
   def('invest_options_fetch_cache', 'global', {
     softDelete: false,

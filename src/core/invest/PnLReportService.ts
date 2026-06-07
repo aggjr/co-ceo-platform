@@ -2,6 +2,7 @@ import type { CoCeoDataGateway, UserContext } from '../dal';
 import { rebuildCustodyFromLedger } from './CustodyEngine';
 import { LedgerImportService } from './LedgerImportService';
 import { computeThreePricesByUnderlying } from './threePricesEngine';
+import { ThreePricesContextFactory } from './ThreePricesContextFactory';
 
 export type PnLRow = {
   ticker: string;
@@ -36,8 +37,11 @@ export class PnLReportService {
       return d >= from && d <= to;
     });
 
+    const factory = new ThreePricesContextFactory(this.gateway);
+    const threeCtx = await factory.build(ctx);
+
     const { assets } = rebuildCustodyFromLedger(events);
-    const priceMap = computeThreePricesByUnderlying(events, to);
+    const priceMap = computeThreePricesByUnderlying(events, { ctx: threeCtx }, to);
 
     const extRows = await this.gateway.findWhere(ctx, 'invest_position_ext', {});
     const lastPriceByAssetId = new Map(

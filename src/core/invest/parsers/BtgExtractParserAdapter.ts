@@ -47,7 +47,16 @@ export class BtgExtractParserAdapter implements IBrokerExtractParser {
   readonly brokerCode = 'BTG';
   readonly parserVersion = 'extract-v1';
 
-  constructor(private readonly options: BtgExtractParseOptions = { includeLiqBolsa: true }) {}
+  constructor(private options: BtgExtractParseOptions = { includeLiqBolsa: true }) {}
+
+  /**
+   * Injeta regras carregadas do banco antes de chamar parse().
+   * O caller deve chamar este método com regras de InvestImportRulesRepository.
+   */
+  withImportRules(rules: import('../ledgerTypes').InvestImportRule[]): this {
+    this.options = { ...this.options, importRules: rules };
+    return this;
+  }
 
   canParse(rawContent: string, meta?: BrokerParseMetadata): boolean {
     const filename = String(meta?.filename ?? '').toLowerCase();

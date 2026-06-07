@@ -31,24 +31,11 @@ type UnderlyingState = {
   optionSeries: Map<string, OptionSeriesState>;
 };
 
-const DEFAULT_BASE_ASSET_TYPES = ['stock', 'fii'];
-const DEFAULT_OPTION_ASSET_TYPES = ['option_call', 'option_put'];
+import type { ThreePricesContext } from './ledgerTypes';
 
 const OPTION_SELL_TX = new Set(['put_sell', 'call_sell']);
 const OPTION_BUY_TX = new Set(['put_buy', 'call_buy']);
 
-const IGNORED_TX = new Set([
-  'dividend',
-  'jcp',
-  'cash_yield',
-  'securities_lending',
-  'capital_deposit',
-  'capital_withdrawal',
-  'penalty_b3',
-  'fee',
-  'revaluation',
-  'pending_settlement',
-]);
 
 function emptyState(underlying: string): UnderlyingState {
   return {
@@ -213,14 +200,8 @@ function applyPutShortExercisePremium(
 }
 
 /**
- * CALL comprada exercida: o premio pago aumenta o custo gerencial e o PM B3
- * da posicao (formando o "custo total" da acao = strike + premio). Nao toca
- * em estritoTotal — o Estrito reflete apenas o custo de aquisicao puro (strike).
- *
- * b3AjusteTotal eh subtraido na formula final (estrito - b3Ajuste). Para
- * AUMENTAR o B3, b3AjusteTotal precisa ficar NEGATIVO (allocatedFromHistory
- * vem negativo no caso CALL paga, entao b3AjusteTotal += allocatedFromHistory
- * resulta em soma negativa => B3 sobe).
+ * CALL comprada exercida: o premio pago aumenta o custo gerencial, o PM B3 e 
+ * o PM Estrito da posicao (pois o prêmio gasto compõe o custo puro de aquisição).
  */
 function applyCallLongExercisePremium(
   s: UnderlyingState,
@@ -239,17 +220,55 @@ function applyCallLongExercisePremium(
   if (useExplicitNet) {
     const allocatedExplicit =
       explicitNet! < 0 ? explicitNet! : -Math.abs(explicitNet!);
-    s.b3AjusteTotal += allocatedExplicit;
-    s.premioOpcoesPeriodo += allocatedExplicit;
+    
+    // Prêmio pago compõe o PM Estrito (custo puro de compra)
+    s.estritoTotal += Math.abs(allocatedExplicit);
+
     series.premioLiquido = 0;
     series.premioContadoGerencial = 0;
   } else if (Math.abs(series.premioLiquido) > 0.005) {
-    s.b3AjusteTotal += allocatedFromHistory;
-    s.premioOpcoesPeriodo += allocatedFromHistory;
+    s.estritoTotal += Math.abs(allocatedFromHistory);
+    
     series.premioLiquido -= allocatedFromHistory;
     series.premioContadoGerencial = series.premioLiquido;
   }
 }
+
+/**
+ * Processa ajuste de custo posterior vinculado a um ticker específico.
+ * Casos de uso: IRRF de Tesouro Direto, taxa BTC, taxa de custódia, multa.
+ *
+ * Regra dos 3 preços:
+ *   PM Estrito:   SOBE sempre (custo real de manutenção da posição)
+ *   PM B3:        NEUTRO por padrão — b3AjusteTotal += amount cancela o aumento.
+ *                 Exceção: applies_to_b3=true no metadata → PM B3 sobe junto.
+ *   PM Gerencial: SOBE automaticamente (estritoTotal subiu).
+ *
+ * applies_to_b3 propagado via metadata da camada de importação:
+ *   false (padrão): b3AjusteTotal += amount → PM B3 neutro
+ *   true:           b3AjusteTotal não muda → PM B3 sobe com o Estrito
+ */
+function applyCostAdjustment(s: UnderlyingState, e: LedgerEvent): void {
+  const amount = Math.abs(Number(e.total_net_value ?? e.unit_price ?? 0));
+  if (amount <= 0 || s.qty <= 0) return;
+
+  s.estritoTotal += amount;
+
+  // Lê applies_to_b3 do metadata propagado pela camada de importação.
+  const meta = e.metadata as Record<string, unknown> | null | undefined;
+  const appliesToB3 = meta?.applies_to_b3 === true || meta?.applies_to_b3 === 1;
+  if (!appliesToB3) {
+    s.b3AjusteTotal += amount;
+  }
+}
+
+function applyAmortization(s: UnderlyingState, e: LedgerEvent): void {
+  const amount = Math.abs(Number(e.total_net_value ?? e.unit_price ?? 0));
+  if (amount <= 0 || s.qty <= 0) return;
+  
+  s.estritoTotal = Math.max(0, s.estritoTotal - amount);
+}
+
 
 function applyStockBuy(s: UnderlyingState, e: LedgerEvent): void {
   const q = Math.abs(Number(e.quantity ?? 0));
@@ -396,39 +415,41 @@ function applyOptionExercise(s: UnderlyingState, e: LedgerEvent): void {
   }
 }
 
-type ThreePricesClassification = {
-  baseAssetTypes: Set<string>;
-  optionAssetTypes: Set<string>;
-};
-
 export type ThreePricesOptions = {
-  baseAssetTypes?: Iterable<string>;
-  optionAssetTypes?: Iterable<string>;
+  ctx: ThreePricesContext;
 };
-
-function normalizeTypeSet(values: Iterable<string> | undefined, defaults: string[]): Set<string> {
-  const source = values ?? defaults;
-  return new Set([...source].map((v) => String(v).toLowerCase()));
-}
-
-function buildClassification(options?: ThreePricesOptions): ThreePricesClassification {
-  return {
-    baseAssetTypes: normalizeTypeSet(options?.baseAssetTypes, DEFAULT_BASE_ASSET_TYPES),
-    optionAssetTypes: normalizeTypeSet(options?.optionAssetTypes, DEFAULT_OPTION_ASSET_TYPES),
-  };
-}
 
 function applyEvent(
   s: UnderlyingState,
   e: LedgerEvent,
-  classification: ThreePricesClassification
+  options: ThreePricesOptions
 ): void {
   const type = String(e.transaction_type);
-  if (IGNORED_TX.has(type)) return;
+  const ctx = options.ctx;
+
+  if (ctx.isIgnoredTransaction(type)) return;
 
   const assetType = effectiveAssetType(e);
+  const isStock = ctx.isStockLike(assetType);
+  const isOption = ctx.isOptionLike(assetType);
 
-  if (classification.baseAssetTypes.has(assetType)) {
+  if (!isStock && !isOption && assetType && assetType !== 'cash') {
+    throw new Error(
+      `Ativo ${e.asset_ticker} do tipo ${assetType} nao foi reconhecido nas configuracoes de contexto como acao nem opcao.\n\n` +
+      `[ACAO EXIGIDA] Vasculhar sites como opcoes.net, brapi, dlombello, statusinvest, investidor10 para validar se o ativo existe.\n` +
+      `Se ele for legitimo, cadastre sua categoria no banco de dados.`
+    );
+  }
+
+  if (isStock) {
+    if (type === 'cost_adjustment') {
+      applyCostAdjustment(s, e);
+      return;
+    }
+    if (type === 'amortization') {
+      applyAmortization(s, e);
+      return;
+    }
     if (!impactsPrice(e.impacts_managerial_price)) return;
     if (type === 'buy' || type === 'opening_balance' || type === 'bonus') {
       applyStockBuy(s, e);
@@ -445,7 +466,7 @@ function applyEvent(
     return;
   }
 
-  if (classification.optionAssetTypes.has(assetType)) {
+  if (isOption) {
     // option_exercise sempre processa — engine calcula o ajuste pelo histórico
     // da série, então o flag impacts_managerial_price=false (resíduo de
     // marcadores contábeis antigos) não deve ignorar o exercício.
@@ -508,10 +529,9 @@ function snapshot(s: UnderlyingState): ThreePrices {
  */
 export function computeThreePricesByUnderlying(
   entries: LedgerEvent[],
-  asOfDate?: string,
-  options?: ThreePricesOptions
+  options: ThreePricesOptions,
+  asOfDate?: string
 ): Map<string, ThreePrices> {
-  const classification = buildClassification(options);
   const cutoff = asOfDate?.slice(0, 10);
   const filtered = cutoff
     ? entries.filter((e) => eventDate(e).slice(0, 10) <= cutoff)
@@ -522,10 +542,15 @@ export function computeThreePricesByUnderlying(
   for (const e of sorted) {
     const ticker = String(e.asset_ticker || '');
     const assetType = effectiveAssetType(e);
-    if (
-      !classification.baseAssetTypes.has(assetType) &&
-      !classification.optionAssetTypes.has(assetType)
-    ) continue;
+
+    const isStock = options.ctx.isStockLike(assetType);
+    const isOption = options.ctx.isOptionLike(assetType);
+
+    if (!isStock && !isOption && assetType && assetType !== 'cash') {
+      // Ignora caixa, mas se for outro ativo que não bateu, o applyEvent vai lançar a exceção.
+    } else if (!isStock && !isOption) {
+      continue;
+    }
 
     const underlying = inferUnderlyingTicker(
       ticker,
@@ -538,7 +563,7 @@ export function computeThreePricesByUnderlying(
       state = emptyState(underlying);
       states.set(underlying, state);
     }
-    applyEvent(state, e, classification);
+    applyEvent(state, e, options);
   }
 
   const out = new Map<string, ThreePrices>();

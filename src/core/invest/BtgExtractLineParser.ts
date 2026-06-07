@@ -3,6 +3,7 @@
  * Ignora liquidações agregadas de bolsa — o detalhe vem do myProfit / notas.
  */
 import { MAIN_CASH_TICKER } from './ledgerTypes';
+import type { InvestImportRule } from './ledgerTypes';
 
 const LFT_TICKER_RE = /LFT\s+(\d{2})\/(\d{2})\/(\d{4})/i;
 
@@ -107,8 +108,30 @@ function parseLftTicker(description: string): string {
 }
 
 /** Classifica linha do extrato → operação do livro-razão INVEST. */
-export function classifyBtgDescription(description: string): BtgLedgerMapping {
+export function classifyBtgDescription(
+  description: string,
+  rules?: InvestImportRule[]
+): BtgLedgerMapping {
   const d = description.toUpperCase();
+
+  if (rules && rules.length > 0) {
+    const sortedRules = [...rules].sort((a, b) => a.priority - b.priority);
+    for (const rule of sortedRules) {
+      try {
+        const regex = new RegExp(rule.description_pattern, 'i');
+        if (regex.test(description)) {
+          return {
+            operation: rule.mapped_operation,
+            ticker: rule.target_asset_type === 'cash' ? CASH_TICKER : 'UNKNOWN_DB_TICKER',
+            asset_type: rule.target_asset_type,
+            notes: description,
+          };
+        }
+      } catch (e) {
+        // Regex invalida cadastrada no banco, ignora
+      }
+    }
+  }
 
   if (d.includes('LIQ BOLSA')) {
     return { operation: 'skip', ticker: CASH_TICKER, skip: true };
@@ -314,6 +337,7 @@ const NEG_PENALTY_RE = /JUROS\s+SOBRE\s+SALDO\s+NEGATIVO|IOF\s+SOBRE\s+SALDO\s+N
 export type BtgExtractParseOptions = {
   /** Inclui LIQ BOLSA como marcador de liquidacao para roteamento pelo LiqBolsaSettlementService. */
   includeLiqBolsa?: boolean;
+  importRules?: InvestImportRule[];
 };
 
 export interface BtgExtractResolvers {
@@ -361,7 +385,7 @@ export function btgLinesToImportEntries(
     if (!parsed) continue;
     prev = parsed.balance;
 
-    const map = classifyBtgDescription(parsed.description);
+    const map = classifyBtgDescription(parsed.description, options?.importRules);
     const upperDesc = parsed.description.toUpperCase();
     if (
       (map.skip || map.operation === 'skip') &&

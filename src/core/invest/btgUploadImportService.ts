@@ -31,6 +31,7 @@ import {
 } from './btgExtractBatchReconcile';
 import type { LedgerEvent } from './CustodyEngine';
 import { logReconcileEvent, logReconcileFailure } from './reconcile/reconcileErrorDetail';
+import { InvestImportRulesRepository } from './InvestImportRulesRepository';
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -286,9 +287,10 @@ function buildExtractPreview(
   file: BtgUploadFileInput,
   format: BtgExtractFileFormat,
   lines: string[],
-  openingBalance: number
+  openingBalance: number,
+  importRules?: import('./ledgerTypes').InvestImportRule[]
 ): BtgExtractImportPreview {
-  const entries = btgLinesToImportEntries(lines, openingBalance);
+  const entries = btgLinesToImportEntries(lines, openingBalance, undefined, { importRules });
 
   const byOperation: Record<string, { count: number; total: number }> = {};
   let firstDate: string | null = null;
@@ -586,7 +588,9 @@ export async function previewBtgExtractUpload(
 export async function parseExtractUploadImportLines(
   file: BtgUploadFileInput,
   options?: import('./BtgExtractLineParser').BtgExtractParseOptions,
-  resolvedOpeningBalance?: number
+  resolvedOpeningBalance?: number,
+  importRulesRepo?: InvestImportRulesRepository,
+  ctx?: UserContext
 ): Promise<LedgerImportLine[]> {
   const { raw, format } = await rawTextFromExtractUpload(file);
   const lines = normalizeExtractLines(raw, format);
@@ -598,7 +602,10 @@ export async function parseExtractUploadImportLines(
       400
     );
   }
-  const rawEntries = btgLinesToImportEntries(lines, openingBalance, undefined, options);
+  const importRules =
+    importRulesRepo && ctx ? await importRulesRepo.loadForBroker(ctx, 'BTG') : [];
+  const mergedOptions = { ...options, importRules };
+  const rawEntries = btgLinesToImportEntries(lines, openingBalance, undefined, mergedOptions);
   return assignExtractRefs(
     rawEntries.map((e) => ({
       ...e,

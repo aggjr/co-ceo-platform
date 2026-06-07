@@ -1,6 +1,16 @@
 import { computeThreePricesByUnderlying } from '../../../src/core/invest/threePricesEngine';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 
+import type { ThreePricesContext } from '../../../src/core/invest/ledgerTypes';
+
+const mockContext: ThreePricesContext = {
+  baseAssetTypes: new Set(['stock']),
+  optionAssetTypes: new Set(['option_call', 'option_put']),
+  isStockLike: (t) => t === 'stock',
+  isOptionLike: (t) => t === 'option_call' || t === 'option_put',
+  isIgnoredTransaction: (t) => t === 'ignore',
+};
+const mockOptions = { ctx: mockContext };
 function filterOpenRows(priceMap: ReturnType<typeof computeThreePricesByUnderlying>) {
   const rows: Array<{ ticker: string; qty: number; pmGerencial: number; pmEstrito: number }> = [];
   for (const [ticker, p] of priceMap) {
@@ -41,7 +51,7 @@ describe('ThreePrices — endpoint data shape', () => {
         total_net_value: 38000,
       },
     ];
-    const map = computeThreePricesByUnderlying(events);
+    const map = computeThreePricesByUnderlying(events, mockOptions);
     const petr = map.get('PETR4');
     expect(petr?.qty).toBe(0);
     expect(filterOpenRows(map)).toHaveLength(0);
@@ -73,7 +83,7 @@ describe('ThreePrices — endpoint data shape', () => {
         total_net_value: 600,
       },
     ];
-    const map = computeThreePricesByUnderlying(events);
+    const map = computeThreePricesByUnderlying(events, mockOptions);
     const itub = map.get('ITUB4');
     expect(itub?.qty).toBe(500);
     expect(itub?.estrito).toBeCloseTo(36.0, 2);

@@ -174,9 +174,22 @@ beforeEach(() => {
   seq = 0;
 });
 
+const mockOptions = {
+  ctx: {
+    isStockLike: (type: string) => type === 'stock' || type === 'fii',
+    isOptionLike: (type: string) => type === 'option_call' || type === 'option_put',
+    isIgnoredTransaction: (type: string) => 
+      ['dividend', 'jcp', 'cash_yield', 'securities_lending', 'capital_deposit', 
+       'capital_withdrawal', 'penalty_b3', 'fee', 'revaluation', 'pending_settlement'].includes(type)
+  }
+};
+
+const runEngine = (entries: LedgerEvent[], asOfDate?: string) => 
+  computeThreePricesByUnderlying(entries, mockOptions, asOfDate);
+
 describe('threePricesEngine', () => {
   it('abertura com unit_price zerado usa total_net_value', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       {
         id: nextId(),
         asset_id: 'ITUB4',
@@ -196,7 +209,7 @@ describe('threePricesEngine', () => {
   });
 
   it('compra simples — três preços iguais', () => {
-    const out = computeThreePricesByUnderlying([buy('PRIO3', 100, 40, '2026-01-10')]);
+    const out = runEngine([buy('PRIO3', 100, 40, '2026-01-10')]);
     const p = out.get('PRIO3')!;
     expect(p.qty).toBe(100);
     expect(p.estrito).toBe(40);
@@ -206,13 +219,13 @@ describe('threePricesEngine', () => {
   });
 
   it('compra incorpora emolumentos/taxas no Estrito', () => {
-    const out = computeThreePricesByUnderlying([buy('PRIO3', 100, 40, '2026-01-10', 5)]);
+    const out = runEngine([buy('PRIO3', 100, 40, '2026-01-10', 5)]);
     const p = out.get('PRIO3')!;
     expect(p.estrito).toBeCloseTo((100 * 40 + 5) / 100, 4);
   });
 
   it('duas compras — média ponderada', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       buy('PRIO3', 100, 40, '2026-01-10'),
       buy('PRIO3', 100, 50, '2026-02-10'),
     ]);
@@ -224,7 +237,7 @@ describe('threePricesEngine', () => {
   });
 
   it('asOfDate ignora eventos futuros', () => {
-    const out = computeThreePricesByUnderlying(
+    const out = runEngine(
       [
         buy('PRIO3', 100, 40, '2026-01-10'),
         buy('PRIO3', 100, 50, '2026-02-10'),
@@ -239,7 +252,7 @@ describe('threePricesEngine', () => {
   });
 
   it('venda parcial — Estrito e B3 constantes', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       buy('PRIO3', 200, 40, '2026-01-10'),
       sell('PRIO3', 50, 60, '2026-02-15'),
     ]);
@@ -251,7 +264,7 @@ describe('threePricesEngine', () => {
   });
 
   it('Caso A: vendi PUT por R$ 10 + PUT exercida → 1000 ações ao strike R$ 1', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       putSell('PRIOXYZ', 'PRIO3', 1000, 10, '2026-01-10'),
       ...putExerciseBuyShares('PRIOXYZ', 'PRIO3', 1000, 1, 10, '2026-02-20'),
     ]);
@@ -262,20 +275,20 @@ describe('threePricesEngine', () => {
     expect(p.gerencial).toBeCloseTo(0.99, 4);
   });
 
-  it('CALL comprada exercida: B3 = strike + prêmio (ex. 100 + 1)', () => {
-    const out = computeThreePricesByUnderlying([
+  it('CALL comprada exercida: Estrito = strike + prêmio, B3 = strike + prêmio', () => {
+    const out = runEngine([
       callBuy('STOCKA100', 'ACAO3', 100, 100, '2026-01-05'),
       buy('ACAO3', 100, 100, '2026-01-20', 0),
       optionExercise('STOCKA100', 'ACAO3', 100, 100, false, '2026-01-20', -100),
     ]);
     const p = out.get('ACAO3')!;
     expect(p.qty).toBe(100);
-    expect(p.estrito).toBeCloseTo(100, 4);
+    expect(p.estrito).toBeCloseTo(101, 4);
     expect(p.b3).toBeCloseTo(101, 4);
   });
 
   it('exercício CALL: compra da ação com nota Exercício liga à série da call_buy', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       callBuy('PRIOA100', 'PRIO3', 10, 10, '2026-01-05'),
       {
         id: nextId(),
@@ -296,19 +309,20 @@ describe('threePricesEngine', () => {
   });
 
   it('Caso B: comprei CALL por R$ 10 + exerci → 1000 ações ao strike R$ 1', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       callBuy('PRIOABC', 'PRIO3', 1000, 10, '2026-01-10'),
       ...callExerciseBuyShares('PRIOABC', 'PRIO3', 1000, 1, 10, '2026-02-20'),
     ]);
     const p = out.get('PRIO3')!;
     expect(p.qty).toBe(1000);
-    expect(p.estrito).toBeCloseTo(1, 4);
+    // Strike (1) + Premium (0.01)
+    expect(p.estrito).toBeCloseTo(1.01, 4);
     expect(p.b3).toBeCloseTo(1.01, 4);
     expect(p.gerencial).toBeCloseTo(1.01, 4);
   });
 
   it('Caso C parcial: vendi 1000 PUT, recomprei 200, 600 das 800 exercidas', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       // Compra inicial de 5000 ações ao strike R$ 50 para ter base
       buy('PRIO3', 5000, 50, '2026-01-05'),
       putSell('PRIOM50', 'PRIO3', 1000, 1000, '2026-01-10'),
@@ -329,7 +343,7 @@ describe('threePricesEngine', () => {
 
   it('vendi 3 PUTs, 2 exercidas, 1 expira — Gerencial abate todas; B3 abate só as exercidas', () => {
     // 3 PUTs vendidas, prêmio total R$ 30. 2 exercidas = par buy + option_exercise (sem net).
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       buy('TEST3', 100, 20, '2026-01-05'),
       putSell('TESTM20', 'TEST3', 3, 30, '2026-01-10'),
       buy('TEST3', 2, 20, '2026-02-15'),
@@ -344,7 +358,7 @@ describe('threePricesEngine', () => {
 
   it('vendi 5 CALLs, 1 exercida (saída), 4 expiram — Gerencial abate todas; B3 não muda do remanescente', () => {
     // qty inicial 500, vendo 5 CALLs (cobertas), 1 é exercida (vende 1 ação ao strike)
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       buy('TEST3', 500, 20, '2026-01-05'),
       callSell('TESTA25', 'TEST3', 5, 50, '2026-01-10'),
       optionExercise('TESTA25', 'TEST3', 1, 25, false, '2026-02-15'),
@@ -364,7 +378,7 @@ describe('threePricesEngine', () => {
   });
 
   it('lote zera por venda total → próxima compra começa do zero', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       buy('PRIO3', 100, 40, '2026-01-10'),
       putSell('PRIOXYZ', 'PRIO3', 100, 50, '2026-01-15'), // prêmio acumula
       sell('PRIO3', 100, 60, '2026-02-10'), // zera o lote
@@ -380,7 +394,7 @@ describe('threePricesEngine', () => {
   });
 
   it('reset não vaza estado por opção (séries são limpas)', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       buy('PRIO3', 100, 40, '2026-01-10'),
       putSell('PRIOXYZ', 'PRIO3', 100, 50, '2026-01-15'),
       sell('PRIO3', 100, 60, '2026-02-10'), // lote zera
@@ -400,7 +414,7 @@ describe('threePricesEngine', () => {
   });
 
   it('dividendo, JCP, locação são ignorados — não afetam PM', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       buy('PRIO3', 100, 40, '2026-01-10'),
       {
         id: 'd1',
@@ -432,7 +446,7 @@ describe('threePricesEngine', () => {
   });
 
   it('cenário do arquiteto (mês 2 + mês 3): PUT série A não exercida = não conta; PUT série B com parte exercida = toda conta', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       putSell('PRIOMA1', 'PRIO3', 1000, 10, '2026-02-05'),
       putSell('PRIOMB1', 'PRIO3', 1000, 10, '2026-03-05'),
       buy('PRIO3', 500, 1, '2026-03-20'),
@@ -449,7 +463,7 @@ describe('threePricesEngine', () => {
   });
 
   it('option_exercise é processado mesmo com impacts_managerial_price=false (engine calcula prêmio pelo histórico, flag legado não bloqueia)', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       putSell('PRIOM40', 'PRIO3', 100, 200, '2026-01-05'),
       buy('PRIO3', 100, 40, '2026-02-15'),
       {
@@ -473,7 +487,7 @@ describe('threePricesEngine', () => {
   });
 
   it('PUT com underlying_ticker errado (ITUB3) casa no bucket ITUB4 com o exercício', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       putSell('ITUBQ445', 'ITUB3', 900, 216, '2026-04-29'),
       {
         id: nextId(),
@@ -498,7 +512,7 @@ describe('threePricesEngine', () => {
   });
 
   it('compra por exercício só no papel (BTG): Estrito = strike; B3 e Gerencial abatem prêmio da PUT', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       putSell('ITUBQ413', 'ITUB4', 1200, 377, '2026-04-27'),
       putSell('ITUBQ413', 'ITUB4', 700, 252, '2026-04-29'),
       {
@@ -527,7 +541,7 @@ describe('threePricesEngine', () => {
   });
 
   it('nota BTG ITUB4: exercício PUT com ref #9 abate prêmio no B3', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       putSell('ITUBQ413', 'ITUB4', 1200, 377, '2026-04-27'),
       {
         id: nextId(),
@@ -549,7 +563,7 @@ describe('threePricesEngine', () => {
   });
 
   it('nota BTG (ref com índice de perna): compra por exercício de PUT abate prêmio no B3', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       putSell('PRIOP620', 'PRIO3', 1000, 2100, '2026-03-25'),
       putSell('PRIOP640', 'PRIO3', 3000, 3510, '2026-03-31'),
       {
@@ -588,7 +602,7 @@ describe('threePricesEngine', () => {
   });
 
   it('opening_balance de short herdado (total_net negativo) abate prêmio no gerencial', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       {
         id: 'a-open-stock',
         asset_id: 'PRIO3',
@@ -620,7 +634,7 @@ describe('threePricesEngine', () => {
   });
 
   it('operações de opção (put_sell/put_buy/etc.) com impacts=false são ignoradas — marcadores contábeis', () => {
-    const out = computeThreePricesByUnderlying([
+    const out = runEngine([
       buy('PRIO3', 100, 40, '2026-01-10'),
       {
         id: 'p1',
@@ -640,5 +654,63 @@ describe('threePricesEngine', () => {
     expect(p.estrito).toBe(40);
     expect(p.b3).toBe(40);
     expect(p.gerencial).toBe(40);
+  });
+
+  it('amortization deve abater apenas do PM Estrito, travado em 0', () => {
+    const out = runEngine([
+      buy('FII11', 100, 100, '2026-01-10'),
+      {
+        id: 'a1',
+        asset_id: 'FII11',
+        asset_ticker: 'FII11',
+        asset_type: 'fii',
+        transaction_type: 'amortization',
+        transaction_date: '2026-02-15',
+        quantity: 0,
+        unit_price: 10,
+        total_net_value: 1000,
+      },
+    ]);
+    const p = out.get('FII11')!;
+    expect(p.qty).toBe(100);
+    // (100 * 100 - 1000) / 100 = 90
+    expect(p.estrito).toBe(90);
+    expect(p.b3).toBe(90); // como b3AjusteTotal é 0, estrito == b3
+  });
+
+  it('cost_adjustment deve somar no PM Estrito — ambos sobem o Estrito', () => {
+    const out = runEngine([
+      buy('PRIO3', 100, 40, '2026-01-10'),
+      {
+        id: 'ca1',
+        asset_id: 'PRIO3',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'cost_adjustment',
+        transaction_date: '2026-02-15',
+        quantity: 0,
+        unit_price: 100, // Custo de 100 reais
+        total_net_value: -100,
+      },
+      {
+        id: 'ca2',
+        asset_id: 'PRIO3',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'cost_adjustment',
+        transaction_date: '2026-03-15',
+        quantity: 0,
+        unit_price: 50,
+        total_net_value: -50,
+        metadata: { applies_to_b3: true },
+      },
+    ]);
+    const p = out.get('PRIO3')!;
+    expect(p.qty).toBe(100);
+    // 4000 + 100 + 50 = 4150 -> 41.5
+    expect(p.estrito).toBe(41.5);
+    // B3 Ajuste = 100
+    // PM B3 = (4150 - 100) / 100 = 4050 / 100 = 40.5
+    expect(p.b3).toBe(40.5);
   });
 });

@@ -3,6 +3,7 @@ import { PatrimonyDailyRebuildService } from '../core/invest/PatrimonyDailyRebui
 import { LedgerImportService } from '../core/invest/LedgerImportService';
 import { rebuildCustodyFromLedger } from '../core/invest/CustodyEngine';
 import { computeThreePricesByUnderlying } from '../core/invest/threePricesEngine';
+import { ThreePricesContextFactory } from '../core/invest/ThreePricesContextFactory';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
@@ -20,12 +21,14 @@ export class RemoteRecalcController {
   private readonly ledger: LedgerImportService;
   private readonly categories: ModuleCategories;
   private readonly valuation: AssetValuationContext;
+  private readonly threePricesFactory: ThreePricesContextFactory;
 
   constructor(private gateway: CoCeoDataGateway) {
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.ledger = new LedgerImportService(gateway);
     this.categories = new ModuleCategories(gateway);
     this.valuation = new AssetValuationContext(gateway);
+    this.threePricesFactory = new ThreePricesContextFactory(gateway);
   }
 
   /** @deprecated Prefer POST /api/invest/patrimony-daily/rebuild ou /reconcile/recalc-all */
@@ -99,10 +102,8 @@ export class RemoteRecalcController {
           optionAssetTypes.add(assetType);
         }
       }
-      const pricesMap = computeThreePricesByUnderlying(events, to, {
-        baseAssetTypes,
-        optionAssetTypes,
-      });
+      const threeCtx = await this.threePricesFactory.build(ctx);
+      const pricesMap = computeThreePricesByUnderlying(events, { ctx: threeCtx }, to);
 
       const marketQuoteRepo = new MarketQuoteRepository(this.gateway);
       const quoteTickers = new Set<string>();

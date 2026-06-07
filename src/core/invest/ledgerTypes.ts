@@ -28,6 +28,11 @@ export const LEDGER_TRANSACTION_TYPES = [
    * docstring de MovementType.cost_adjustment.
    */
   'cost_adjustment',
+  /**
+   * Amortização de ativo. Ex.: fundo devolvendo capital ou FII amortizando.
+   * Reduz apenas o PM Estrito (limitado a zero).
+   */
+  'amortization',
 ] as const;
 
 /** Ticker sintético por corretora para lançamentos de extrato (caixa). */
@@ -184,3 +189,19 @@ export type LedgerImportPayload = OpeningImportPayload & {
   }>;
   source_label?: string;
 };
+
+export interface ThreePricesContext {
+  isStockLike(assetType: string): boolean;
+  isOptionLike(assetType: string): boolean;
+  isIgnoredTransaction(operationType: string): boolean;
+}
+
+export interface InvestImportRule {
+  rule_code: string;
+  broker_id: string;
+  description_pattern: string; // Expressão regular armazenada em DB
+  mapped_operation: string; // ex: 'amortization', 'fee'
+  target_asset_type?: string;
+  priority: number;
+}
+

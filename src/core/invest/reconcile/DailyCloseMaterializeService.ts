@@ -7,6 +7,7 @@ import { PatrimonyDailyStore } from '../PatrimonyDailyStore';
 import { LedgerImportService } from '../LedgerImportService';
 import { rebuildCustodyFromLedger } from '../CustodyEngine';
 import { computeThreePricesByUnderlying } from '../threePricesEngine';
+import { ThreePricesContextFactory } from '../ThreePricesContextFactory';
 import { MarketQuoteRepository } from '../../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../../modules/invest/sync/InvestAssetProjection';
 import type { SecurePayload } from '../../dal/types';
@@ -60,6 +61,7 @@ export class DailyCloseMaterializeService {
   private readonly categories: ModuleCategories;
   private readonly fxRates: FxRateRepository;
   private readonly valuation: AssetValuationContext;
+  private readonly threePricesFactory: ThreePricesContextFactory;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.quoteSync = new InvestQuoteSyncService(gateway);
@@ -72,6 +74,7 @@ export class DailyCloseMaterializeService {
     this.categories = new ModuleCategories(gateway);
     this.fxRates = new FxRateRepository(gateway);
     this.valuation = new AssetValuationContext(gateway);
+    this.threePricesFactory = new ThreePricesContextFactory(gateway);
   }
 
   async syncQuotesForDate(ctx: UserContext, date: string): Promise<QuoteSyncDayReport> {
@@ -229,10 +232,8 @@ export class DailyCloseMaterializeService {
         optionAssetTypes.add(assetType);
       }
     }
-    const pricesMap = computeThreePricesByUnderlying(events, limitDate, {
-      baseAssetTypes,
-      optionAssetTypes,
-    });
+    const threeCtx = await this.threePricesFactory.build(ctx);
+    const pricesMap = computeThreePricesByUnderlying(events, { ctx: threeCtx }, limitDate);
 
     const marketCtx = authBootstrapContext();
     const quoteTickers = new Set<string>();

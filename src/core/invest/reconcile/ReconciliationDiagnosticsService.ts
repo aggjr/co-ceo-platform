@@ -6,6 +6,7 @@ import { rebuildCustodyFromLedger, type LedgerEvent } from '../CustodyEngine';
 import { inferAssetType, inferUnderlyingTicker, isFixedIncomeTicker, isOptionTicker } from '../assetClassifier';
 import { LedgerImportService } from '../LedgerImportService';
 import { computeThreePricesByUnderlying } from '../threePricesEngine';
+import { ThreePricesContextFactory } from '../ThreePricesContextFactory';
 import { buildCashInTransitSummary } from '../cashInTransit';
 import { cashBalanceFromLedger, settledCashBalanceFromLedger } from '../cashInvestLedger';
 import { fixedIncomeTotalFromLedger } from '../patrimonyLedgerGates';
@@ -246,11 +247,13 @@ export class ReconciliationDiagnosticsService {
   private readonly ledger: LedgerImportService;
   private readonly snapshots: BrokerCustodySnapshotRepository;
   private readonly valuationContext: AssetValuationContext;
+  private readonly threePricesFactory: ThreePricesContextFactory;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
     this.snapshots = new BrokerCustodySnapshotRepository(gateway);
     this.valuationContext = new AssetValuationContext(gateway);
+    this.threePricesFactory = new ThreePricesContextFactory(gateway);
   }
 
   async getFinancialDiagnostics(
@@ -289,7 +292,8 @@ export class ReconciliationDiagnosticsService {
     const asOf = (asOfInput || latestSnapshot?.referenceDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', asOf);
     const custody = rebuildCustodyFromLedger(events);
-    const threePrices = computeThreePricesByUnderlying(events, asOf);
+    const threeCtx = await this.threePricesFactory.build(ctx);
+    const threePrices = computeThreePricesByUnderlying(events, { ctx: threeCtx }, asOf);
     const valuation = await this.valuationContext.load(ctx);
     const stored = await this.loadStoredPositions(ctx);
     const broker = this.aggregateBroker(latestSnapshot);

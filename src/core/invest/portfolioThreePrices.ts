@@ -15,9 +15,10 @@ export type ThreeAvgPrices = {
 
 /** PM da ação mãe nos três modos (gerencial só com opções do lote aberto atual). */
 export function buildThreeAvgPricesByUnderlying(
-  entries: LedgerEvent[]
+  entries: LedgerEvent[],
+  options: import('./threePricesEngine').ThreePricesOptions
 ): Map<string, ThreeAvgPrices> {
-  const result = computeThreePricesByUnderlying(entries);
+  const result = computeThreePricesByUnderlying(entries, options);
   const out = new Map<string, ThreeAvgPrices>();
   for (const [u, p] of result) {
     out.set(u, { strict: p.estrito, b3: p.b3, managerial: p.gerencial });
@@ -28,8 +29,11 @@ export function buildThreeAvgPricesByUnderlying(
 /**
  * Data em que o lote atual da ação mãe foi aberto (última vez que qty passou de 0 para >0).
  */
-export function computeLotStartDates(entries: LedgerEvent[]): Map<string, string> {
-  const result = computeThreePricesByUnderlying(entries);
+export function computeLotStartDates(
+  entries: LedgerEvent[],
+  options: import('./threePricesEngine').ThreePricesOptions
+): Map<string, string> {
+  const result = computeThreePricesByUnderlying(entries, options);
   const out = new Map<string, string>();
   for (const [u, p] of result) {
     if (p.lotStart) out.set(u, p.lotStart);
