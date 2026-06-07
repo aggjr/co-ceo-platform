@@ -23,6 +23,8 @@ import { inferAssetType, inferUnderlyingTicker } from '../../core/invest/assetCl
 import { SettlementRulesService } from '../../core/invest/SettlementRulesService';
 import { inferOptionExpiryDate } from '../../core/invest/optionExpiry';
 import type { LedgerImportLine } from '../../core/invest/ledgerTypes';
+import { InvestOperationPolicyService } from '../../core/invest/InvestOperationPolicyService';
+import { InvestCashAccountPolicy } from '../../core/invest/InvestCashAccountPolicy';
 import {
   type DedupMatchKind,
   type IndexedLedgerOperation,
@@ -31,11 +33,7 @@ import {
   lookupDuplicate,
   wouldDoubleCash,
 } from '../../core/invest/ledgerOperationDedup';
-const PASSIVE_INCOME_OPS = new Set(['dividend', 'jcp', 'cash_yield', 'securities_lending']);
-const PASSIVE_EXPENSE_OPS = new Set(['fee', 'penalty_b3']);
-const CAPITAL_OPS = new Set(['capital_deposit', 'capital_withdrawal']);
-const OPTION_OPS = new Set(['put_sell', 'put_buy', 'call_sell', 'call_buy']);
-const TRADE_OPS = new Set(['buy', 'sell']);
+
 
 function parseMetadataObject(raw: unknown): Record<string, unknown> {
   if (!raw) return {};
@@ -61,6 +59,8 @@ function parseMetadataObject(raw: unknown): Record<string, unknown> {
  */
 export class InvestOperations {
   private readonly settlementRules: SettlementRulesService;
+  private readonly operationPolicies: InvestOperationPolicyService;
+  private readonly cashPolicy: InvestCashAccountPolicy;
 
   constructor(
     private readonly gateway: CoCeoDataGateway,
@@ -72,25 +72,20 @@ export class InvestOperations {
      * Registry do header canonico (business_events). Opcional pra nao quebrar
      * callers legados, mas todo write novo deveria ja passar.
      */
-    private readonly businessEvents: BusinessEventRegistry
+    private readonly businessEvents: BusinessEventRegistry,
+    cashPolicy?: InvestCashAccountPolicy
   ) {
     this.settlementRules = new SettlementRulesService(gateway);
+    this.operationPolicies = new InvestOperationPolicyService(gateway);
+    this.cashPolicy = cashPolicy ?? new InvestCashAccountPolicy(gateway);
   }
 
-  /**
-   * Mapeia operacao de import (LedgerTransactionType) para event_kind canonico.
-   */
-  private static kindOf(op: string): BusinessEventKind {
-    if (op === 'opening_balance') return 'opening_balance';
-    if (op === 'buy' || op === 'sell' || op === 'pending_settlement') return 'broker_note_spot';
-    if (op === 'put_sell' || op === 'put_buy' || op === 'call_sell' || op === 'call_buy' || op === 'option_exercise') {
-      return 'broker_note_option';
-    }
-    if (op === 'split' || op === 'bonus' || op === 'revaluation') return 'corporate_action';
-    if (op === 'securities_lending') return 'broker_note_loan';
-    // dividend, jcp, cash_yield, fee, penalty_b3, capital_*, cost_adjustment
-    return 'cash_movement';
+  private brokerCodeFromLine(line: LedgerImportLine): string {
+    // Transitional default until broker adapters provide brokerCode explicitly.
+    return line.broker_code ?? line.counterparty ?? 'BTG';
   }
+
+
 
   /**
    * Resolve qual business_event vincular a linha:
@@ -108,10 +103,10 @@ export class InvestOperations {
    */
   private async resolveOrCreateEvent(
     ctx: UserContext,
-    line: LedgerImportLine
+    line: LedgerImportLine,
+    kind: BusinessEventKind
   ): Promise<string> {
     if (line.business_event_id) return line.business_event_id;
-    const kind = InvestOperations.kindOf(String(line.operation));
     const net = Number(line.total_net_value ?? line.quantity * line.unit_price);
     if (line.event_source_ref) {
       const { event } = await this.businessEvents.ensureByRef(ctx, {
@@ -258,7 +253,7 @@ export class InvestOperations {
         broker_note_ref: brokerRef,
         event_source_ref: `OPENING:${asOfDate}`,
         source_system: 'invest_operations.opening_position',
-      }));
+      }, 'opening_balance'));
     const { entry, state } = await this.inventoryLedger.recordMovement(ctx, {
       itemId: item.id,
       transactionDate: asOfDate,
@@ -324,39 +319,54 @@ export class InvestOperations {
       businessEventId?: string | null;
     }
   ): Promise<{ accountId: string; entryId: string | null }> {
-    const name = input.accountName ?? `Caixa ${input.brokerCode}`;
-    const account = await this.accountRegistry.register(ctx, {
-      sourceModule: 'INVEST',
-      accountType: 'brokerage',
-      name,
-      externalId: input.externalId ?? input.brokerCode,
-      openingBalance: 0,
-      openingDate: asOfDate,
-      metadata: { broker_code: input.brokerCode },
+    const policy = await this.cashPolicy.resolve(ctx, {
+      brokerCode: input.brokerCode,
+      eventDate: asOfDate,
     });
+    
+    let accountId = policy.financialAccountId;
+    if (!accountId) {
+      const name = input.accountName ?? policy.cashName;
+      const account = await this.accountRegistry.register(ctx, {
+        sourceModule: 'INVEST',
+        accountType: policy.financialAccountType as any,
+        name,
+        externalId: input.externalId ?? policy.financialAccountExternalId,
+        openingBalance: 0,
+        openingDate: asOfDate,
+        metadata: { broker_code: policy.brokerCode, cash_ticker: policy.cashTicker, currency_code: policy.currencyCode, cash_policy_id: policy.policyId },
+      });
+      accountId = account.id;
+      await this.cashPolicy.bindFinancialAccount(ctx, {
+        policyId: policy.policyId,
+        financialAccountId: account.id,
+        cashTicker: policy.cashTicker,
+        currencyCode: policy.currencyCode,
+      });
+    }
 
     const eventId =
       input.businessEventId ??
       (await this.resolveOrCreateEvent(ctx, {
         date: asOfDate,
-        ticker: `CAIXA-${input.brokerCode}`,
+        ticker: policy.cashTicker,
         operation: 'opening_balance',
         quantity: 1,
         unit_price: input.balance,
         total_net_value: input.balance,
         event_source_ref: `OPENING:${asOfDate}`,
         source_system: 'invest_operations.opening_cash',
-      }));
+      }, 'opening_balance'));
 
     if (input.balance === 0) {
-      return { accountId: account.id, entryId: null };
+      return { accountId, entryId: null };
     }
 
     const existingOpening = (await this.gateway.findWhere(
       ctx,
       'financial_ledger_entries',
       {
-        account_id: account.id,
+        account_id: accountId,
         transaction_date: asOfDate,
         business_event_id: eventId,
       },
@@ -370,11 +380,11 @@ export class InvestOperations {
       );
     });
     if (existing) {
-      return { accountId: account.id, entryId: existing.id };
+      return { accountId, entryId: existing.id };
     }
 
     const entry = await this.financialLedger.record(ctx, {
-      accountId: account.id,
+      accountId,
       transactionDate: asOfDate,
       direction: input.balance >= 0 ? 'in' : 'out',
       amount: Math.abs(input.balance),
@@ -385,7 +395,7 @@ export class InvestOperations {
       metadata: { legacy_op: 'opening_balance' },
     });
 
-    return { accountId: account.id, entryId: entry.id };
+    return { accountId, entryId: entry.id };
   }
 
   /**
@@ -600,28 +610,56 @@ export class InvestOperations {
   }
 
   /**
-   * Resolve a conta de caixa canonica para um lancamento financeiro. Se o
-   * ticker eh CAIXA-X, busca por external_id=X. Se nao, usa a primeira conta
-   * INVEST da org (fallback). Cria sob demanda.
+   * Resolve a conta de caixa canonica para um lancamento financeiro.
+   * Utiliza a InvestCashAccountPolicy para determinar qual conta usar baseada
+   * na organizacao, broker e moeda. Cria sob demanda caso nao exista.
    */
   private async resolveCashAccount(
     ctx: UserContext,
-    ticker: string,
-    asOfDate: string
-  ): Promise<{ accountId: string }> {
-    const external = InvestOperations.cashTickerToExternalId(ticker) ?? 'CASH';
-    let account = await this.accountRegistry.findByExternalId(ctx, 'INVEST', external);
-    if (!account) {
-      account = await this.accountRegistry.register(ctx, {
-        sourceModule: 'INVEST',
-        accountType: 'brokerage',
-        name: `Caixa ${external}`,
-        externalId: external,
-        openingBalance: 0,
-        openingDate: asOfDate,
-      });
+    input: {
+      brokerCode?: string | null;
+      sourceSystem?: string | null;
+      currencyCode?: string | null;
+      eventDate?: string | null;
     }
-    return { accountId: account.id };
+  ): Promise<{ accountId: string; cashTicker: string; policyId: string; brokerCode: string; currencyCode: string }> {
+    const policy = await this.cashPolicy.resolve(ctx, input);
+
+    if (policy.financialAccountId) {
+      return { 
+        accountId: policy.financialAccountId, 
+        cashTicker: policy.cashTicker, 
+        policyId: policy.policyId, 
+        brokerCode: policy.brokerCode, 
+        currencyCode: policy.currencyCode 
+      };
+    }
+
+    // Register new account using financialAccountExternalId
+    const account = await this.accountRegistry.register(ctx, {
+      sourceModule: 'INVEST',
+      accountType: policy.financialAccountType as any,
+      name: policy.cashName,
+      externalId: policy.financialAccountExternalId,
+      openingBalance: 0,
+      openingDate: input.eventDate ?? new Date().toISOString().slice(0, 10),
+      metadata: { broker_code: policy.brokerCode, cash_ticker: policy.cashTicker, currency_code: policy.currencyCode, cash_policy_id: policy.policyId },
+    });
+
+    await this.cashPolicy.bindFinancialAccount(ctx, {
+      policyId: policy.policyId,
+      financialAccountId: account.id,
+      cashTicker: policy.cashTicker,
+      currencyCode: policy.currencyCode,
+    });
+
+    return { 
+      accountId: account.id, 
+      cashTicker: policy.cashTicker, 
+      policyId: policy.policyId, 
+      brokerCode: policy.brokerCode, 
+      currencyCode: policy.currencyCode 
+    };
   }
 
   /**
@@ -701,7 +739,12 @@ export class InvestOperations {
     const declaredType = String(line.asset_type ?? '').trim();
     const assetType = declaredType || inferAssetType(ticker);
     const isCash = assetType === 'cash' || ticker.startsWith('CAIXA-');
-    const businessEventId = await this.resolveOrCreateEvent(ctx, line);
+    const policy = await this.operationPolicies.resolve(ctx, {
+      operationCode: op,
+      assetType,
+      eventDate: line.date,
+    });
+    const businessEventId = await this.resolveOrCreateEvent(ctx, line, policy.businessEventKind);
 
     // Opening_balance vai pelo caminho dedicado. Repassa businessEventId pra
     // garantir rastreabilidade no header OPENING:{date}.
@@ -742,9 +785,15 @@ export class InvestOperations {
       return { skipped: false };
     }
 
-    if (PASSIVE_INCOME_OPS.has(op) || CAPITAL_OPS.has(op)) {
-      const { accountId } = await this.resolveCashAccount(ctx, ticker, line.date);
-      const direction: 'in' | 'out' = op === 'capital_withdrawal' ? 'out' : 'in';
+    if (policy.isPassiveIncome || policy.isExternalFlowForTwr) {
+      const cashResolution = await this.resolveCashAccount(ctx, {
+        brokerCode: this.brokerCodeFromLine(line),
+        sourceSystem: line.source_system,
+        currencyCode: line.currency ?? 'BRL',
+        eventDate: line.date,
+      });
+      const accountId = cashResolution.accountId;
+      const direction = policy.cashDirection as 'in' | 'out';
       const amount = Math.abs(
         Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price))
       );
@@ -766,10 +815,14 @@ export class InvestOperations {
           line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)
         ),
         skip_financial_ledger: Boolean(line.skip_financial_ledger),
+        broker_code: cashResolution.brokerCode,
+        cash_ticker: cashResolution.cashTicker,
+        currency_code: cashResolution.currencyCode,
+        cash_policy_id: cashResolution.policyId,
       };
       // Registra o ticker candidato no metadata para rastreabilidade futura
       // (quando source do dividendo for identificavel).
-      if (PASSIVE_INCOME_OPS.has(op) && !isCash) {
+      if (policy.isPassiveIncome && !isCash) {
         finMeta.target_ticker = ticker;
       }
 
@@ -789,8 +842,14 @@ export class InvestOperations {
       return { skipped: false };
     }
 
-    if (PASSIVE_EXPENSE_OPS.has(op)) {
-      const { accountId } = await this.resolveCashAccount(ctx, ticker, line.date);
+    if (policy.isPassiveExpense) {
+      const cashResolution = await this.resolveCashAccount(ctx, {
+        brokerCode: this.brokerCodeFromLine(line),
+        sourceSystem: line.source_system,
+        currencyCode: line.currency ?? 'BRL',
+        eventDate: line.date,
+      });
+      const accountId = cashResolution.accountId;
       const amount = Math.abs(
         Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price))
       );
@@ -829,6 +888,10 @@ export class InvestOperations {
       const expFinMeta: Record<string, unknown> = {
         legacy_op: op,
         broker_note_ref: ref ?? null,
+        broker_code: cashResolution.brokerCode,
+        cash_ticker: cashResolution.cashTicker,
+        currency_code: cashResolution.currencyCode,
+        cash_policy_id: cashResolution.policyId,
       };
       if (!isCash) {
         expFinMeta.target_ticker = ticker;
@@ -858,7 +921,7 @@ export class InvestOperations {
       return { skipped: false };
     }
 
-    if (op === 'cost_adjustment') {
+    if (policy.inventoryMovementType === 'cost_adjustment' && policy.affectsPortfolio && !policy.isPassiveExpense) {
       if (isCash) {
         return {
           skipped: true,
@@ -895,7 +958,13 @@ export class InvestOperations {
         },
       });
 
-      const { accountId } = await this.resolveCashAccount(ctx, 'CAIXA-DEFAULT', line.date);
+      const cashResolution = await this.resolveCashAccount(ctx, {
+        brokerCode: this.brokerCodeFromLine(line),
+        sourceSystem: line.source_system,
+        currencyCode: line.currency ?? 'BRL',
+        eventDate: line.date,
+      });
+      const accountId = cashResolution.accountId;
       const caFinEntry = await this.financialLedger.record(ctx, {
         accountId,
         transactionDate: line.date,
@@ -911,6 +980,10 @@ export class InvestOperations {
           broker_note_ref: ref ?? null,
           target_ticker: ticker,
           patrimony_item_id: item.id,
+          broker_code: cashResolution.brokerCode,
+          cash_ticker: cashResolution.cashTicker,
+          currency_code: cashResolution.currencyCode,
+          cash_policy_id: cashResolution.policyId,
         },
       });
 
@@ -921,8 +994,14 @@ export class InvestOperations {
       return { skipped: false };
     }
 
-    if (op === 'pending_settlement') {
-      const { accountId } = await this.resolveCashAccount(ctx, ticker, line.date);
+    if (policy.defaultFinancialStatus === 'pending') {
+      const cashResolution = await this.resolveCashAccount(ctx, {
+        brokerCode: this.brokerCodeFromLine(line),
+        sourceSystem: line.source_system,
+        currencyCode: line.currency ?? 'BRL',
+        eventDate: line.date,
+      });
+      const accountId = cashResolution.accountId;
       const netValue = Number(line.total_net_value ?? 0);
       const direction: 'in' | 'out' = netValue >= 0 ? 'in' : 'out';
       const amount = Math.abs(netValue);
@@ -937,7 +1016,14 @@ export class InvestOperations {
         settlementDate: line.settlement_date ?? line.date,
         businessEventId,
         externalRef: ref ? `BROKER_REF:${ref}` : null,
-        metadata: { legacy_op: op, broker_note_ref: ref ?? null },
+        metadata: { 
+          legacy_op: op, 
+          broker_note_ref: ref ?? null,
+          broker_code: cashResolution.brokerCode,
+          cash_ticker: cashResolution.cashTicker,
+          currency_code: cashResolution.currencyCode,
+          cash_policy_id: cashResolution.policyId,
+        },
       });
       return { skipped: false };
     }
@@ -962,43 +1048,32 @@ export class InvestOperations {
       | 'split'
       | 'bonus'
       | 'revaluation';
-    let quantityDelta: number;
+    let quantityDelta = 0;
     let cashDirection: 'in' | 'out' | null = null;
 
-    if (TRADE_OPS.has(op)) {
-      movementType = op === 'buy' ? 'acquisition' : 'disposition';
-      quantityDelta = op === 'buy' ? Math.abs(line.quantity) : -Math.abs(line.quantity);
-      cashDirection = op === 'buy' ? 'out' : 'in';
-    } else if (OPTION_OPS.has(op)) {
-      // Toda venda (put_sell/call_sell) eh disposition. Toda compra
-      // (put_buy/call_buy) eh acquisition. O estado de "short" e derivado
-      // pela quantidade resultante (qty < 0 = posicao vendida liquida).
-      if (op === 'put_sell' || op === 'call_sell') {
-        movementType = 'disposition';
-        quantityDelta = -Math.abs(line.quantity);
-        cashDirection = 'in';
+    movementType = policy.inventoryMovementType as any;
+    
+    if (policy.isTrade || policy.isOptionTrade) {
+      if (policy.inventoryMovementType === 'signed_quantity') {
+        const signed = Number(line.quantity);
+        movementType = signed >= 0 ? 'acquisition' : 'disposition';
+        quantityDelta = signed;
+        const netValue = Number(line.total_net_value ?? 0);
+        cashDirection = netValue >= 0 ? 'in' : 'out';
       } else {
-        movementType = 'acquisition';
-        quantityDelta = Math.abs(line.quantity);
-        cashDirection = 'out';
+        quantityDelta = policy.inventoryMovementType === 'disposition' ? -Math.abs(line.quantity) : Math.abs(line.quantity);
+        cashDirection = policy.cashDirection as 'in' | 'out';
       }
-    } else if (op === 'option_exercise') {
-      const signed = Number(line.quantity);
-      movementType = signed >= 0 ? 'acquisition' : 'disposition';
-      quantityDelta = signed;
-      const netValue = Number(line.total_net_value ?? 0);
-      cashDirection = netValue >= 0 ? 'in' : 'out';
-    } else if (op === 'split') {
-      movementType = 'split';
-      quantityDelta = Number(line.quantity);
-    } else if (op === 'bonus') {
-      movementType = 'bonus';
-      quantityDelta = Math.abs(line.quantity);
-    } else if (op === 'revaluation') {
-      movementType = 'revaluation';
-      quantityDelta = 0;
+    } else if (policy.isCorporateAction) {
+      if (policy.inventoryMovementType === 'split') {
+        quantityDelta = Number(line.quantity);
+      } else if (policy.inventoryMovementType === 'bonus') {
+        quantityDelta = Math.abs(line.quantity);
+      } else if (policy.inventoryMovementType === 'revaluation') {
+        quantityDelta = 0;
+      }
     } else {
-      return { skipped: true, reason: `operacao desconhecida: ${op}` };
+      return { skipped: true, reason: `operacao não suportada no fluxo patrimonial: ${op}` };
     }
 
     const { entry: tradePatEntry } = await this.inventoryLedger.recordMovement(ctx, {
@@ -1031,7 +1106,7 @@ export class InvestOperations {
     });
 
     const isOptionTrade =
-      assetClass === 'option_call' || assetClass === 'option_put' || OPTION_OPS.has(op);
+      assetClass === 'option_call' || assetClass === 'option_put' || policy.isOptionTrade;
     if (isOptionTrade && line.option_strike != null && line.option_strike > 0) {
       const und = inferUnderlyingTicker(ticker, line.underlying_ticker);
       if (und) {
@@ -1048,7 +1123,13 @@ export class InvestOperations {
     // Corporate actions (split/bonus/revaluation): sem fluxo de caixa → apenas perna patrimonial.
     // Pernas sem link sao legitimas quando genuinamente nao ha relacao com o outro mundo.
     if (cashDirection && !line.skip_financial_ledger) {
-      const { accountId } = await this.resolveCashAccount(ctx, 'CAIXA-DEFAULT', line.date);
+      const cashResolution = await this.resolveCashAccount(ctx, {
+        brokerCode: this.brokerCodeFromLine(line),
+        sourceSystem: line.source_system,
+        currencyCode: line.currency ?? 'BRL',
+        eventDate: line.date,
+      });
+      const accountId = cashResolution.accountId;
       const totalCash = Math.abs(Number(line.total_net_value ?? line.quantity * line.unit_price));
       const fees = Math.abs(
         (line.brokerage_fee ?? 0) + (line.b3_fees ?? 0) + (line.irrf_tax ?? 0)
@@ -1082,6 +1163,10 @@ export class InvestOperations {
             irrf_tax: line.irrf_tax ?? 0,
             patrimony_item_id: item.id,
             target_ticker: ticker,
+            broker_code: cashResolution.brokerCode,
+            cash_ticker: cashResolution.cashTicker,
+            currency_code: cashResolution.currencyCode,
+            cash_policy_id: cashResolution.policyId,
           },
         });
         // Link bidirecional: trade tem AMBAS as pernas → relaciona-las explicitamente.

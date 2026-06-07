@@ -108,6 +108,11 @@ export class LiqBolsaSettlementService {
     settlementDate: string,
     accountId?: string
   ): Promise<LiqBolsaCandidate[]> {
+    // TODO [INVEST POLICY REFACTOR]:
+    // Esta lista de `bolsaKinds` está hardcoded com os IDs legados das operações e dos `business_events` 
+    // gerados no passado. No futuro, quando a infraestrutura de catalog for expandida com regras de liquidação,
+    // o `InvestOperationPolicyService` deverá ser utilizado aqui para inferir dinamicamente
+    // se o evento liquida em bolsa (ex: `policy.settlementMode === 'liq_bolsa'`).
     const bolsaKinds = new Set([
       'broker_note_spot',
       'broker_note_option',

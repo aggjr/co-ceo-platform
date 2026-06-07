@@ -15,6 +15,7 @@ import { inferAssetType, isOptionTicker } from './assetClassifier';
 import { ModuleCategories } from '../module-registry';
 import { AssetValuationContext } from './valuation/AssetValuationContext';
 import { FxRateRepository } from '../market/FxRateRepository';
+import { InvestOperationPolicyService } from './InvestOperationPolicyService';
 
 export type RecordDailyPatrimonyResult = {
   snapshotDate: string;
@@ -35,6 +36,7 @@ export class PatrimonyDailyRecorder {
   private readonly categories: ModuleCategories;
   private readonly valuationContext: AssetValuationContext;
   private readonly fxRates: FxRateRepository;
+  private readonly policyService: InvestOperationPolicyService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -46,6 +48,7 @@ export class PatrimonyDailyRecorder {
     this.categories = new ModuleCategories(gateway);
     this.valuationContext = new AssetValuationContext(gateway);
     this.fxRates = new FxRateRepository(gateway);
+    this.policyService = new InvestOperationPolicyService(gateway);
   }
 
   private isWeekend(iso: string): boolean {
@@ -234,7 +237,7 @@ export class PatrimonyDailyRecorder {
     const rfForEconomic = rfLedger;
 
     const useCalibration =
-      !opts?.economicOnly && hasAnchors && shouldUseBtgAnchorCalibration(events);
+      !opts?.economicOnly && hasAnchors && (await shouldUseBtgAnchorCalibration(ctx, events, this.policyService));
     const valuationSnapshot = await this.valuationContext.load(ctx);
     const fxByPair = new Map<string, number>();
     const foreignCurrencies = new Set(

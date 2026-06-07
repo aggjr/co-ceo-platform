@@ -21,7 +21,9 @@ export type GatewayErrorCode =
   | 'UNKNOWN_VALUATION_METHOD'
   | 'UNKNOWN_SETTLEMENT_PROFILE'
   | 'INVENTORY_RULE_VIOLATION'
-  | 'FINANCIAL_RULE_VIOLATION';
+  | 'FINANCIAL_RULE_VIOLATION'
+  | 'UNKNOWN_INVEST_OPERATION'
+  | 'INVEST_CASH_ACCOUNT_POLICY_NOT_FOUND';
 
 export class GatewayError extends Error {
   readonly code: GatewayErrorCode;

@@ -34,6 +34,9 @@ type UnderlyingState = {
 const DEFAULT_BASE_ASSET_TYPES = ['stock', 'fii'];
 const DEFAULT_OPTION_ASSET_TYPES = ['option_call', 'option_put'];
 
+// TODO [INVEST POLICY REFACTOR]:
+// Estes Sets refletem as lógicas pré-catálogo. No futuro, estas verificações 
+// deverão ser migradas para consultar o `InvestOperationPolicyService` (ex: `policy.isOptionTrade` e `policy.signedQuantity < 0`).
 const OPTION_SELL_TX = new Set(['put_sell', 'call_sell']);
 const OPTION_BUY_TX = new Set(['put_buy', 'call_buy']);
 

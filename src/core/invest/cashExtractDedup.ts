@@ -5,6 +5,11 @@ import type { LedgerEvent } from './CustodyEngine';
 import { isCashInvestTicker } from './cashInvestLedger';
 import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
 
+// TODO [INVEST POLICY REFACTOR]:
+// Estes Sets refletem as lógicas pré-catálogo. No futuro, estas verificações 
+// deverão ser migradas para consultar o `InvestOperationPolicyService` ou para
+// uma camada de deduplicação que tenha acesso ao contexto de banco (já que este 
+// arquivo lida com structs DTO puros sincronamente).
 const TRADE_OPS = new Set<LedgerTransactionType>(['buy', 'sell']);
 const OPTION_OPS = new Set<LedgerTransactionType>([
   'put_sell',

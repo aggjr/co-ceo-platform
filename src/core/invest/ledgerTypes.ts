@@ -33,8 +33,15 @@ export const LEDGER_TRANSACTION_TYPES = [
 /** Ticker sintético por corretora para lançamentos de extrato (caixa). */
 export const CASH_TICKER_PREFIX = 'CAIXA-';
 
-/** Conta corrente BTG no livro razão INVEST (identificador canônico). */
+/**
+ * @deprecated Use InvestCashAccountPolicy. Mantido apenas para compatibilidade
+ * com testes e importadores legados ate a remocao final.
+ */
 export const MAIN_CASH_TICKER = 'CAIXA-BTG';
+/**
+ * @deprecated Use InvestCashAccountPolicy. Mantido apenas para compatibilidade
+ * com testes e importadores legados ate a remocao final.
+ */
 export const MAIN_CASH_NAME = 'Conta Corrente BTG';
 
 export type LedgerTransactionType = (typeof LEDGER_TRANSACTION_TYPES)[number];
@@ -136,6 +143,10 @@ export type LedgerImportLine = {
   source_system?: string;
   /** Versao do parser (commit sha curto). */
   source_version?: string;
+  /** Corretora que originou a linha (transicional). */
+  broker_code?: string;
+  /** Moeda da linha (default BRL). */
+  currency?: string;
   /** Contraparte legivel: 'BTG Pactual', etc. */
   counterparty?: string;
   /**
