@@ -57,7 +57,22 @@ function mockPoolForPreview(
 
 function mockGateway(): CoCeoDataGateway {
   return {
-    findWhere: jest.fn(),
+    findWhere: jest.fn(async (_ctx, table) => {
+      if (table === 'invest_book_periods') {
+        return [
+          {
+            id: 'book-custom',
+            book_code: 'INVEST',
+            opening_date: '2025-07-01',
+            opening_source_ref: 'OPENING:2025-07-01',
+            fiscal_year: 2025,
+            status: 'active',
+            is_default: 1,
+          },
+        ];
+      }
+      return [];
+    }),
     insert: jest.fn(),
     readQuery: jest.fn(),
     findById: jest.fn(),
@@ -77,7 +92,7 @@ describe('HoldingPurgeKeepOpeningService', () => {
         asset_ticker: 'PRIO3',
         asset_type: 'stock',
         transaction_type: 'opening_balance',
-        transaction_date: '2026-01-01',
+        transaction_date: '2025-07-01',
         quantity: 100,
         unit_price: 40,
         total_net_value: -4000,
@@ -92,8 +107,8 @@ describe('HoldingPurgeKeepOpeningService', () => {
     );
     const pf = await service.preflight(ctx);
     expect(pf.needsDataModeChoice).toBe(true);
-    expect(pf.openingDate).toBe('2026-01-01');
-    expect(pf.openingRef).toBe('OPENING:2026-01-01');
+    expect(pf.openingDate).toBe('2025-07-01');
+    expect(pf.openingRef).toBe('OPENING:2025-07-01');
     expect(pf.purgePreview?.patrimonyLegsToRemove).toBe(10);
   });
 

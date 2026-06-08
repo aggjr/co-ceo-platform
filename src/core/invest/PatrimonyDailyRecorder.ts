@@ -1,6 +1,8 @@
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
+import { GatewayError } from '../dal/errors';
 import { LedgerImportService } from './LedgerImportService';
+import { InvestBookPeriodService } from './InvestBookPeriodService';
 import { buildDailyPatrimonyMtmSeries } from './PatrimonyMtmDailyEngine';
 import { interpolatePatrimonyTarget } from './patrimonyAnchors';
 import { PatrimonyMonthlyAnchorsRepository } from './PatrimonyMonthlyAnchorsRepository';
@@ -37,6 +39,7 @@ export class PatrimonyDailyRecorder {
   private readonly valuationContext: AssetValuationContext;
   private readonly fxRates: FxRateRepository;
   private readonly policyService: InvestOperationPolicyService;
+  private readonly periods: InvestBookPeriodService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -49,6 +52,7 @@ export class PatrimonyDailyRecorder {
     this.valuationContext = new AssetValuationContext(gateway);
     this.fxRates = new FxRateRepository(gateway);
     this.policyService = new InvestOperationPolicyService(gateway);
+    this.periods = new InvestBookPeriodService(gateway);
   }
 
   private isWeekend(iso: string): boolean {
@@ -182,8 +186,15 @@ export class PatrimonyDailyRecorder {
     const anchors = await this.anchorsRepo.loadForOrganization(ctx);
     const hasAnchors = anchors.month_ends.length > 0;
 
-    const events = await this.ledger.listLedgerEvents(ctx, '2020-01-01', date);
-    const bounds = resolveInvestPeriodBounds(events);
+    const period = await this.resolvePeriodOrNull(ctx);
+    const events = await this.ledger.listLedgerEvents(
+      ctx,
+      period?.openingDate ?? '2020-01-01',
+      date
+    );
+    const bounds = resolveInvestPeriodBounds(events, {
+      openingDate: period?.openingDate ?? null,
+    });
     const ledgerFrom = bounds.periodMin || date;
 
     const quoteMap = await this.marketQuotes.loadQuoteMapForRange(ctx, ledgerFrom, date);
@@ -348,5 +359,16 @@ export class PatrimonyDailyRecorder {
       economicPatrimony: economicPoint.patrimony,
       btgPatrimony,
     };
+  }
+
+  private async resolvePeriodOrNull(ctx: UserContext) {
+    try {
+      return await this.periods.resolveDefault(ctx);
+    } catch (err) {
+      if (err instanceof GatewayError && err.code === 'INVEST_BOOK_PERIOD_NOT_FOUND') {
+        return null;
+      }
+      throw err;
+    }
   }
 }

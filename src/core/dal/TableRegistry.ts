@@ -245,6 +245,10 @@ const TABLES: TableDefinition[] = [
     softDelete: false,
     countsTowardStorage: false,
   }),
+  def('invest_book_periods', 'tenant', {
+    softDelete: false,
+    countsTowardStorage: false,
+  }),
   // ===== Mercado (cotações e índices compartilhados, ver migration 20) =====
   def('invest_options_fetch_cache', 'global', {
     softDelete: false,

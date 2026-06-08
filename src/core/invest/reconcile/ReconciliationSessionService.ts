@@ -9,6 +9,7 @@ import type { BtgUploadFileInput } from '../btgUploadImportService';
 import { previewBtgBrokerageUpload } from '../btgUploadImportService';
 import { buildBrokerageNoteReviewRows } from '../brokerageNotesReviewFromLedger';
 import { resolveInvestPeriodBounds } from '../investPeriodBounds';
+import { InvestBookPeriodService } from '../InvestBookPeriodService';
 import { ReconciliationAuditService } from './ReconciliationAuditService';
 import { ReconciliationSessionStore, type ReconciliationPhase } from './ReconciliationSessionStore';
 import {
@@ -127,6 +128,7 @@ export class ReconciliationSessionService {
   private readonly patrimonyStore: PatrimonyDailyStore;
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly dailyClose: DailyCloseMaterializeService;
+  private readonly periods: InvestBookPeriodService;
 
   private readonly holdingPurge: HoldingPurgeKeepOpeningService | null;
   private readonly dbPool: Pool | null;
@@ -143,6 +145,7 @@ export class ReconciliationSessionService {
     this.patrimonyStore = new PatrimonyDailyStore(gateway);
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.dailyClose = new DailyCloseMaterializeService(gateway);
+    this.periods = new InvestBookPeriodService(gateway);
     this.holdingPurge = pool ? new HoldingPurgeKeepOpeningService(gateway, pool) : null;
   }
 
@@ -486,8 +489,10 @@ export class ReconciliationSessionService {
         : null;
 
     const audit = await this.audit.run(ctx, { throughDate: asOfDate, scope: 'through' });
+    const period = await this.resolvePeriodOrNull(ctx);
     const bounds = resolveInvestPeriodBounds(
-      await this.ledger.listLedgerEvents(ctx, '2000-01-01', asOfDate)
+      await this.ledger.listLedgerEvents(ctx, period?.openingDate ?? '2000-01-01', asOfDate),
+      { openingDate: period?.openingDate ?? null }
     );
     const stored = await this.patrimonyStore.loadRange(ctx, bounds.periodMin, asOfDate);
 
@@ -599,6 +604,17 @@ export class ReconciliationSessionService {
 
   private async materializeThroughDate(ctx: UserContext, throughDate: string) {
     await this.dailyClose.materializeDay(ctx, throughDate);
+  }
+
+  private async resolvePeriodOrNull(ctx: UserContext) {
+    try {
+      return await this.periods.resolveDefault(ctx);
+    } catch (err) {
+      if (err instanceof GatewayError && err.code === 'INVEST_BOOK_PERIOD_NOT_FOUND') {
+        return null;
+      }
+      throw err;
+    }
   }
 
   private async requireSession(ctx: UserContext, sessionId: string) {

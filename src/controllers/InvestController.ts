@@ -41,6 +41,7 @@ import {
 } from '../core/invest/storedPatrimonyChart';
 
 import { resolveInvestPeriodBounds } from '../core/invest/investPeriodBounds';
+import { InvestBookPeriodService } from '../core/invest/InvestBookPeriodService';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import {
   filterStoredDaysForChartMethod,
@@ -197,6 +198,7 @@ export class InvestController {
   private readonly patrimonyAnchorsRepo: PatrimonyMonthlyAnchorsRepository;
   private readonly valuationContext: AssetValuationContext;
   private readonly fxRates: FxRateRepository;
+  private readonly investPeriods: InvestBookPeriodService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -211,12 +213,25 @@ export class InvestController {
     this.patrimonyAnchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
     this.valuationContext = new AssetValuationContext(gateway);
     this.fxRates = new FxRateRepository(gateway);
+    this.investPeriods = new InvestBookPeriodService(gateway);
   }
 
   private async periodBoundsFor(ctx: UserContext) {
     const today = new Date().toISOString().slice(0, 10);
-    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
-    return resolveInvestPeriodBounds(events);
+    const openingDate = await this.ledgerStartDateFor(ctx);
+    const events = await this.ledger.listLedgerEvents(ctx, openingDate, today);
+    return resolveInvestPeriodBounds(events, { openingDate });
+  }
+
+  private async ledgerStartDateFor(ctx: UserContext, fallback = '2000-01-01'): Promise<string> {
+    try {
+      return (await this.investPeriods.resolveDefault(ctx)).openingDate;
+    } catch (err) {
+      if (err instanceof GatewayError && err.code === 'INVEST_BOOK_PERIOD_NOT_FOUND') {
+        return fallback;
+      }
+      throw err;
+    }
   }
 
   getInvestUiContext = async (req: Request, res: Response) => {
@@ -266,7 +281,7 @@ export class InvestController {
     const today = new Date().toISOString().slice(0, 10);
     const ledgerEvents = await this.ledger.listLedgerEvents(
       ctx,
-      '2000-01-01',
+      await this.ledgerStartDateFor(ctx),
       today
     );
     const { assets: ledgerCustody } = rebuildCustodyFromLedger(ledgerEvents);
@@ -556,7 +571,11 @@ export class InvestController {
       const quoteMap = await this.marketQuoteRepo.loadLatestQuoteMap(ctx, [underlying]);
       const mq = quoteMap.get(underlying);
       const today = new Date().toISOString().slice(0, 10);
-      const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+      const events = await this.ledger.listLedgerEvents(
+        ctx,
+        await this.ledgerStartDateFor(ctx),
+        today
+      );
       const threePrices = computeThreePricesByUnderlying(events, today).get(underlying);
       return res.json({
         success: true,
@@ -1116,7 +1135,11 @@ export class InvestController {
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+    const events = await this.ledger.listLedgerEvents(
+      ctx,
+      await this.ledgerStartDateFor(ctx),
+      today
+    );
     const rows = buildBrokerageNoteReviewRows(events, today);
 
     const notesCount = new Set<string>();
@@ -1162,7 +1185,11 @@ export class InvestController {
     }
 
     const today = new Date().toISOString().slice(0, 10);
-    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+    const events = await this.ledger.listLedgerEvents(
+      ctx,
+      await this.ledgerStartDateFor(ctx),
+      today
+    );
     const cashEvents = events.filter((e) => e.asset_type === 'cash');
     const tradeEvents = events.filter((e) => e.asset_type !== 'cash');
 
@@ -1723,7 +1750,11 @@ export class InvestController {
         return res.status(400).json({ success: false, error: 'Personifique a holding.' });
       }
       const today = new Date().toISOString().slice(0, 10);
-      const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+      const events = await this.ledger.listLedgerEvents(
+        ctx,
+        await this.ledgerStartDateFor(ctx),
+        today
+      );
       const priceMap = computeThreePricesByUnderlying(events, today);
 
       const rows: ThreePricesRow[] = [];
@@ -1754,7 +1785,11 @@ export class InvestController {
         return res.status(400).json({ success: false, error: 'Personifique a holding.' });
       }
       const today = new Date().toISOString().slice(0, 10);
-      const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+      const events = await this.ledger.listLedgerEvents(
+        ctx,
+        await this.ledgerStartDateFor(ctx),
+        today
+      );
       const { assets } = rebuildCustodyFromLedger(events);
       const priceMap = computeThreePricesByUnderlying(events, today);
 
@@ -1834,7 +1869,11 @@ export class InvestController {
       }));
 
       if (series.length === 0) {
-        const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', to);
+        const events = await this.ledger.listLedgerEvents(
+          ctx,
+          await this.ledgerStartDateFor(ctx),
+          to
+        );
         const mtm = buildDailyPatrimonyMtmSeries(events, from, to, {});
         return res.json({
           success: true,
@@ -1855,7 +1894,11 @@ export class InvestController {
         return res.status(400).json({ success: false, error: 'Personifique a holding.' });
       }
       const asOf = String(req.query.asOf ?? new Date().toISOString().slice(0, 10)).slice(0, 10);
-      const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', asOf);
+      const events = await this.ledger.listLedgerEvents(
+        ctx,
+        await this.ledgerStartDateFor(ctx),
+        asOf
+      );
       const summary = buildCashInTransitSummary(events, asOf);
       return res.json({ success: true, data: summary });
     } catch (err) {

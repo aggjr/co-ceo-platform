@@ -1,4 +1,5 @@
 import type { CoCeoDataGateway, UserContext } from '../../dal';
+import { GatewayError } from '../../dal/errors';
 import { authBootstrapContext } from '../../auth/authBootstrapContext';
 import { InvestQuoteSyncService } from '../InvestQuoteSyncService';
 import { OptionMarketSyncService } from '../OptionMarketSyncService';
@@ -20,6 +21,7 @@ import {
   contributesToMarketPricedPatrimony,
   isOptionCategory,
 } from '../valuation/AssetValuationContext';
+import { InvestBookPeriodService } from '../InvestBookPeriodService';
 
 export type QuoteSyncDayReport = {
   date: string;
@@ -60,6 +62,7 @@ export class DailyCloseMaterializeService {
   private readonly categories: ModuleCategories;
   private readonly fxRates: FxRateRepository;
   private readonly valuation: AssetValuationContext;
+  private readonly periods: InvestBookPeriodService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.quoteSync = new InvestQuoteSyncService(gateway);
@@ -72,6 +75,7 @@ export class DailyCloseMaterializeService {
     this.categories = new ModuleCategories(gateway);
     this.fxRates = new FxRateRepository(gateway);
     this.valuation = new AssetValuationContext(gateway);
+    this.periods = new InvestBookPeriodService(gateway);
   }
 
   async syncQuotesForDate(ctx: UserContext, date: string): Promise<QuoteSyncDayReport> {
@@ -194,7 +198,12 @@ export class DailyCloseMaterializeService {
     asOfDate: string
   ): Promise<{ positionsUpdated: number; positionsZeroed: number }> {
     const limitDate = asOfDate ? asOfDate.slice(0, 10) : new Date().toISOString().slice(0, 10);
-    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', limitDate);
+    const period = await this.resolvePeriodOrNull(ctx);
+    const events = await this.ledger.listLedgerEvents(
+      ctx,
+      period?.openingDate ?? '2000-01-01',
+      limitDate
+    );
     const { assets } = rebuildCustodyFromLedger(events);
     this.valuation.clear();
     const valuationSnapshot = await this.valuation.load(ctx);
@@ -309,6 +318,17 @@ export class DailyCloseMaterializeService {
 
     void asOfDate;
     return { positionsUpdated, positionsZeroed };
+  }
+
+  private async resolvePeriodOrNull(ctx: UserContext) {
+    try {
+      return await this.periods.resolveDefault(ctx);
+    } catch (err) {
+      if (err instanceof GatewayError && err.code === 'INVEST_BOOK_PERIOD_NOT_FOUND') {
+        return null;
+      }
+      throw err;
+    }
   }
 
   private async upsertPositionExt(

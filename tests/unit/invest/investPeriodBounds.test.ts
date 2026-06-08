@@ -60,4 +60,34 @@ describe('resolveInvestPeriodBounds', () => {
     expect(bounds.chartBenchmarkTicker).toBe('VALE3');
     if (prev) process.env.INVEST_CHART_BENCHMARK_TICKER = prev;
   });
+  it('usa abertura configurada mesmo quando existe lancamento anterior', () => {
+    const events: LedgerEvent[] = [
+      {
+        transaction_date: '2025-01-01',
+        transaction_type: 'opening_balance',
+        asset_id: 'old',
+        asset_ticker: 'PETR4',
+        asset_type: 'stock',
+        quantity: 100,
+        unit_price: 10,
+        total_net_value: 1000,
+      },
+      {
+        transaction_date: '2025-07-01',
+        transaction_type: 'opening_balance',
+        asset_id: 'new',
+        asset_ticker: 'VALE3',
+        asset_type: 'stock',
+        quantity: 100,
+        unit_price: 20,
+        total_net_value: 2000,
+      },
+    ];
+
+    const bounds = resolveInvestPeriodBounds(events, { openingDate: '2025-07-01' });
+
+    expect(bounds.openingDate).toBe('2025-07-01');
+    expect(bounds.defaultFrom).toBe('2025-07-01');
+    expect(bounds.periodMin).toBe('2025-07-01');
+  });
 });

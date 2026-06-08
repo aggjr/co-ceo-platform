@@ -1,8 +1,11 @@
 import { randomUUID } from 'crypto';
 import type { CoCeoDataGateway, SecurePayload, UserContext } from '../dal';
 import { BusinessEventRegistry } from '../business-events';
+import { InvestBookPeriodService } from './InvestBookPeriodService';
 
+/** @deprecated Use InvestBookPeriodService. */
 export const INVEST_OPENING_SOURCE_REF = 'INVEST-OPENING-2026-01-01';
+/** @deprecated Use InvestBookPeriodService. */
 export const INVEST_OPENING_DATE = '2026-01-01';
 
 const MONEY_TOL = 0.01;
@@ -49,9 +52,11 @@ function parseMetadata(raw: unknown): Record<string, unknown> {
 
 export class OpeningBalanceMigrationService {
   private readonly events: BusinessEventRegistry;
+  private readonly periods: InvestBookPeriodService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.events = new BusinessEventRegistry(gateway);
+    this.periods = new InvestBookPeriodService(gateway);
   }
 
   async migrate(ctx: UserContext): Promise<OpeningMigrationReport> {
@@ -63,18 +68,21 @@ export class OpeningBalanceMigrationService {
       blocked: [],
     };
 
+    const period = await this.periods.resolveDefault(ctx);
     const { event } = await this.events.ensureByRef(ctx, {
       sourceModule: 'INVEST',
       eventKind: 'opening_balance',
-      occurredOn: INVEST_OPENING_DATE,
-      settlesOn: INVEST_OPENING_DATE,
-      sourceRef: INVEST_OPENING_SOURCE_REF,
+      occurredOn: period.openingDate,
+      settlesOn: period.openingDate,
+      sourceRef: period.openingSourceRef,
       counterparty: 'Saldo inicial',
       totalNet: 0,
       sourceSystem: 'opening_balance_migration',
       metadata: {
         kind: 'trusted_opening_snapshot',
-        description: 'Abertura confiavel INVEST 2026-01-01',
+        description: `Abertura confiavel INVEST ${period.openingDate}`,
+        book_period_source: period.source,
+        opening_source_refs: period.openingSourceRefs,
       },
     });
 
@@ -88,7 +96,7 @@ export class OpeningBalanceMigrationService {
         await this.migrateAccount(ctx, {
           accountId: String(account.id),
           openingBalance: Number(account.opening_balance ?? 0),
-          openingDate: toIsoDate(account.opening_date, INVEST_OPENING_DATE),
+          openingDate: toIsoDate(account.opening_date, period.openingDate),
           openingEventId: event.id,
           report,
         });
