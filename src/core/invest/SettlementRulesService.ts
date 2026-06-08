@@ -48,7 +48,7 @@ export class SettlementRulesService {
       transactionType: string;
       ticker?: string;
     },
-    ctx: UserContext = authBootstrapContext()
+    _ctx: UserContext = authBootstrapContext()
   ): Promise<ResolvedSettlementRule | null> {
     const day = input.tradeDate.slice(0, 10);
     const assetType = String(input.assetType || '').trim().toLowerCase();
@@ -56,7 +56,8 @@ export class SettlementRulesService {
     const ticker = String(input.ticker || '').trim().toUpperCase();
     if (!day || !assetType || !transactionType) return null;
 
-    const rows = await this.gateway.readQuery(ctx, 'settlement_rule_candidates', [
+    const catalogCtx = authBootstrapContext();
+    const rows = await this.gateway.readQuery(catalogCtx, 'settlement_rule_candidates', [
       assetType,
       transactionType,
       day,

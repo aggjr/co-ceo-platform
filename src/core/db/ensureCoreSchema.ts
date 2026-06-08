@@ -3,11 +3,15 @@ import { runSqlFile, tableExists } from './sqlMigrationRunner';
 import { ensureInvestReconciliationSchema } from './ensureInvestReconciliationSchema';
 
 const MARKET_TABLES = ['market_instruments', 'market_quotes_daily', 'market_index_daily'] as const;
+const INVEST_OPERATION_POLICIES_TABLE = 'invest_operation_policies';
+const INVEST_CASH_ACCOUNT_POLICIES_TABLE = 'invest_cash_account_policies';
 
 export type EnsureCoreSchemaResult = {
   marketMigrationApplied: boolean;
   platformJobMigrationApplied: boolean;
   reconciliationMigrationApplied: boolean;
+  investOperationPolicyMigrationApplied: boolean;
+  investCashAccountPolicyMigrationApplied: boolean;
 };
 
 /**
@@ -33,9 +37,23 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
 
   const reconciliation = await ensureInvestReconciliationSchema(pool);
 
+  let investOperationPolicyMigrationApplied = false;
+  if (!(await tableExists(pool, INVEST_OPERATION_POLICIES_TABLE))) {
+    await runSqlFile(pool, '43_invest_operation_policy_catalog.sql');
+    investOperationPolicyMigrationApplied = true;
+  }
+
+  let investCashAccountPolicyMigrationApplied = false;
+  if (!(await tableExists(pool, INVEST_CASH_ACCOUNT_POLICIES_TABLE))) {
+    await runSqlFile(pool, '44_invest_cash_account_policy.sql');
+    investCashAccountPolicyMigrationApplied = true;
+  }
+
   return {
     marketMigrationApplied,
     platformJobMigrationApplied,
     reconciliationMigrationApplied: reconciliation.applied,
+    investOperationPolicyMigrationApplied,
+    investCashAccountPolicyMigrationApplied,
   };
 }
