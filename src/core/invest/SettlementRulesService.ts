@@ -1,6 +1,12 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import { authBootstrapContext } from '../auth/authBootstrapContext';
-import { addBusinessDays, addCalendarDays, type SettlementCalendarUnit } from './settlementCalendar';
+import { isMissingSchemaError } from '../dal/mysqlErrors';
+import {
+  addBusinessDays,
+  addCalendarDays,
+  investmentSettlementRuleFor,
+  type SettlementCalendarUnit,
+} from './settlementCalendar';
 
 export type ResolvedSettlementRule = {
   ruleCode: string;
@@ -38,6 +44,30 @@ function rowToRule(row: Record<string, unknown>): ResolvedSettlementRule {
   };
 }
 
+function fallbackRule(input: {
+  tradeDate: string;
+  assetType: string;
+  transactionType: string;
+  ticker?: string;
+}): ResolvedSettlementRule | null {
+  const rule = investmentSettlementRuleFor(
+    input.tradeDate,
+    input.assetType,
+    input.transactionType,
+    input.ticker
+  );
+  if (!rule) return null;
+  return {
+    ruleCode: rule.ruleCode,
+    contractTypeCode: rule.contractTypeCode,
+    daysOffset: rule.daysOffset,
+    calendarUnit: rule.calendarUnit,
+    businessCalendarCode: rule.calendarUnit === 'business_days' ? 'B3' : null,
+    defaultStatus: 'pending',
+    label: rule.label,
+  };
+}
+
 export class SettlementRulesService {
   constructor(private readonly gateway: CoCeoDataGateway) {}
 
@@ -57,12 +87,20 @@ export class SettlementRulesService {
     if (!day || !assetType || !transactionType) return null;
 
     const catalogCtx = authBootstrapContext();
-    const rows = await this.gateway.readQuery(catalogCtx, 'settlement_rule_candidates', [
-      assetType,
-      transactionType,
-      day,
-      day,
-    ]);
+    let rows: Record<string, unknown>[];
+    try {
+      rows = await this.gateway.readQuery(catalogCtx, 'settlement_rule_candidates', [
+        assetType,
+        transactionType,
+        day,
+        day,
+      ]);
+    } catch (err) {
+      if (isMissingSchemaError(err)) {
+        return fallbackRule({ tradeDate: day, assetType, transactionType, ticker });
+      }
+      throw err;
+    }
     const matches = rows
       .filter((row) => tickerMatchesPrefix(row.ticker_prefix, ticker))
       .sort((a, b) => specificity(b) - specificity(a) || Number(a.priority ?? 100) - Number(b.priority ?? 100));

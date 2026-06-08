@@ -435,8 +435,11 @@ function applyEvent(
   const assetType = effectiveAssetType(e);
   const isStock = ctx.isStockLike(assetType);
   const isOption = ctx.isOptionLike(assetType);
+  const isIgnoredAsset = ctx.isIgnoredAssetType(assetType);
 
-  if (!isStock && !isOption && assetType && assetType !== 'cash') {
+  if (isIgnoredAsset || assetType === 'cash') return;
+
+  if (!isStock && !isOption && assetType) {
     throw new Error(
       `Ativo ${e.asset_ticker} do tipo ${assetType} nao foi reconhecido nas configuracoes de contexto como acao nem opcao.\n\n` +
       `[ACAO EXIGIDA] Vasculhar sites como opcoes.net, brapi, dlombello, statusinvest, investidor10 para validar se o ativo existe.\n` +
@@ -548,9 +551,14 @@ export function computeThreePricesByUnderlying(
 
     const isStock = options.ctx.isStockLike(assetType);
     const isOption = options.ctx.isOptionLike(assetType);
+    const isIgnoredAsset = options.ctx.isIgnoredAssetType(assetType);
 
-    if (!isStock && !isOption && assetType && assetType !== 'cash') {
-      // Ignora caixa, mas se for outro ativo que não bateu, o applyEvent vai lançar a exceção.
+    if (isIgnoredAsset || assetType === 'cash') {
+      continue;
+    }
+
+    if (!isStock && !isOption && assetType) {
+      // Ativo nao reconhecido: segue ate applyEvent para emitir erro acionavel.
     } else if (!isStock && !isOption) {
       continue;
     }

@@ -28,4 +28,35 @@ describe('SettlementRulesService', () => {
     expect(rule).not.toBeNull();
     expect(rule?.daysOffset).toBeGreaterThan(0);
   });
+
+  it('usa fallback local quando tabela de regras ainda nao existe', async () => {
+    const gateway = {
+      readQuery: jest.fn().mockRejectedValue({ code: 'ER_NO_SUCH_TABLE', errno: 1146 }),
+    };
+    const service = new SettlementRulesService(gateway as any);
+
+    const fixedIncomeRule = await service.resolveRule(
+      {
+        tradeDate: '2026-05-15',
+        assetType: 'fixed_income',
+        transactionType: 'buy',
+        ticker: 'LFT-20310301',
+      },
+      nodeCtx
+    );
+    const equityRule = await service.resolveRule(
+      {
+        tradeDate: '2026-05-15',
+        assetType: 'stock',
+        transactionType: 'buy',
+        ticker: 'PRIO3',
+      },
+      nodeCtx
+    );
+
+    expect(fixedIncomeRule?.ruleCode).toBe('TESOURO_D1');
+    expect(fixedIncomeRule?.daysOffset).toBe(1);
+    expect(equityRule?.ruleCode).toBe('B3_EQUITY_D2');
+    expect(equityRule?.daysOffset).toBe(2);
+  });
 });

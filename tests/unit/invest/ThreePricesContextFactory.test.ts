@@ -18,6 +18,7 @@ describe('ThreePricesContextFactory', () => {
       [
         { asset_type: 'stock', is_stock_like: 1, is_option_like: 0, is_active: 1 },
         { asset_type: 'fii',   is_stock_like: 1, is_option_like: 0, is_active: 1 },
+        { asset_type: 'fixed_income', is_stock_like: 0, is_option_like: 0, is_ignored_for_pm: 1, is_active: 1 },
       ],
       []
     );
@@ -26,6 +27,7 @@ describe('ThreePricesContextFactory', () => {
     expect(ctx.isStockLike('stock')).toBe(true);
     expect(ctx.isStockLike('fii')).toBe(true);
     expect(ctx.isStockLike('option_call')).toBe(false);
+    expect(ctx.isIgnoredAssetType('fixed_income')).toBe(true);
   });
 
   it('classifica option_call e option_put como isOptionLike', async () => {
@@ -80,6 +82,8 @@ describe('ThreePricesContextFactory', () => {
     const ctx = await factory.build(mockCtx);
     expect(ctx.isStockLike('stock')).toBe(true);
     expect(ctx.isOptionLike('option_call')).toBe(true);
+    expect(ctx.isIgnoredAssetType('fixed_income')).toBe(true);
+    expect(ctx.isIgnoredAssetType('cash')).toBe(true);
     expect(ctx.isIgnoredTransaction('dividend')).toBe(true);
   });
 

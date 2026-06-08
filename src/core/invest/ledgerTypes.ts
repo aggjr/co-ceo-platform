@@ -204,6 +204,7 @@ export type LedgerImportPayload = OpeningImportPayload & {
 export interface ThreePricesContext {
   isStockLike(assetType: string): boolean;
   isOptionLike(assetType: string): boolean;
+  isIgnoredAssetType(assetType: string): boolean;
   isIgnoredTransaction(operationType: string): boolean;
 }
 

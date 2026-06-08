@@ -178,6 +178,7 @@ const mockOptions = {
   ctx: {
     isStockLike: (type: string) => type === 'stock' || type === 'fii',
     isOptionLike: (type: string) => type === 'option_call' || type === 'option_put',
+    isIgnoredAssetType: (type: string) => type === 'cash' || type === 'fixed_income',
     isIgnoredTransaction: (type: string) => 
       ['dividend', 'jcp', 'cash_yield', 'securities_lending', 'capital_deposit', 
        'capital_withdrawal', 'penalty_b3', 'fee', 'revaluation', 'pending_settlement'].includes(type)
@@ -222,6 +223,25 @@ describe('threePricesEngine', () => {
     const out = runEngine([buy('PRIO3', 100, 40, '2026-01-10', 5)]);
     const p = out.get('PRIO3')!;
     expect(p.estrito).toBeCloseTo((100 * 40 + 5) / 100, 4);
+  });
+
+  it('ignora renda fixa no calculo de tres precos de acoes/opcoes', () => {
+    const out = runEngine([
+      {
+        id: nextId(),
+        asset_id: 'LFT-20310301',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'buy',
+        transaction_date: '2026-01-10',
+        quantity: 1,
+        unit_price: 15000,
+        total_net_value: -15000,
+      },
+      buy('PRIO3', 100, 40, '2026-01-10'),
+    ]);
+    expect(out.has('LFT-20310301')).toBe(false);
+    expect(out.get('PRIO3')?.estrito).toBe(40);
   });
 
   it('duas compras — média ponderada', () => {

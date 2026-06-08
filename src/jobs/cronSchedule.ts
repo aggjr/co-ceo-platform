@@ -29,7 +29,8 @@ export function msUntilNextWallClock(
   timeZone: string,
   fromMs = Date.now()
 ): number {
-  let probe = fromMs;
+  const minuteMs = 60_000;
+  let probe = Math.floor(fromMs / minuteMs) * minuteMs + minuteMs;
   for (let i = 0; i < 60 * 24 * 4; i++) {
     const p = getZonedParts(new Date(probe), timeZone);
     if (p.hour === hour && p.minute === minute) {

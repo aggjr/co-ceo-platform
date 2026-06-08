@@ -5,6 +5,7 @@ type AssetTypeRow = {
   asset_type: string;
   is_stock_like: number;
   is_option_like: number;
+  is_ignored_for_pm?: number;
   is_active: number;
 };
 
@@ -23,8 +24,10 @@ type IgnoredTxRow = {
  * Use clearCache() em testes ou após migration administrativa.
  */
 export class ThreePricesContextFactory {
-  private assetTypeCache: Map<string, { isStockLike: boolean; isOptionLike: boolean }> | null =
-    null;
+  private assetTypeCache: Map<
+    string,
+    { isStockLike: boolean; isOptionLike: boolean; isIgnoredForPm?: boolean }
+  > | null = null;
   private ignoredTxCache: Set<string> | null = null;
 
   constructor(private readonly gateway: CoCeoDataGateway) {}
@@ -45,6 +48,9 @@ export class ThreePricesContextFactory {
       },
       isOptionLike(assetType: string): boolean {
         return assetTypes.get(assetType)?.isOptionLike === true;
+      },
+      isIgnoredAssetType(assetType: string): boolean {
+        return assetTypes.get(assetType)?.isIgnoredForPm === true;
       },
       isIgnoredTransaction(operationType: string): boolean {
         return ignoredTx.has(operationType);
@@ -69,7 +75,11 @@ export class ThreePricesContextFactory {
       this.assetTypeCache = new Map(
         (assetRows as AssetTypeRow[]).map((r) => [
           r.asset_type,
-          { isStockLike: r.is_stock_like === 1, isOptionLike: r.is_option_like === 1 },
+          {
+            isStockLike: r.is_stock_like === 1,
+            isOptionLike: r.is_option_like === 1,
+            isIgnoredForPm: r.is_ignored_for_pm === 1,
+          },
         ])
       );
 
@@ -82,8 +92,13 @@ export class ThreePricesContextFactory {
       this.assetTypeCache = new Map([
         ['stock',       { isStockLike: true,  isOptionLike: false }],
         ['fii',         { isStockLike: true,  isOptionLike: false }],
+        ['etf',         { isStockLike: true,  isOptionLike: false }],
+        ['bdr',         { isStockLike: true,  isOptionLike: false }],
+        ['stock_us',    { isStockLike: true,  isOptionLike: false }],
         ['option_call', { isStockLike: false, isOptionLike: true  }],
         ['option_put',  { isStockLike: false, isOptionLike: true  }],
+        ['cash',        { isStockLike: false, isOptionLike: false, isIgnoredForPm: true }],
+        ['fixed_income',{ isStockLike: false, isOptionLike: false, isIgnoredForPm: true }],
       ]);
       this.ignoredTxCache = new Set([
         'dividend',

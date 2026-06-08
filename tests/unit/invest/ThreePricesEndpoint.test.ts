@@ -4,10 +4,9 @@ import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 import type { ThreePricesContext } from '../../../src/core/invest/ledgerTypes';
 
 const mockContext: ThreePricesContext = {
-  baseAssetTypes: new Set(['stock']),
-  optionAssetTypes: new Set(['option_call', 'option_put']),
   isStockLike: (t) => t === 'stock',
   isOptionLike: (t) => t === 'option_call' || t === 'option_put',
+  isIgnoredAssetType: (t) => t === 'cash' || t === 'fixed_income',
   isIgnoredTransaction: (t) => t === 'ignore',
 };
 const mockOptions = { ctx: mockContext };
