@@ -70,11 +70,12 @@ async function startServer() {
       r.marketMigrationApplied ||
       r.platformJobMigrationApplied ||
       r.reconciliationMigrationApplied ||
+      r.settlementRulesMigrationApplied ||
       r.investOperationPolicyMigrationApplied ||
       r.investCashAccountPolicyMigrationApplied
     ) {
       console.log(
-        `[co-CEO Core] Schema core aplicado (mercado=${r.marketMigrationApplied}, jobs=${r.platformJobMigrationApplied}, conciliação=${r.reconciliationMigrationApplied}, políticas=${r.investOperationPolicyMigrationApplied}, caixa=${r.investCashAccountPolicyMigrationApplied}).`
+        `[co-CEO Core] Schema core aplicado (mercado=${r.marketMigrationApplied}, jobs=${r.platformJobMigrationApplied}, conciliação=${r.reconciliationMigrationApplied}, liquidação=${r.settlementRulesMigrationApplied}, políticas=${r.investOperationPolicyMigrationApplied}, caixa=${r.investCashAccountPolicyMigrationApplied}).`
       );
     }
   } catch (err) {

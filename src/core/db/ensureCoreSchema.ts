@@ -3,6 +3,7 @@ import { runSqlFile, tableExists } from './sqlMigrationRunner';
 import { ensureInvestReconciliationSchema } from './ensureInvestReconciliationSchema';
 
 const MARKET_TABLES = ['market_instruments', 'market_quotes_daily', 'market_index_daily'] as const;
+const SETTLEMENT_CONTRACT_RULES_TABLE = 'settlement_contract_rules';
 const INVEST_OPERATION_POLICIES_TABLE = 'invest_operation_policies';
 const INVEST_CASH_ACCOUNT_POLICIES_TABLE = 'invest_cash_account_policies';
 
@@ -10,6 +11,7 @@ export type EnsureCoreSchemaResult = {
   marketMigrationApplied: boolean;
   platformJobMigrationApplied: boolean;
   reconciliationMigrationApplied: boolean;
+  settlementRulesMigrationApplied: boolean;
   investOperationPolicyMigrationApplied: boolean;
   investCashAccountPolicyMigrationApplied: boolean;
 };
@@ -37,6 +39,12 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
 
   const reconciliation = await ensureInvestReconciliationSchema(pool);
 
+  let settlementRulesMigrationApplied = false;
+  if (!(await tableExists(pool, SETTLEMENT_CONTRACT_RULES_TABLE))) {
+    await runSqlFile(pool, '39_normalize_settlement_contracts.sql');
+    settlementRulesMigrationApplied = true;
+  }
+
   let investOperationPolicyMigrationApplied = false;
   if (!(await tableExists(pool, INVEST_OPERATION_POLICIES_TABLE))) {
     await runSqlFile(pool, '43_invest_operation_policy_catalog.sql');
@@ -53,6 +61,7 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
     marketMigrationApplied,
     platformJobMigrationApplied,
     reconciliationMigrationApplied: reconciliation.applied,
+    settlementRulesMigrationApplied,
     investOperationPolicyMigrationApplied,
     investCashAccountPolicyMigrationApplied,
   };
