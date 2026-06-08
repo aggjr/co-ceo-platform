@@ -237,6 +237,37 @@ const TABLES: TableDefinition[] = [
     allowHardDelete: false,
     countsTowardStorage: false,
   }),
+  def('invest_operation_types', 'global', {
+    softDelete: false,
+    primaryKey: 'operation_code',
+    countsTowardStorage: false,
+  }),
+  def('invest_operation_policies', 'global', {
+    softDelete: false,
+    primaryKey: 'operation_code',
+    countsTowardStorage: false,
+  }),
+  def('invest_operation_asset_overrides', 'global', {
+    softDelete: false,
+    countsTowardStorage: false,
+  }),
+  def('invest_brokers', 'global', {
+    softDelete: false,
+    primaryKey: 'broker_code',
+    countsTowardStorage: false,
+  }),
+  def('invest_cash_account_policies', 'global', {
+    softDelete: false,
+    countsTowardStorage: false,
+  }),
+  def('invest_cash_account_bindings', 'global', {
+    softDelete: false,
+    countsTowardStorage: false,
+  }),
+  def('invest_book_periods', 'tenant', {
+    softDelete: false,
+    countsTowardStorage: false,
+  }),
   // ===== Mercado (cotações e índices compartilhados, ver migration 20) =====
   def('invest_options_fetch_cache', 'global', {
     softDelete: false,

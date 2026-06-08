@@ -19,6 +19,7 @@ import {
   type UserContext,
 } from '../../../../src/core/dal/types';
 import { InMemoryGateway, castGateway } from '../../core/business-events/inMemoryGateway';
+import { seedPolicies } from './seedPolicies';
 
 const ctx: UserContext = {
   userId: SYSTEM_INSTALLER_USER_ID,
@@ -53,6 +54,7 @@ async function seedCatalog(gw: InMemoryGateway): Promise<void> {
     settlement_days: 0,
     is_active: 1,
   });
+  await seedPolicies(gw, ctx);
 }
 
 function buildStack(gw: InMemoryGateway) {

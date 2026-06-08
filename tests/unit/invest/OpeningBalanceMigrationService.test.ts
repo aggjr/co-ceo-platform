@@ -1,6 +1,5 @@
 import type { UserContext } from '../../../src/core/dal';
 import {
-  INVEST_OPENING_SOURCE_REF,
   OpeningBalanceMigrationService,
 } from '../../../src/core/invest/OpeningBalanceMigrationService';
 import { CashBalanceService } from '../../../src/core/invest/CashBalanceService';
@@ -21,6 +20,15 @@ describe('OpeningBalanceMigrationService', () => {
   it('migra opening_balance para perna financeira de forma idempotente', async () => {
     const gw = new InMemoryGateway();
     const gateway = castGateway(gw);
+    await gateway.insert(ctx, 'invest_book_periods', {
+      id: 'book-custom',
+      book_code: 'INVEST',
+      opening_date: '2025-07-01',
+      opening_source_ref: 'OPENING:2025-07-01',
+      fiscal_year: 2025,
+      status: 'active',
+      is_default: 1,
+    });
     await gateway.insert(ctx, 'financial_accounts', {
       id: 'acc-1',
       source_module: 'INVEST',
@@ -28,7 +36,7 @@ describe('OpeningBalanceMigrationService', () => {
       external_id: 'BTG',
       name: 'Caixa BTG',
       opening_balance: 1234.56,
-      opening_date: '2026-01-01',
+      opening_date: '2025-07-01',
       status: 'active',
     });
 
@@ -48,11 +56,13 @@ describe('OpeningBalanceMigrationService', () => {
 
     const events = gw.dump('business_events');
     expect(events).toHaveLength(1);
-    expect(events[0]!.source_ref).toBe(INVEST_OPENING_SOURCE_REF);
+    expect(events[0]!.source_ref).toBe('OPENING:2025-07-01');
+    expect(events[0]!.occurred_on).toBe('2025-07-01');
 
     const legs = gw.dump('financial_ledger_entries');
     expect(legs).toHaveLength(1);
     expect(legs[0]!.business_event_id).toBe(events[0]!.id);
+    expect(legs[0]!.transaction_date).toBe('2025-07-01');
     expect(legs[0]!.direction).toBe('in');
     expect(Number(legs[0]!.amount)).toBeCloseTo(1234.56);
 
@@ -64,6 +74,15 @@ describe('OpeningBalanceMigrationService', () => {
   it('bloqueia divergencia se a perna existente nao bate com opening_balance', async () => {
     const gw = new InMemoryGateway();
     const gateway = castGateway(gw);
+    await gateway.insert(ctx, 'invest_book_periods', {
+      id: 'book-2026',
+      book_code: 'INVEST',
+      opening_date: '2026-01-01',
+      opening_source_ref: 'OPENING:2026-01-01',
+      fiscal_year: 2026,
+      status: 'active',
+      is_default: 1,
+    });
     await gateway.insert(ctx, 'financial_accounts', {
       id: 'acc-1',
       source_module: 'INVEST',

@@ -1,18 +1,7 @@
+import type { UserContext } from '../dal';
 import type { LedgerEvent } from './CustodyEngine';
 import { inferAssetType } from './assetClassifier';
-
-const POSITION_TX = new Set([
-  'opening_balance',
-  'buy',
-  'sell',
-  'bonus',
-  'put_sell',
-  'put_buy',
-  'call_sell',
-  'call_buy',
-  'option_exercise',
-  'split',
-]);
+import type { InvestOperationPolicyService } from './InvestOperationPolicyService';
 
 function isCashAsset(assetType: string, ticker: string): boolean {
   return assetType === 'cash' || ticker.startsWith('CAIXA-');
@@ -32,10 +21,19 @@ function isFixedIncomeAsset(assetType: string, ticker: string): boolean {
  * Calibração BTG (âncoras mensais) só quando o livro já tem custódia de RV/RF.
  * Livro vazio após purge → patrimônio econômico real (zero), sem curva fantasma.
  */
-export function shouldUseBtgAnchorCalibration(entries: LedgerEvent[]): boolean {
+export async function shouldUseBtgAnchorCalibration(
+  ctx: UserContext,
+  entries: LedgerEvent[],
+  policyService: InvestOperationPolicyService
+): Promise<boolean> {
   for (const e of entries) {
     const type = String(e.transaction_type || '');
-    if (!POSITION_TX.has(type)) continue;
+    
+    const policy = await policyService.requirePolicy(ctx, type);
+    
+    // O que antes era POSITION_TX agora equivale a operações que afetam custódia
+    if (!policy.affectsPortfolio) continue;
+    
     const ticker = String(e.asset_ticker || '').toUpperCase();
     const assetType = String(e.asset_type || inferAssetType(ticker));
     if (isCashAsset(assetType, ticker)) continue;

@@ -9,11 +9,11 @@ import {
 import { logReconcileFailure } from './reconcile/reconcileErrorDetail';
 import { LedgerImportService } from './LedgerImportService';
 import { resolveInvestPeriodBounds } from './investPeriodBounds';
+import { InvestBookPeriodService } from './InvestBookPeriodService';
 import {
   clearLedgerCrossLinksForOpeningPurge,
   deleteOrphanPatrimonyItemDependents,
 } from './ledgerPurgeCrossLinks';
-import { INVEST_OPENING_SOURCE_REF } from './OpeningBalanceMigrationService';
 
 const AUX_ORG_TABLES = [
   'patrimony_closings',
@@ -62,18 +62,25 @@ export type ReconcilePreflightResult = {
 
 export class HoldingPurgeKeepOpeningService {
   private readonly ledger: LedgerImportService;
+  private readonly periods: InvestBookPeriodService;
 
   constructor(
     private readonly gateway: CoCeoDataGateway,
     private readonly pool: Pool
   ) {
     this.ledger = new LedgerImportService(gateway);
+    this.periods = new InvestBookPeriodService(gateway);
   }
 
   async preflight(ctx: UserContext): Promise<ReconcilePreflightResult> {
     const orgId = this.requireOrg(ctx);
     const bounds = await this.openingBounds(ctx);
-    const preview = await this.buildPreview(orgId, bounds.openingDate, bounds.openingRef);
+    const preview = await this.buildPreview(
+      orgId,
+      bounds.openingDate,
+      bounds.openingRef,
+      bounds.openingRefs
+    );
 
     const hasBeyondOpening =
       preview.patrimonyLegsToRemove > 0 ||
@@ -92,7 +99,12 @@ export class HoldingPurgeKeepOpeningService {
   async purgeKeepOpening(ctx: UserContext): Promise<HoldingPurgeResult> {
     const orgId = this.requireOrg(ctx);
     const bounds = await this.openingBounds(ctx);
-    const preview = await this.buildPreview(orgId, bounds.openingDate, bounds.openingRef);
+    const preview = await this.buildPreview(
+      orgId,
+      bounds.openingDate,
+      bounds.openingRef,
+      bounds.openingRefs
+    );
 
     if (!preview.canPurge) {
       throw new GatewayError(
@@ -116,6 +128,7 @@ export class HoldingPurgeKeepOpeningService {
         orgId,
         bounds.openingDate,
         bounds.openingRef,
+        bounds.openingRefs,
         preview.openingEventIds,
         log
       );
@@ -153,11 +166,14 @@ export class HoldingPurgeKeepOpeningService {
 
   private async openingBounds(
     ctx: UserContext
-  ): Promise<{ openingDate: string; openingRef: string }> {
+  ): Promise<{ openingDate: string; openingRef: string; openingRefs: string[] }> {
+    const period = await this.periods.resolveDefault(ctx);
     const today = new Date().toISOString().slice(0, 10);
     const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
-    const bounds = resolveInvestPeriodBounds(events);
-    const openingDate = bounds.openingDate;
+    const bounds = resolveInvestPeriodBounds(events, {
+      openingDate: period.openingDate,
+    });
+    const openingDate = bounds.openingDate ?? period.openingDate;
     if (!openingDate) {
       throw new GatewayError(
         'FINANCIAL_RULE_VIOLATION',
@@ -165,17 +181,22 @@ export class HoldingPurgeKeepOpeningService {
         422
       );
     }
-    return { openingDate, openingRef: `OPENING:${openingDate}` };
+    return {
+      openingDate,
+      openingRef: period.openingSourceRef,
+      openingRefs: period.openingSourceRefs,
+    };
   }
 
   private async buildPreview(
     orgId: string,
     openingDate: string,
-    openingRef: string
+    openingRef: string,
+    openingRefs: string[]
   ): Promise<HoldingPurgePreview> {
     const conn = await this.pool.getConnection();
     try {
-      const openingEventIds = await this.loadOpeningEventIds(conn, orgId, openingDate, openingRef);
+      const openingEventIds = await this.loadOpeningEventIds(conn, orgId, openingDate, openingRefs);
       const openingInSql =
         openingEventIds.length > 0 ? openingEventIds : ['00000000-0000-0000-0000-000000000000'];
 
@@ -217,8 +238,8 @@ export class HoldingPurgeKeepOpeningService {
         `SELECT COUNT(*) AS n FROM business_events be
          WHERE be.organization_id = ?
            AND be.deleted_at IS NULL
-           AND be.source_ref NOT IN (?, ?)`,
-        [orgId, openingRef, INVEST_OPENING_SOURCE_REF]
+           AND be.source_ref NOT IN (?)`,
+        [orgId, openingRefs]
       );
 
       const openingLegCount = Number(openingLegCountRow[0]?.n ?? 0);
@@ -250,6 +271,7 @@ export class HoldingPurgeKeepOpeningService {
     orgId: string,
     openingDate: string,
     openingRef: string,
+    openingRefs: string[],
     openingEventIds: string[],
     log?: (message: string, command: string, level?: ReconcileActivityStep['level']) => void
   ): Promise<{
@@ -300,7 +322,7 @@ export class HoldingPurgeKeepOpeningService {
       `DELETE be FROM business_events be
        WHERE be.organization_id = ?
          AND be.deleted_at IS NULL
-         AND be.source_ref NOT IN (?, ?)
+         AND be.source_ref NOT IN (?)
          AND NOT EXISTS (
            SELECT 1 FROM patrimony_ledger_entries ple
            WHERE ple.business_event_id = be.id AND ple.organization_id = ?
@@ -309,7 +331,7 @@ export class HoldingPurgeKeepOpeningService {
            SELECT 1 FROM financial_ledger_entries fle
            WHERE fle.business_event_id = be.id AND fle.organization_id = ?
          )`,
-      [orgId, openingRef, INVEST_OPENING_SOURCE_REF, orgId, orgId]
+      [orgId, openingRefs, orgId, orgId]
     );
     log?.(`DELETE business_events: ${be.affectedRows}`, 'purge.business_events');
 
@@ -399,12 +421,12 @@ export class HoldingPurgeKeepOpeningService {
     conn: PoolConnection,
     orgId: string,
     openingDate: string,
-    openingRef: string
+    openingRefs: string[]
   ): Promise<string[]> {
     const [openingEvents] = await conn.query<RowDataPacket[]>(
       `SELECT id FROM business_events
-       WHERE organization_id = ? AND deleted_at IS NULL AND source_ref IN (?, ?)`,
-      [orgId, openingRef, INVEST_OPENING_SOURCE_REF]
+       WHERE organization_id = ? AND deleted_at IS NULL AND source_ref IN (?)`,
+      [orgId, openingRefs]
     );
     const [openingLegEvents] = await conn.query<RowDataPacket[]>(
       `SELECT DISTINCT business_event_id AS id

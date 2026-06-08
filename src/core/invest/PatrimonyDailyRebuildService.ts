@@ -1,6 +1,8 @@
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
+import { GatewayError } from '../dal/errors';
 import { resolveInvestPeriodBounds } from './investPeriodBounds';
+import { InvestBookPeriodService } from './InvestBookPeriodService';
 import { LedgerImportService } from './LedgerImportService';
 import { PatrimonyDailyRecorder } from './PatrimonyDailyRecorder';
 import { PatrimonyDailyStore } from './PatrimonyDailyStore';
@@ -64,6 +66,7 @@ export class PatrimonyDailyRebuildService {
   private readonly assetProjection: InvestAssetProjection;
   private readonly dailyClose: DailyCloseMaterializeService;
   private readonly categories: ModuleCategories;
+  private readonly periods: InvestBookPeriodService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -73,6 +76,7 @@ export class PatrimonyDailyRebuildService {
     this.assetProjection = new InvestAssetProjection(gateway);
     this.dailyClose = new DailyCloseMaterializeService(gateway);
     this.categories = new ModuleCategories(gateway);
+    this.periods = new InvestBookPeriodService(gateway);
   }
 
   getStatus(ctx: UserContext): PatrimonyRebuildStatus {
@@ -97,8 +101,15 @@ export class PatrimonyDailyRebuildService {
 
     const orgId = ctx.organizationId;
     const today = new Date().toISOString().slice(0, 10);
-    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
-    const bounds = resolveInvestPeriodBounds(events);
+    const period = await this.resolvePeriodOrNull(ctx);
+    const events = await this.ledger.listLedgerEvents(
+      ctx,
+      period?.openingDate ?? '2000-01-01',
+      today
+    );
+    const bounds = resolveInvestPeriodBounds(events, {
+      openingDate: period?.openingDate ?? null,
+    });
     const lastTrusted = (
       opts.lastTrustedDate ??
       (await this.marketQuotes.getLastQuoteDate(ctx)) ??
@@ -205,5 +216,16 @@ export class PatrimonyDailyRebuildService {
       tickers.push(ticker);
     }
     return tickers;
+  }
+
+  private async resolvePeriodOrNull(ctx: UserContext) {
+    try {
+      return await this.periods.resolveDefault(ctx);
+    } catch (err) {
+      if (err instanceof GatewayError && err.code === 'INVEST_BOOK_PERIOD_NOT_FOUND') {
+        return null;
+      }
+      throw err;
+    }
   }
 }

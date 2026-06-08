@@ -117,6 +117,9 @@ describe('LedgerImportService — erros de validação', () => {
       method_code: 'cash_balance',
       is_active: 1,
     });
+    const { seedPolicies } = require('../modules/invest/seedPolicies');
+    await seedPolicies(gw, ctxWithOrg);
+
     const service = new LedgerImportService(castGateway(gw));
     (service as any).patrimonyStore.invalidateFromDate = jest.fn().mockResolvedValue(undefined);
 

@@ -66,9 +66,17 @@ app.get('*', (req, res, next) => {
 async function startServer() {
   try {
     const r = await ensureCoreSchema(pool);
-    if (r.marketMigrationApplied || r.platformJobMigrationApplied || r.reconciliationMigrationApplied) {
+    if (
+      r.marketMigrationApplied ||
+      r.platformJobMigrationApplied ||
+      r.reconciliationMigrationApplied ||
+      r.settlementRulesMigrationApplied ||
+      r.investOperationPolicyMigrationApplied ||
+      r.investCashAccountPolicyMigrationApplied ||
+      r.investBookPeriodsMigrationApplied
+    ) {
       console.log(
-        `[co-CEO Core] Schema core aplicado (mercado=${r.marketMigrationApplied}, jobs=${r.platformJobMigrationApplied}, conciliação=${r.reconciliationMigrationApplied}).`
+        `[co-CEO Core] Schema core aplicado (mercado=${r.marketMigrationApplied}, jobs=${r.platformJobMigrationApplied}, conciliação=${r.reconciliationMigrationApplied}, liquidação=${r.settlementRulesMigrationApplied}, políticas=${r.investOperationPolicyMigrationApplied}, caixa=${r.investCashAccountPolicyMigrationApplied}, períodos=${r.investBookPeriodsMigrationApplied}).`
       );
     }
   } catch (err) {

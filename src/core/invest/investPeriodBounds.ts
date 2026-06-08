@@ -12,6 +12,10 @@ export type InvestPeriodBounds = {
   chartBenchmarkTicker: string | null;
 };
 
+export type InvestPeriodBoundsOptions = {
+  openingDate?: string | null;
+};
+
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -25,22 +29,28 @@ function isEquityTickerForBenchmark(ticker: string): boolean {
  * Limites de período e benchmark derivados do livro razão da organização.
  * Sem datas nem tickers fixos no código.
  */
-export function resolveInvestPeriodBounds(events: LedgerEvent[]): InvestPeriodBounds {
+export function resolveInvestPeriodBounds(
+  events: LedgerEvent[],
+  options: InvestPeriodBoundsOptions = {}
+): InvestPeriodBounds {
   const today = todayIso();
-  let openingDate: string | null = null;
+  let openingDate: string | null =
+    options.openingDate && /^\d{4}-\d{2}-\d{2}$/.test(options.openingDate)
+      ? options.openingDate
+      : null;
   let minDate: string | null = null;
 
   for (const e of events) {
     const d = String(e.transaction_date ?? '').slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
     if (!minDate || d < minDate) minDate = d;
-    if (String(e.transaction_type) === 'opening_balance') {
+    if (!options.openingDate && String(e.transaction_type) === 'opening_balance') {
       if (!openingDate || d < openingDate) openingDate = d;
     }
   }
 
   const defaultFrom = openingDate ?? minDate ?? today;
-  const periodMin = minDate ?? defaultFrom;
+  const periodMin = openingDate ?? minDate ?? defaultFrom;
 
   const envTicker = (process.env.INVEST_CHART_BENCHMARK_TICKER ?? '').trim().toUpperCase();
   let chartBenchmarkTicker: string | null = envTicker || null;

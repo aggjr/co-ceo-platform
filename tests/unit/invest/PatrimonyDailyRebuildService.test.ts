@@ -57,9 +57,9 @@ const ctx: UserContext = {
   scope: 'node',
 };
 
-function mockGateway(): CoCeoDataGateway {
+function mockGateway(rowsByTable: Record<string, Array<Record<string, unknown>>> = {}): CoCeoDataGateway {
   return {
-    findWhere: jest.fn().mockResolvedValue([]),
+    findWhere: jest.fn().mockImplementation((_ctx, table) => Promise.resolve(rowsByTable[table] ?? [])),
     insert: jest.fn(),
     readQuery: jest.fn().mockResolvedValue([]),
     findById: jest.fn(),
@@ -135,5 +135,30 @@ describe('PatrimonyDailyRebuildService', () => {
     expect(result.to).toBe('2026-01-06');
     expect(loadQuoteMapForRange).toHaveBeenCalledWith(ctx, '2026-01-02', '2026-01-06');
     expect(recalcThreePricesPublic).toHaveBeenCalledWith(ctx, '2026-01-06');
+  });
+
+  it('usa abertura configurada do livro INVEST como piso do rebuild', async () => {
+    const svc = new PatrimonyDailyRebuildService(mockGateway({
+      invest_book_periods: [{
+        id: 'bp-1',
+        book_code: 'INVEST',
+        opening_date: '2025-07-01',
+        opening_source_ref: 'OPENING:2025-07-01',
+        fiscal_year: 2025,
+        status: 'active',
+        is_default: 1,
+      }],
+    }));
+
+    const result = await svc.rebuild(ctx, { from: '2025-01-01', to: '2025-07-03' });
+
+    expect(listLedgerEvents).toHaveBeenCalledWith(
+      ctx,
+      '2025-07-01',
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+    );
+    expect(invalidateFromDate).toHaveBeenCalledWith(ctx, '2025-07-01');
+    expect(loadQuoteMapForRange).toHaveBeenCalledWith(ctx, '2025-07-01', '2025-07-03');
+    expect(result.from).toBe('2025-07-01');
   });
 });

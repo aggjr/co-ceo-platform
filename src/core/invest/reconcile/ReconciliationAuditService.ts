@@ -1,10 +1,12 @@
 import type { CoCeoDataGateway, UserContext } from '../../dal';
+import { GatewayError } from '../../dal/errors';
 import { BusinessEventRegistry, BusinessEventReconciler } from '../../business-events';
 import type { LedgerEvent } from '../CustodyEngine';
 import { rebuildCustodyFromLedger } from '../CustodyEngine';
 import { LedgerImportService } from '../LedgerImportService';
 import { buildLedgerDedupIndex } from '../ledgerOperationDedup';
 import { resolveInvestPeriodBounds } from '../investPeriodBounds';
+import { InvestBookPeriodService } from '../InvestBookPeriodService';
 import { PatrimonyDailyStore } from '../PatrimonyDailyStore';
 import {
   type AuditIssue,
@@ -19,12 +21,14 @@ export class ReconciliationAuditService {
   private readonly ledger: LedgerImportService;
   private readonly reconciler: BusinessEventReconciler;
   private readonly patrimonyStore: PatrimonyDailyStore;
+  private readonly periods: InvestBookPeriodService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
     const registry = new BusinessEventRegistry(gateway);
     this.reconciler = new BusinessEventReconciler(gateway, registry);
     this.patrimonyStore = new PatrimonyDailyStore(gateway);
+    this.periods = new InvestBookPeriodService(gateway);
   }
 
   async run(ctx: UserContext, opts: AuditRunOptions = {}): Promise<AuditReport> {
@@ -32,8 +36,15 @@ export class ReconciliationAuditService {
 
     const today = new Date().toISOString().slice(0, 10);
     const through = (opts.throughDate ?? today).slice(0, 10);
-    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', through);
-    const bounds = resolveInvestPeriodBounds(events);
+    const period = await this.resolvePeriodOrNull(ctx);
+    const events = await this.ledger.listLedgerEvents(
+      ctx,
+      period?.openingDate ?? '2000-01-01',
+      through
+    );
+    const bounds = resolveInvestPeriodBounds(events, {
+      openingDate: period?.openingDate ?? null,
+    });
 
     const issues: AuditIssue[] = [];
     issues.push(...(await this.checkOrphanLegs(ctx, bounds.periodMin, through)));
@@ -46,6 +57,17 @@ export class ReconciliationAuditService {
     issues.push(...(await this.checkPortfolioDailyGaps(ctx, bounds.periodMin, through, opts)));
 
     return buildAuditReport(issues);
+  }
+
+  private async resolvePeriodOrNull(ctx: UserContext) {
+    try {
+      return await this.periods.resolveDefault(ctx);
+    } catch (err) {
+      if (err instanceof GatewayError && err.code === 'INVEST_BOOK_PERIOD_NOT_FOUND') {
+        return null;
+      }
+      throw err;
+    }
   }
 
   private async checkOrphanLegs(

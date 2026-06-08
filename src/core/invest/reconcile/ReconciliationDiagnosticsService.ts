@@ -16,6 +16,7 @@ import {
   categoryFor,
   type AssetValuationSnapshot,
 } from '../valuation/AssetValuationContext';
+import { InvestBookPeriodService } from '../InvestBookPeriodService';
 
 type StoredPosition = {
   ticker: string;
@@ -248,12 +249,14 @@ export class ReconciliationDiagnosticsService {
   private readonly snapshots: BrokerCustodySnapshotRepository;
   private readonly valuationContext: AssetValuationContext;
   private readonly threePricesFactory: ThreePricesContextFactory;
+  private readonly periods: InvestBookPeriodService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
     this.snapshots = new BrokerCustodySnapshotRepository(gateway);
     this.valuationContext = new AssetValuationContext(gateway);
     this.threePricesFactory = new ThreePricesContextFactory(gateway);
+    this.periods = new InvestBookPeriodService(gateway);
   }
 
   async getFinancialDiagnostics(
@@ -290,7 +293,8 @@ export class ReconciliationDiagnosticsService {
 
     const latestSnapshot = await this.snapshots.loadLatest(ctx).catch(() => null);
     const asOf = (asOfInput || latestSnapshot?.referenceDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
-    const events = await this.ledger.listLedgerEvents(ctx, '2000-01-01', asOf);
+    const period = await this.resolvePeriodOrNull(ctx);
+    const events = await this.ledger.listLedgerEvents(ctx, period?.openingDate ?? '2000-01-01', asOf);
     const custody = rebuildCustodyFromLedger(events);
     const threeCtx = await this.threePricesFactory.build(ctx);
     const threePrices = computeThreePricesByUnderlying(events, { ctx: threeCtx }, asOf);
@@ -308,7 +312,7 @@ export class ReconciliationDiagnosticsService {
     );
     const eventRows = this.buildBusinessEventRows(events);
     const cashRows = this.buildCashRows(events, latestSnapshot, asOf);
-    const dailyAudit = this.buildDailyAuditRows(events, asOf);
+    const dailyAudit = this.buildDailyAuditRows(events, asOf, period?.openingDate ?? null);
     const resetRows = await this.buildResetRows(ctx);
     const critical = this.buildCriticalFindings(assetRows, eventRows, cashRows, resetRows);
     if (!latestSnapshot) {
@@ -651,7 +655,18 @@ export class ReconciliationDiagnosticsService {
     ];
   }
 
-  private buildDailyAuditRows(events: LedgerEvent[], asOf: string): {
+  private async resolvePeriodOrNull(ctx: UserContext) {
+    try {
+      return await this.periods.resolveDefault(ctx);
+    } catch (err) {
+      if (err instanceof GatewayError && err.code === 'INVEST_BOOK_PERIOD_NOT_FOUND') {
+        return null;
+      }
+      throw err;
+    }
+  }
+
+  private buildDailyAuditRows(events: LedgerEvent[], asOf: string, openingDate: string | null): {
     financial: DailyFinancialAuditRow[];
     business: DailyBusinessAuditRow[];
     portfolio: DailyPortfolioAuditRow[];
@@ -661,7 +676,9 @@ export class ReconciliationDiagnosticsService {
       String(a.id ?? '').localeCompare(String(b.id ?? ''))
     );
     const firstDate =
-      sorted.map((e) => String(e.transaction_date || '').slice(0, 10)).find(Boolean) || asOf;
+      openingDate ||
+      sorted.map((e) => String(e.transaction_date || '').slice(0, 10)).find(Boolean) ||
+      asOf;
     const calendar = dateRange(firstDate, asOf);
     const byDate = new Map<string, LedgerEvent[]>();
     for (const e of sorted) {

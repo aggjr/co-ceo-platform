@@ -27,6 +27,8 @@ const ctx: UserContext = {
   scope: 'node',
 };
 
+import { seedPolicies } from './seedPolicies';
+
 async function seedCatalog(gw: InMemoryGateway): Promise<void> {
   for (const sub of ['stock', 'option_call', 'option_put', 'cash']) {
     await gw.insert(ctx, 'module_categories', {
@@ -59,6 +61,7 @@ async function seedCatalog(gw: InMemoryGateway): Promise<void> {
     settlement_days: 0,
     is_active: 1,
   });
+  await seedPolicies(gw, ctx);
 }
 
 function buildOps(gw: InMemoryGateway) {

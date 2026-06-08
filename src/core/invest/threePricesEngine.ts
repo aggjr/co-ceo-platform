@@ -33,6 +33,9 @@ type UnderlyingState = {
 
 import type { ThreePricesContext } from './ledgerTypes';
 
+// TODO [INVEST POLICY REFACTOR]:
+// Estes Sets refletem as lógicas pré-catálogo. No futuro, estas verificações 
+// deverão ser migradas para consultar o `InvestOperationPolicyService` (ex: `policy.isOptionTrade` e `policy.signedQuantity < 0`).
 const OPTION_SELL_TX = new Set(['put_sell', 'call_sell']);
 const OPTION_BUY_TX = new Set(['put_buy', 'call_buy']);
 
