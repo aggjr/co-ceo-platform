@@ -260,7 +260,7 @@ const TABLES: TableDefinition[] = [
     softDelete: false,
     countsTowardStorage: false,
   }),
-  def('invest_cash_account_bindings', 'global', {
+  def('invest_cash_account_bindings', 'tenant', {
     softDelete: false,
     countsTowardStorage: false,
   }),
