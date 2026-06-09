@@ -61,6 +61,10 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
     await runSqlFile(pool, '44_invest_cash_account_policy.sql');
   }
 
+  if (!(await tableExists(pool, 'invest_broker_aliases'))) {
+    await runSqlFile(pool, '45_invest_broker_aliases.sql');
+  }
+
   let investBookPeriodsMigrationApplied = false;
   if (!(await tableExists(pool, INVEST_BOOK_PERIODS_TABLE))) {
     await runSqlFile(pool, '46_invest_book_periods.sql');
