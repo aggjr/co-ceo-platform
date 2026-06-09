@@ -104,7 +104,13 @@ describe('InvestCashAccountPolicy', () => {
       currencyCode: 'BRL'
     });
 
+    const bindings = await gateway.findWhere(ctx, 'invest_cash_account_bindings', {
+      policy_id: 'policy-with-binding',
+      organization_id: ctx.organizationId,
+    });
     const result = await policy.resolve(ctx, { brokerCode: 'BTG', currencyCode: 'BRL' });
+    expect(bindings[0]?.id).toEqual(expect.any(String));
+    expect(String(bindings[0]?.id)).toHaveLength(36);
     expect(result.financialAccountId).toBe('fin-acc-123');
   });
 

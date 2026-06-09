@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import { GatewayError } from '../dal/errors';
 import { isMissingSchemaError } from '../dal/mysqlErrors';
@@ -135,6 +136,7 @@ export class InvestCashAccountPolicy {
       });
     } else {
       await this.gateway.insert(ctx, 'invest_cash_account_bindings', {
+        id: randomUUID(),
         policy_id: input.policyId,
         organization_id: orgId,
         financial_account_id: input.financialAccountId,
