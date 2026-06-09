@@ -59,4 +59,31 @@ describe('SettlementRulesService', () => {
     expect(equityRule?.ruleCode).toBe('B3_EQUITY_D2');
     expect(equityRule?.daysOffset).toBe(2);
   });
+
+  it('regressao producao: ACCESS_DENIED em settlement_rule_candidates nao derruba purge/Option C', async () => {
+    const gateway = {
+      readQuery: jest.fn().mockRejectedValue({
+        code: 'ACCESS_DENIED',
+        message: 'Consulta restrita ao escopo global da plataforma.',
+      }),
+    };
+    const service = new SettlementRulesService(gateway as any);
+
+    const settlementDate = await service.resolveSettlementDate(
+      {
+        tradeDate: '2026-01-06',
+        assetType: 'stock',
+        transactionType: 'buy',
+        ticker: 'PRIO3',
+      },
+      nodeCtx
+    );
+
+    expect(settlementDate).toBe('2026-01-08');
+    expect(gateway.readQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: 'global' }),
+      'settlement_rule_candidates',
+      ['stock', 'buy', '2026-01-06', '2026-01-06']
+    );
+  });
 });

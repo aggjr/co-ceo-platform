@@ -13,4 +13,10 @@ describe('ensureCoreSchema migrations', () => {
     expect(fs.existsSync(path.join(dir, '44_invest_cash_account_policy.sql'))).toBe(true);
     expect(fs.existsSync(path.join(dir, '46_invest_book_periods.sql'))).toBe(true);
   });
+
+  it('regressao producao: catalogo de periodo contabil fica na migration 46, nao 45', () => {
+    const dir = migrationsDir();
+    expect(fs.existsSync(path.join(dir, '46_invest_book_periods.sql'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, '45_invest_book_periods.sql'))).toBe(false);
+  });
 });

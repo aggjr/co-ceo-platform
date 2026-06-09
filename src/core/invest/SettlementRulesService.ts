@@ -68,6 +68,11 @@ function fallbackRule(input: {
   };
 }
 
+function isCatalogAccessDenied(err: unknown): boolean {
+  const e = err as { code?: string };
+  return e?.code === 'ACCESS_DENIED';
+}
+
 export class SettlementRulesService {
   constructor(private readonly gateway: CoCeoDataGateway) {}
 
@@ -96,7 +101,7 @@ export class SettlementRulesService {
         day,
       ]);
     } catch (err) {
-      if (isMissingSchemaError(err)) {
+      if (isMissingSchemaError(err) || isCatalogAccessDenied(err)) {
         return fallbackRule({ tradeDate: day, assetType, transactionType, ticker });
       }
       throw err;

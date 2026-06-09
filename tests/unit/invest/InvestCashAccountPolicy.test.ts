@@ -30,6 +30,18 @@ describe('InvestCashAccountPolicy', () => {
     expect(result.financialAccountExternalId).toBe('BTG');
   });
 
+  it('regressao producao: schema ausente de policy nao bloqueia BTG/BRL', async () => {
+    const missingSchemaGateway = {
+      findWhere: jest.fn().mockRejectedValue({ code: 'ER_NO_SUCH_TABLE', errno: 1146 }),
+    };
+    const service = new InvestCashAccountPolicy(missingSchemaGateway as any);
+
+    const result = await service.resolve(ctx, { brokerCode: 'BTG', currencyCode: 'BRL' });
+
+    expect(result.policyId).toBe('icap-btg-brl-default');
+    expect(result.cashTicker).toBe('CAIXA-BTG');
+  });
+
   it('resolves default policy for currency correctly', async () => {
     await gateway.insert(ctx, 'invest_cash_account_policies', {
       id: 'icap-btg-brl-default',
@@ -96,7 +108,8 @@ describe('InvestCashAccountPolicy', () => {
       valid_from: '1900-01-01'
     });
 
-    // Bind financial account
+    const insertSpy = jest.spyOn(gateway, 'insert');
+
     await policy.bindFinancialAccount(ctx, {
       policyId: 'policy-with-binding',
       financialAccountId: 'fin-acc-123',
@@ -109,6 +122,8 @@ describe('InvestCashAccountPolicy', () => {
       organization_id: ctx.organizationId,
     });
     const result = await policy.resolve(ctx, { brokerCode: 'BTG', currencyCode: 'BRL' });
+    const bindingInsert = insertSpy.mock.calls.find((call) => call[1] === 'invest_cash_account_bindings');
+    expect(bindingInsert?.[2]).toEqual(expect.objectContaining({ id: expect.any(String) }));
     expect(bindings[0]?.id).toEqual(expect.any(String));
     expect(String(bindings[0]?.id)).toHaveLength(36);
     expect(result.financialAccountId).toBe('fin-acc-123');
