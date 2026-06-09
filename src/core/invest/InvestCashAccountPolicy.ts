@@ -45,6 +45,31 @@ export class InvestCashAccountPolicy {
 
   constructor(private readonly gateway: CoCeoDataGateway) {}
 
+  /**
+   * Mapa de normalização de nomes de broker para o código canônico.
+   * Usado como fallback seguro antes de consultar a tabela invest_broker_aliases.
+   * Adicione entradas aqui quando novos aliases forem identificados.
+   */
+  private static readonly BROKER_ALIAS_MAP: Record<string, string> = {
+    'btg pactual':    'BTG',
+    'btgpactual':     'BTG',
+    'btg':            'BTG',
+    'xp investimentos': 'XP',
+    'xp':             'XP',
+    'rico':           'RICO',
+    'clear':          'CLEAR',
+    'nuinvest':       'NUINVEST',
+    'nu invest':      'NUINVEST',
+    'inter':          'INTER',
+    'banco inter':    'INTER',
+  };
+
+  private normalizeBrokerCode(raw?: string | null): string {
+    if (!raw) return 'BTG';
+    const normalized = InvestCashAccountPolicy.BROKER_ALIAS_MAP[raw.trim().toLowerCase()];
+    return normalized ?? raw.trim();
+  }
+
   async resolve(
     ctx: UserContext,
     input?: Partial<InvestCashAccountResolutionInput>
@@ -54,7 +79,7 @@ export class InvestCashAccountPolicy {
       throw new GatewayError('INVALID_PAYLOAD', 'Organization ID is required to resolve cash account.', 400);
     }
 
-    const brokerCode = input?.brokerCode || 'BTG'; // Fallback transicional until broker adapters are generic
+    const brokerCode = this.normalizeBrokerCode(input?.brokerCode); // Normaliza alias antes de qualquer lookup
     const currencyCode = input?.currencyCode || 'BRL';
     const sourceSystem = input?.sourceSystem || null;
     const eventDate = input?.eventDate || new Date().toISOString().slice(0, 10);
