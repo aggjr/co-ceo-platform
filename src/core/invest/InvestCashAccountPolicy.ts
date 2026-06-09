@@ -1,5 +1,6 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import { GatewayError } from '../dal/errors';
+import { isMissingSchemaError } from '../dal/mysqlErrors';
 
 export type InvestCashAccountResolutionInput = {
   organizationId: string;
@@ -66,11 +67,16 @@ export class InvestCashAccountPolicy {
     const policy = await this.queryPolicy(ctx, orgId, brokerCode, currencyCode, sourceSystem, eventDate);
 
     if (!policy) {
-      throw new GatewayError(
-        'INVEST_CASH_ACCOUNT_POLICY_NOT_FOUND',
-        `Nenhuma policy de caixa encontrada para org=${orgId}, broker=${brokerCode}, currency=${currencyCode}.`,
-        400
-      );
+      const fallback = this.defaultPolicy(orgId, brokerCode, currencyCode);
+      if (!fallback) {
+        throw new GatewayError(
+          'INVEST_CASH_ACCOUNT_POLICY_NOT_FOUND',
+          `Nenhuma policy de caixa encontrada para org=${orgId}, broker=${brokerCode}, currency=${currencyCode}.`,
+          400
+        );
+      }
+      this.resolutionCache.set(cacheKey, fallback);
+      return fallback;
     }
 
     const resolved: ResolvedInvestCashAccount = {
@@ -84,10 +90,15 @@ export class InvestCashAccountPolicy {
     };
 
     // Try to find an existing binding
-    const bindingRows = await this.gateway.findWhere(ctx, 'invest_cash_account_bindings', {
-      policy_id: policy.id,
-      organization_id: orgId
-    });
+    let bindingRows: Array<{ financial_account_id?: unknown }> = [];
+    try {
+      bindingRows = await this.gateway.findWhere(ctx, 'invest_cash_account_bindings', {
+        policy_id: policy.id,
+        organization_id: orgId
+      });
+    } catch (err) {
+      if (!isMissingSchemaError(err)) throw err;
+    }
 
     if (bindingRows.length > 0) {
       resolved.financialAccountId = String(bindingRows[0].financial_account_id);
@@ -139,6 +150,24 @@ export class InvestCashAccountPolicy {
     this.resolutionCache.clear();
   }
 
+  private defaultPolicy(
+    orgId: string,
+    brokerCode: string,
+    currencyCode: string
+  ): ResolvedInvestCashAccount | null {
+    if (brokerCode !== 'BTG' || currencyCode !== 'BRL') return null;
+    void orgId;
+    return {
+      policyId: 'icap-btg-brl-default',
+      brokerCode: 'BTG',
+      currencyCode: 'BRL',
+      cashTicker: 'CAIXA-BTG',
+      cashName: 'Conta Corrente BTG',
+      financialAccountExternalId: 'BTG',
+      financialAccountType: 'brokerage',
+    };
+  }
+
   private async queryPolicy(
     ctx: UserContext,
     orgId: string,
@@ -159,9 +188,15 @@ export class InvestCashAccountPolicy {
     // As doing complex order by in SQL is possible but could be tricky across default flags,
     // we fetch the candidates and sort them in code to strictly follow the requested priority.
 
-    const allRows = await this.gateway.findWhere(ctx, 'invest_cash_account_policies', { is_active: 1 }) as InvestCashAccountPolicyRow[];
+    let allRows: InvestCashAccountPolicyRow[];
+    try {
+      allRows = await this.gateway.findWhere(ctx, 'invest_cash_account_policies', { is_active: 1 }) as InvestCashAccountPolicyRow[];
+    } catch (err) {
+      if (isMissingSchemaError(err)) return null;
+      throw err;
+    }
     const rows = allRows.filter(r => 
-      (r.organization_id === orgId || r.organization_id === null) &&
+      (this.rowOrganizationId(r) === orgId || this.rowOrganizationId(r) === null) &&
       r.currency_code === currencyCode &&
       r.valid_from <= eventDate &&
       (!r.valid_to || r.valid_to >= eventDate)
@@ -183,8 +218,8 @@ export class InvestCashAccountPolicy {
 
     candidates.sort((a, b) => {
       // 1. Org specific vs global
-      const aIsOrg = a.organization_id === orgId;
-      const bIsOrg = b.organization_id === orgId;
+      const aIsOrg = this.rowOrganizationId(a) === orgId;
+      const bIsOrg = this.rowOrganizationId(b) === orgId;
       if (aIsOrg && !bIsOrg) return -1;
       if (!aIsOrg && bIsOrg) return 1;
 
@@ -220,5 +255,12 @@ export class InvestCashAccountPolicy {
     });
 
     return candidates[0];
+  }
+
+  private rowOrganizationId(row: InvestCashAccountPolicyRow): string | null {
+    const raw = (row as InvestCashAccountPolicyRow & { org_id?: string | null }).organization_id ??
+      (row as InvestCashAccountPolicyRow & { org_id?: string | null }).org_id ??
+      null;
+    return raw == null ? null : String(raw);
   }
 }

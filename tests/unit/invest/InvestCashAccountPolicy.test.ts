@@ -23,6 +23,13 @@ describe('InvestCashAccountPolicy', () => {
     await expect(policy.resolve(ctx, { brokerCode: 'UNKNOWN' })).rejects.toThrow(/Nenhuma policy de caixa encontrada/);
   });
 
+  it('usa default transicional BTG/BRL quando a policy ainda nao foi semeada', async () => {
+    const result = await policy.resolve(ctx, { brokerCode: 'BTG', currencyCode: 'BRL' });
+    expect(result.policyId).toBe('icap-btg-brl-default');
+    expect(result.cashTicker).toBe('CAIXA-BTG');
+    expect(result.financialAccountExternalId).toBe('BTG');
+  });
+
   it('resolves default policy for currency correctly', async () => {
     await gateway.insert(ctx, 'invest_cash_account_policies', {
       id: 'icap-btg-brl-default',
