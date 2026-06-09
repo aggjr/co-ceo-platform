@@ -45,7 +45,8 @@ export type GatewayReadQueryKey =
   | 'ui_texts_resolved_for_org'
   | 'ui_catalog_version'
   | 'platform_admin_alerts_unread'
-  | 'platform_admin_alerts_recent';
+  | 'platform_admin_alerts_recent'
+  | 'invest_broker_aliases_all';
 
 export interface GatewayReadQueryDef {
   sql: string;
@@ -483,5 +484,9 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
             (SELECT COALESCE(MAX(updated_at), '1970-01-01')
                FROM ui_text_overrides WHERE organization_id = ?) AS overrides_at
           FROM ui_text_catalog`,
+  },
+  invest_broker_aliases_all: {
+    requiresGlobalScope: true,
+    sql: `SELECT alias_name, broker_code FROM invest_broker_aliases`,
   },
 };

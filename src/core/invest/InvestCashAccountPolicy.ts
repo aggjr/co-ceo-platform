@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import type { CoCeoDataGateway, UserContext } from '../dal';
+import { SYSTEM_INSTALLER_USER_ID } from '../dal/types';
 import { GatewayError } from '../dal/errors';
 import { isMissingSchemaError } from '../dal/mysqlErrors';
 
@@ -52,12 +53,23 @@ export class InvestCashAccountPolicy {
    * Carrega o mapa DE-PARA da tabela invest_broker_aliases (uma vez por instância).
    * Chave: alias em UPPER CASE | Valor: broker_code canônico.
    */
-  private async loadBrokerAliases(ctx: UserContext): Promise<Map<string, string>> {
+  private async loadBrokerAliases(): Promise<Map<string, string>> {
     if (this.brokerAliasCache !== null) return this.brokerAliasCache;
+
+    const globalCtx: UserContext = {
+      userId: SYSTEM_INSTALLER_USER_ID,
+      organizationId: null,
+      impersonatorId: null,
+      scope: 'global',
+    };
 
     const map = new Map<string, string>();
     try {
-      const rows = await this.gateway.findWhere(ctx, 'invest_broker_aliases', {}) as Array<{ alias_name: string; broker_code: string }>;
+      const rows = await this.gateway.readQuery(
+        globalCtx,
+        'invest_broker_aliases_all',
+        []
+      ) as Array<{ alias_name: string; broker_code: string }>;
       for (const row of rows) {
         map.set(row.alias_name.toUpperCase().trim(), row.broker_code);
       }
@@ -70,9 +82,9 @@ export class InvestCashAccountPolicy {
     return map;
   }
 
-  private async normalizeBrokerCode(ctx: UserContext, raw?: string | null): Promise<string> {
+  private async normalizeBrokerCode(raw?: string | null): Promise<string> {
     if (!raw) return 'BTG';
-    const aliases = await this.loadBrokerAliases(ctx);
+    const aliases = await this.loadBrokerAliases();
     return aliases.get(raw.toUpperCase().trim()) ?? raw.trim();
   }
 
@@ -90,7 +102,7 @@ export class InvestCashAccountPolicy {
       throw new GatewayError('INVALID_PAYLOAD', 'Organization ID is required to resolve cash account.', 400);
     }
 
-    const brokerCode = await this.normalizeBrokerCode(ctx, input?.brokerCode); // DE-PARA via tabela invest_broker_aliases
+    const brokerCode = await this.normalizeBrokerCode(input?.brokerCode); // DE-PARA via tabela invest_broker_aliases
     const currencyCode = input?.currencyCode || 'BRL';
     const sourceSystem = input?.sourceSystem || null;
     const eventDate = input?.eventDate || new Date().toISOString().slice(0, 10);
