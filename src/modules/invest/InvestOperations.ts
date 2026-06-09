@@ -80,9 +80,33 @@ export class InvestOperations {
     this.cashPolicy = cashPolicy ?? new InvestCashAccountPolicy(gateway);
   }
 
-  private brokerCodeFromLine(line: LedgerImportLine): string {
-    // Transitional default until broker adapters provide brokerCode explicitly.
-    return line.broker_code ?? line.counterparty ?? 'BTG';
+  private brokerAliasesCache: Map<string, string> | null = null;
+
+  private async brokerCodeFromLine(ctx: UserContext, line: LedgerImportLine): Promise<string> {
+    if (line.broker_code) return line.broker_code;
+
+    if (!this.brokerAliasesCache) {
+      this.brokerAliasesCache = new Map();
+      try {
+        const rows = await this.gateway.findWhere(ctx, 'invest_broker_aliases', {}) as Array<{ alias_name: string, broker_code: string }>;
+        for (const row of rows) {
+          this.brokerAliasesCache.set(String(row.alias_name).toUpperCase(), String(row.broker_code));
+        }
+      } catch (err) {
+        // Table might not exist yet if migration didn't run, silently fallback
+      }
+    }
+
+    const cp = line.counterparty?.trim().toUpperCase();
+    if (cp) {
+      if (this.brokerAliasesCache.has(cp)) {
+        return this.brokerAliasesCache.get(cp)!;
+      }
+      for (const [alias, code] of this.brokerAliasesCache.entries()) {
+        if (cp.includes(alias)) return code;
+      }
+    }
+    return line.counterparty ?? 'BTG';
   }
 
 
@@ -787,7 +811,7 @@ export class InvestOperations {
 
     if (policy.isPassiveIncome || policy.isExternalFlowForTwr) {
       const cashResolution = await this.resolveCashAccount(ctx, {
-        brokerCode: this.brokerCodeFromLine(line),
+        brokerCode: await this.brokerCodeFromLine(ctx, line),
         sourceSystem: line.source_system,
         currencyCode: line.currency ?? 'BRL',
         eventDate: line.date,
@@ -844,7 +868,7 @@ export class InvestOperations {
 
     if (policy.isPassiveExpense) {
       const cashResolution = await this.resolveCashAccount(ctx, {
-        brokerCode: this.brokerCodeFromLine(line),
+        brokerCode: await this.brokerCodeFromLine(ctx, line),
         sourceSystem: line.source_system,
         currencyCode: line.currency ?? 'BRL',
         eventDate: line.date,
@@ -959,7 +983,7 @@ export class InvestOperations {
       });
 
       const cashResolution = await this.resolveCashAccount(ctx, {
-        brokerCode: this.brokerCodeFromLine(line),
+        brokerCode: await this.brokerCodeFromLine(ctx, line),
         sourceSystem: line.source_system,
         currencyCode: line.currency ?? 'BRL',
         eventDate: line.date,
@@ -996,7 +1020,7 @@ export class InvestOperations {
 
     if (policy.defaultFinancialStatus === 'pending') {
       const cashResolution = await this.resolveCashAccount(ctx, {
-        brokerCode: this.brokerCodeFromLine(line),
+        brokerCode: await this.brokerCodeFromLine(ctx, line),
         sourceSystem: line.source_system,
         currencyCode: line.currency ?? 'BRL',
         eventDate: line.date,
@@ -1124,7 +1148,7 @@ export class InvestOperations {
     // Pernas sem link sao legitimas quando genuinamente nao ha relacao com o outro mundo.
     if (cashDirection && !line.skip_financial_ledger) {
       const cashResolution = await this.resolveCashAccount(ctx, {
-        brokerCode: this.brokerCodeFromLine(line),
+        brokerCode: await this.brokerCodeFromLine(ctx, line),
         sourceSystem: line.source_system,
         currencyCode: line.currency ?? 'BRL',
         eventDate: line.date,

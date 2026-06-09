@@ -256,6 +256,11 @@ const TABLES: TableDefinition[] = [
     primaryKey: 'broker_code',
     countsTowardStorage: false,
   }),
+  def('invest_broker_aliases', 'global', {
+    softDelete: false,
+    primaryKey: 'alias_name',
+    countsTowardStorage: false,
+  }),
   def('invest_cash_account_policies', 'global', {
     softDelete: false,
     countsTowardStorage: false,
