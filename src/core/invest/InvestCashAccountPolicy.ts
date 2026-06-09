@@ -43,31 +43,42 @@ export class InvestCashAccountPolicy {
   // Simple cache to avoid repeated queries for the same parameters within a run.
   private resolutionCache = new Map<string, ResolvedInvestCashAccount>();
 
+  // Cache do DE-PARA de aliases carregado da tabela invest_broker_aliases
+  private brokerAliasCache: Map<string, string> | null = null;
+
   constructor(private readonly gateway: CoCeoDataGateway) {}
 
   /**
-   * Mapa de normalização de nomes de broker para o código canônico.
-   * Usado como fallback seguro antes de consultar a tabela invest_broker_aliases.
-   * Adicione entradas aqui quando novos aliases forem identificados.
+   * Carrega o mapa DE-PARA da tabela invest_broker_aliases (uma vez por instância).
+   * Chave: alias em UPPER CASE | Valor: broker_code canônico.
    */
-  private static readonly BROKER_ALIAS_MAP: Record<string, string> = {
-    'btg pactual':    'BTG',
-    'btgpactual':     'BTG',
-    'btg':            'BTG',
-    'xp investimentos': 'XP',
-    'xp':             'XP',
-    'rico':           'RICO',
-    'clear':          'CLEAR',
-    'nuinvest':       'NUINVEST',
-    'nu invest':      'NUINVEST',
-    'inter':          'INTER',
-    'banco inter':    'INTER',
-  };
+  private async loadBrokerAliases(ctx: UserContext): Promise<Map<string, string>> {
+    if (this.brokerAliasCache !== null) return this.brokerAliasCache;
 
-  private normalizeBrokerCode(raw?: string | null): string {
+    const map = new Map<string, string>();
+    try {
+      const rows = await this.gateway.findWhere(ctx, 'invest_broker_aliases', {}) as Array<{ alias_name: string; broker_code: string }>;
+      for (const row of rows) {
+        map.set(row.alias_name.toUpperCase().trim(), row.broker_code);
+      }
+    } catch (err) {
+      if (!isMissingSchemaError(err)) throw err;
+      // Tabela ainda não existe — cache vazio, sem aliases
+    }
+
+    this.brokerAliasCache = map;
+    return map;
+  }
+
+  private async normalizeBrokerCode(ctx: UserContext, raw?: string | null): Promise<string> {
     if (!raw) return 'BTG';
-    const normalized = InvestCashAccountPolicy.BROKER_ALIAS_MAP[raw.trim().toLowerCase()];
-    return normalized ?? raw.trim();
+    const aliases = await this.loadBrokerAliases(ctx);
+    return aliases.get(raw.toUpperCase().trim()) ?? raw.trim();
+  }
+
+  clearCache(): void {
+    this.resolutionCache.clear();
+    this.brokerAliasCache = null; // Invalida também o cache de aliases
   }
 
   async resolve(
@@ -79,7 +90,7 @@ export class InvestCashAccountPolicy {
       throw new GatewayError('INVALID_PAYLOAD', 'Organization ID is required to resolve cash account.', 400);
     }
 
-    const brokerCode = this.normalizeBrokerCode(input?.brokerCode); // Normaliza alias antes de qualquer lookup
+    const brokerCode = await this.normalizeBrokerCode(ctx, input?.brokerCode); // DE-PARA via tabela invest_broker_aliases
     const currencyCode = input?.currencyCode || 'BRL';
     const sourceSystem = input?.sourceSystem || null;
     const eventDate = input?.eventDate || new Date().toISOString().slice(0, 10);
@@ -173,9 +184,8 @@ export class InvestCashAccountPolicy {
     this.clearCache();
   }
 
-  clearCache(): void {
-    this.resolutionCache.clear();
-  }
+
+
 
   private defaultPolicy(
     orgId: string,
