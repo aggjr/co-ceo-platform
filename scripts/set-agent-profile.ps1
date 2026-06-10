@@ -5,7 +5,7 @@
 
 param(
   [Parameter(Mandatory = $true, Position = 0)]
-  [ValidateSet("antigravity-gamer", "antigravity-guto", "note-gamer", "note-guto")]
+  [ValidateSet("cursor-gamer", "antigravity-gamer", "antigravity-guto", "note-gamer", "note-guto")]
   [string]$Profile
 )
 

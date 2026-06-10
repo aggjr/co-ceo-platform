@@ -718,7 +718,7 @@ export class InvestController {
               anchors,
               stockQuotes,
               fixedIncomeTotal,
-              calibrateToAnchors: false,
+              calibrateToAnchors: method === 'mtm_btg_calibrated' || method === 'mtm_economic_calibrated',
               quoteForDate,
               valuationContext: valuationSnapshot,
               fxRateForDate: (fromCurrency: string, toCurrency: string, date: string) =>

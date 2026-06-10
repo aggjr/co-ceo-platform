@@ -26,6 +26,7 @@ export type PatrimonyRebuildOptions = {
   from?: string;
   to?: string;
   lastTrustedDate?: string;
+  onProgress?: (daysWritten: number, daysSkipped: number, currentDay: string) => void;
 };
 
 export type PatrimonyRebuildStatus = {
@@ -171,6 +172,10 @@ export class PatrimonyDailyRebuildService {
           if (!msg.includes('Sem patrimônio econômico')) {
             warnings.push(`${day}: ${msg}`);
           }
+        }
+        // Emite progresso a cada 10 dias para logs em tempo real
+        if ((daysWritten + daysSkipped) % 10 === 0 && opts.onProgress) {
+          opts.onProgress(daysWritten, daysSkipped, day);
         }
       }
 

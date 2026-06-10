@@ -4,6 +4,7 @@ import type { DailyPatrimonyPoint, PatrimonyDailyResult } from './PatrimonyDaily
 import {
   computePortfolioPerformance,
   computeTwrFromMonthEndAnchors,
+  aggregateExternalFlowsByDate,
 } from './portfolioPerformance';
 import { buildCashInTransitSummary } from './cashInTransit';
 import { computeSharpeRatio, dailyReturnsFromPatrimony } from './sharpeRatio';
@@ -237,6 +238,7 @@ export function buildDailyPatrimonyMtmSeries(
     String(a.transaction_date).localeCompare(String(b.transaction_date))
   );
   const byDay = groupByDate(sorted);
+  const flowsByDate = aggregateExternalFlowsByDate(entries, from, to);
   const positions = new Map<string, DayPosition>();
   const lastKnownPrices = new Map<string, number>();
   let pendingSettlements = 0;
@@ -256,6 +258,7 @@ export function buildDailyPatrimonyMtmSeries(
     target: number;
   }> = [];
 
+  let lastResidual = 0;
   for (const date of calendar) {
     for (const e of byDay.get(date) || []) {
       const type = String(e.transaction_type);
@@ -349,14 +352,15 @@ export function buildDailyPatrimonyMtmSeries(
       ? anchors.month_ends[anchors.month_ends.length - 1]!.date 
       : '';
     const shouldCalibrate = calibrate && date <= lastAnchorDate;
-    const target = shouldCalibrate ? interpolatePatrimonyTarget(date, anchors) : 0;
+    const target = shouldCalibrate ? interpolatePatrimonyTarget(date, anchors, flowsByDate) : 0;
     
     let optionsValue: number;
     if (!shouldCalibrate) {
-      optionsValue = Math.round((optionsFromMarket + optionsStructural) * 100) / 100;
+      optionsValue = Math.round((optionsFromMarket + optionsStructural + lastResidual) * 100) / 100;
     } else {
       const residual = Math.round((target - base - pending - optionsFromMarket) * 100) / 100;
       optionsValue = Math.round((optionsFromMarket + residual) * 100) / 100;
+      lastResidual = residual;
     }
     let patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
     let patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
@@ -415,8 +419,8 @@ export function buildDailyPatrimonyMtmSeries(
         periodReturnTwrDaily: performanceDaily.periodReturnTwr,
         monthAnchorTwr: monthLinked?.periodReturnTwr,
         monthAnchorBreakdown: monthLinked?.months,
-        periodReturnTwr: performanceDaily.periodReturnTwr,
-        periodGainBrl: monthLinked
+        periodReturnTwr: calibrate && monthLinked ? monthLinked.periodReturnTwr : performanceDaily.periodReturnTwr,
+        periodGainBrl: monthLinked && calibrate
           ? Math.round(
               ((monthLinked.months[monthLinked.months.length - 1]?.endPatrimony ?? performanceDaily.endPatrimony) -
                 (monthLinked.months[0]?.startPatrimony ?? performanceDaily.startPatrimony) -

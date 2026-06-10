@@ -1,0 +1,1516 @@
+{
+  "organizations": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "parent_id VARCHAR(36)",
+      "name VARCHAR(255) NOT NULL",
+      "type ENUM('holding', 'company', 'family_office', 'branch') NOT NULL",
+      "path VARCHAR(1000) NOT NULL, -- Materialized Path (ex: /org-1/org-2/)",
+      "status ENUM('active', 'inactive', 'suspended') DEFAULT 'active'",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL, -- SOFT DELETE"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "00_core_saas_schema.sql",
+    "comment": ""
+  },
+  "users": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "email VARCHAR(255) UNIQUE NOT NULL",
+      "recovery_email VARCHAR(255) NULL",
+      "password_hash VARCHAR(255) NOT NULL",
+      "full_name VARCHAR(255) NOT NULL",
+      "preferred_name VARCHAR(100)",
+      "is_active BOOLEAN DEFAULT TRUE",
+      "must_change_password BOOLEAN DEFAULT FALSE, -- Flag de segurança para primeiro login",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL -- SOFT DELETE"
+    ],
+    "fks": [],
+    "file": "00_core_saas_schema.sql",
+    "comment": ""
+  },
+  "modules": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "code VARCHAR(50) UNIQUE NOT NULL, -- ex: 'CORE', 'INVEST', 'CASH', 'STOCKSPIN'",
+      "name VARCHAR(100) NOT NULL",
+      "description TEXT",
+      "is_active BOOLEAN DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    ],
+    "fks": [],
+    "file": "00_core_saas_schema.sql",
+    "comment": ""
+  },
+  "contracts": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL, -- O cliente pagante",
+      "client_manager_user_id VARCHAR(36) NOT NULL, -- O 'Pai' ou gestor do cliente",
+      "co_ceo_manager_user_id VARCHAR(36) NOT NULL, -- O Account Manager do CO-CEO",
+      "contract_start_date DATE NOT NULL",
+      "contract_end_date DATE NULL",
+      "status ENUM('active', 'canceled', 'trial') DEFAULT 'active'",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL, -- SOFT DELETE"
+    ],
+    "fks": [
+      "organizations",
+      "users",
+      "users"
+    ],
+    "file": "00_core_saas_schema.sql",
+    "comment": ""
+  },
+  "contract_modules": {
+    "cols": [
+      "contract_id VARCHAR(36) NOT NULL",
+      "module_code VARCHAR(50) NOT NULL",
+      "status ENUM('active', 'suspended') DEFAULT 'active'",
+      "granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "contracts",
+      "modules"
+    ],
+    "file": "00_core_saas_schema.sql",
+    "comment": ""
+  },
+  "field_permissions": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "role_id VARCHAR(36) NOT NULL, -- Referência futura para tabela de roles",
+      "table_name VARCHAR(100) NOT NULL",
+      "field_name VARCHAR(100) NOT NULL",
+      "permission_type ENUM('read', 'write', 'hidden', 'mask') NOT NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "00_core_saas_schema.sql",
+    "comment": ""
+  },
+  "custom_field_labels": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "table_name VARCHAR(100) NOT NULL",
+      "field_name VARCHAR(100) NOT NULL",
+      "custom_label VARCHAR(255) NOT NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "00_core_saas_schema.sql",
+    "comment": ""
+  },
+  "audit_logs": {
+    "cols": [
+      "id BIGINT AUTO_INCREMENT PRIMARY KEY",
+      "table_name VARCHAR(100) NOT NULL",
+      "record_id VARCHAR(255) NOT NULL",
+      "action ENUM('INSERT', 'UPDATE', 'SOFT_DELETE') NOT NULL",
+      "organization_id VARCHAR(36) NULL, -- Null se for alteração global do CO-CEO",
+      "actor_user_id VARCHAR(36) NOT NULL, -- Quem apertou o botão",
+      "impersonator_user_id VARCHAR(36) NULL, -- Se o CO-CEO estava logado como o cliente",
+      "old_payload JSON NULL",
+      "new_payload JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "INDEX idx_audit_record (table_name, record_id)",
+      "INDEX idx_audit_org (organization_id)"
+    ],
+    "fks": [],
+    "file": "00_core_saas_schema.sql",
+    "comment": ""
+  },
+  "invest_assets": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "asset_ticker VARCHAR(20) NOT NULL, -- Ex: 'PRIO3', 'PETR4', 'PICASSO-01'",
+      "asset_type ENUM('stock', 'option_call', 'option_put', 'fii', 'fixed_income', 'alternative', 'artwork', 'real_estate') NOT NULL",
+      "current_quantity DECIMAL(18, 4) DEFAULT 0",
+      "managerial_avg_price DECIMAL(18, 4) DEFAULT 0, -- O Santo Graal (Calculado Botton-Up)",
+      "metadata JSON NULL, -- Para armazenar dados dinâmicos de Obras de Arte, Imóveis, etc.",
+      "status ENUM('active', 'liquidated') DEFAULT 'active'",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL, -- SOFT DELETE"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "01_invest_schema.sql",
+    "comment": ""
+  },
+  "invest_ledger_entries": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "asset_id VARCHAR(36) NOT NULL",
+      "transaction_date DATE NOT NULL",
+      "transaction_type ENUM('buy', 'sell', 'dividend', 'jcp', 'split', 'bonus', 'option_exercise', 'fee', 'revaluation') NOT NULL",
+      "quantity DECIMAL(18, 4) NOT NULL, -- Positivo (compra/ganho), Negativo (venda/perda)",
+      "unit_price DECIMAL(18, 4) NOT NULL",
+      "total_gross_value DECIMAL(18, 4) NOT NULL, -- quantity * unit_price",
+      "brokerage_fee DECIMAL(18, 4) DEFAULT 0",
+      "b3_fees DECIMAL(18, 4) DEFAULT 0",
+      "irrf_tax DECIMAL(18, 4) DEFAULT 0",
+      "total_net_value DECIMAL(18, 4) NOT NULL, -- gross - fees - taxes",
+      "impacts_managerial_price BOOLEAN DEFAULT TRUE, -- Se for FALSE, é apenas registro contábil",
+      "notes VARCHAR(500)",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL, -- SOFT DELETE (Substitui o DELETE físico em caso de erro na boleta)"
+    ],
+    "fks": [
+      "organizations",
+      "invest_assets"
+    ],
+    "file": "01_invest_schema.sql",
+    "comment": ""
+  },
+  "invest_daily_snapshots": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "asset_id VARCHAR(36) NOT NULL",
+      "snapshot_date DATE NOT NULL",
+      "closing_price DECIMAL(18, 4) NOT NULL, -- Preço de mercado no dia",
+      "quantity_held DECIMAL(18, 4) NOT NULL, -- Quantidade no dia",
+      "managerial_avg_price DECIMAL(18, 4) NOT NULL, -- O preço médio naquele dia",
+      "total_market_value DECIMAL(18, 4) NOT NULL, -- closing * qty",
+      "total_managerial_value DECIMAL(18, 4) NOT NULL, -- avg * qty",
+      "unrealized_pnl DECIMAL(18, 4) NOT NULL, -- market - managerial",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "organizations",
+      "invest_assets"
+    ],
+    "file": "01_invest_schema.sql",
+    "comment": ""
+  },
+  "invest_options_chain": {
+    "cols": [
+      "ticker VARCHAR(20) PRIMARY KEY",
+      "underlying_ticker VARCHAR(20) NOT NULL, -- Ação mãe (ex: PRIO3)",
+      "type ENUM('CALL', 'PUT') NOT NULL",
+      "strike_price DECIMAL(18, 4) NOT NULL",
+      "expiration_date DATE NOT NULL",
+      "european_american ENUM('E', 'A') NOT NULL",
+      "delta DECIMAL(8, 4) NULL, -- Gregas",
+      "gamma DECIMAL(8, 4) NULL",
+      "theta DECIMAL(8, 4) NULL",
+      "vega DECIMAL(8, 4) NULL",
+      "implied_volatility DECIMAL(8, 4) NULL",
+      "last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_underlying_exp (underlying_ticker, expiration_date)"
+    ],
+    "fks": [],
+    "file": "01_invest_schema.sql",
+    "comment": ""
+  },
+  "organization_storage_ledger": {
+    "cols": [
+      "id BIGINT AUTO_INCREMENT PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "delta_bytes BIGINT NOT NULL",
+      "source_table VARCHAR(100) NOT NULL",
+      "record_id VARCHAR(255) NULL",
+      "action ENUM('INSERT', 'UPDATE', 'SOFT_DELETE') NOT NULL",
+      "actor_user_id VARCHAR(36) NOT NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "INDEX idx_storage_org_created (organization_id, created_at)"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "02_gateway_storage_and_meter.sql",
+    "comment": ""
+  },
+  "roles": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "code VARCHAR(80) NOT NULL",
+      "name VARCHAR(100) NOT NULL",
+      "scope ENUM('global', 'node') NOT NULL",
+      "owner_organization_id VARCHAR(36) NULL",
+      "is_system BOOLEAN NOT NULL DEFAULT FALSE",
+      "description VARCHAR(255) NULL",
+      "perm_version INT NOT NULL DEFAULT 1",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "03_iam_cockpit_schema.sql",
+    "comment": ""
+  },
+  "permissions": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "code VARCHAR(120) NOT NULL UNIQUE",
+      "module VARCHAR(50) NOT NULL",
+      "resource VARCHAR(50) NOT NULL",
+      "action VARCHAR(30) NOT NULL",
+      "description VARCHAR(255) NULL",
+      "audience ENUM('platform', 'organization', 'both') NOT NULL DEFAULT 'both'",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    ],
+    "fks": [],
+    "file": "03_iam_cockpit_schema.sql",
+    "comment": ""
+  },
+  "role_permissions": {
+    "cols": [
+      "role_id VARCHAR(36) NOT NULL",
+      "permission_id VARCHAR(36) NOT NULL"
+    ],
+    "fks": [
+      "roles",
+      "permissions"
+    ],
+    "file": "03_iam_cockpit_schema.sql",
+    "comment": ""
+  },
+  "contract_users": {
+    "cols": [
+      "contract_id VARCHAR(36) NOT NULL",
+      "user_id VARCHAR(36) NOT NULL",
+      "default_organization_id VARCHAR(36) NOT NULL",
+      "status ENUM('active', 'invited', 'suspended') NOT NULL DEFAULT 'active'",
+      "invited_by_user_id VARCHAR(36) NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "contracts",
+      "users",
+      "organizations"
+    ],
+    "file": "03_iam_cockpit_schema.sql",
+    "comment": ""
+  },
+  "user_roles": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "user_id VARCHAR(36) NOT NULL",
+      "role_id VARCHAR(36) NOT NULL",
+      "contract_id VARCHAR(36) NULL",
+      "organization_id VARCHAR(36) NULL",
+      "is_primary BOOLEAN NOT NULL DEFAULT FALSE",
+      "granted_by_user_id VARCHAR(36) NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL",
+      "INDEX idx_user_roles_user (user_id)",
+      "INDEX idx_user_roles_contract (contract_id)"
+    ],
+    "fks": [
+      "users",
+      "roles",
+      "contracts",
+      "organizations"
+    ],
+    "file": "03_iam_cockpit_schema.sql",
+    "comment": ""
+  },
+  "access_resources": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "resource_key VARCHAR(160) NOT NULL UNIQUE",
+      "resource_type ENUM('module', 'screen', 'route', 'button', 'api') NOT NULL",
+      "module_code VARCHAR(50) NULL",
+      "parent_resource_key VARCHAR(160) NULL",
+      "label VARCHAR(255) NOT NULL",
+      "description VARCHAR(500) NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    ],
+    "fks": [],
+    "file": "03_iam_cockpit_schema.sql",
+    "comment": ""
+  },
+  "role_resource_grants": {
+    "cols": [
+      "role_id VARCHAR(36) NOT NULL",
+      "resource_id VARCHAR(36) NOT NULL",
+      "effect ENUM('allow', 'deny') NOT NULL DEFAULT 'allow'"
+    ],
+    "fks": [
+      "roles",
+      "access_resources"
+    ],
+    "file": "03_iam_cockpit_schema.sql",
+    "comment": ""
+  },
+  "iam_config_audit": {
+    "cols": [
+      "id BIGINT AUTO_INCREMENT PRIMARY KEY",
+      "contract_id VARCHAR(36) NULL",
+      "organization_id VARCHAR(36) NULL",
+      "actor_user_id VARCHAR(36) NOT NULL",
+      "impersonator_user_id VARCHAR(36) NULL",
+      "change_type VARCHAR(80) NOT NULL",
+      "entity_type VARCHAR(80) NOT NULL",
+      "entity_id VARCHAR(36) NOT NULL",
+      "old_payload JSON NULL",
+      "new_payload JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "INDEX idx_iam_audit_contract (contract_id)",
+      "INDEX idx_iam_audit_org (organization_id)"
+    ],
+    "fks": [],
+    "file": "03_iam_cockpit_schema.sql",
+    "comment": ""
+  },
+  "telemetry_events": {
+    "cols": [
+      "id BIGINT AUTO_INCREMENT PRIMARY KEY",
+      "user_id VARCHAR(36) NOT NULL",
+      "organization_id VARCHAR(36) NULL",
+      "contract_id VARCHAR(36) NULL",
+      "role_id VARCHAR(36) NULL",
+      "user_role_id VARCHAR(36) NULL",
+      "impersonator_user_id VARCHAR(36) NULL",
+      "event_type VARCHAR(50) NOT NULL",
+      "event_name VARCHAR(100) NOT NULL",
+      "module_code VARCHAR(50) NULL",
+      "screen_path VARCHAR(255) NULL",
+      "session_id VARCHAR(64) NULL",
+      "metadata JSON NULL",
+      "ip_address VARCHAR(45) NULL",
+      "user_agent TEXT NULL",
+      "client_timestamp TIMESTAMP NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "INDEX idx_telemetry_org (organization_id)",
+      "INDEX idx_telemetry_user (user_id)",
+      "INDEX idx_telemetry_contract (contract_id)",
+      "INDEX idx_telemetry_event (event_type, event_name)",
+      "INDEX idx_telemetry_created (created_at)",
+      "INDEX idx_telemetry_session (session_id)"
+    ],
+    "fks": [],
+    "file": "04_telemetry_events.sql",
+    "comment": ""
+  },
+  "quality_test_runs": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "run_mode VARCHAR(20) NOT NULL",
+      "status VARCHAR(20) NOT NULL",
+      "triggered_by_user_id VARCHAR(36) NOT NULL",
+      "git_branch VARCHAR(120) NULL",
+      "git_commit VARCHAR(40) NULL",
+      "total_tests INT NOT NULL DEFAULT 0",
+      "passed INT NOT NULL DEFAULT 0",
+      "failed INT NOT NULL DEFAULT 0",
+      "skipped INT NOT NULL DEFAULT 0",
+      "coverage_lines_pct DECIMAL(5,2) NULL",
+      "impact_skipped INT NULL",
+      "report_json JSON NOT NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "INDEX idx_quality_runs_created (created_at DESC)"
+    ],
+    "fks": [],
+    "file": "05_quality_test_runs.sql",
+    "comment": ""
+  },
+  "invest_portfolio_daily": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "snapshot_date DATE NOT NULL",
+      "patrimony DECIMAL(18, 4) NOT NULL",
+      "patrimony_gross DECIMAL(18, 4) NOT NULL",
+      "cash DECIMAL(18, 4) NOT NULL",
+      "positions_value DECIMAL(18, 4) NOT NULL",
+      "pending_settlements DECIMAL(18, 4) DEFAULT 0",
+      "fixed_income_total DECIMAL(18, 4) DEFAULT 0",
+      "external_flow DECIMAL(18, 4) DEFAULT 0",
+      "daily_return_simple DECIMAL(12, 8) NULL",
+      "daily_return_twr DECIMAL(12, 8) NULL",
+      "cumulative_twr DECIMAL(12, 8) NULL",
+      "quotes_as_of DATE NULL",
+      "source VARCHAR(32) NOT NULL DEFAULT 'mtm_economic'",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "09_invest_portfolio_daily.sql",
+    "comment": ""
+  },
+  "database_usage_telemetry": {
+    "cols": [
+      "id BIGINT AUTO_INCREMENT PRIMARY KEY",
+      "user_id VARCHAR(36) NOT NULL",
+      "organization_id VARCHAR(36) NULL",
+      "contract_id VARCHAR(36) NULL",
+      "impersonator_user_id VARCHAR(36) NULL",
+      "operation_type VARCHAR(50) NOT NULL",
+      "target_table VARCHAR(100) NULL",
+      "query_key VARCHAR(100) NULL",
+      "bytes_in INT NOT NULL DEFAULT 0",
+      "bytes_out INT NOT NULL DEFAULT 0",
+      "rows_affected INT NOT NULL DEFAULT 0",
+      "duration_ms INT NOT NULL DEFAULT 0",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "INDEX idx_db_telemetry_org (organization_id)",
+      "INDEX idx_db_telemetry_user (user_id)",
+      "INDEX idx_db_telemetry_created (created_at)"
+    ],
+    "fks": [],
+    "file": "10_database_usage_telemetry.sql",
+    "comment": ""
+  },
+  "patrimony_items": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "source_module VARCHAR(50) NOT NULL",
+      "category VARCHAR(50) NOT NULL",
+      "subcategory VARCHAR(50) NOT NULL",
+      "identifier VARCHAR(64) NOT NULL",
+      "name VARCHAR(255) NULL",
+      "quantity DECIMAL(18, 6) NOT NULL DEFAULT 0",
+      "quantity_unit VARCHAR(16) NOT NULL DEFAULT 'un'",
+      "acquisition_value DECIMAL(18, 4) NULL",
+      "current_value DECIMAL(18, 4) NULL",
+      "currency CHAR(3) NOT NULL DEFAULT 'BRL'",
+      "acquired_at DATE NULL",
+      "divested_at DATE NULL",
+      "status ENUM('active', 'liquidated', 'written_off') NOT NULL DEFAULT 'active'",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL",
+      "INDEX idx_patrimony_org_category (organization_id, category, subcategory)",
+      "INDEX idx_patrimony_org_status (organization_id, status)"
+    ],
+    "fks": [
+      "organizations",
+      "modules"
+    ],
+    "file": "11_core_patrimony_schema.sql",
+    "comment": ""
+  },
+  "patrimony_locations": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "location_type VARCHAR(40) NOT NULL",
+      "name VARCHAR(255) NOT NULL",
+      "external_id VARCHAR(128) NULL",
+      "address_line VARCHAR(500) NULL",
+      "url VARCHAR(500) NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL",
+      "INDEX idx_locations_org_type (organization_id, location_type)"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "11_core_patrimony_schema.sql",
+    "comment": ""
+  },
+  "patrimony_item_locations": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "patrimony_item_id VARCHAR(36) NOT NULL",
+      "location_id VARCHAR(36) NOT NULL",
+      "quantity_at_location DECIMAL(18, 6) NOT NULL DEFAULT 0",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "organizations",
+      "patrimony_items",
+      "patrimony_locations"
+    ],
+    "file": "11_core_patrimony_schema.sql",
+    "comment": ""
+  },
+  "patrimony_ledger_entries": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "patrimony_item_id VARCHAR(36) NOT NULL",
+      "location_id VARCHAR(36) NULL",
+      "transaction_date DATE NOT NULL",
+      "movement_type ENUM(",
+      "'opening_balance'",
+      "'acquisition'",
+      "'disposition'",
+      "'transfer_in'",
+      "'transfer_out'",
+      "'revaluation'",
+      "'split'",
+      "'bonus'",
+      "'write_off'",
+      "'short_open'",
+      "'short_close'",
+      "'income_in_kind'",
+      ") NOT NULL",
+      "quantity_delta DECIMAL(18, 6) NOT NULL",
+      "unit_value DECIMAL(18, 6) NOT NULL",
+      "total_value DECIMAL(18, 4) NOT NULL",
+      "impacts_valuation BOOLEAN NOT NULL DEFAULT TRUE",
+      "source_batch_id VARCHAR(36) NULL",
+      "external_ref VARCHAR(128) NULL",
+      "notes VARCHAR(500) NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL",
+      "INDEX idx_patrimony_ledger_org_date (organization_id, transaction_date)",
+      "INDEX idx_patrimony_ledger_item_date (patrimony_item_id, transaction_date)",
+      "INDEX idx_patrimony_ledger_ref (organization_id, external_ref)"
+    ],
+    "fks": [
+      "organizations",
+      "patrimony_items",
+      "patrimony_locations"
+    ],
+    "file": "11_core_patrimony_schema.sql",
+    "comment": ""
+  },
+  "patrimony_closings": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "scope ENUM('inventory', 'financial', 'full') NOT NULL",
+      "period ENUM('daily', 'weekly', 'monthly', 'quarterly', 'annual') NOT NULL",
+      "reference_date DATE NOT NULL",
+      "status ENUM('open', 'in_progress', 'closed', 'reopened') NOT NULL DEFAULT 'open'",
+      "closed_by_user_id VARCHAR(36) NULL",
+      "closed_at TIMESTAMP NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "11_core_patrimony_schema.sql",
+    "comment": ""
+  },
+  "financial_accounts": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "source_module VARCHAR(50) NOT NULL",
+      "account_type ENUM(",
+      "'checking'",
+      "'savings'",
+      "'brokerage'",
+      "'cash_register'",
+      "'credit_line'",
+      "'gateway'",
+      "'wallet'",
+      ") NOT NULL",
+      "external_id VARCHAR(128) NULL",
+      "name VARCHAR(255) NOT NULL",
+      "currency CHAR(3) NOT NULL DEFAULT 'BRL'",
+      "opening_balance DECIMAL(18, 4) NOT NULL DEFAULT 0",
+      "opening_date DATE NULL",
+      "status ENUM('active', 'closed') NOT NULL DEFAULT 'active'",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL",
+      "INDEX idx_fin_account_org_status (organization_id, status)"
+    ],
+    "fks": [
+      "organizations",
+      "modules"
+    ],
+    "file": "12_core_financial_schema.sql",
+    "comment": ""
+  },
+  "financial_ledger_entries": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "account_id VARCHAR(36) NOT NULL",
+      "transaction_date DATE NOT NULL",
+      "settlement_date DATE NOT NULL",
+      "direction ENUM('in', 'out') NOT NULL",
+      "amount DECIMAL(18, 4) NOT NULL",
+      "currency CHAR(3) NOT NULL DEFAULT 'BRL'",
+      "description VARCHAR(500) NULL",
+      "counterparty VARCHAR(255) NULL",
+      "status ENUM('pending', 'cleared', 'cancelled') NOT NULL DEFAULT 'cleared'",
+      "related_patrimony_ledger_id VARCHAR(36) NULL",
+      "source_batch_id VARCHAR(36) NULL",
+      "external_ref VARCHAR(128) NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at TIMESTAMP NULL",
+      "INDEX idx_fin_ledger_org_date (organization_id, transaction_date)",
+      "INDEX idx_fin_ledger_account_date (account_id, transaction_date)",
+      "INDEX idx_fin_ledger_settlement (organization_id, settlement_date, status)",
+      "INDEX idx_fin_ledger_ref (organization_id, external_ref)"
+    ],
+    "fks": [
+      "organizations",
+      "financial_accounts",
+      "patrimony_ledger_entries"
+    ],
+    "file": "12_core_financial_schema.sql",
+    "comment": ""
+  },
+  "financial_closings": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "account_id VARCHAR(36) NULL",
+      "period ENUM('daily', 'weekly', 'monthly', 'quarterly', 'annual') NOT NULL",
+      "reference_date DATE NOT NULL",
+      "opening_balance DECIMAL(18, 4) NOT NULL DEFAULT 0",
+      "closing_balance DECIMAL(18, 4) NOT NULL DEFAULT 0",
+      "total_in DECIMAL(18, 4) NOT NULL DEFAULT 0",
+      "total_out DECIMAL(18, 4) NOT NULL DEFAULT 0",
+      "pending_amount DECIMAL(18, 4) NOT NULL DEFAULT 0",
+      "status ENUM('open', 'in_progress', 'closed', 'reopened') NOT NULL DEFAULT 'open'",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "organizations",
+      "financial_accounts"
+    ],
+    "file": "12_core_financial_schema.sql",
+    "comment": ""
+  },
+  "module_categories": {
+    "cols": [
+      "module_code VARCHAR(50) NOT NULL",
+      "category VARCHAR(50) NOT NULL",
+      "subcategory VARCHAR(50) NOT NULL",
+      "canonical_name VARCHAR(120) NOT NULL",
+      "description VARCHAR(500) NULL",
+      "default_quantity_unit VARCHAR(16) NOT NULL DEFAULT 'un'",
+      "default_valuation_method VARCHAR(64) NOT NULL DEFAULT 'weighted_avg'",
+      "default_settlement_profile VARCHAR(64) NOT NULL DEFAULT 'INSTANT'",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    ],
+    "fks": [
+      "modules"
+    ],
+    "file": "13_module_registry.sql",
+    "comment": ""
+  },
+  "module_valuation_methods": {
+    "cols": [
+      "method_code VARCHAR(64) PRIMARY KEY",
+      "canonical_name VARCHAR(120) NOT NULL",
+      "class_path VARCHAR(255) NOT NULL",
+      "description VARCHAR(500) NULL",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    ],
+    "fks": [],
+    "file": "13_module_registry.sql",
+    "comment": ""
+  },
+  "module_settlement_profiles": {
+    "cols": [
+      "profile_code VARCHAR(64) PRIMARY KEY",
+      "canonical_name VARCHAR(120) NOT NULL",
+      "days_offset INT NOT NULL DEFAULT 0",
+      "business_days_only BOOLEAN NOT NULL DEFAULT TRUE",
+      "default_status ENUM('pending', 'cleared') NOT NULL DEFAULT 'pending'",
+      "description VARCHAR(500) NULL",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    ],
+    "fks": [],
+    "file": "13_module_registry.sql",
+    "comment": ""
+  },
+  "invest_position_ext": {
+    "cols": [
+      "patrimony_item_id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "asset_class ENUM('stock', 'fii', 'option_call', 'option_put', 'fixed_income', 'etf', 'bdr') NOT NULL",
+      "underlying_ticker VARCHAR(20) NULL",
+      "pm_estrito DECIMAL(18, 6) NULL",
+      "pm_b3 DECIMAL(18, 6) NULL",
+      "pm_gerencial DECIMAL(18, 6) NULL",
+      "last_price DECIMAL(18, 6) NULL",
+      "last_price_as_of DATE NULL",
+      "sector VARCHAR(120) NULL",
+      "issuer_name VARCHAR(255) NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_invest_pos_underlying (organization_id, underlying_ticker)"
+    ],
+    "fks": [
+      "organizations",
+      "patrimony_items"
+    ],
+    "file": "14_invest_extensions.sql",
+    "comment": ""
+  },
+  "invest_option_ext": {
+    "cols": [
+      "patrimony_item_id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "option_type ENUM('CALL', 'PUT') NOT NULL",
+      "underlying_ticker VARCHAR(20) NOT NULL",
+      "strike_price DECIMAL(18, 6) NOT NULL",
+      "expiration_date DATE NOT NULL",
+      "european_american ENUM('E', 'A') NOT NULL DEFAULT 'A'",
+      "delta DECIMAL(10, 6) NULL",
+      "gamma DECIMAL(10, 6) NULL",
+      "theta DECIMAL(10, 6) NULL",
+      "vega DECIMAL(10, 6) NULL",
+      "implied_volatility DECIMAL(10, 6) NULL",
+      "last_greeks_at TIMESTAMP NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_invest_option_underlying_exp (organization_id, underlying_ticker, expiration_date)"
+    ],
+    "fks": [
+      "organizations",
+      "patrimony_items"
+    ],
+    "file": "14_invest_extensions.sql",
+    "comment": ""
+  },
+  "invest_options_market": {
+    "cols": [
+      "ticker VARCHAR(20) PRIMARY KEY",
+      "underlying_ticker VARCHAR(20) NOT NULL",
+      "option_type ENUM('CALL', 'PUT') NOT NULL",
+      "strike_price DECIMAL(18, 6) NOT NULL",
+      "expiration_date DATE NOT NULL",
+      "european_american ENUM('E', 'A') NOT NULL",
+      "delta DECIMAL(10, 6) NULL",
+      "gamma DECIMAL(10, 6) NULL",
+      "theta DECIMAL(10, 6) NULL",
+      "vega DECIMAL(10, 6) NULL",
+      "implied_volatility DECIMAL(10, 6) NULL",
+      "last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_invest_market_underlying_exp (underlying_ticker, expiration_date)"
+    ],
+    "fks": [],
+    "file": "14_invest_extensions.sql",
+    "comment": ""
+  },
+  "business_events": {
+    "cols": [
+      "id                   VARCHAR(36) PRIMARY KEY",
+      "organization_id      VARCHAR(36) NOT NULL",
+      "source_module        VARCHAR(50) NOT NULL",
+      "event_kind           VARCHAR(50) NOT NULL",
+      "occurred_on          DATE NOT NULL",
+      "settles_on           DATE NULL",
+      "source_ref           VARCHAR(128) NULL",
+      "counterparty         VARCHAR(255) NULL",
+      "total_gross          DECIMAL(18, 4) NOT NULL DEFAULT 0",
+      "total_costs          DECIMAL(18, 4) NOT NULL DEFAULT 0",
+      "total_net            DECIMAL(18, 4) NOT NULL DEFAULT 0",
+      "-- proveniencia (sem armazenar o documento; so o RASTRO)",
+      "source_system        VARCHAR(80) NOT NULL",
+      "source_version       VARCHAR(40) NULL",
+      "recorded_by_user_id  VARCHAR(36) NULL",
+      "recorded_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "-- revisao",
+      "revision_no          INT NOT NULL DEFAULT 1",
+      "supersedes_event_id  VARCHAR(36) NULL",
+      "voided_at            TIMESTAMP NULL",
+      "voided_by_user_id    VARCHAR(36) NULL",
+      "void_reason          VARCHAR(500) NULL",
+      "metadata             JSON NULL",
+      "created_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "updated_at           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "deleted_at           TIMESTAMP NULL",
+      "INDEX idx_event_org_date (organization_id, occurred_on)",
+      "INDEX idx_event_org_settles (organization_id, settles_on)",
+      "INDEX idx_event_org_kind (organization_id, event_kind)"
+    ],
+    "fks": [
+      "organizations",
+      "modules",
+      "business_events"
+    ],
+    "file": "16_business_events.sql",
+    "comment": ""
+  },
+  "ui_text_catalog": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "text_key VARCHAR(160) NOT NULL",
+      "locale VARCHAR(10) NOT NULL DEFAULT 'pt-BR'",
+      "module_code VARCHAR(50) NULL",
+      "kind ENUM(",
+      "'menu_item'",
+      "'screen_title'",
+      "'column_label'",
+      "'field_label'",
+      "'value_label'",
+      "'button_label'",
+      ") NOT NULL",
+      "default_text VARCHAR(255) NOT NULL",
+      "description VARCHAR(500) NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_text_module_kind (module_code, kind)"
+    ],
+    "fks": [],
+    "file": "20_ui_catalog_schema.sql",
+    "comment": ""
+  },
+  "ui_text_overrides": {
+    "cols": [
+      "organization_id VARCHAR(36) NOT NULL",
+      "text_key VARCHAR(160) NOT NULL",
+      "locale VARCHAR(10) NOT NULL DEFAULT 'pt-BR'",
+      "text VARCHAR(255) NOT NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_override_key (text_key, locale)"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "20_ui_catalog_schema.sql",
+    "comment": ""
+  },
+  "ui_menu_nodes": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "code VARCHAR(80) NOT NULL",
+      "parent_id VARCHAR(36) NULL",
+      "module_code VARCHAR(50) NOT NULL",
+      "path VARCHAR(255) NULL",
+      "icon VARCHAR(80) NULL",
+      "order_index INT NOT NULL DEFAULT 0",
+      "text_key VARCHAR(160) NOT NULL",
+      "access_resource_key VARCHAR(160) NULL",
+      "visibility ENUM('all', 'platform_only', 'client_only') NOT NULL DEFAULT 'all'",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_menu_module (module_code, is_active)",
+      "INDEX idx_menu_parent (parent_id, order_index)"
+    ],
+    "fks": [
+      "ui_menu_nodes"
+    ],
+    "file": "20_ui_catalog_schema.sql",
+    "comment": ""
+  },
+  "market_instruments": {
+    "cols": [
+      "ticker VARCHAR(32) PRIMARY KEY",
+      "instrument_type ENUM(",
+      "'stock','fii','etf','bdr'",
+      "'option_call','option_put'",
+      "'tesouro_lft','tesouro_ntnb','tesouro_ltn'",
+      "'cdb_pos','cdb_pre','cdb_ipca'",
+      "'fixed_income_generic'",
+      ") NOT NULL",
+      "underlying_ticker VARCHAR(32) NULL",
+      "emission_date DATE NULL",
+      "maturity_date DATE NULL",
+      "index_code VARCHAR(20) NULL",
+      "index_percent DECIMAL(8, 4) NULL",
+      "pre_rate DECIMAL(8, 4) NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_market_instruments_type (instrument_type)",
+      "INDEX idx_market_instruments_underlying (underlying_ticker)"
+    ],
+    "fks": [],
+    "file": "22_market_quotes_global.sql",
+    "comment": ""
+  },
+  "market_quotes_daily": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "ticker VARCHAR(32) NOT NULL",
+      "quote_date DATE NOT NULL",
+      "closing_price DECIMAL(18, 6) NOT NULL",
+      "open_price DECIMAL(18, 6) NULL",
+      "min_price DECIMAL(18, 6) NULL",
+      "max_price DECIMAL(18, 6) NULL",
+      "volume DECIMAL(20, 2) NULL",
+      "currency CHAR(3) NOT NULL DEFAULT 'BRL'",
+      "source ENUM(",
+      "'brapi','opcoes_net','tesouro_direto'",
+      "'computed_cdi','computed_pre','computed_ipca'",
+      "'user_manual'",
+      ") NOT NULL",
+      "source_fetched_at TIMESTAMP NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_market_quotes_date (quote_date)",
+      "INDEX idx_market_quotes_source (source, quote_date)"
+    ],
+    "fks": [],
+    "file": "22_market_quotes_global.sql",
+    "comment": ""
+  },
+  "market_index_daily": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "index_code VARCHAR(20) NOT NULL",
+      "reference_date DATE NOT NULL",
+      "daily_factor DECIMAL(20, 12) NOT NULL",
+      "annualized_rate DECIMAL(10, 6) NULL",
+      "source VARCHAR(40) NOT NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_market_index_date (reference_date)"
+    ],
+    "fks": [],
+    "file": "22_market_quotes_global.sql",
+    "comment": ""
+  },
+  "platform_scheduled_job_runs": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "job_key VARCHAR(64) NOT NULL",
+      "status ENUM('running', 'success', 'warning', 'error') NOT NULL",
+      "started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "finished_at TIMESTAMP NULL",
+      "summary_json JSON NULL",
+      "error_message TEXT NULL",
+      "host VARCHAR(120) NULL",
+      "INDEX idx_platform_job_runs_key_started (job_key, started_at DESC)",
+      "INDEX idx_platform_job_runs_status_started (status, started_at DESC)"
+    ],
+    "fks": [],
+    "file": "25_platform_job_monitoring.sql",
+    "comment": ""
+  },
+  "platform_admin_alerts": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "job_run_id VARCHAR(36) NULL",
+      "job_key VARCHAR(64) NOT NULL",
+      "severity ENUM('info', 'warning', 'error') NOT NULL",
+      "title VARCHAR(200) NOT NULL",
+      "body TEXT NOT NULL",
+      "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "acknowledged_at TIMESTAMP NULL",
+      "acknowledged_by_user_id VARCHAR(36) NULL",
+      "INDEX idx_platform_alerts_unread (acknowledged_at, created_at DESC)",
+      "INDEX idx_platform_alerts_job (job_key, created_at DESC)"
+    ],
+    "fks": [],
+    "file": "25_platform_job_monitoring.sql",
+    "comment": ""
+  },
+  "invest_patrimony_monthly_anchors": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "reference_date DATE NOT NULL",
+      "patrimony DECIMAL(18, 4) NOT NULL",
+      "source VARCHAR(64) NOT NULL DEFAULT 'btg_custody'",
+      "notes VARCHAR(500) NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_invest_patrimony_anchor_org (organization_id)"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "26_invest_patrimony_monthly_anchors.sql",
+    "comment": ""
+  },
+  "invest_broker_custody_snapshots": {
+    "cols": [
+      "id VARCHAR(64) NOT NULL PRIMARY KEY",
+      "organization_id VARCHAR(64) NOT NULL",
+      "broker_code VARCHAR(32) NOT NULL DEFAULT 'btg'",
+      "reference_date DATE NOT NULL",
+      "status ENUM('imported', 'applied', 'superseded') NOT NULL DEFAULT 'imported'",
+      "variable_income DECIMAL(18, 4) NULL",
+      "fixed_income DECIMAL(18, 4) NULL",
+      "cash_balance DECIMAL(18, 4) NULL",
+      "in_transit DECIMAL(18, 4) NULL",
+      "derivatives DECIMAL(18, 4) NULL",
+      "total_patrimony DECIMAL(18, 4) NULL",
+      "source_label VARCHAR(128) NULL",
+      "notes TEXT NULL",
+      "imported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "applied_at TIMESTAMP NULL"
+    ],
+    "fks": [],
+    "file": "28_invest_broker_custody_snapshots.sql",
+    "comment": ""
+  },
+  "invest_broker_custody_snapshot_lines": {
+    "cols": [
+      "id VARCHAR(96) NOT NULL PRIMARY KEY",
+      "snapshot_id VARCHAR(64) NOT NULL",
+      "organization_id VARCHAR(64) NOT NULL",
+      "ticker VARCHAR(32) NOT NULL",
+      "line_kind ENUM('mark', 'pending_open', 'pending_topup', 'pending_migrate') NOT NULL",
+      "quantity DECIMAL(18, 4) NOT NULL",
+      "last_price DECIMAL(18, 6) NULL",
+      "market_value DECIMAL(18, 4) NULL",
+      "avg_price DECIMAL(18, 6) NULL",
+      "leg_tag VARCHAR(32) NULL"
+    ],
+    "fks": [],
+    "file": "28_invest_broker_custody_snapshots.sql",
+    "comment": ""
+  },
+  "invest_reconciliation_sessions": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "organization_id VARCHAR(36) NOT NULL",
+      "phase ENUM('notes', 'cash') NOT NULL",
+      "status ENUM('in_progress', 'notes_complete', 'cash_complete', 'aborted') NOT NULL DEFAULT 'in_progress'",
+      "horizon_trusted_through DATE NULL",
+      "file_index JSON NULL",
+      "progress_by_day JSON NULL",
+      "started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "completed_at TIMESTAMP NULL",
+      "INDEX idx_recon_session_org_status (organization_id, status)",
+      "INDEX idx_recon_session_org_phase (organization_id, phase)"
+    ],
+    "fks": [
+      "organizations"
+    ],
+    "file": "34_invest_reconciliation_sessions.sql",
+    "comment": ""
+  },
+  "invest_reconciliation_day_log": {
+    "cols": [
+      "id VARCHAR(36) PRIMARY KEY",
+      "session_id VARCHAR(36) NOT NULL",
+      "organization_id VARCHAR(36) NOT NULL",
+      "business_date DATE NOT NULL",
+      "action ENUM('preview', 'resolve', 'close') NOT NULL",
+      "inserted INT NOT NULL DEFAULT 0",
+      "deleted INT NOT NULL DEFAULT 0",
+      "skipped INT NOT NULL DEFAULT 0",
+      "user_decisions JSON NULL",
+      "audit_snapshot JSON NULL",
+      "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "INDEX idx_recon_day_log_session (session_id, business_date)",
+      "INDEX idx_recon_day_log_org_date (organization_id, business_date)"
+    ],
+    "fks": [
+      "organizations",
+      "invest_reconciliation_sessions"
+    ],
+    "file": "34_invest_reconciliation_sessions.sql",
+    "comment": ""
+  },
+  "invest_options_fetch_cache": {
+    "cols": [
+      "ticker VARCHAR(20) NOT NULL",
+      "quote_date DATE NOT NULL",
+      "fetch_date DATE NOT NULL",
+      "closing_price DECIMAL(18, 6) NULL",
+      "status ENUM('FOUND', 'NOT_FOUND') NOT NULL DEFAULT 'NOT_FOUND'",
+      "source VARCHAR(80) NOT NULL DEFAULT 'unknown'",
+      "source_system VARCHAR(80) NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_option_fetch_ticker_status (ticker, status)",
+      "INDEX idx_option_fetch_date (fetch_date)"
+    ],
+    "fks": [],
+    "file": "36_invest_options_fetch_cache.sql",
+    "comment": ""
+  },
+  "settlement_counterparties": {
+    "cols": [
+      "counterparty_code VARCHAR(80) PRIMARY KEY",
+      "module_code VARCHAR(40) NOT NULL",
+      "counterparty_kind ENUM('exchange', 'broker', 'supplier', 'customer', 'internal', 'other') NOT NULL DEFAULT 'other'",
+      "country_code CHAR(2) NULL",
+      "canonical_name VARCHAR(180) NOT NULL",
+      "description VARCHAR(500) NULL",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_settlement_counterparties_module (module_code)",
+      "INDEX idx_settlement_counterparties_kind (counterparty_kind)"
+    ],
+    "fks": [],
+    "file": "39_normalize_settlement_contracts.sql",
+    "comment": ""
+  },
+  "settlement_contract_types": {
+    "cols": [
+      "contract_type_code VARCHAR(80) PRIMARY KEY",
+      "module_code VARCHAR(40) NOT NULL",
+      "canonical_name VARCHAR(180) NOT NULL",
+      "description VARCHAR(500) NULL",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_settlement_contract_types_module (module_code)"
+    ],
+    "fks": [],
+    "file": "39_normalize_settlement_contracts.sql",
+    "comment": ""
+  },
+  "settlement_counterparty_contract_types": {
+    "cols": [
+      "counterparty_code VARCHAR(80) NOT NULL",
+      "contract_type_code VARCHAR(80) NOT NULL",
+      "is_default BOOLEAN NOT NULL DEFAULT FALSE",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "ON DELETE CASCADE",
+      "ON DELETE CASCADE"
+    ],
+    "fks": [
+      "settlement_counterparties",
+      "settlement_contract_types"
+    ],
+    "file": "39_normalize_settlement_contracts.sql",
+    "comment": ""
+  },
+  "settlement_contract_rules": {
+    "cols": [
+      "rule_code VARCHAR(80) PRIMARY KEY",
+      "contract_type_code VARCHAR(80) NOT NULL",
+      "valid_from DATE NOT NULL",
+      "valid_to DATE NULL",
+      "days_offset INT NOT NULL DEFAULT 0",
+      "calendar_unit ENUM('business_days', 'calendar_days') NOT NULL DEFAULT 'business_days'",
+      "business_calendar_code VARCHAR(40) NULL",
+      "default_status ENUM('pending', 'cleared') NOT NULL DEFAULT 'pending'",
+      "label VARCHAR(180) NOT NULL",
+      "priority INT NOT NULL DEFAULT 100",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "ON DELETE CASCADE",
+      "INDEX idx_scr_contract_validity (contract_type_code, valid_from, valid_to)",
+      "INDEX idx_scr_priority (priority)"
+    ],
+    "fks": [
+      "settlement_contract_types"
+    ],
+    "file": "39_normalize_settlement_contracts.sql",
+    "comment": ""
+  },
+  "settlement_rule_asset_types": {
+    "cols": [
+      "rule_code VARCHAR(80) NOT NULL",
+      "asset_type VARCHAR(80) NOT NULL",
+      "ON DELETE CASCADE"
+    ],
+    "fks": [
+      "settlement_contract_rules"
+    ],
+    "file": "39_normalize_settlement_contracts.sql",
+    "comment": ""
+  },
+  "settlement_rule_transaction_types": {
+    "cols": [
+      "rule_code VARCHAR(80) NOT NULL",
+      "transaction_type VARCHAR(80) NOT NULL",
+      "ON DELETE CASCADE"
+    ],
+    "fks": [
+      "settlement_contract_rules"
+    ],
+    "file": "39_normalize_settlement_contracts.sql",
+    "comment": ""
+  },
+  "settlement_rule_ticker_prefixes": {
+    "cols": [
+      "rule_code VARCHAR(80) NOT NULL",
+      "ticker_prefix VARCHAR(40) NOT NULL",
+      "ON DELETE CASCADE"
+    ],
+    "fks": [
+      "settlement_contract_rules"
+    ],
+    "file": "39_normalize_settlement_contracts.sql",
+    "comment": ""
+  },
+  "module_quote_sources": {
+    "cols": [
+      "source_code VARCHAR(50) NOT NULL",
+      "description VARCHAR(255) NOT NULL",
+      "base_currency VARCHAR(10) NOT NULL DEFAULT 'BRL'",
+      "requires_ticker_mapping BOOLEAN NOT NULL DEFAULT FALSE",
+      "adapter_code VARCHAR(80) NOT NULL",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+      "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    ],
+    "fks": [],
+    "file": "40_module_categories_patrimony_quote_sources.sql",
+    "comment": ""
+  },
+  "exchanges": {
+    "cols": [
+      "code VARCHAR(40) NOT NULL",
+      "canonical_name VARCHAR(160) NOT NULL",
+      "country_code CHAR(2) NULL",
+      "currency_code CHAR(3) NOT NULL DEFAULT 'BRL'",
+      "timezone VARCHAR(80) NOT NULL DEFAULT 'UTC'",
+      "trading_calendar_code VARCHAR(80) NOT NULL DEFAULT 'weekdays'",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+    ],
+    "fks": [],
+    "file": "42_invest_market_architecture.sql",
+    "comment": ""
+  },
+  "market_quote_source_mappings": {
+    "cols": [
+      "source_code VARCHAR(50) NOT NULL",
+      "ticker VARCHAR(64) NOT NULL",
+      "provider_symbol VARCHAR(160) NOT NULL",
+      "provider_currency CHAR(3) NULL",
+      "metadata JSON NULL",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "ON DELETE CASCADE"
+    ],
+    "fks": [
+      "module_quote_sources"
+    ],
+    "file": "42_invest_market_architecture.sql",
+    "comment": ""
+  },
+  "fx_rates": {
+    "cols": [
+      "id VARCHAR(36) NOT NULL",
+      "from_currency CHAR(3) NOT NULL",
+      "to_currency CHAR(3) NOT NULL",
+      "rate_date DATE NOT NULL",
+      "closing_rate DECIMAL(20, 8) NOT NULL",
+      "source VARCHAR(50) NOT NULL",
+      "metadata JSON NULL",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_fx_rates_date (rate_date)"
+    ],
+    "fks": [],
+    "file": "42_invest_market_architecture.sql",
+    "comment": ""
+  },
+  "fee_schedules": {
+    "cols": [
+      "fee_schedule_code VARCHAR(80) NOT NULL",
+      "broker_code VARCHAR(80) NOT NULL",
+      "exchange_code VARCHAR(40) NOT NULL",
+      "fee_type VARCHAR(80) NOT NULL",
+      "calculation_base VARCHAR(80) NOT NULL DEFAULT 'gross_value'",
+      "rate_pct DECIMAL(18, 10) NULL",
+      "fixed_amount DECIMAL(20, 6) NULL",
+      "min_amount DECIMAL(20, 6) NULL",
+      "max_amount DECIMAL(20, 6) NULL",
+      "currency_code CHAR(3) NOT NULL DEFAULT 'BRL'",
+      "valid_from DATE NOT NULL",
+      "valid_to DATE NULL",
+      "priority INT NOT NULL DEFAULT 100",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_fee_schedule_lookup (broker_code, exchange_code, fee_type, valid_from, valid_to)"
+    ],
+    "fks": [],
+    "file": "42_invest_market_architecture.sql",
+    "comment": ""
+  },
+  "fee_schedule_asset_types": {
+    "cols": [
+      "fee_schedule_code VARCHAR(80) NOT NULL",
+      "asset_type VARCHAR(80) NOT NULL",
+      "ON DELETE CASCADE"
+    ],
+    "fks": [
+      "fee_schedules"
+    ],
+    "file": "42_invest_market_architecture.sql",
+    "comment": ""
+  },
+  "invest_operation_types": {
+    "cols": [
+      "operation_code VARCHAR(80) NOT NULL",
+      "module_code VARCHAR(40) NOT NULL DEFAULT 'INVEST'",
+      "canonical_name VARCHAR(180) NOT NULL",
+      "description VARCHAR(500) NULL",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_iot_module_active (module_code, is_active)"
+    ],
+    "fks": [],
+    "file": "43_invest_operation_policy_catalog.sql",
+    "comment": ""
+  },
+  "invest_operation_policies": {
+    "cols": [
+      "operation_code VARCHAR(80) NOT NULL",
+      "business_event_kind VARCHAR(80) NOT NULL",
+      "affects_portfolio BOOLEAN NOT NULL DEFAULT FALSE",
+      "affects_financial BOOLEAN NOT NULL DEFAULT FALSE",
+      "inventory_movement_type VARCHAR(80) NULL",
+      "cash_direction ENUM('in', 'out', 'none', 'signed') NOT NULL DEFAULT 'none'",
+      "default_financial_status ENUM('pending', 'cleared') NOT NULL DEFAULT 'cleared'",
+      "uses_settlement_rules BOOLEAN NOT NULL DEFAULT FALSE",
+      "requires_instrument BOOLEAN NOT NULL DEFAULT FALSE",
+      "requires_cash_account BOOLEAN NOT NULL DEFAULT FALSE",
+      "is_external_flow_for_twr BOOLEAN NOT NULL DEFAULT FALSE",
+      "is_trade BOOLEAN NOT NULL DEFAULT FALSE",
+      "is_option_trade BOOLEAN NOT NULL DEFAULT FALSE",
+      "is_corporate_action BOOLEAN NOT NULL DEFAULT FALSE",
+      "is_passive_income BOOLEAN NOT NULL DEFAULT FALSE",
+      "is_passive_expense BOOLEAN NOT NULL DEFAULT FALSE",
+      "is_opening BOOLEAN NOT NULL DEFAULT FALSE",
+      "default_pivot_column VARCHAR(80) NULL",
+      "priority INT NOT NULL DEFAULT 100",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "ON DELETE CASCADE",
+      "INDEX idx_iop_event_kind (business_event_kind)",
+      "INDEX idx_iop_flags (is_trade, is_option_trade, is_passive_income, is_passive_expense)"
+    ],
+    "fks": [
+      "invest_operation_types"
+    ],
+    "file": "43_invest_operation_policy_catalog.sql",
+    "comment": ""
+  },
+  "invest_operation_asset_overrides": {
+    "cols": [
+      "id VARCHAR(36) NOT NULL",
+      "operation_code VARCHAR(80) NOT NULL",
+      "asset_type VARCHAR(80) NOT NULL",
+      "affects_portfolio BOOLEAN NULL",
+      "affects_financial BOOLEAN NULL",
+      "inventory_movement_type VARCHAR(80) NULL",
+      "cash_direction ENUM('in', 'out', 'none', 'signed') NULL",
+      "default_financial_status ENUM('pending', 'cleared') NULL",
+      "uses_settlement_rules BOOLEAN NULL",
+      "requires_instrument BOOLEAN NULL",
+      "requires_cash_account BOOLEAN NULL",
+      "is_external_flow_for_twr BOOLEAN NULL",
+      "valid_from DATE NOT NULL DEFAULT '1900-01-01'",
+      "valid_to DATE NULL",
+      "priority INT NOT NULL DEFAULT 100",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "ON DELETE CASCADE",
+      "INDEX idx_ioao_lookup (operation_code, asset_type, valid_from, valid_to, is_active)"
+    ],
+    "fks": [
+      "invest_operation_types"
+    ],
+    "file": "43_invest_operation_policy_catalog.sql",
+    "comment": ""
+  },
+  "invest_brokers": {
+    "cols": [
+      "broker_code VARCHAR(80) NOT NULL",
+      "canonical_name VARCHAR(180) NOT NULL",
+      "country_code CHAR(2) NULL",
+      "default_currency_code CHAR(3) NOT NULL DEFAULT 'BRL'",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "INDEX idx_invest_brokers_active (is_active)"
+    ],
+    "fks": [],
+    "file": "44_invest_cash_account_policy.sql",
+    "comment": ""
+  },
+  "invest_cash_account_policies": {
+    "cols": [
+      "id VARCHAR(36) NOT NULL",
+      "organization_id VARCHAR(36) NULL",
+      "broker_code VARCHAR(80) NOT NULL",
+      "source_system VARCHAR(120) NULL",
+      "currency_code CHAR(3) NOT NULL DEFAULT 'BRL'",
+      "cash_ticker VARCHAR(120) NOT NULL",
+      "cash_name VARCHAR(180) NOT NULL",
+      "financial_account_external_id VARCHAR(180) NOT NULL",
+      "financial_account_type VARCHAR(80) NOT NULL DEFAULT 'brokerage'",
+      "is_default_for_broker BOOLEAN NOT NULL DEFAULT FALSE",
+      "is_default_for_currency BOOLEAN NOT NULL DEFAULT FALSE",
+      "valid_from DATE NOT NULL DEFAULT '1900-01-01'",
+      "valid_to DATE NULL",
+      "priority INT NOT NULL DEFAULT 100",
+      "is_active BOOLEAN NOT NULL DEFAULT TRUE",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "ON DELETE RESTRICT",
+      "INDEX idx_icap_lookup (",
+      "organization_id",
+      "broker_code",
+      "currency_code",
+      "source_system",
+      "valid_from",
+      "valid_to",
+      "is_active",
+      ")",
+      "INDEX idx_icap_defaults (organization_id, currency_code, is_default_for_currency, is_active)"
+    ],
+    "fks": [
+      "invest_brokers"
+    ],
+    "file": "44_invest_cash_account_policy.sql",
+    "comment": ""
+  },
+  "invest_cash_account_bindings": {
+    "cols": [
+      "id VARCHAR(36) NOT NULL",
+      "policy_id VARCHAR(36) NOT NULL",
+      "organization_id VARCHAR(36) NOT NULL",
+      "financial_account_id VARCHAR(36) NOT NULL",
+      "cash_ticker VARCHAR(120) NOT NULL",
+      "currency_code CHAR(3) NOT NULL DEFAULT 'BRL'",
+      "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+      "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+      "ON DELETE CASCADE",
+      "INDEX idx_icab_account (financial_account_id)",
+      "INDEX idx_icab_cash_ticker (organization_id, cash_ticker)"
+    ],
+    "fks": [
+      "invest_cash_account_policies"
+    ],
+    "file": "44_invest_cash_account_policy.sql",
+    "comment": ""
+  }
+}
