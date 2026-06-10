@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+
 import { computePortfolioPerformance, computeTwrFromMonthEndAnchors } from '../../../src/core/invest/portfolioPerformance';
 
 describe('TWR with smoothed anchors and flows', () => {
