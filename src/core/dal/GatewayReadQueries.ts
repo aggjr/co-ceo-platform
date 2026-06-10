@@ -377,7 +377,7 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
   market_quotes_bulk_range: {
     sql: `SELECT ticker, quote_date, closing_price, source
           FROM market_quotes_daily
-          WHERE quote_date >= ?
+          WHERE quote_date >= DATE_SUB(?, INTERVAL 15 DAY)
             AND quote_date <= ?
           ORDER BY ticker ASC, quote_date ASC`,
   },

@@ -216,6 +216,11 @@ export class InMemoryGateway {
       }
       return latest ? [{ id: 'market_quotes_latest_date', quote_date: latest }] : [];
     }
+    if (queryKey === 'invest_broker_aliases_all') {
+      const t = this.tables.get('invest_broker_aliases');
+      if (!t) return [];
+      return Array.from(t.values()).filter((r) => !r.deleted_at).map((r) => ({ ...r }));
+    }
     if (!table) throw new Error(`[inMemoryGateway] readQuery: ${queryKey} nao suportada`);
     const t = this.tables.get(table);
     if (!t) return [];

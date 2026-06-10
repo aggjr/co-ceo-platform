@@ -1551,9 +1551,14 @@ export async function InvestConciliacaoPage(container) {
       }
       
       if (labelExtracts) {
-        labelExtracts.textContent = state.phase === 'done' 
-          ? `Fase extratos/materialização · Concluído`
-          : `Fase extratos/materialização · Processando ${extractsTotal} arquivo(s) (pode levar alguns segundos)...`;
+        if (state.phase === 'done') {
+          labelExtracts.textContent = `Fase extratos/materialização · Concluído`;
+        } else {
+          const lastLog = state.activityLog && state.activityLog.length > 0
+            ? state.activityLog[state.activityLog.length - 1]
+            : `Processando ${extractsTotal} arquivo(s) (pode levar alguns segundos)...`;
+          labelExtracts.textContent = `Fase extratos/materialização · ${lastLog}`;
+        }
       }
     } else {
       if (labelExtracts) labelExtracts.hidden = true;
@@ -1654,6 +1659,18 @@ export async function InvestConciliacaoPage(container) {
         data = await apiRequest(`/api/invest/reconcile/option-c/status/${encodeURIComponent(optcRunId)}`);
         transientErrors = 0;
       } catch (err) {
+        // 404 = run não encontrado (expirado ou anterior a persistência MySQL).
+        // Limpa estado local para o usuário poder reiniciar limpo.
+        if (err?.status === 404) {
+          appendLog(
+            logEl,
+            '⚠️ Execução não encontrada no servidor. Estado local limpo — inicie uma nova conciliação.',
+            'warn'
+          );
+          logOptcBrowser('warn', 'option-c.status.run-not-found', { runId: optcRunId });
+          resetOptcRunScreen();
+          return;
+        }
         transientErrors += 1;
         const msg = err?.message || String(err);
         appendLog(

@@ -17,6 +17,7 @@ import {
   type HomeBrokerSnapshotUploadResult,
 } from './HomeBrokerSnapshotUploadService';
 import { logReconcileEvent, logReconcileFailure } from './reconcileErrorDetail';
+import { OptionCRunRepository } from './OptionCRunRepository';
 import type { ReconcileDecision } from './auditTypes';
 import type { LedgerImportLine } from '../ledgerTypes';
 
@@ -79,6 +80,7 @@ export class OptionCDailyCloseOrchestrator {
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly homeBrokerUpload: HomeBrokerSnapshotUploadService;
   private readonly holdingPurge: HoldingPurgeKeepOpeningService | null;
+  private readonly runRepo: OptionCRunRepository | null;
 
   constructor(
     private readonly gateway: CoCeoDataGateway,
@@ -90,10 +92,36 @@ export class OptionCDailyCloseOrchestrator {
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.homeBrokerUpload = new HomeBrokerSnapshotUploadService(gateway);
     this.holdingPurge = pool ? new HoldingPurgeKeepOpeningService(gateway, pool) : null;
+    this.runRepo = pool ? new OptionCRunRepository(pool) : null;
   }
 
   getRun(runId: string): OptionCRunState | null {
     return runsById.get(runId)?.state ?? null;
+  }
+
+  /**
+   * Busca o run no cache em memória; se não encontrar, tenta restaurar do DB.
+   * Retorna null se o run não existir em nenhuma das fontes.
+   */
+  async getRunWithFallback(runId: string): Promise<OptionCRunState | null> {
+    const cached = runsById.get(runId)?.state;
+    if (cached) return cached;
+    if (!this.runRepo) return null;
+    try {
+      const persisted = await this.runRepo.findById(runId);
+      if (persisted) {
+        // Restaura no cache sem os arquivos binários (não reanexamos os files aqui)
+        runsById.set(runId, {
+          state: persisted,
+          notesFiles: [],
+          extractFiles: [],
+          linesByDate: new Map(),
+        });
+      }
+      return persisted;
+    } catch {
+      return null;
+    }
   }
 
   async start(
@@ -208,6 +236,18 @@ export class OptionCDailyCloseOrchestrator {
       `Opção C iniciada (${mode}) — ${rt.state.calendar.length} pregão(ões) de notas, ${input.extractFiles.length} extrato(s) na fase 2.`
     );
     runsById.set(runId, rt);
+
+    // Persiste o estado inicial no DB e remove runs antigos
+    if (this.runRepo) {
+      try {
+        await this.runRepo.upsert(rt.state);
+        await this.runRepo.pruneOld();
+      } catch (err) {
+        logReconcileFailure('option-c.run-repo.upsert', ctx.organizationId, err, { runId });
+        // Não interrompe: persistência é best-effort, a execução continua
+      }
+    }
+
     return rt.state;
   }
 
@@ -419,6 +459,9 @@ export class OptionCDailyCloseOrchestrator {
     }
 
     logStep(rt, 'Baixando cotações históricas em lote (Brapi)...');
+    if (this.runRepo) {
+      try { await this.runRepo.upsert(rt.state); } catch { /* best-effort */ }
+    }
     try {
       const quoteSync = new InvestQuoteSyncService(this.gateway);
       const quotesFetched = await quoteSync.syncHistoricalFromBrapi(ctx);
@@ -433,7 +476,24 @@ export class OptionCDailyCloseOrchestrator {
     }
 
     logStep(rt, 'Rebuild patrimônio diário (intervalo completo)…');
-    const rebuild = await this.patrimonyRebuild.rebuild(ctx);
+    if (this.runRepo) {
+      try { await this.runRepo.upsert(rt.state); } catch { /* best-effort */ }
+    }
+    const rebuild = await this.patrimonyRebuild.rebuild(ctx, {
+      onProgress: (daysWritten, daysSkipped, currentDay) => {
+        logStep(
+          rt,
+          `Rebuild em andamento... Dia ${currentDay} (${daysWritten + daysSkipped} dias processados).`
+        );
+        if (this.runRepo) {
+          try {
+            this.runRepo.upsert(rt.state);
+          } catch {
+            /* best-effort */
+          }
+        }
+      },
+    });
     logStep(
       rt,
       `Rebuild: ${rebuild.daysWritten} dia(s) gravados, ${rebuild.daysSkipped} pulados.`
@@ -441,7 +501,13 @@ export class OptionCDailyCloseOrchestrator {
 
     rt.state.phase = 'done';
     rt.state.extractPending = false;
+    rt.state.runStatus = 'done';
     logStep(rt, '🎉 Opção C concluída. Confira Resultado histórico e Ações/FIIs.');
+
+    // Persiste estado final
+    if (this.runRepo) {
+      try { await this.runRepo.upsert(rt.state); } catch { /* best-effort */ }
+    }
 
     return {
       status: 'done' as const,

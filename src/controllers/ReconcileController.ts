@@ -449,6 +449,8 @@ export class ReconcileController {
                     `(${state.dayIndex}/${state.calendar.length}) fase=${state.phase}`
                 );
               }
+              // Persiste progresso a cada pregão
+              await this.optionC.getRunWithFallback(runId); // atualiza cache
               if (result.status === 'blocked' && state.mode !== 'homologation') break;
               if (result.status === 'done') break;
               if (delayMs > 0 && result.status !== 'phase_complete') {
@@ -526,7 +528,8 @@ export class ReconcileController {
   /** GET /api/invest/reconcile/option-c/status/:runId */
   optionCStatus = async (req: Request, res: Response): Promise<Response> => {
     try {
-      const state = this.optionC.getRun(String(req.params.runId));
+      // Tenta na memória primeiro; se não encontrar, busca no DB (sobrevive a restart)
+      const state = await this.optionC.getRunWithFallback(String(req.params.runId));
       if (!state) {
         return res.status(404).json({ success: false, error: 'Execução não encontrada.' });
       }
