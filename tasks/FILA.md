@@ -39,6 +39,11 @@ titulo: prioridade: 0
 prioridade: 0
 status: pending
 
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
+
 titulo: prioridade: 90
 
 prioridade: 90
@@ -53,6 +58,8 @@ titulo: Rebuild patrimônio diário + gráfico Resultado histórico
 
 PatrimonyDailyRebuildService, API rebuild, dashboard com method=mtm_economic.
 Doc: docs/architecture/invest_conciliacao.md. Bloqueia correção do gráfico após saneamento do livro.
+
+---
 
 ---
 
@@ -78,10 +85,17 @@ status: pending
 titulo: prioridade: 0
 
 prioridade: 0
+status: pending
+
+titulo: prioridade: 0
+
+prioridade: 0
 status: cancelled
 spec: tasks/wave-conciliacao/01-reconcile-cash-api.md
 
 titulo: (cancelada — absorvida por CONC-12/14)
+
+---
 
 ---
 
@@ -107,10 +121,17 @@ status: pending
 titulo: prioridade: 0
 
 prioridade: 0
+status: pending
+
+titulo: prioridade: 0
+
+prioridade: 0
 status: cancelled
 spec: tasks/wave-conciliacao/02-reconcile-cash-ui.md
 
 titulo: (cancelada — absorvida por CONC-13/14)
+
+---
 
 ---
 
@@ -136,10 +157,17 @@ status: pending
 titulo: prioridade: 0
 
 prioridade: 0
+status: pending
+
+titulo: prioridade: 0
+
+prioridade: 0
 status: cancelled
 spec: tasks/wave-conciliacao/03-reconcile-assets-api.md
 
 titulo: (cancelada — absorvida por CONC-12/13)
+
+---
 
 ---
 
@@ -165,6 +193,11 @@ status: pending
 titulo: prioridade: 0
 
 prioridade: 0
+status: pending
+
+titulo: prioridade: 0
+
+prioridade: 0
 status: cancelled
 spec: tasks/wave-conciliacao/04-reconcile-assets-ui.md
 
@@ -176,13 +209,22 @@ titulo: (cancelada — absorvida por CONC-13)
 
 ---
 
+---
+
 ## CONC-10
 
 prioridade: 0
-status: done
+status: pending
 agente: 
 spec: 
 assumida: 
+concluida: 
+release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: done
 concluida: 2026-06-10T21:24:40.219Z
 release: V0.0.321
 
@@ -210,15 +252,22 @@ Doc: docs/architecture/invest_reconciliacao_sessao.md. Paralelo com CONC-00/11.
 
 ---
 
+---
+
 ## CONC-11
 
 prioridade: 0
-status: pending
+status: done
 agente: 
 spec: 
 assumida: 
-concluida: 
-release: 
+concluida: 2026-06-10T21:26:45.487Z
+release: V0.0.322
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: prioridade: 0
 
@@ -243,6 +292,8 @@ titulo: Varredura completa ReconciliationAuditService
 
 ---
 
+---
+
 ## CONC-12
 
 prioridade: 0
@@ -252,6 +303,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: prioridade: 0
 
@@ -274,6 +330,8 @@ resolve/close estrito; decisão humana obrigatória (§J). Depende CONC-00,10,11
 
 ---
 
+---
+
 ## CONC-13
 
 prioridade: 0
@@ -283,6 +341,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: prioridade: 0
 
@@ -305,6 +368,8 @@ Painel Pendências do dia + ações explícitas. Depende CONC-12.
 
 ---
 
+---
+
 ## CONC-14
 
 prioridade: 0
@@ -314,6 +379,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: prioridade: 0
 
@@ -336,6 +406,8 @@ Bloqueado até notes_complete. Depende CONC-13.
 
 ---
 
+---
+
 ## CONC-15
 
 prioridade: 0
@@ -345,6 +417,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: prioridade: 0
 
@@ -367,6 +444,8 @@ Item único Conciliação no menu. Depende CONC-13.
 
 ---
 
+---
+
 ## W3-02
 
 prioridade: 0
@@ -376,6 +455,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: prioridade: 0
 
