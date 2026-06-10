@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+
 import { InvestOperations } from '../../../../src/modules/invest/InvestOperations';
 import { ThreePricesValuation } from '../../../../src/modules/invest/ThreePricesValuation';
 import { BusinessEventRegistry } from '../../../../src/core/business-events';

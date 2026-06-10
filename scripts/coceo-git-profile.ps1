@@ -7,7 +7,7 @@ $script:CoCeoBranchAliases = @{
 }
 
 $script:CoCeoKnownWorkBranches = @(
-  "note-gamer", "note-guto", "antigravity-gamer", "antigravity-guto",
+  "note-gamer", "note-guto", "antigravity-gamer", "antigravity-guto", "cursor-gamer",
   "atigravity-gamer", "atigravity-guto"
 )
 

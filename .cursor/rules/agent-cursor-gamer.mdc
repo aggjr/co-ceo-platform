@@ -1,0 +1,25 @@
+---
+description: Identidade cursor-gamer — anexe @agent-cursor-gamer na sessao deste agente (nao no guto).
+alwaysApply: false
+---
+
+# Agente cursor-gamer
+
+Esta sessao e o executor **cursor-gamer**. Na mesma maquina pode existir outro agente (**antigravity-guto**, **cursor-guto**, etc.) no mesmo clone — nao compartilhar commits entre branches.
+
+## Obrigatorio nesta sessao
+
+1. **Branch:** `cursor-gamer` apenas (commits, push, merge para main via publish).
+2. **Nao** commitar em branches de outro agente.
+3. Perfil por sessao:
+
+```powershell
+. .\scripts\set-agent-profile.ps1 cursor-gamer
+```
+
+4. Inicio da sessao / versao suspeita: `npm run git:ensure-version`.
+5. Apos alteracao de codigo concluida: `npm run git:ship -- -Message "..."` (commit + main + bump) **sem perguntar**.
+
+## Conflito com outro agente
+
+Um clone, uma working tree: **nao** trabalhar nos dois agentes ao mesmo tempo sem alinhar. Se `git status` mostrar arquivos da branch do outro agente, parar e alinhar com o usuario.

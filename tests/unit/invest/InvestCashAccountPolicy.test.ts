@@ -31,8 +31,10 @@ describe('InvestCashAccountPolicy', () => {
   });
 
   it('regressao producao: schema ausente de policy nao bloqueia BTG/BRL', async () => {
+    const missingSchemaErr = { code: 'ER_NO_SUCH_TABLE', errno: 1146 };
     const missingSchemaGateway = {
-      findWhere: jest.fn().mockRejectedValue({ code: 'ER_NO_SUCH_TABLE', errno: 1146 }),
+      findWhere: jest.fn().mockRejectedValue(missingSchemaErr),
+      readQuery: jest.fn().mockRejectedValue(missingSchemaErr), // tabela invest_broker_aliases também ausente
     };
     const service = new InvestCashAccountPolicy(missingSchemaGateway as any);
 
@@ -191,5 +193,58 @@ describe('InvestCashAccountPolicy', () => {
 
     result = await policy.resolve(ctx, { brokerCode: 'BTG', currencyCode: 'BRL' });
     expect(result.financialAccountId).toBe('fin-acc-2');
+  });
+
+  describe('normalização de broker via tabela invest_broker_aliases', () => {
+    beforeEach(async () => {
+      // Seed da tabela de aliases (simula o que o migration 45 insere em prod)
+      await gateway.insert(
+        { userId: 'system', organizationId: null, impersonatorId: null, scope: 'global' } as any,
+        'invest_broker_aliases',
+        { id: 'alias-btg-pactual', alias_name: 'BTG PACTUAL', broker_code: 'BTG' }
+      );
+      await gateway.insert(
+        { userId: 'system', organizationId: null, impersonatorId: null, scope: 'global' } as any,
+        'invest_broker_aliases',
+        { id: 'alias-btg', alias_name: 'BTG', broker_code: 'BTG' }
+      );
+
+      // Seed da policy para BTG/BRL
+      await gateway.insert(ctx, 'invest_cash_account_policies', {
+        id: 'policy-btg-brl',
+        org_id: ctx.organizationId,
+        broker_code: 'BTG',
+        currency_code: 'BRL',
+        cash_ticker: 'CAIXA-BTG',
+        cash_name: 'Conta BTG',
+        financial_account_type: 'brokerage',
+        financial_account_external_id: 'BTG-BRL',
+        is_default_for_currency: 0, // 0 para que CORRETORA_DESCONHECIDA não resolva via currency default
+        is_active: 1,
+        valid_from: '1900-01-01',
+      });
+    });
+
+    it('regressao producao: "BTG Pactual" é normalizado para "BTG" via tabela DE-PARA', async () => {
+      const result = await policy.resolve(ctx, { brokerCode: 'BTG Pactual', currencyCode: 'BRL' });
+      expect(result.cashTicker).toBe('CAIXA-BTG');
+      expect(result.brokerCode).toBe('BTG');
+    });
+
+    it('"BTG PACTUAL" (maiúsculo) também é normalizado corretamente', async () => {
+      const result = await policy.resolve(ctx, { brokerCode: 'BTG PACTUAL', currencyCode: 'BRL' });
+      expect(result.cashTicker).toBe('CAIXA-BTG');
+    });
+
+    it('"BTG" direto continua funcionando', async () => {
+      const result = await policy.resolve(ctx, { brokerCode: 'BTG', currencyCode: 'BRL' });
+      expect(result.cashTicker).toBe('CAIXA-BTG');
+    });
+
+    it('broker sem alias lança INVEST_CASH_ACCOUNT_POLICY_NOT_FOUND', async () => {
+      await expect(
+        policy.resolve(ctx, { brokerCode: 'CORRETORA_DESCONHECIDA', currencyCode: 'BRL' })
+      ).rejects.toThrow(/Nenhuma policy de caixa encontrada/);
+    });
   });
 });

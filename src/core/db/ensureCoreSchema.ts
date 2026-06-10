@@ -7,6 +7,7 @@ const SETTLEMENT_CONTRACT_RULES_TABLE = 'settlement_contract_rules';
 const INVEST_OPERATION_POLICIES_TABLE = 'invest_operation_policies';
 const INVEST_CASH_ACCOUNT_POLICIES_TABLE = 'invest_cash_account_policies';
 const INVEST_BOOK_PERIODS_TABLE = 'invest_book_periods';
+const INVEST_RECONCILE_RUNS_TABLE = 'invest_reconcile_runs';
 
 export type EnsureCoreSchemaResult = {
   marketMigrationApplied: boolean;
@@ -16,6 +17,7 @@ export type EnsureCoreSchemaResult = {
   investOperationPolicyMigrationApplied: boolean;
   investCashAccountPolicyMigrationApplied: boolean;
   investBookPeriodsMigrationApplied: boolean;
+  investReconcileRunsMigrationApplied: boolean;
 };
 
 /**
@@ -71,6 +73,12 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
     investBookPeriodsMigrationApplied = true;
   }
 
+  let investReconcileRunsMigrationApplied = false;
+  if (!(await tableExists(pool, INVEST_RECONCILE_RUNS_TABLE))) {
+    await runSqlFile(pool, '47_invest_reconcile_runs.sql');
+    investReconcileRunsMigrationApplied = true;
+  }
+
   return {
     marketMigrationApplied,
     platformJobMigrationApplied,
@@ -79,5 +87,6 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
     investOperationPolicyMigrationApplied,
     investCashAccountPolicyMigrationApplied,
     investBookPeriodsMigrationApplied,
+    investReconcileRunsMigrationApplied,
   };
 }

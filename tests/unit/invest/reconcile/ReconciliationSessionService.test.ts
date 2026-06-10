@@ -111,11 +111,11 @@ function mockGateway(): CoCeoDataGateway {
   return {
     findWhere: jest.fn().mockImplementation(async (ctxOrTable, tableOrQuery) => {
       const table = typeof ctxOrTable === 'string' ? ctxOrTable : tableOrQuery;
-      if (table === 'invest_import_rules') {
+      if (table === 'invest_asset_type_config') {
         return [
-          { id: 'r1', pattern_type: 'asset_type', pattern: 'stock', resulting_type: 'stock', flags: {} },
-          { id: 'r2', pattern_type: 'asset_type', pattern: 'option_call', resulting_type: 'option_call', flags: {} },
-          { id: 'r3', pattern_type: 'asset_type', pattern: 'option_put', resulting_type: 'option_put', flags: {} },
+          { id: 'r1', asset_type: 'stock', is_stock_like: 1, is_option_like: 0 },
+          { id: 'r2', asset_type: 'option_call', is_stock_like: 0, is_option_like: 1 },
+          { id: 'r3', asset_type: 'option_put', is_stock_like: 0, is_option_like: 1 },
         ];
       }
       return [];

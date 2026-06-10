@@ -11,7 +11,7 @@
    git config coceo.machineBranch note-guto
    ```
 
-   Valores: `note-guto` | `note-gamer` | `antigravity-gamer` | `antigravity-guto` — **cada agente um valor diferente**.
+   Valores: `note-guto` | `note-gamer` | `cursor-gamer` | `antigravity-gamer` | `antigravity-guto` — **cada agente um valor diferente**.
 
 3. Alinhar versao e pegar tarefa (**sem o usuario pedir**):
 

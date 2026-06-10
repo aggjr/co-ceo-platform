@@ -114,8 +114,12 @@ export function loadPatrimonyAnchors(): PatrimonyAnchorFile {
   return { month_ends: [], fixed_income_total: 0 };
 }
 
-/** Patrimônio alvo BTG com interpolação linear entre âncoras mensais. */
-export function interpolatePatrimonyTarget(date: string, anchors?: PatrimonyAnchorFile): number {
+/** Patrimônio alvo BTG com interpolação linear entre âncoras mensais (ajustado por fluxos). */
+export function interpolatePatrimonyTarget(
+  date: string,
+  anchors?: PatrimonyAnchorFile,
+  flowsByDate?: Map<string, number>
+): number {
   const data = anchors ?? loadPatrimonyAnchors();
   const points = [...data.month_ends].sort((a, b) => a.date.localeCompare(b.date));
   if (points.length === 0) return 0;
@@ -132,7 +136,20 @@ export function interpolatePatrimonyTarget(date: string, anchors?: PatrimonyAnch
       const tb = new Date(`${b.date}T12:00:00Z`).getTime();
       const td = new Date(`${d}T12:00:00Z`).getTime();
       const w = tb === ta ? 0 : (td - ta) / (tb - ta);
-      return a.patrimony + w * (b.patrimony - a.patrimony);
+
+      let totalFlowsPeriod = 0;
+      let flowsUpToDate = 0;
+      if (flowsByDate) {
+        for (const [day, flow] of flowsByDate) {
+          if (day > a.date && day <= b.date) {
+            totalFlowsPeriod += flow;
+            if (day <= d) flowsUpToDate += flow;
+          }
+        }
+      }
+
+      const growthExFlow = b.patrimony - a.patrimony - totalFlowsPeriod;
+      return a.patrimony + w * growthExFlow + flowsUpToDate;
     }
   }
   return last.patrimony;
