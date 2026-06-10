@@ -27,9 +27,18 @@ Criterio de aceite, arquivos, banco remoto, etc.
 ## CONC-00
 
 prioridade: 0
-status: done
+status: claimed
 agente: cursor-guto
 spec: 
+assumida: 2026-06-10T21:12:24.472Z
+concluida: 
+release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: done
+agente: cursor-guto
 assumida: 2026-06-10T20:56:00.682Z
 concluida: 2026-06-10T21:02:13.860Z
 release: V0.0.319
@@ -89,6 +98,8 @@ Doc: docs/architecture/invest_conciliacao.md. Bloqueia correção do gráfico ap
 
 ---
 
+---
+
 ## CONC-01
 
 prioridade: 0
@@ -98,6 +109,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -142,6 +158,8 @@ titulo: (cancelada — absorvida por CONC-12/14)
 
 ---
 
+---
+
 ## CONC-02
 
 prioridade: 0
@@ -151,6 +169,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -195,6 +218,8 @@ titulo: (cancelada — absorvida por CONC-13/14)
 
 ---
 
+---
+
 ## CONC-03
 
 prioridade: 0
@@ -204,6 +229,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -248,6 +278,8 @@ titulo: (cancelada — absorvida por CONC-12/13)
 
 ---
 
+---
+
 ## CONC-04
 
 prioridade: 0
@@ -257,6 +289,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -301,6 +338,8 @@ titulo: (cancelada — absorvida por CONC-13)
 
 ---
 
+---
+
 ## CONC-10
 
 prioridade: 0
@@ -310,6 +349,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -357,6 +401,8 @@ Doc: docs/architecture/invest_reconciliacao_sessao.md. Paralelo com CONC-00/11.
 
 ---
 
+---
+
 ## CONC-11
 
 prioridade: 0
@@ -366,6 +412,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -413,6 +464,8 @@ titulo: Varredura completa ReconciliationAuditService
 
 ---
 
+---
+
 ## CONC-12
 
 prioridade: 0
@@ -422,6 +475,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -469,6 +527,8 @@ resolve/close estrito; decisão humana obrigatória (§J). Depende CONC-00,10,11
 
 ---
 
+---
+
 ## CONC-13
 
 prioridade: 0
@@ -478,6 +538,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -525,6 +590,8 @@ Painel Pendências do dia + ações explícitas. Depende CONC-12.
 
 ---
 
+---
+
 ## CONC-14
 
 prioridade: 0
@@ -534,6 +601,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -581,6 +653,8 @@ Bloqueado até notes_complete. Depende CONC-13.
 
 ---
 
+---
+
 ## CONC-15
 
 prioridade: 0
@@ -590,6 +664,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
@@ -637,6 +716,8 @@ Item único Conciliação no menu. Depende CONC-13.
 
 ---
 
+---
+
 ## W3-02
 
 prioridade: 0
@@ -646,6 +727,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: titulo: prioridade: 0
 
