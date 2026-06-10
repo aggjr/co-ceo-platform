@@ -28,11 +28,18 @@ Criterio de aceite, arquivos, banco remoto, etc.
 
 prioridade: 0
 status: claimed
-agente: antigravity-gamer
+agente: cursor-guto
 spec: 
-assumida: 2026-05-29T23:32:46.808Z
+assumida: 2026-06-10T20:55:07.729Z
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: claimed
+agente: antigravity-gamer
+assumida: 2026-05-29T23:32:46.808Z
 
 titulo: prioridade: 0
 
@@ -76,6 +83,8 @@ Doc: docs/architecture/invest_conciliacao.md. Bloqueia correção do gráfico ap
 
 ---
 
+---
+
 ## CONC-01
 
 prioridade: 0
@@ -104,9 +113,16 @@ status: pending
 titulo: prioridade: 0
 
 prioridade: 0
+status: pending
+
+titulo: prioridade: 0
+
+prioridade: 0
 status: cancelled
 spec: tasks/wave-conciliacao/01-reconcile-cash-api.md
 titulo: (cancelada — absorvida por CONC-12/14)
+
+---
 
 ---
 
@@ -146,9 +162,16 @@ status: pending
 titulo: prioridade: 0
 
 prioridade: 0
+status: pending
+
+titulo: prioridade: 0
+
+prioridade: 0
 status: cancelled
 spec: tasks/wave-conciliacao/02-reconcile-cash-ui.md
 titulo: (cancelada — absorvida por CONC-13/14)
+
+---
 
 ---
 
@@ -188,9 +211,16 @@ status: pending
 titulo: prioridade: 0
 
 prioridade: 0
+status: pending
+
+titulo: prioridade: 0
+
+prioridade: 0
 status: cancelled
 spec: tasks/wave-conciliacao/03-reconcile-assets-api.md
 titulo: (cancelada — absorvida por CONC-12/13)
+
+---
 
 ---
 
@@ -230,9 +260,16 @@ status: pending
 titulo: prioridade: 0
 
 prioridade: 0
+status: pending
+
+titulo: prioridade: 0
+
+prioridade: 0
 status: cancelled
 spec: tasks/wave-conciliacao/04-reconcile-assets-ui.md
 titulo: (cancelada — absorvida por CONC-13)
+
+---
 
 ---
 
@@ -269,6 +306,11 @@ titulo: prioridade: 0
 prioridade: 0
 status: pending
 
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
+
 titulo: prioridade: 88
 
 prioridade: 88
@@ -278,6 +320,8 @@ spec: tasks/wave-conciliacao/10-reconciliation-session-schema.md
 titulo: Schema sessão de conciliação (MySQL + store)
 
 Doc: docs/architecture/invest_reconciliacao_sessao.md. Paralelo com CONC-00/11.
+
+---
 
 ---
 
@@ -314,6 +358,11 @@ titulo: prioridade: 0
 prioridade: 0
 status: pending
 
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
+
 titulo: prioridade: 88
 
 prioridade: 88
@@ -323,6 +372,8 @@ spec: tasks/wave-conciliacao/11-reconciliation-audit-sweep.md
 titulo: Varredura completa ReconciliationAuditService
 
 17 dimensões; issues viram pendingDecisions (sem auto-fix). Gate antes de fechar dia.
+
+---
 
 ---
 
@@ -359,6 +410,11 @@ titulo: prioridade: 0
 prioridade: 0
 status: pending
 
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
+
 titulo: prioridade: 92
 
 prioridade: 92
@@ -368,6 +424,8 @@ spec: tasks/wave-conciliacao/12-reconciliation-session-service.md
 titulo: Sessão conciliação — API dia a dia + materialize
 
 resolve/close estrito; decisão humana obrigatória (§J). Depende CONC-00,10,11.
+
+---
 
 ---
 
@@ -404,6 +462,11 @@ titulo: prioridade: 0
 prioridade: 0
 status: pending
 
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
+
 titulo: prioridade: 90
 
 prioridade: 90
@@ -413,6 +476,8 @@ spec: tasks/wave-conciliacao/13-reconciliation-wizard-ui.md
 titulo: UI wizard conciliação (pasta notas, dia a dia)
 
 Painel Pendências do dia + ações explícitas. Depende CONC-12.
+
+---
 
 ---
 
@@ -449,6 +514,11 @@ titulo: prioridade: 0
 prioridade: 0
 status: pending
 
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
+
 titulo: prioridade: 82
 
 prioridade: 82
@@ -458,6 +528,8 @@ spec: tasks/wave-conciliacao/14-reconciliation-cash-phase.md
 titulo: Fase extrato na sessão (após notas 100%)
 
 Bloqueado até notes_complete. Depende CONC-13.
+
+---
 
 ---
 
@@ -494,6 +566,11 @@ titulo: prioridade: 0
 prioridade: 0
 status: pending
 
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
+
 titulo: prioridade: 70
 
 prioridade: 70
@@ -514,6 +591,8 @@ Item único Conciliação no menu. Depende CONC-13.
 
 ---
 
+---
+
 ## W3-02
 
 prioridade: 0
@@ -523,6 +602,11 @@ spec:
 assumida: 
 concluida: 
 release: 
+
+titulo: prioridade: 0
+
+prioridade: 0
+status: pending
 
 titulo: prioridade: 0
 
