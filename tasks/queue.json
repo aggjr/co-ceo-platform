@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-06-10T21:22:25.977Z",
+  "updated_at": "2026-06-10T21:24:40.228Z",
   "tasks": [
     {
       "id": "CONC-00",
-      "title": "prioridade: 90\r",
+      "title": "prioridade: 0\r",
       "spec": null,
       "priority": 0,
       "status": "pending",
@@ -13,7 +13,7 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 90\r\nstatus: done\r\nagente: cursor-guto\r\nspec: tasks/wave-conciliacao/00-patrimony-daily-rebuild.md\r\nassumida: 2026-06-10T20:56:00.682Z\r\nconcluida: 2026-06-10T21:02:13.860Z\r\nrelease: V0.0.319\r\n\r\ntitulo: Rebuild patrimônio diário + gráfico Resultado histórico\r\n\r\nPatrimonyDailyRebuildService, API rebuild, dashboard com method=mtm_economic.\r\nDoc: docs/architecture/invest_conciliacao.md. Bloqueia correção do gráfico após saneamento do livro.\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 90\r\n\r\nprioridade: 90\r\nstatus: done\r\nagente: cursor-guto\r\nspec: tasks/wave-conciliacao/00-patrimony-daily-rebuild.md\r\nassumida: 2026-06-10T20:56:00.682Z\r\nconcluida: 2026-06-10T21:02:13.860Z\r\nrelease: V0.0.319\r\n\r\ntitulo: Rebuild patrimônio diário + gráfico Resultado histórico\r\n\r\nPatrimonyDailyRebuildService, API rebuild, dashboard com method=mtm_economic.\r\nDoc: docs/architecture/invest_conciliacao.md. Bloqueia correção do gráfico após saneamento do livro.\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
@@ -27,7 +27,7 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 0\r\nstatus: cancelled\r\nspec: tasks/wave-conciliacao/01-reconcile-cash-api.md\r\n\r\ntitulo: (cancelada — absorvida por CONC-12/14)\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 0\r\n\r\nprioridade: 0\r\nstatus: cancelled\r\nspec: tasks/wave-conciliacao/01-reconcile-cash-api.md\r\n\r\ntitulo: (cancelada — absorvida por CONC-12/14)\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
@@ -41,7 +41,7 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 0\r\nstatus: cancelled\r\nspec: tasks/wave-conciliacao/02-reconcile-cash-ui.md\r\n\r\ntitulo: (cancelada — absorvida por CONC-13/14)\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 0\r\n\r\nprioridade: 0\r\nstatus: cancelled\r\nspec: tasks/wave-conciliacao/02-reconcile-cash-ui.md\r\n\r\ntitulo: (cancelada — absorvida por CONC-13/14)\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
@@ -55,7 +55,7 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 0\r\nstatus: cancelled\r\nspec: tasks/wave-conciliacao/03-reconcile-assets-api.md\r\n\r\ntitulo: (cancelada — absorvida por CONC-12/13)\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 0\r\n\r\nprioridade: 0\r\nstatus: cancelled\r\nspec: tasks/wave-conciliacao/03-reconcile-assets-api.md\r\n\r\ntitulo: (cancelada — absorvida por CONC-12/13)\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
@@ -69,26 +69,26 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 0\r\nstatus: cancelled\r\nspec: tasks/wave-conciliacao/04-reconcile-assets-ui.md\r\n\r\ntitulo: (cancelada — absorvida por CONC-13)\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 0\r\n\r\nprioridade: 0\r\nstatus: cancelled\r\nspec: tasks/wave-conciliacao/04-reconcile-assets-ui.md\r\n\r\ntitulo: (cancelada — absorvida por CONC-13)\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
       "id": "CONC-10",
-      "title": "prioridade: 88\r",
+      "title": "prioridade: 0\r",
       "spec": null,
       "priority": 0,
-      "status": "pending",
+      "status": "done",
       "claimed_by": null,
       "claimed_at": null,
       "started_at": null,
-      "completed_at": null,
-      "release_version": null,
-      "description": "prioridade: 88\r\nstatus: in_progress\r\nagente: cursor-guto\r\nspec: tasks/wave-conciliacao/10-reconciliation-session-schema.md\r\nassumida: 2026-06-10T21:18:00.000Z\r\n\r\ntitulo: Schema sessão de conciliação (MySQL + store)\r\n\r\nMigração SQL + tipos + leitura/escrita via CoCeoDataGateway para invest_reconciliation_sessions e invest_reconciliation_day_log.\r\nDoc: docs/architecture/invest_reconciliacao_sessao.md. Paralelo com CONC-00/11.\r\n\r\n---\r",
+      "completed_at": "2026-06-10T21:24:40.219Z",
+      "release_version": "V0.0.321",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 88\r\n\r\nprioridade: 88\r\nstatus: in_progress\r\nagente: cursor-guto\r\nspec: tasks/wave-conciliacao/10-reconciliation-session-schema.md\r\nassumida: 2026-06-10T21:18:00.000Z\r\n\r\ntitulo: Schema sessão de conciliação (MySQL + store)\r\n\r\nMigração SQL + tipos + leitura/escrita via CoCeoDataGateway para invest_reconciliation_sessions e invest_reconciliation_day_log.\r\nDoc: docs/architecture/invest_reconciliacao_sessao.md. Paralelo com CONC-00/11.\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
       "id": "CONC-11",
-      "title": "prioridade: 88\r",
+      "title": "prioridade: 0\r",
       "spec": null,
       "priority": 0,
       "status": "pending",
@@ -97,12 +97,12 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 88\r\nstatus: in_progress\r\nagente: cursor-guto\r\nspec: tasks/wave-conciliacao/11-reconciliation-audit-sweep.md\r\nassumida: 2026-06-10T21:18:00.000Z\r\n\r\ntitulo: Varredura completa ReconciliationAuditService\r\n\r\n17 dimensões; issues viram pendingDecisions (sem auto-fix). Gate antes de fechar dia.\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 88\r\n\r\nprioridade: 88\r\nstatus: in_progress\r\nagente: cursor-guto\r\nspec: tasks/wave-conciliacao/11-reconciliation-audit-sweep.md\r\nassumida: 2026-06-10T21:18:00.000Z\r\n\r\ntitulo: Varredura completa ReconciliationAuditService\r\n\r\n17 dimensões; issues viram pendingDecisions (sem auto-fix). Gate antes de fechar dia.\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
       "id": "CONC-12",
-      "title": "prioridade: 92\r",
+      "title": "prioridade: 0\r",
       "spec": null,
       "priority": 0,
       "status": "pending",
@@ -111,12 +111,12 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 92\r\nstatus: pending\r\nspec: tasks/wave-conciliacao/12-reconciliation-session-service.md\r\n\r\ntitulo: Sessão conciliação — API dia a dia + materialize\r\n\r\nresolve/close estrito; decisão humana obrigatória (§J). Depende CONC-00,10,11.\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 92\r\n\r\nprioridade: 92\r\nstatus: pending\r\nspec: tasks/wave-conciliacao/12-reconciliation-session-service.md\r\n\r\ntitulo: Sessão conciliação — API dia a dia + materialize\r\n\r\nresolve/close estrito; decisão humana obrigatória (§J). Depende CONC-00,10,11.\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
       "id": "CONC-13",
-      "title": "prioridade: 90\r",
+      "title": "prioridade: 0\r",
       "spec": null,
       "priority": 0,
       "status": "pending",
@@ -125,12 +125,12 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 90\r\nstatus: pending\r\nspec: tasks/wave-conciliacao/13-reconciliation-wizard-ui.md\r\n\r\ntitulo: UI wizard conciliação (pasta notas, dia a dia)\r\n\r\nPainel Pendências do dia + ações explícitas. Depende CONC-12.\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 90\r\n\r\nprioridade: 90\r\nstatus: pending\r\nspec: tasks/wave-conciliacao/13-reconciliation-wizard-ui.md\r\n\r\ntitulo: UI wizard conciliação (pasta notas, dia a dia)\r\n\r\nPainel Pendências do dia + ações explícitas. Depende CONC-12.\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
       "id": "CONC-14",
-      "title": "prioridade: 82\r",
+      "title": "prioridade: 0\r",
       "spec": null,
       "priority": 0,
       "status": "pending",
@@ -139,12 +139,12 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 82\r\nstatus: pending\r\nspec: tasks/wave-conciliacao/14-reconciliation-cash-phase.md\r\n\r\ntitulo: Fase extrato na sessão (após notas 100%)\r\n\r\nBloqueado até notes_complete. Depende CONC-13.\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 82\r\n\r\nprioridade: 82\r\nstatus: pending\r\nspec: tasks/wave-conciliacao/14-reconciliation-cash-phase.md\r\n\r\ntitulo: Fase extrato na sessão (após notas 100%)\r\n\r\nBloqueado até notes_complete. Depende CONC-13.\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
       "id": "CONC-15",
-      "title": "prioridade: 70\r",
+      "title": "prioridade: 0\r",
       "spec": null,
       "priority": 0,
       "status": "pending",
@@ -153,12 +153,12 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 70\r\nstatus: pending\r\nspec: tasks/wave-conciliacao/05-catalog-deploy.md\r\n\r\ntitulo: Menu e catálogo UI conciliação + deploy\r\n\r\nItem único Conciliação no menu. Depende CONC-13.\r\n\r\n---\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 70\r\n\r\nprioridade: 70\r\nstatus: pending\r\nspec: tasks/wave-conciliacao/05-catalog-deploy.md\r\n\r\ntitulo: Menu e catálogo UI conciliação + deploy\r\n\r\nItem único Conciliação no menu. Depende CONC-13.\r\n\r\n---\r\n\r\n---\r",
       "notes": ""
     },
     {
       "id": "W3-02",
-      "title": "prioridade: 80\r",
+      "title": "prioridade: 0\r",
       "spec": null,
       "priority": 0,
       "status": "pending",
@@ -167,7 +167,7 @@
       "started_at": null,
       "completed_at": null,
       "release_version": null,
-      "description": "prioridade: 80\r\nstatus: done\r\nagente: antigravity-gamer\r\nspec: tasks/wave-3/02.md\r\nassumida: 2026-05-28T02:46:53.398Z\r\nconcluida: 2026-05-28T12:32:01.022Z\r\nrelease: V0.0.165\r\n\r\ntitulo: INVEST: recalcular resultados por ação desde 2026\r\n\r\nINVEST: recalcular resultados por ação desde 2026\r",
+      "description": "prioridade: 0\r\nstatus: pending\r\n\r\ntitulo: prioridade: 80\r\n\r\nprioridade: 80\r\nstatus: done\r\nagente: antigravity-gamer\r\nspec: tasks/wave-3/02.md\r\nassumida: 2026-05-28T02:46:53.398Z\r\nconcluida: 2026-05-28T12:32:01.022Z\r\nrelease: V0.0.165\r\n\r\ntitulo: INVEST: recalcular resultados por ação desde 2026\r\n\r\nINVEST: recalcular resultados por ação desde 2026\r",
       "notes": ""
     }
   ]
