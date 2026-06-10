@@ -1654,6 +1654,18 @@ export async function InvestConciliacaoPage(container) {
         data = await apiRequest(`/api/invest/reconcile/option-c/status/${encodeURIComponent(optcRunId)}`);
         transientErrors = 0;
       } catch (err) {
+        // 404 = run não encontrado (expirado ou anterior a persistência MySQL).
+        // Limpa estado local para o usuário poder reiniciar limpo.
+        if (err?.status === 404) {
+          appendLog(
+            logEl,
+            '⚠️ Execução não encontrada no servidor. Estado local limpo — inicie uma nova conciliação.',
+            'warn'
+          );
+          logOptcBrowser('warn', 'option-c.status.run-not-found', { runId: optcRunId });
+          resetOptcRunScreen();
+          return;
+        }
         transientErrors += 1;
         const msg = err?.message || String(err);
         appendLog(
