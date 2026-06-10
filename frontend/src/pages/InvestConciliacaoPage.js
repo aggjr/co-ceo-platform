@@ -1551,9 +1551,14 @@ export async function InvestConciliacaoPage(container) {
       }
       
       if (labelExtracts) {
-        labelExtracts.textContent = state.phase === 'done' 
-          ? `Fase extratos/materialização · Concluído`
-          : `Fase extratos/materialização · Processando ${extractsTotal} arquivo(s) (pode levar alguns segundos)...`;
+        if (state.phase === 'done') {
+          labelExtracts.textContent = `Fase extratos/materialização · Concluído`;
+        } else {
+          const lastLog = state.activityLog && state.activityLog.length > 0
+            ? state.activityLog[state.activityLog.length - 1]
+            : `Processando ${extractsTotal} arquivo(s) (pode levar alguns segundos)...`;
+          labelExtracts.textContent = `Fase extratos/materialização · ${lastLog}`;
+        }
       }
     } else {
       if (labelExtracts) labelExtracts.hidden = true;

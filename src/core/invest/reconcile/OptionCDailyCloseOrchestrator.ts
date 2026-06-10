@@ -479,7 +479,21 @@ export class OptionCDailyCloseOrchestrator {
     if (this.runRepo) {
       try { await this.runRepo.upsert(rt.state); } catch { /* best-effort */ }
     }
-    const rebuild = await this.patrimonyRebuild.rebuild(ctx);
+    const rebuild = await this.patrimonyRebuild.rebuild(ctx, {
+      onProgress: (daysWritten, daysSkipped, currentDay) => {
+        logStep(
+          rt,
+          `Rebuild em andamento... Dia ${currentDay} (${daysWritten + daysSkipped} dias processados).`
+        );
+        if (this.runRepo) {
+          try {
+            this.runRepo.upsert(rt.state);
+          } catch {
+            /* best-effort */
+          }
+        }
+      },
+    });
     logStep(
       rt,
       `Rebuild: ${rebuild.daysWritten} dia(s) gravados, ${rebuild.daysSkipped} pulados.`
