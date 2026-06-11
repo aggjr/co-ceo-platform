@@ -3,7 +3,7 @@ import { GatewayError } from '../../dal/errors';
 import { authBootstrapContext } from '../../auth/authBootstrapContext';
 import { InvestQuoteSyncService } from '../InvestQuoteSyncService';
 import { OptionMarketSyncService } from '../OptionMarketSyncService';
-import { PatrimonyDailyRecorder } from '../PatrimonyDailyRecorder';
+import { PatrimonyDailyRecorder, type RecordDailyPatrimonyResult } from '../PatrimonyDailyRecorder';
 import { PatrimonyDailyStore } from '../PatrimonyDailyStore';
 import { LedgerImportService } from '../LedgerImportService';
 import { rebuildCustodyFromLedger } from '../CustodyEngine';
@@ -39,6 +39,13 @@ export type MaterializeDayReport = {
   quoteSync: QuoteSyncDayReport;
   patrimonyRecorded: boolean;
   economicPatrimony: number | null;
+  patrimonyValidation: {
+    recordedPatrimony: number;
+    componentsTotal: number;
+    componentsDelta: number;
+    anchorPatrimony: number | null;
+    anchorDelta: number | null;
+  } | null;
   positionsUpdated: number;
   positionsZeroed: number;
   custody: unknown;
@@ -156,14 +163,17 @@ export class DailyCloseMaterializeService {
 
     let patrimonyRecorded = false;
     let economicPatrimony: number | null = null;
+    let patrimonyValidation: MaterializeDayReport['patrimonyValidation'] = null;
     try {
       const rec = await this.recorder.recordDay(ctx, day);
+      patrimonyValidation = this.assertPatrimonyCoherent(day, rec);
       patrimonyRecorded = true;
       economicPatrimony = rec.economicPatrimony;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       quoteSync.warnings.push(`Patrimônio ${day}: ${msg}`);
       logReconcileFailure('daily-close.patrimony', ctx.organizationId ?? undefined, err, { date: day });
+      throw err;
     }
 
     const custody = await this.ledger.reconcileCustody(ctx);
@@ -173,6 +183,7 @@ export class DailyCloseMaterializeService {
       durationMs: Date.now() - startedAt,
       patrimonyRecorded,
       economicPatrimony,
+      patrimonyValidation,
       positionsUpdated,
       positionsZeroed,
       warnings: quoteSync.warnings.length,
@@ -183,6 +194,7 @@ export class DailyCloseMaterializeService {
       quoteSync,
       patrimonyRecorded,
       economicPatrimony,
+      patrimonyValidation,
       positionsUpdated,
       positionsZeroed,
       custody,
@@ -194,6 +206,53 @@ export class DailyCloseMaterializeService {
     asOfDate: string
   ): Promise<{ positionsUpdated: number; positionsZeroed: number }> {
     return this.recalcThreePrices(ctx, asOfDate);
+  }
+
+  private assertPatrimonyCoherent(
+    day: string,
+    result: RecordDailyPatrimonyResult
+  ): NonNullable<MaterializeDayReport['patrimonyValidation']> {
+    const recorded = result.recorded;
+    const recordedPatrimony = round2(Number(recorded.patrimony ?? 0));
+    const componentsTotal = round2(
+      Number(recorded.cash ?? 0) +
+        Number(recorded.positions_value ?? 0) +
+        Number(recorded.fixed_income_total ?? 0) +
+        Number(recorded.pending_settlements ?? 0)
+    );
+    const componentsDelta = round2(recordedPatrimony - componentsTotal);
+    if (Math.abs(componentsDelta) > 0.02) {
+      throw new GatewayError(
+        'FINANCIAL_RULE_VIOLATION',
+        `Fechamento ${day} incoerente: patrimonio=${recordedPatrimony}, componentes=${componentsTotal}, delta=${componentsDelta}.`,
+        409
+      );
+    }
+
+    const anchorPatrimony =
+      result.btgPatrimony != null && Number.isFinite(result.btgPatrimony)
+        ? round2(result.btgPatrimony)
+        : null;
+    const anchorDelta =
+      anchorPatrimony != null ? round2(recordedPatrimony - anchorPatrimony) : null;
+    if (anchorPatrimony != null && anchorDelta != null) {
+      const anchorTolerance = Math.max(1, Math.abs(anchorPatrimony) * 0.0005);
+      if (Math.abs(anchorDelta) > anchorTolerance) {
+        throw new GatewayError(
+          'FINANCIAL_RULE_VIOLATION',
+          `Fechamento ${day} fora da ancora BTG: patrimonio=${recordedPatrimony}, ancora=${anchorPatrimony}, delta=${anchorDelta}, tolerancia=${round2(anchorTolerance)}.`,
+          409
+        );
+      }
+    }
+
+    return {
+      recordedPatrimony,
+      componentsTotal,
+      componentsDelta,
+      anchorPatrimony,
+      anchorDelta,
+    };
   }
 
   private async recalcThreePrices(
@@ -369,4 +428,8 @@ export class DailyCloseMaterializeService {
     };
     await this.gateway.insert(ctx, 'invest_position_ext', insertPayload);
   }
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }

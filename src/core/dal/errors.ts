@@ -24,7 +24,8 @@ export type GatewayErrorCode =
   | 'FINANCIAL_RULE_VIOLATION'
   | 'UNKNOWN_INVEST_OPERATION'
   | 'INVEST_CASH_ACCOUNT_POLICY_NOT_FOUND'
-  | 'INVEST_BOOK_PERIOD_NOT_FOUND';
+  | 'INVEST_BOOK_PERIOD_NOT_FOUND'
+  | 'CASH_PHASE_BLOCKED';
 
 export class GatewayError extends Error {
   readonly code: GatewayErrorCode;

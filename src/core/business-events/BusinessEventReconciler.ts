@@ -12,9 +12,9 @@ import type { EventReconciliationReport } from './types';
  *   1. SUM(financial_legs_cleared+pending) deve bater com header.total_net
  *      (com tolerancia de 0.01). Quando total_net=0 a regra vira "tem que
  *      ter pelo menos 1 perna" — eh o caso do opening_balance.
- *   2. Pelo menos 1 perna (custodia OU caixa) deve existir. Header sem
- *      pernas eh um defeito (alguem criou o header mas falhou em gravar
- *      as pernas).
+ *   2. Todo header precisa representar uma composicao contabil completa:
+ *      custodia+caixa, duas pernas de custodia, ou duas pernas financeiras.
+ *      Um header com uma unica perna eh sempre pendente de pareamento/correcao.
  *   3. Pernas com status='cancelled' nao entram na soma.
  */
 const TOLERANCE = 0.01;
@@ -62,6 +62,12 @@ export class BusinessEventReconciler {
     }
     if (patrimonyLegs.length === 0 && financialLegs.length === 0) {
       issues.push(`Header sem pernas (nem custodia nem caixa).`);
+    }
+    if (!hasCompleteLegComposition(patrimonyLegs.length, financialLegs.length)) {
+      issues.push(
+        `Composicao incompleta de pernas: patrimony=${patrimonyLegs.length}, financial=${financialLegs.length}. ` +
+          `Esperado custodia+caixa, 2+ custodia, ou 2+ financeiras.`
+      );
     }
     if (event.voided_at) {
       issues.push(`Header esta voided (em ${event.voided_at}). Pernas deveriam ter sido estornadas.`);
@@ -130,4 +136,11 @@ export class BusinessEventReconciler {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+function hasCompleteLegComposition(patrimonyCount: number, financialCount: number): boolean {
+  if (patrimonyCount >= 1 && financialCount >= 1) return true;
+  if (patrimonyCount >= 2) return true;
+  if (financialCount >= 2) return true;
+  return false;
 }

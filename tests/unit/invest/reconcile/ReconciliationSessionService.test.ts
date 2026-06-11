@@ -204,7 +204,33 @@ describe('ReconciliationSessionService', () => {
       updated_at: new Date().toISOString(),
       completed_at: null,
     }));
-    recordDay.mockResolvedValue({});
+    recordDay.mockResolvedValue({
+      snapshotDate: '2026-01-02',
+      recorded: {
+        id: 'day-1',
+        organization_id: 'org-holding-001',
+        snapshot_date: '2026-01-02',
+        patrimony: 4000,
+        patrimony_gross: 4000,
+        cash: 0,
+        positions_value: 4000,
+        pending_settlements: 0,
+        settled_cash: null,
+        cash_in_transit: null,
+        fixed_income_total: 0,
+        external_flow: 0,
+        daily_return_simple: null,
+        daily_return_twr: null,
+        cumulative_twr: null,
+        quotes_as_of: '2026-01-02',
+        source: 'mtm_economic',
+        metadata: null,
+      },
+      positionsSaved: 1,
+      quotesAsOf: '2026-01-02',
+      economicPatrimony: 4000,
+      btgPatrimony: null,
+    });
     invalidateFromDate.mockResolvedValue(undefined);
   });
 
@@ -220,7 +246,7 @@ describe('ReconciliationSessionService', () => {
     });
   });
 
-  it('bloqueia fase cash legada para evitar extrato sem LIQ BOLSA', async () => {
+  it('bloqueia fase cash quando não há sessão de notas completa', async () => {
     const service = new ReconciliationSessionService(mockGateway());
 
     await expect(
@@ -229,8 +255,8 @@ describe('ReconciliationSessionService', () => {
         files: [{ name: 'extrato.txt', contentBase64: 'U2FsZG8gSW5pY2lhbCAwLDAw' }],
       })
     ).rejects.toMatchObject({
-      httpStatus: 400,
-      message: expect.stringContaining('Fase de caixa via sessao legada desativada'),
+      httpStatus: 403,
+      message: expect.stringContaining('Fase 2 bloqueada'),
     });
   });
 
