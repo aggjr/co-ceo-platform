@@ -984,7 +984,7 @@ export const TEXTS: TextSeed[] = [
     module_code: 'INVEST',
     kind: 'value_label',
     default_text: 'AÇÃO',
-    metadata: typeMeta('notes-type--stock', '#f97316', '--invest-type-stock'),
+    metadata: typeMeta('notes-type--stock', '#eab308', '--invest-type-stock'),
   },
   {
     id: '00000000-0000-4003-8000-000000000310',

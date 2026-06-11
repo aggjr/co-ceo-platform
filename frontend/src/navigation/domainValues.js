@@ -43,7 +43,7 @@ const FALLBACK_BY_CODE = {
   LCI: RF_FALLBACK,
   LCA: RF_FALLBACK,
   'DEBÊNTURE': RF_FALLBACK,
-  'AÇÃO': { cssClass: 'notes-type--stock', color: '#f97316', cssVar: '--invest-type-stock' },
+  'AÇÃO': { cssClass: 'notes-type--stock', color: '#eab308', cssVar: '--invest-type-stock' },
   FII: { cssClass: 'notes-type--fii', color: '#a78bfa', cssVar: '--invest-type-fii' },
   BDR: { cssClass: 'notes-type--bdr', color: '#38bdf8', cssVar: '--invest-type-bdr' },
 };
