@@ -220,7 +220,7 @@ describe('ReconciliationSessionService', () => {
     });
   });
 
-  it('bloqueia fase cash legada para evitar extrato sem LIQ BOLSA', async () => {
+  it('bloqueia fase cash quando não há sessão de notas completa', async () => {
     const service = new ReconciliationSessionService(mockGateway());
 
     await expect(
@@ -229,8 +229,8 @@ describe('ReconciliationSessionService', () => {
         files: [{ name: 'extrato.txt', contentBase64: 'U2FsZG8gSW5pY2lhbCAwLDAw' }],
       })
     ).rejects.toMatchObject({
-      httpStatus: 400,
-      message: expect.stringContaining('Fase de caixa via sessao legada desativada'),
+      httpStatus: 403,
+      message: expect.stringContaining('Fase 2 bloqueada'),
     });
   });
 
