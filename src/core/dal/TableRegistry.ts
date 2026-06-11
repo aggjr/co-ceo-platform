@@ -380,6 +380,10 @@ export class TableRegistry {
     return table.primaryKeyColumns ?? [table.primaryKey];
   }
 
+  static listStorageCountedTables(): TableDefinition[] {
+    return TABLES.filter((table) => table.countsTowardStorage);
+  }
+
   static formatRecordId(table: TableDefinition, row: Record<string, unknown>): string {
     const cols = TableRegistry.getPrimaryKeyColumns(table);
     if (cols.length === 1) {

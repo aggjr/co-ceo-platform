@@ -19,6 +19,7 @@
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
 import { CoCeoDataGateway } from '../src/core/dal';
+import { StorageMeter } from '../src/core/dal/StorageMeter';
 import { SYSTEM_INSTALLER_USER_ID } from '../src/core/dal/types';
 import { buildInvestOperations } from '../src/modules/invest';
 import type { UserContext } from '../src/core/dal';
@@ -168,6 +169,8 @@ async function purgeOrgData(conn: mysql.Connection): Promise<void> {
       `Purge incompleto: ${JSON.stringify(row)}. Verifique constraints.`
     );
   }
+  const storage = await StorageMeter.resetOrganizationUsage(conn, ORG_ID);
+  console.log(`Hodometro resetado: ${storage.previousBytes} -> 0 bytes.`);
   console.log('Estado limpo confirmado.');
 }
 

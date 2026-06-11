@@ -6,6 +6,7 @@
  */
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
+import { StorageMeter } from '../src/core/dal/StorageMeter';
 
 dotenv.config();
 
@@ -24,8 +25,10 @@ async function main() {
     [ORG]
   );
   const n = (res as { affectedRows: number }).affectedRows;
+  const storage = await StorageMeter.recalculateOrganizationUsage(pool, ORG);
   console.log(`Removidos ${n} fechamento(s) diário(s) para ${ORG}.`);
   console.log('Após importar o livro: npx ts-node scripts/record-daily-patrimony.ts');
+  console.log(`Hodometro recalculado: ${storage.previousBytes} -> ${storage.recalculatedBytes} bytes.`);
   await pool.end();
 }
 

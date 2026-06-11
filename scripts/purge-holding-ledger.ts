@@ -8,6 +8,7 @@
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import { CoCeoDataGateway } from '../src/core/dal';
+import { StorageMeter } from '../src/core/dal/StorageMeter';
 import { installerContext } from '../src/database/seeds/lib/installerContext';
 import { LedgerImportService } from '../src/core/invest/LedgerImportService';
 
@@ -51,6 +52,9 @@ async function main() {
   const ctx = { ...installerContext(), organizationId: ORG, scope: 'node' as const };
   const reconcile = await ledger.reconcileCustody(ctx);
   console.log('Custódia reconciliada:', reconcile);
+
+  const storage = await StorageMeter.recalculateOrganizationUsage(pool, ORG);
+  console.log(`Hodometro recalculado: ${storage.previousBytes} -> ${storage.recalculatedBytes} bytes.`);
 
   const [activeRows] = await pool.query(
     `SELECT COUNT(1) AS n FROM invest_assets

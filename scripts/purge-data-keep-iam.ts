@@ -16,6 +16,7 @@
  */
 import 'dotenv/config';
 import mysql from 'mysql2/promise';
+import { StorageMeter } from '../src/core/dal/StorageMeter';
 
 const SUPER_ADMIN_ID = 'a4052508-d505-42d0-8589-178157983e9c';
 const USER_TO_REMOVE = 'usr-co-ceo-001';
@@ -67,6 +68,8 @@ const TRUNCATE_TABLES = [
       console.log(`  ${t.padEnd(34)} ERR ${(e as Error).message}`);
     }
   }
+  const storage = await StorageMeter.recalculateOrganizationUsage(conn, 'org-holding-001');
+  console.log(`  storage_bytes_used: ${storage.previousBytes} -> ${storage.recalculatedBytes}`);
   await conn.query('SET FOREIGN_KEY_CHECKS = 1');
 
   console.log('PASSO 3 — remover user_roles do usuário descontinuado');

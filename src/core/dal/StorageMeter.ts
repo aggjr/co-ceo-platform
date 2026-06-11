@@ -1,5 +1,6 @@
 import mysql from 'mysql2/promise';
 import { GatewayError } from './errors';
+import { TableRegistry } from './TableRegistry';
 import type { AuditAction, UserContext } from './types';
 
 export function estimatePayloadBytes(payload: Record<string, unknown> | null): number {
@@ -101,7 +102,7 @@ export class StorageMeter {
    * Remove o ledger da org para o próximo mapeamento recontar só via applyDelta.
    */
   static async resetOrganizationUsage(
-    connection: mysql.Connection | mysql.PoolConnection,
+    connection: mysql.Connection | mysql.PoolConnection | mysql.Pool,
     organizationId: string
   ): Promise<{ previousBytes: number }> {
     const [rows] = await connection.query<mysql.RowDataPacket[]>(
@@ -123,5 +124,60 @@ export class StorageMeter {
     );
 
     return { previousBytes };
+  }
+
+  /**
+   * Recalcula o hodometro a partir das linhas atuais que contam para storage.
+   * Use apos purges/importacoes diretas por SQL, quando os deltas do gateway
+   * nao representam mais a base real.
+   */
+  static async recalculateOrganizationUsage(
+    connection: mysql.Connection | mysql.PoolConnection | mysql.Pool,
+    organizationId: string
+  ): Promise<{ previousBytes: number; recalculatedBytes: number; tablesScanned: number }> {
+    const [orgRows] = await connection.query<mysql.RowDataPacket[]>(
+      `SELECT storage_bytes_used FROM organizations WHERE id = ? AND deleted_at IS NULL`,
+      [organizationId]
+    );
+    if (!orgRows.length) {
+      throw new GatewayError('ORG_NOT_FOUND', 'Organizacao nao encontrada para cobranca.', 404);
+    }
+
+    const previousBytes = Number(orgRows[0].storage_bytes_used ?? 0);
+    let recalculatedBytes = 0;
+    let tablesScanned = 0;
+
+    for (const table of TableRegistry.listStorageCountedTables()) {
+      const where = table.softDelete
+        ? 'organization_id = ? AND deleted_at IS NULL'
+        : 'organization_id = ?';
+      try {
+        const [rows] = await connection.query<mysql.RowDataPacket[]>(
+          `SELECT * FROM \`${table.name}\` WHERE ${where}`,
+          [organizationId]
+        );
+        tablesScanned += 1;
+        for (const row of rows) {
+          recalculatedBytes += estimatePayloadBytes({ ...row });
+        }
+      } catch (error) {
+        const mysqlError = error as { code?: string };
+        if (mysqlError.code === 'ER_NO_SUCH_TABLE' || mysqlError.code === 'ER_BAD_FIELD_ERROR') {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    await connection.execute(
+      `DELETE FROM organization_storage_ledger WHERE organization_id = ?`,
+      [organizationId]
+    );
+    await connection.execute(
+      `UPDATE organizations SET storage_bytes_used = ? WHERE id = ?`,
+      [recalculatedBytes, organizationId]
+    );
+
+    return { previousBytes, recalculatedBytes, tablesScanned };
   }
 }

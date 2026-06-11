@@ -6,6 +6,7 @@
  */
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
+import { StorageMeter } from '../src/core/dal/StorageMeter';
 
 dotenv.config();
 
@@ -215,6 +216,9 @@ async function main() {
         if (!msg.includes("doesn't exist") && !msg.includes('Unknown column')) throw e;
       }
     }
+
+    const storage = await StorageMeter.recalculateOrganizationUsage(conn, ORG);
+    console.log(`Hodometro recalculado: ${storage.previousBytes} -> ${storage.recalculatedBytes} bytes.`);
 
     await conn.commit();
     console.log('\nPurge concluído. Próximo: npx ts-node scripts/reimport-btg-month.ts', MONTH);
