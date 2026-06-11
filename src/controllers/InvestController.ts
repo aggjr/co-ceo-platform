@@ -901,7 +901,18 @@ export class InvestController {
     }
     const asOf = req.body?.date ? String(req.body.date).slice(0, 10) : undefined;
     try {
+      // Sincroniza cotações da holding (invest_position_ext) + market_quotes_daily (via authBootstrapContext interno)
       const result = await this.quoteSync.syncFromBrapi(ctx, asOf);
+
+      // Garante que a tabela global market_quotes_daily também é alimentada com todos os
+      // tickers em uso na plataforma (necessário para o cálculo de patrimônio histórico).
+      // Roda em background — falha não bloqueia a resposta ao cliente.
+      new StockMarketSyncService(this.gateway)
+        .syncFromBrapi(authBootstrapContext(), asOf)
+        .catch((err) =>
+          console.warn('[syncB3Quotes] Falha ao sincronizar market_quotes_daily global:', err)
+        );
+
       return res.json({
         success: true,
         ...result,
