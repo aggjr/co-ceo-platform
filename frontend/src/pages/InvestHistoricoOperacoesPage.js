@@ -84,11 +84,22 @@ function buildColumns(t, manifest) {
       key: 'netOperations',
       label: 'Líq. nota (caixa)',
       type: 'currency',
-      cellClass: (row) => {
+      render: (row) => {
         const val = Number(row.netOperations) || 0;
-        if (val > 0) return 'notes-note-net notes-net--positive';
-        if (val < 0) return 'notes-note-net notes-net--negative';
-        return 'notes-note-net';
+        const span = document.createElement('span');
+        
+        if (!val || !Number.isFinite(val) || Math.abs(val) < 0.01) {
+          span.className = 'muted notes-note-net';
+          span.textContent = '—';
+          return span;
+        }
+
+        span.className = 'notes-note-net';
+        if (val > 0) span.classList.add('notes-net--positive');
+        else if (val < 0) span.classList.add('notes-net--negative');
+
+        span.textContent = val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        return span;
       },
     },
     { key: 'dc', label: 'D/C', type: 'text' },
