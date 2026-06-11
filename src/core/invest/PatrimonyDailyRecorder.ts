@@ -60,6 +60,14 @@ export class PatrimonyDailyRecorder {
     return dow === 0 || dow === 6;
   }
 
+  private requiresExactDailyQuote(assetType: string, ticker: string): boolean {
+    const type = assetType.toLowerCase();
+    if (type === 'fixed_income') return false;
+    if (type === 'option_call' || type === 'option_put' || type.includes('option')) return false;
+    if (isOptionTicker(ticker)) return false;
+    return true;
+  }
+
   private async quotedTickersOpenOnDate(
     ctx: UserContext,
     events: Array<Record<string, unknown>>,
@@ -76,6 +84,7 @@ export class PatrimonyDailyRecorder {
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
       const assetType = String(e.asset_type || inferAssetType(ticker));
       if (!(await this.categories.requiresMarketQuote(ctx, assetType))) continue;
+      if (!this.requiresExactDailyQuote(assetType, ticker)) continue;
       const type = String(e.transaction_type ?? '');
       const qty = Math.abs(Number(e.quantity ?? 0));
       if (!Number.isFinite(qty) || qty <= 0) continue;
