@@ -2,6 +2,7 @@ import type { UserContext } from '../../../src/core/dal';
 import { InvestQuoteSyncService } from '../../../src/core/invest/InvestQuoteSyncService';
 import { fetchB3Quotes } from '../../../src/core/invest/B3QuoteProvider';
 import { fetchOpcoesNetOptionQuotes } from '../../../src/core/invest/opcoesNetQuotes';
+import { fetchTesouroDiretoQuotes } from '../../../src/core/invest/TesouroDiretoQuoteProvider';
 import {
   InMemoryGateway,
   castGateway,
@@ -13,6 +14,10 @@ jest.mock('../../../src/core/invest/B3QuoteProvider', () => ({
 
 jest.mock('../../../src/core/invest/opcoesNetQuotes', () => ({
   fetchOpcoesNetOptionQuotes: jest.fn(),
+}));
+
+jest.mock('../../../src/core/invest/TesouroDiretoQuoteProvider', () => ({
+  fetchTesouroDiretoQuotes: jest.fn(),
 }));
 
 const ctx: UserContext = {
@@ -71,6 +76,7 @@ describe('InvestQuoteSyncService catalog routing', () => {
   beforeEach(() => {
     jest.mocked(fetchB3Quotes).mockReset();
     jest.mocked(fetchOpcoesNetOptionQuotes).mockReset();
+    jest.mocked(fetchTesouroDiretoQuotes).mockReset();
   });
 
   it('routes quote targets by module_categories instead of stock/fii hardcode', async () => {
@@ -90,6 +96,16 @@ describe('InvestQuoteSyncService catalog routing', () => {
     jest.mocked(fetchOpcoesNetOptionQuotes).mockResolvedValue([
       { ticker: 'ITUBF420', price: 0.42, asOf: '2026-06-05' },
     ]);
+    jest.mocked(fetchTesouroDiretoQuotes).mockResolvedValue([
+      {
+        ticker: 'LFT-20310301',
+        price: 1_002_500.12,
+        asOf: '2026-06-05',
+        source: 'computed_cdi',
+        kind: 'tesouro_estimated_lft',
+        provider: 'lftVnaEstimator:2026-01-01',
+      },
+    ]);
 
     const report = await new InvestQuoteSyncService(castGateway(gw)).syncFromBrapi(
       ctx,
@@ -104,12 +120,20 @@ describe('InvestQuoteSyncService catalog routing', () => {
       ['ITUBF420'],
       { asOfDate: '2026-06-05' }
     );
+    expect(fetchTesouroDiretoQuotes).toHaveBeenCalledWith(
+      ['LFT-20310301'],
+      { asOfDate: '2026-06-05' }
+    );
     expect(report.requested).toBe(4);
-    expect(report.missing).toEqual(['LFT-20310301:tesouro_direto']);
+    expect(report.missing).toEqual([]);
     expect(gw.dump('market_quotes_daily').map((r) => r.ticker).sort()).toEqual([
       'BOVA11',
       'ITUB4',
       'ITUBF420',
+      'LFT-20310301',
     ]);
+    const lftQuote = gw.dump('market_quotes_daily').find((r) => r.ticker === 'LFT-20310301');
+    expect(lftQuote?.closing_price).toBe(1_002_500.12);
+    expect(lftQuote?.source).toBe('computed_cdi');
   });
 });
