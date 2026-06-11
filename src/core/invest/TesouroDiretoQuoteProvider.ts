@@ -29,6 +29,14 @@ type TesouroCsvRow = {
   price: number;
 };
 
+type TesouroTitleFamily = 'SELIC' | 'IPCA' | 'PREFIXADO';
+
+type ParsedTesouroTicker = {
+  normalized: string;
+  maturity: string;
+  family: TesouroTitleFamily;
+};
+
 type CkanSearchResponse = {
   result?: {
     results?: Array<{
@@ -49,6 +57,15 @@ const CKAN_PACKAGE_SEARCH_URL =
 const DEFAULT_LFT_REF_DATE = '2026-01-01';
 const DEFAULT_LFT_REF_VNA = 1_000_341.65;
 const DEFAULT_LFT_SELIC_ANUAL = 0.1475;
+const PRICE_HEADER_CANDIDATES = [
+  'PU Base Manha',
+  'PU Venda Manha',
+  'PU Compra Manha',
+  'Preco Unitario Venda',
+  'Preco Unitario Compra',
+  'Valor Base',
+  'PU',
+];
 
 function cleanTicker(ticker: string): string {
   return ticker.trim().toUpperCase();
@@ -116,16 +133,7 @@ function headerIndex(headers: string[], candidates: string[]): number {
 }
 
 function preferredPrice(row: string[], headers: string[]): number | null {
-  const candidates = [
-    'PU Base Manha',
-    'PU Venda Manha',
-    'PU Compra Manha',
-    'Preco Unitario Venda',
-    'Preco Unitario Compra',
-    'Valor Base',
-    'PU',
-  ];
-  for (const candidate of candidates) {
+  for (const candidate of PRICE_HEADER_CANDIDATES) {
     const idx = headerIndex(headers, [candidate]);
     const price = idx >= 0 ? parsePtBrNumber(row[idx]) : null;
     if (price) return Math.round(price * 100) / 100;
@@ -161,31 +169,54 @@ export function parseTesouroDiretoCsv(csv: string): TesouroCsvRow[] {
   return rows;
 }
 
-function parseTicker(ticker: string): { normalized: string; maturity: string; titleFamily: string } | null {
+function dateFromCompact(parts: RegExpMatchArray): string {
+  return `${parts[1]}-${parts[2]}-${parts[3]}`;
+}
+
+function parseTicker(ticker: string): ParsedTesouroTicker | null {
   const normalized = cleanTicker(ticker);
   const lft = normalized.match(/^LFT-(\d{4})(\d{2})(\d{2})$/);
   if (lft) {
-    return { normalized, maturity: `${lft[1]}-${lft[2]}-${lft[3]}`, titleFamily: 'SELIC' };
+    return { normalized, maturity: dateFromCompact(lft), family: 'SELIC' };
+  }
+  const ntnb = normalized.match(/^NTN-?B-(\d{4})(\d{2})(\d{2})$/);
+  if (ntnb) {
+    return { normalized, maturity: dateFromCompact(ntnb), family: 'IPCA' };
+  }
+  const ltn = normalized.match(/^LTN-(\d{4})(\d{2})(\d{2})$/);
+  if (ltn) {
+    return { normalized, maturity: dateFromCompact(ltn), family: 'PREFIXADO' };
   }
   const withYear = normalized.match(/^TESOURO-([A-Z]+)-(\d{4})$/);
   if (withYear) {
-    return { normalized, maturity: withYear[2]!, titleFamily: withYear[1]! };
+    const family = familyFromAlias(withYear[1]!);
+    if (!family) return null;
+    return { normalized, maturity: withYear[2]!, family };
   }
   return null;
 }
 
-function rowMatchesTicker(row: TesouroCsvRow, parsed: NonNullable<ReturnType<typeof parseTicker>>): boolean {
+function familyFromAlias(alias: string): TesouroTitleFamily | null {
+  const normalized = normalizeText(alias);
+  if (normalized === 'SELIC' || normalized === 'LFT') return 'SELIC';
+  if (normalized === 'IPCA' || normalized === 'NTNB' || normalized === 'NTN B') return 'IPCA';
+  if (normalized === 'PREFIXADO' || normalized === 'PRE' || normalized === 'LTN') return 'PREFIXADO';
+  return null;
+}
+
+function rowMatchesFamily(title: string, family: TesouroTitleFamily): boolean {
+  if (family === 'SELIC') return title.includes('SELIC') || title.includes('LFT');
+  if (family === 'IPCA') return title.includes('IPCA') || title.includes('NTN B');
+  return title.includes('PREFIXADO') || title.includes('LTN') || title.includes('NTN F');
+}
+
+function rowMatchesMaturity(rowMaturity: string, tickerMaturity: string): boolean {
+  return rowMaturity === tickerMaturity || rowMaturity.startsWith(`${tickerMaturity}-`);
+}
+
+function rowMatchesTicker(row: TesouroCsvRow, parsed: ParsedTesouroTicker): boolean {
   const title = normalizeText(row.tipoTitulo);
-  if (parsed.titleFamily === 'SELIC') {
-    if (!title.includes('SELIC') && !title.includes('LFT')) return false;
-  } else if (parsed.titleFamily === 'IPCA') {
-    if (!title.includes('IPCA') && !title.includes('NTN B')) return false;
-  } else if (parsed.titleFamily === 'PREFIXADO' || parsed.titleFamily === 'PRE') {
-    if (!title.includes('PREFIXADO') && !title.includes('LTN') && !title.includes('NTN F')) return false;
-  } else {
-    return false;
-  }
-  return row.vencimento === parsed.maturity || row.vencimento.startsWith(`${parsed.maturity}-`);
+  return rowMatchesFamily(title, parsed.family) && rowMatchesMaturity(row.vencimento, parsed.maturity);
 }
 
 function configuredCsvUrls(options: FetchTesouroDiretoQuotesOptions): string[] {
@@ -217,10 +248,10 @@ async function discoverCsvUrls(fetchImpl: typeof fetch): Promise<string[]> {
 
 async function loadHistoricalRows(options: FetchTesouroDiretoQuotesOptions): Promise<TesouroCsvRow[]> {
   const fetchImpl = options.fetchImpl || fetch;
-  const urls = configuredCsvUrls(options);
+  let urls = configuredCsvUrls(options);
   if (!urls.length) {
     try {
-      urls.push(...(await discoverCsvUrls(fetchImpl)));
+      urls = await discoverCsvUrls(fetchImpl);
     } catch {
       return [];
     }
@@ -248,7 +279,7 @@ function estimateLftQuote(
   options: FetchTesouroDiretoQuotesOptions
 ): TesouroDiretoQuote | null {
   const parsed = parseTicker(ticker);
-  if (!parsed || parsed.titleFamily !== 'SELIC') return null;
+  if (!parsed || parsed.family !== 'SELIC') return null;
   const refDate = (options.lftRefDate || process.env.TESOURO_LFT_REF_DATE || DEFAULT_LFT_REF_DATE).slice(0, 10);
   const refVna = Number(options.lftRefVna ?? process.env.TESOURO_LFT_REF_VNA ?? DEFAULT_LFT_REF_VNA);
   const selicAnual = Number(

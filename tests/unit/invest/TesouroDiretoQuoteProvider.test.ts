@@ -81,6 +81,41 @@ describe('TesouroDiretoQuoteProvider', () => {
     expect(quotes).toEqual([]);
   });
 
+  it('usa historico para NTN-B/IPCA+ e prefixados quando o CSV traz o preco', async () => {
+    const csv = [
+      'Tipo Titulo;Data Vencimento;Data Base;PU Base Manha',
+      'Tesouro IPCA+;15/08/2045;05/06/2026;4220,33',
+      'Tesouro Prefixado;01/01/2029;05/06/2026;780,42',
+    ].join('\n');
+    const fetchImpl = jest.fn().mockResolvedValue(textResponse(csv));
+
+    const quotes = await fetchTesouroDiretoQuotes(['NTNB-20450815', 'LTN-20290101'], {
+      asOfDate: '2026-06-05',
+      historicalCsvUrls: ['https://example.test/tesouro.csv'],
+      fetchImpl,
+      fallbackLft: false,
+    });
+
+    expect(quotes).toEqual([
+      {
+        ticker: 'NTNB-20450815',
+        price: 4220.33,
+        asOf: '2026-06-05',
+        source: 'tesouro_direto',
+        kind: 'tesouro_close',
+        provider: 'tesouro_transparente_csv',
+      },
+      {
+        ticker: 'LTN-20290101',
+        price: 780.42,
+        asOf: '2026-06-05',
+        source: 'tesouro_direto',
+        kind: 'tesouro_close',
+        provider: 'tesouro_transparente_csv',
+      },
+    ]);
+  });
+
   it('parseia cabecalhos comuns do Tesouro Transparente', () => {
     const rows = parseTesouroDiretoCsv(
       [
