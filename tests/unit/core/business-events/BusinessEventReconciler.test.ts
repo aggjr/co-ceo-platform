@@ -114,7 +114,7 @@ describe('BusinessEventReconciler', () => {
     expect(report.consistent).toBe(true);
   });
 
-  it('opening_balance (total_net=0) eh consistent quando tem pelo menos 1 perna', async () => {
+  it('opening_balance (total_net=0) exige duas pernas de carteira para ser completo', async () => {
     const { gw, reg, rec } = makeTriple();
     const ev = await reg.create(ctx, {
       sourceModule: 'INVEST',
@@ -131,9 +131,71 @@ describe('BusinessEventReconciler', () => {
       transaction_date: '2026-01-01',
       movement_type: 'opening_balance',
     });
+    await gw.insert(ctx, 'patrimony_ledger_entries', {
+      id: 'p2',
+      patrimony_item_id: 'item-prio4',
+      business_event_id: ev.id,
+      transaction_date: '2026-01-01',
+      movement_type: 'opening_balance',
+    });
+    const report = await rec.reconcileEvent(ctx, ev.id);
+    expect(report.consistent).toBe(true);
+    expect(report.patrimonyLegCount).toBe(2);
+  });
+
+  it('header com uma unica perna eh incompleto mesmo quando total_net bate', async () => {
+    const { gw, reg, rec } = makeTriple();
+    const ev = await reg.create(ctx, {
+      sourceModule: 'INVEST',
+      eventKind: 'opening_balance',
+      occurredOn: '2026-01-01',
+      sourceRef: 'OPENING:2026-01-01:ONE',
+      sourceSystem: 'bootstrap',
+      totalNet: 0,
+    });
+    await gw.insert(ctx, 'patrimony_ledger_entries', {
+      id: 'p1',
+      patrimony_item_id: 'item-prio3',
+      business_event_id: ev.id,
+      transaction_date: '2026-01-01',
+      movement_type: 'opening_balance',
+    });
+    const report = await rec.reconcileEvent(ctx, ev.id);
+    expect(report.consistent).toBe(false);
+    expect(report.patrimonyLegCount).toBe(1);
+    expect(report.issues.some((i) => /composicao incompleta/i.test(i))).toBe(true);
+  });
+
+  it('header com carteira e financeiro eh composicao completa', async () => {
+    const { gw, reg, rec } = makeTriple();
+    const ev = await reg.create(ctx, {
+      sourceModule: 'INVEST',
+      eventKind: 'broker_note_spot',
+      occurredOn: '2026-04-17',
+      sourceRef: 'NOTA-COMPLETE',
+      sourceSystem: 'parser',
+      totalNet: -1000,
+    });
+    await gw.insert(ctx, 'patrimony_ledger_entries', {
+      id: 'p1',
+      patrimony_item_id: 'item-asset',
+      business_event_id: ev.id,
+      transaction_date: '2026-04-17',
+      movement_type: 'buy',
+    });
+    await gw.insert(ctx, 'financial_ledger_entries', {
+      id: 'f1',
+      account_id: 'acc-1',
+      business_event_id: ev.id,
+      transaction_date: '2026-04-22',
+      direction: 'out',
+      amount: 1000,
+      status: 'cleared',
+    });
     const report = await rec.reconcileEvent(ctx, ev.id);
     expect(report.consistent).toBe(true);
     expect(report.patrimonyLegCount).toBe(1);
+    expect(report.financialLegCount).toBe(1);
   });
 
   it('header sem pernas eh inconsistente', async () => {

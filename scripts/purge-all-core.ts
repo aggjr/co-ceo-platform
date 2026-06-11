@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
+import { StorageMeter } from '../src/core/dal/StorageMeter';
 
 dotenv.config();
 
@@ -94,6 +95,9 @@ async function main() {
         console.log(`${table} removidos:`, r.affectedRows);
       } catch (e) { }
     }
+
+    const storage = await StorageMeter.recalculateOrganizationUsage(conn, ORG);
+    console.log(`Hodometro recalculado: ${storage.previousBytes} -> ${storage.recalculatedBytes} bytes.`);
 
     await conn.commit();
     console.log(`\nPurge concluído.`);

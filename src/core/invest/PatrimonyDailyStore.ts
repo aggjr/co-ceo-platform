@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import pool from '../../config/database';
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
+import { StorageMeter } from '../dal/StorageMeter';
 import { isMissingSchemaError } from '../dal/mysqlErrors';
 import type { DailyPatrimonyPoint } from './PatrimonyDailyEngine';
 import type { PositionDailySnapshot } from './PatrimonyMtmDailyEngine';
@@ -170,6 +171,7 @@ export class PatrimonyDailyStore {
         `DELETE FROM invest_daily_snapshots WHERE organization_id = ? AND snapshot_date >= ?`,
         [ctx.organizationId, fromDate]
       );
+      await StorageMeter.recalculateOrganizationUsage(pool, ctx.organizationId);
     } catch (err) {
       console.error('Falha ao invalidar patrimônio diário retroativo:', err);
     }

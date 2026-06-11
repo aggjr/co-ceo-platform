@@ -192,6 +192,7 @@ export function buildStockBenchmarkForChart(
   let lastPrice = basePrice;
   const series: BenchmarkChartPoint[] = alignDates.map((rawDate) => {
     const date = rawDate.slice(0, 10);
+    const previousPrice = lastPrice;
     let price = byDate.get(date);
     if (price == null) {
       for (let i = sortedDates.length - 1; i >= 0; i--) {
@@ -201,6 +202,7 @@ export function buildStockBenchmarkForChart(
         }
       }
     }
+    const observedPrice = price != null && byDate.has(date);
     if (price != null && price > 0) lastPrice = price;
     const level = (lastPrice / basePrice) * 100;
     const rounded = Math.round(level * 1_000_000) / 1_000_000;
@@ -208,7 +210,7 @@ export function buildStockBenchmarkForChart(
       date,
       indexedLevel: rounded,
       periodReturnToDate: Math.round((rounded / 100 - 1) * 1_000_000) / 1_000_000,
-      dailyFactor: price != null && byDate.has(date) ? price / lastPrice : null,
+      dailyFactor: observedPrice && previousPrice > 0 ? lastPrice / previousPrice : null,
     };
   });
 

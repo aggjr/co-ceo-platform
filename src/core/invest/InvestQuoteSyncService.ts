@@ -14,6 +14,7 @@ import {
   fetchExternalStockHistory,
   fetchExternalStockQuoteForDate,
 } from '../market/ExternalStockQuoteProvider';
+import { fetchTesouroDiretoQuotes } from './TesouroDiretoQuoteProvider';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 import { ModuleCategories } from '../module-registry';
 import { FxRateRepository } from '../market/FxRateRepository';
@@ -158,6 +159,17 @@ export class InvestQuoteSyncService {
         asOf: q.asOf,
         source: 'opcoes_net',
         kind: 'option_last',
+      }));
+    }
+    if (source === 'tesouro_direto') {
+      const tesouroQuotes = await fetchTesouroDiretoQuotes(tickers, { asOfDate });
+      return tesouroQuotes.map((q) => ({
+        ticker: q.ticker,
+        price: q.price,
+        asOf: q.asOf,
+        source: q.source,
+        kind: q.kind,
+        provider: q.provider,
       }));
     }
     if (source === 'yahoo_finance') {

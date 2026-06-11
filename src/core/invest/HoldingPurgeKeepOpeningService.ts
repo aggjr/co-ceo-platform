@@ -47,7 +47,7 @@ export type HoldingPurgeResult = HoldingPurgePreview & {
   financialLegsRemoved: number;
   businessEventsRemoved: number;
   storageBytesBefore: number;
-  storageBytesAfter: 0;
+  storageBytesAfter: number;
   activityLog: ReconcileActivityStep[];
   reconcileCustody: unknown;
 };
@@ -132,10 +132,10 @@ export class HoldingPurgeKeepOpeningService {
         preview.openingEventIds,
         log
       );
-      const storageReset = await StorageMeter.resetOrganizationUsage(conn, orgId);
+      const storageRecalc = await StorageMeter.recalculateOrganizationUsage(conn, orgId);
       await conn.commit();
       log(
-        `Purge concluído — storage ${storageReset.previousBytes} → 0 bytes`,
+        `Purge concluído — storage ${storageRecalc.previousBytes} → ${storageRecalc.recalculatedBytes} bytes`,
         'purge.done',
         'ok'
       );
@@ -147,8 +147,8 @@ export class HoldingPurgeKeepOpeningService {
         ...preview,
         executed: true,
         ...executed,
-        storageBytesBefore: storageReset.previousBytes,
-        storageBytesAfter: 0,
+        storageBytesBefore: storageRecalc.previousBytes,
+        storageBytesAfter: storageRecalc.recalculatedBytes,
         activityLog,
         reconcileCustody,
       };

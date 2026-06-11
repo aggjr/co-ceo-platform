@@ -3,6 +3,7 @@
  * Cruza perna patrimonial (qty × preço = valor nominal) com perna de caixa
  * (metadata.fees / b3_fees) pelo mesmo broker_note_ref.
  */
+import { inferUnderlyingTicker } from './assetClassifier';
 import type { LedgerEvent } from './CustodyEngine';
 
 export type BrokerageNoteReviewRow = {
@@ -28,6 +29,7 @@ export type BrokerageNoteReviewRow = {
   marketType: string;
   operationLabel: string;
   maturity: string | null;
+  strikePrice: number | null;
   ticker: string;
   underlyingStock: string;
   isExercise: boolean;
@@ -245,9 +247,10 @@ export function buildBrokerageNoteReviewRows(
       sideLabel: side === 'C' ? 'Compra' : side === 'V' ? 'Venda' : '—',
       marketType: isExercise ? 'EXERCÍCIO' : category === 'OPTIONS' ? 'OPÇÕES' : 'VISTA',
       operationLabel: isExercise ? 'Exercício' : side === 'C' ? 'Compra' : 'Venda',
-      maturity: null,
+      maturity: isoDateToBr((e.metadata?.option_expiration as string | undefined) || ''),
+      strikePrice: (e.metadata?.option_strike as number | undefined) || null,
       ticker: e.asset_ticker,
-      underlyingStock: e.underlying_ticker || e.asset_ticker,
+      underlyingStock: inferUnderlyingTicker(e.asset_ticker, e.underlying_ticker ?? undefined),
       isExercise,
       specification: '',
       quantity: Math.abs(e.quantity),

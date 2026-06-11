@@ -90,12 +90,18 @@ button:active {
   background: rgba(0, 0, 0, 0.25);
   color: var(--color-text);
   font-family: var(--font);
+  color-scheme: dark;
 }
 
 .field input:focus,
 .field select:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+
+input[type="date"] {
+  color-scheme: dark;
+  color: var(--color-text);
 }
 
 /* Layout do shell: ver cockpit-shell.css (importado em Shell.tsx) */

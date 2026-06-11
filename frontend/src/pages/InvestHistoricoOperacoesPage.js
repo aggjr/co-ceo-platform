@@ -18,7 +18,7 @@ function makeCostRender(key) {
   return (row) => {
     const v = Number(row[key]);
     const span = document.createElement('span');
-    if (!v || !Number.isFinite(v)) {
+    if (!v || !Number.isFinite(v) || Math.abs(v) < 0.01) {
       span.className = 'muted';
       span.textContent = '—';
       return span;
@@ -65,16 +65,31 @@ function buildColumns(t, manifest) {
       type: 'currency',
       cellClass: () => 'notes-contract-value',
     },
-    { key: 'quantity', label: t['column.invest.historico_operacoes.quantity'] || 'Qtd', type: 'number' },
+    {
+      key: 'quantity',
+      label: t['column.invest.historico_operacoes.quantity'] || 'Qtd',
+      type: 'number',
+      render: (row) => {
+        const v = Number(row.quantity);
+        const span = document.createElement('span');
+        span.textContent = !v || !Number.isFinite(v) ? '0' : v.toLocaleString('pt-BR');
+        return span;
+      }
+    },
     { key: 'maturity', label: t['column.invest.historico_operacoes.maturity'] || 'Data Strike', type: 'text' },
+    { key: 'strikePrice', label: t['column.invest.historico_operacoes.strike_price'] || 'Valor Strike', type: 'currency' },
     { key: 'noteNumber', label: t['column.invest.historico_operacoes.note_number'] || 'Nr. nota', type: 'text' },
     { key: 'category', label: t['column.invest.historico_operacoes.category'] || 'Mercado', type: 'text' },
-    { key: 'lineNo', label: 'Linha', type: 'number' },
     {
       key: 'netOperations',
       label: 'Líq. nota (caixa)',
       type: 'currency',
-      cellClass: () => 'notes-note-net',
+      cellClass: (row) => {
+        const val = Number(row.netOperations) || 0;
+        if (val > 0) return 'notes-note-net notes-net--positive';
+        if (val < 0) return 'notes-note-net notes-net--negative';
+        return 'notes-note-net';
+      },
     },
     { key: 'dc', label: 'D/C', type: 'text' },
     { key: 'sourceFile', label: 'Arquivo', type: 'text' },

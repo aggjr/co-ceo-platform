@@ -5,7 +5,7 @@ import {
 } from './assetClassifier';
 import type { AssetCustodyState } from './CustodyEngine';
 import type { LedgerEvent } from './CustodyEngine';
-import { inferOptionMonthFromTicker } from './optionExpiry';
+import { inferOptionMonthFromTicker, inferOptionExpiryDate, localTodayIso } from './optionExpiry';
 
 export { inferOptionMonthFromTicker };
 
@@ -62,13 +62,24 @@ export function resolveCoverageUnderlying(
   return inferUnderlyingTicker(t);
 }
 
-/** Soma CALLs vendidas (unidades) por ação objeto. */
+/** Soma CALLs vendidas (unidades) por ação objeto, limitando para próximos 30 dias. */
 export function buildShortCallsSoldByUnderlying(
   options: CallCoverageOptionRow[] | null | undefined
 ): Map<string, number> {
   const map = new Map<string, number>();
+  
+  const now = new Date();
+  const todayIso = localTodayIso(now);
+  now.setDate(now.getDate() + 30);
+  const limit30Iso = localTodayIso(now);
+  const currentYear = now.getFullYear();
+
   for (const opt of options || []) {
     if (!isShortCallPosition(opt)) continue;
+
+    const exp = inferOptionExpiryDate(opt.ticker || '', currentYear);
+    if (exp < todayIso || exp > limit30Iso) continue;
+
     const u = resolveCoverageUnderlying(opt.ticker || '', opt.underlying);
     if (!u) continue;
     const units = optionQtyAbs(opt.quantity);
