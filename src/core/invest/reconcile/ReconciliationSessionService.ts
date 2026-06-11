@@ -5,8 +5,8 @@ import { LedgerImportService } from '../LedgerImportService';
 import { PatrimonyDailyRecorder } from '../PatrimonyDailyRecorder';
 import { PatrimonyDailyStore } from '../PatrimonyDailyStore';
 import { PatrimonyDailyRebuildService } from '../PatrimonyDailyRebuildService';
-import type { BtgUploadFileInput } from '../btgUploadImportService';
-import { previewBtgBrokerageUpload } from '../btgUploadImportService';
+import type { BtgUploadFileInput, BtgExtractBatchPreview } from '../btgUploadImportService';
+import { previewBtgBrokerageUpload, previewBtgExtractBatchUpload } from '../btgUploadImportService';
 import { buildBrokerageNoteReviewRows } from '../brokerageNotesReviewFromLedger';
 import { resolveInvestPeriodBounds } from '../investPeriodBounds';
 import { InvestBookPeriodService } from '../InvestBookPeriodService';
@@ -64,9 +64,27 @@ type SessionRuntime = {
   noteLinesByDate: Record<string, NoteFilePreviewRow[]>;
   linesByRowKey: Map<string, LedgerImportLine>;
   resolvedByDay: Map<string, Map<string, ReconcileAction>>;
+  extractBatchPreview?: BtgExtractBatchPreview | null;
 };
 
 const runtimeBySession = new Map<string, SessionRuntime>();
+
+function buildExtractCalendar(fileResults: BtgExtractBatchPreview['fileResults']): string[] {
+  const dates = new Set<string>();
+  for (const f of fileResults) {
+    if (!f.parseOk || !f.preview?.firstDate || !f.preview?.lastDate) continue;
+    let d = f.preview.firstDate.slice(0, 10);
+    const end = f.preview.lastDate.slice(0, 10);
+    while (d <= end) {
+      const dow = new Date(`${d}T12:00:00Z`).getUTCDay();
+      if (dow !== 0 && dow !== 6) dates.add(d);
+      const next = new Date(`${d}T12:00:00Z`);
+      next.setUTCDate(next.getUTCDate() + 1);
+      d = next.toISOString().slice(0, 10);
+    }
+  }
+  return Array.from(dates).sort();
+}
 
 function ledgerRowKey(e: LedgerEvent): string {
   return e.id ? `pat:${e.id}` : `pat:${e.asset_ticker}:${e.transaction_date}`;
@@ -200,11 +218,56 @@ export class ReconciliationSessionService {
     }
 
     if (input.phase === 'cash') {
-      throw new GatewayError(
-        'INVALID_PAYLOAD',
-        'Fase de caixa via sessao legada desativada. Use a Opcao C ou a importacao batch de extratos, que processam LIQ BOLSA e caixa em transito.',
-        400
+      const completedRows = await this.gateway.findWhere(
+        ctx,
+        'invest_reconciliation_sessions',
+        { status: 'notes_complete' },
+        { limit: 1 }
       );
+      if (!completedRows.length) {
+        throw new GatewayError(
+          'CASH_PHASE_BLOCKED',
+          'Fase 2 bloqueada: complete as notas antes de iniciar o extrato.',
+          403
+        );
+      }
+      if (!input.files?.length) {
+        throw new GatewayError('INVALID_PAYLOAD', 'Envie ao menos um arquivo de extrato.', 400);
+      }
+      const extractPreview = await previewBtgExtractBatchUpload(ctx, this.ledger, input.files);
+      const calendar = buildExtractCalendar(extractPreview.fileResults);
+      const session = await this.store.createSession(ctx, {
+        phase: 'cash',
+        fileIndex: { filesCount: input.files.length, calendar },
+      });
+      runtimeBySession.set(session.id, {
+        phase: 'cash',
+        files: input.files,
+        calendar,
+        noteLinesByDate: {},
+        linesByRowKey: new Map(),
+        resolvedByDay: new Map(),
+        extractBatchPreview: extractPreview,
+      });
+      const baselineAudit = await this.audit.run(ctx);
+      return {
+        sessionId: session.id,
+        calendar,
+        baselineAudit,
+        session,
+        activityLog: [],
+        fileResults: extractPreview.fileResults,
+        schemaApplied: false,
+        importProgress: {
+          filesTotal: input.files.length,
+          filesProcessed: extractPreview.filesOk,
+          filesFailed: input.files.length - extractPreview.filesOk,
+          percent:
+            input.files.length > 0
+              ? Math.round((100 * extractPreview.filesOk) / input.files.length)
+              : 0,
+        },
+      };
     }
     if (input.phase === 'notes' && (!input.files?.length)) {
       throw new GatewayError('INVALID_PAYLOAD', 'Envie ao menos um PDF de notas.', 400);
@@ -508,8 +571,67 @@ export class ReconciliationSessionService {
     };
   }
 
+  private async buildCashDayPreview(ctx: UserContext, sessionId: string, businessDate: string) {
+    const runtime = this.requireRuntime(sessionId);
+    const today = new Date().toISOString().slice(0, 10);
+    const events = await this.ledger.listLedgerEvents(ctx, businessDate, today);
+    const cashEntries = events.filter(
+      (e) => String(e.transaction_date).slice(0, 10) === businessDate && e.asset_type === 'cash'
+    );
+    const extractCoversDay = (runtime.extractBatchPreview?.fileResults ?? []).some((f) => {
+      if (!f.parseOk || !f.preview?.firstDate || !f.preview?.lastDate) return false;
+      return (
+        businessDate >= f.preview.firstDate.slice(0, 10) &&
+        businessDate <= f.preview.lastDate.slice(0, 10)
+      );
+    });
+    const rows: DayPreviewRow[] = [];
+    if (!extractCoversDay && cashEntries.length > 0) {
+      for (const e of cashEntries) {
+        rows.push({
+          rowKey: `fin:${e.id || businessDate}`,
+          status: 'ledger_only',
+          source: 'ledger',
+          ticker: 'CAIXA',
+          quantity: 1,
+          unitPrice: Math.abs(Number(e.total_net_value ?? 0)),
+          amount: Number(e.total_net_value),
+          ledgerEntryId: e.id,
+        });
+      }
+    } else if (extractCoversDay && cashEntries.length === 0) {
+      rows.push({
+        rowKey: `extract:${businessDate}`,
+        status: 'file_only',
+        source: 'file',
+        ticker: 'CAIXA',
+        quantity: 1,
+        unitPrice: 0,
+      });
+    } else if (extractCoversDay && cashEntries.length > 0) {
+      for (const e of cashEntries) {
+        rows.push({
+          rowKey: `fin:${e.id || businessDate}`,
+          status: 'matched',
+          source: 'ledger',
+          ticker: 'CAIXA',
+          quantity: 1,
+          unitPrice: Math.abs(Number(e.total_net_value ?? 0)),
+          ledgerEntryId: e.id,
+        });
+      }
+    }
+    const pendingDecisions = rows
+      .filter((r) => r.status !== 'matched' && !(r.status === 'skipped' && r.skipConfirmed))
+      .map(previewRowToDecision);
+    return { date: businessDate, rows, pendingDecisions };
+  }
+
   private async buildDayPreview(ctx: UserContext, sessionId: string, businessDate: string) {
     const runtime = this.requireRuntime(sessionId);
+    if (runtime.phase === 'cash') {
+      return this.buildCashDayPreview(ctx, sessionId, businessDate);
+    }
     const today = new Date().toISOString().slice(0, 10);
     const events = await this.ledger.listLedgerEvents(ctx, businessDate, today);
     const ledgerTrades = events.filter((e) => tradeOnDate(e, businessDate) && isPatrimonyTrade(e));
