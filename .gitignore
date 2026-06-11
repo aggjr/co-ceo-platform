@@ -13,6 +13,7 @@ data/**/*.pdf
 data/**/*.txt
 data/**/sources/
 frontend/public/data/
+Dados Obtidos do HomeBroker/
 dados importação/
 dados\ importação/
 dist/
@@ -27,6 +28,7 @@ config/easypanel-ambiente-FASE2-COLE-AQUI.txt
 config/easypanel-ambiente-COLE-AQUI.txt
 deploy-credentials.env
 .claude/settings.local.json
+.vscode/
 # Scripts locais com credenciais hardcoded — nunca versionar
 scripts/q.js
 scripts/branch-peer.local.env

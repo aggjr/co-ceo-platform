@@ -184,7 +184,7 @@ function parseBrMoney(raw: string): number {
 
 function extractOpeningBalance(lines: string[]): number | null {
   for (const line of lines) {
-    if (!/Saldo\s+Inicial/i.test(line)) continue;
+    if (!/Saldo\s+(Inicial|Anterior)/i.test(line)) continue;
     const m = line.match(BR_NUMBER);
     if (m) return parseBrMoney(m[1]!);
   }
