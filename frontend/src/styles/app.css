@@ -90,6 +90,7 @@ button:active {
   background: rgba(0, 0, 0, 0.25);
   color: var(--color-text);
   font-family: var(--font);
+  color-scheme: dark;
 }
 
 .field input:focus,
