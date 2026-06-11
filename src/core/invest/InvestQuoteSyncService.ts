@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
 import {
@@ -26,6 +27,11 @@ export type QuoteSyncQuote = {
   source: QuoteSource;
   kind: string;
   provider?: string;
+  /** Dados do contrato de opção (quando disponíveis via opcoes_net) */
+  strikePrice?: number | null;
+  expirationDate?: string | null;
+  optionType?: 'CALL' | 'PUT' | null;
+  underlyingTicker?: string | null;
 };
 
 export type QuoteSyncResult = {
@@ -157,8 +163,12 @@ export class InvestQuoteSyncService {
         ticker: q.ticker,
         price: q.price,
         asOf: q.asOf,
-        source: 'opcoes_net',
+        source: 'opcoes_net' as QuoteSource,
         kind: 'option_last',
+        strikePrice: q.strikePrice,
+        expirationDate: q.expirationDate,
+        optionType: q.optionType,
+        underlyingTicker: q.underlyingTicker,
       }));
     }
     if (source === 'tesouro_direto') {
@@ -251,6 +261,23 @@ export class InvestQuoteSyncService {
             ? { kind: q.kind, provider: q.provider, requested_source: source }
             : { kind: q.kind, requested_source: source },
         });
+        // Para opções: popular market_instruments com dados do contrato (strike, vencimento)
+        if (
+          source === 'opcoes_net' &&
+          q.strikePrice != null &&
+          q.expirationDate &&
+          q.optionType &&
+          q.underlyingTicker
+        ) {
+          await this.upsertOptionToMarketInstruments(
+            marketCtx,
+            q.ticker,
+            q.strikePrice,
+            q.expirationDate,
+            q.optionType,
+            q.underlyingTicker
+          ).catch((err) => console.warn('[syncFromBrapi] market_instruments upsert:', err));
+        }
         const ok = await this.writeQuoteToPositionExt(ctx, ticker, q.price, q.asOf);
         if (ok) updated += 1;
       }
@@ -374,7 +401,9 @@ export class InvestQuoteSyncService {
   }
 
   /**
-   * Grava cotacao em invest_position_ext.last_price. Retorna true se atualizou.
+   * Grava cotacao em invest_position_ext.last_price.
+   * Se o registro nao existe ainda, cria com dados minimos + last_price.
+   * Retorna true se gravou ou atualizou.
    */
   private async writeQuoteToPositionExt(
     ctx: UserContext,
@@ -395,16 +424,30 @@ export class InvestQuoteSyncService {
     );
     if (!item.length) return false;
     const itemId = String(item[0].id);
+    const asOfDay = asOf.slice(0, 10);
     const ext = await this.gateway.findWhere(
       ctx,
       'invest_position_ext',
       { patrimony_item_id: itemId },
       { limit: 1 }
     );
-    if (!ext.length) return false;
+    if (!ext.length) {
+      // Cria o registro de extensao com dados minimos + last_price
+      const assetClass = inferAssetType(ticker);
+      const underlying = inferUnderlyingTicker(ticker);
+      await this.gateway.insert(ctx, 'invest_position_ext', {
+        patrimony_item_id: itemId,
+        organization_id: ctx.organizationId,
+        asset_class: assetClass,
+        underlying_ticker: underlying ?? null,
+        last_price: lastPrice,
+        last_price_as_of: asOfDay,
+      });
+      return true;
+    }
     await this.gateway.update(ctx, 'invest_position_ext', itemId, {
       last_price: lastPrice,
-      last_price_as_of: asOf.slice(0, 10),
+      last_price_as_of: asOfDay,
     });
     return true;
   }
@@ -457,5 +500,39 @@ export class InvestQuoteSyncService {
       european_american: 'A',
     });
     return true;
+  }
+
+  /**
+   * Popula market_instruments com os dados do contrato de uma opção (strike, vencimento, tipo).
+   * Tabela global: sem organization_id. Usa authBootstrapContext passado como marketCtx.
+   */
+  private async upsertOptionToMarketInstruments(
+    marketCtx: UserContext,
+    ticker: string,
+    strikePrice: number,
+    expirationDate: string,
+    optionType: 'CALL' | 'PUT',
+    underlyingTicker: string
+  ): Promise<void> {
+    const instrumentType = optionType === 'CALL' ? 'option_call' : 'option_put';
+    const existing = await this.gateway.findWhere(
+      marketCtx,
+      'market_instruments',
+      { ticker },
+      { limit: 1, columns: ['ticker'] }
+    );
+    const payload = {
+      instrument_type: instrumentType,
+      underlying_ticker: underlyingTicker.trim().toUpperCase(),
+      maturity_date: expirationDate.slice(0, 10),
+      strike_price: Math.round(strikePrice * 10000) / 10000,
+      last_synced_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      metadata: JSON.stringify({ option_type: optionType, source: 'opcoes_net' }),
+    };
+    if (existing.length) {
+      await this.gateway.update(marketCtx, 'market_instruments', ticker, payload);
+    } else {
+      await this.gateway.insert(marketCtx, 'market_instruments', { ticker, ...payload });
+    }
   }
 }

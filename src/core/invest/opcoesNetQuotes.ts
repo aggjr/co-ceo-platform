@@ -6,6 +6,11 @@ export type OpcoesNetOptionQuote = {
   ticker: string;
   price: number;
   asOf: string;
+  /** Dados do contrato — disponíveis diretamente da grade opcoes.net */
+  strikePrice: number | null;
+  expirationDate: string | null;
+  optionType: 'CALL' | 'PUT' | null;
+  underlyingTicker: string | null;
 };
 
 /**
@@ -46,6 +51,10 @@ export async function fetchOpcoesNetOptionQuotes(
           ticker: row.ticker,
           price,
           asOf: row.quoteDate ?? fallbackAsOf,
+          strikePrice: row.strikePrice,
+          expirationDate: row.expirationDate,
+          optionType: row.optionType,
+          underlyingTicker: underlying,
         });
         found.add(row.ticker);
       }
