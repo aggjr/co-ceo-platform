@@ -194,11 +194,13 @@ export function filterByUnderlying(items, underlying) {
 
 export function formatBrl(value) {
   if (value == null || Number.isNaN(Number(value))) return '—';
+  if (Math.abs(Number(value)) < 0.01) return '—';
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 export function formatNumber(value, digits = 2) {
   if (value == null || Number.isNaN(Number(value))) return '—';
+  if (Math.abs(Number(value)) < 0.01) return '—';
   return Number(value).toLocaleString('pt-BR', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
@@ -208,8 +210,9 @@ export function formatNumber(value, digits = 2) {
 export function formatPct(value) {
   if (value == null || Number.isNaN(Number(value))) return '—';
   const n = Number(value);
-  const sign = n > 0 ? '+' : '';
-  return `${sign}${n.toFixed(2)}%`;
+  if (Math.abs(n) < 0.01) return '—';
+  const sign = n >= 0 ? '+' : '';
+  return `${sign}${n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 }
 
 export function assetTypeLabel(type) {

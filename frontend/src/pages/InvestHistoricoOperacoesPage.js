@@ -91,6 +91,7 @@ function buildColumns(t, manifest) {
         return 'notes-note-net';
       },
     },
+    { key: 'dc', label: 'D/C', type: 'text' },
     { key: 'sourceFile', label: 'Arquivo', type: 'text' },
   ];
 }

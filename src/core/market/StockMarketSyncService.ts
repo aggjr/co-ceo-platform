@@ -66,9 +66,8 @@ export class StockMarketSyncService {
         saved += 1;
       } catch {
         try {
-          const fallback = asOfDate
-            ? await fetchExternalStockQuoteForDate(ticker, asOfDate)
-            : null;
+          const fallbackDate = asOfDate || new Date().toISOString().slice(0, 10);
+          const fallback = await fetchExternalStockQuoteForDate(ticker, fallbackDate);
           if (!fallback) {
             missing.push(ticker);
             continue;

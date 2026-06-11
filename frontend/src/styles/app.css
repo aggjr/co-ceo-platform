@@ -99,6 +99,11 @@ button:active {
   border-color: var(--color-accent);
 }
 
+input[type="date"] {
+  color-scheme: dark;
+  color: var(--color-text);
+}
+
 /* Layout do shell: ver cockpit-shell.css (importado em Shell.tsx) */
 
 .badge {
