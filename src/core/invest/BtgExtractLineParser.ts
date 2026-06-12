@@ -28,7 +28,7 @@ function resolveBalanceAndMovementFromPrevious(
   previousBalance: number,
   a: number,
   b: number
-): { balance: number; movement: number } {
+): { balance: number; movement: number; signedMovement?: number } {
   const tol = 0.02;
   const near = (x: number, y: number) => Math.abs(x - y) <= tol;
   const fitA = near(Math.abs(previousBalance - a), Math.abs(b));
@@ -42,6 +42,10 @@ function resolveBalanceAndMovementFromPrevious(
     const hiRatio = hi / previousBalance;
     if (hiRatio > 0.999 || lo < 100) return { balance: hi, movement: Math.abs(lo) };
     return { balance: lo, movement: Math.abs(hi) };
+  }
+
+  if (Math.abs(b) > 0 && Math.abs(a) > 0 && Math.abs(b) <= Math.abs(a) * 0.01) {
+    return { balance: a, movement: Math.abs(b), signedMovement: b };
   }
 
   return { balance: hi, movement: Math.abs(lo) };
@@ -73,7 +77,7 @@ export function parseBtgMovementLine(
   let signedCash = movementAmount;
   if (previousBalance != null && !Number.isNaN(previousBalance)) {
     const delta = Math.round((balance - previousBalance) * 100) / 100;
-    signedCash = delta;
+    signedCash = resolved.signedMovement ?? delta;
     if (description.toUpperCase().includes('TED ENVIADA')) {
       signedCash = -Math.abs(movementAmount);
     }
