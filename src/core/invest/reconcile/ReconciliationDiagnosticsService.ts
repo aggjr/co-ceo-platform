@@ -743,6 +743,22 @@ export class ReconciliationDiagnosticsService {
         const value = Number(e.total_net_value ?? 0);
         if (txType === 'pending_settlement') {
           const rawRef = String(e.broker_note_ref || e.id || `${date}-${dayState?.transitDetails.length ?? 0}`);
+          if (!rawRef.startsWith(AUTO_D2_REF_PREFIX)) {
+            grossCash += value;
+            if (mode === 'movement' && dayState) {
+              const linkedToAsset = Boolean(
+                e.business_event_id && eventHasAsset.has(String(e.business_event_id))
+              );
+              if (linkedToAsset) {
+                dayState.assetMovementValue.value += value;
+                dayState.assetDetails.push(`${txType} ${ticker}: ${money(value)}`);
+              } else {
+                dayState.pureFinancialValue.value += value;
+                dayState.pureDetails.push(`${txType} ${ticker}: ${money(value)}`);
+              }
+            }
+            return;
+          }
           const baseRef = rawRef.endsWith(':CLEAR') ? rawRef.slice(0, -':CLEAR'.length) : rawRef;
           if (rawRef.endsWith(':CLEAR')) {
             pendingByRef.delete(baseRef);
