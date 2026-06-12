@@ -310,7 +310,7 @@ export async function previewBtgMonthImport(
     ctx,
     ledger,
     monthNorm,
-    notes.simulatedLedgerEvents || [],
+    notes.simulatedLedgerLines ? projectedCashFromExtractLines(notes.simulatedLedgerLines) : [],
     extractFile,
     baseLedger
   );
