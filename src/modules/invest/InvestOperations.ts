@@ -627,6 +627,37 @@ export class InvestOperations {
     return changed;
   }
 
+  private async repairExistingSkipFinancialFromImportLine(
+    ctx: UserContext,
+    line: LedgerImportLine,
+    ref: string
+  ): Promise<boolean> {
+    if (line.skip_financial_ledger !== true) return false;
+    const orgId = ctx.organizationId;
+    if (!orgId) return false;
+
+    const ic = this.installerCtx(orgId);
+    const patRows = await this.gateway.findWhere(
+      ic,
+      'patrimony_ledger_entries',
+      { external_ref: `BROKER_REF:${ref}` },
+      { limit: 1 }
+    );
+    const row = patRows[0];
+    if (!row) return false;
+    const meta = InvestOperations.parseRowMetadata(row.metadata);
+    if (meta.skip_financial_ledger === true || meta.skip_financial_ledger === 1) return false;
+    await this.gateway.update(ic, 'patrimony_ledger_entries', String(row.id), {
+      metadata: {
+        ...meta,
+        skip_financial_ledger: true,
+        skip_financial_repaired_from_import: true,
+        skip_financial_repaired_at: new Date().toISOString(),
+      },
+    });
+    return true;
+  }
+
   private async repairExistingTradeFromImportLine(
     ctx: UserContext,
     line: LedgerImportLine,
@@ -776,6 +807,7 @@ export class InvestOperations {
     const ref = line.broker_note_ref?.trim();
     if (ref && (await this.hasExistingByRef(ctx, ref))) {
       const repaired = await this.repairExistingTradeFromImportLine(ctx, line, ref);
+      const repairedSkipFinancial = await this.repairExistingSkipFinancialFromImportLine(ctx, line, ref);
       const enriched = await this.enrichExistingFromImportLine(
         ctx,
         {
@@ -797,7 +829,7 @@ export class InvestOperations {
       return {
         skipped: true,
         reason: `broker_note_ref ${ref} ja registrado`,
-        enriched: enriched || repaired,
+        enriched: enriched || repaired || repairedSkipFinancial,
         match: 'broker_note_ref',
       };
     }

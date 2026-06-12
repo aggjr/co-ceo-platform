@@ -119,9 +119,32 @@ export async function syncAutoPendingSettlements(
       }
     : null;
 
+  async function removeAutoPendingLegs(ref: string): Promise<number> {
+    if (!installerCtx) return 0;
+    let removed = 0;
+    for (const suffix of ['', ':CLEAR']) {
+      const rows = await gateway.findWhere(
+        installerCtx,
+        'financial_ledger_entries',
+        { external_ref: `BROKER_REF:${ref}${suffix}` },
+        { limit: 10 }
+      );
+      for (const row of rows) {
+        await gateway.update(installerCtx, 'financial_ledger_entries', String(row.id), {
+          deleted_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+          status: 'cancelled',
+        });
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
   for (const e of events) {
     if (!e.id) continue;
     if (e.skip_financial_ledger === true || e.skip_financial_ledger === 1) {
+      const removed = await removeAutoPendingLegs(autoD2Ref(e.id));
+      repaired += removed;
       skipped += 1;
       continue;
     }
