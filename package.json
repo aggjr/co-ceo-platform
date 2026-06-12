@@ -79,7 +79,7 @@
     "fix:duplicate-cash": "ts-node scripts/delete-manual-cash.ts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
