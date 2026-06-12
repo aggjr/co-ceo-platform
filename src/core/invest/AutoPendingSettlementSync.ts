@@ -106,6 +106,10 @@ export async function syncAutoPendingSettlements(
 
   for (const e of events) {
     if (!e.id) continue;
+    if (e.skip_financial_ledger === true || e.skip_financial_ledger === 1) {
+      skipped += 1;
+      continue;
+    }
     const settlement = await resolveAutoPendingSettlement(settlementRules, ctx, e);
     if (!settlement) continue;
 
