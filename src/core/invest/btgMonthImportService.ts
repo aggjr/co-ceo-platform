@@ -385,6 +385,7 @@ export async function applyBtgMonthImport(
   const notesApply = await applyBtgBrokerageUpload(ctx, ledger, noteFiles);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
     parseOptions: MONTH_IMPORT_EXTRACT_OPTS,
+    keepUnmatchedLiqBolsaAsCash: true,
   });
 
   const notesInserted = notesApply.totals.inserted;

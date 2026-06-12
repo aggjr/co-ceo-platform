@@ -247,13 +247,16 @@ function signedCashValue(line: LedgerImportLine): number {
 async function settleLiqBolsaEntries(
   ctx: UserContext,
   ledger: Pick<LedgerImportService, 'settleLiqBolsa'>,
-  entries: LedgerImportLine[]
+  entries: LedgerImportLine[],
+  options?: { keepUnmatchedAsCash?: boolean }
 ): Promise<{
   entries: LedgerImportLine[];
   matched: number;
+  keptAsCash: number;
   unresolved: Array<{ date: string; net: number; notes: string | undefined; reason: string }>;
 }> {
   let matched = 0;
+  let keptAsCash = 0;
   const unresolved: Array<{ date: string; net: number; notes: string | undefined; reason: string }> = [];
   const out: LedgerImportLine[] = [];
 
@@ -273,6 +276,11 @@ async function settleLiqBolsaEntries(
       matched += result.settledEvents.length;
       continue;
     }
+    if (options?.keepUnmatchedAsCash) {
+      keptAsCash += 1;
+      out.push(line);
+      continue;
+    }
     unresolved.push({
       date: line.date,
       net,
@@ -281,7 +289,7 @@ async function settleLiqBolsaEntries(
     });
   }
 
-  return { entries: out, matched, unresolved };
+  return { entries: out, matched, keptAsCash, unresolved };
 }
 
 function buildExtractPreview(
@@ -621,6 +629,7 @@ export async function applyBtgExtractUpload(
   file: BtgUploadFileInput,
   options?: { 
     parseOptions?: import('./BtgExtractLineParser').BtgExtractParseOptions;
+    keepUnmatchedLiqBolsaAsCash?: boolean;
     /** Deprecated: nao usar em fluxos novos; cadeia quebrada deve bloquear. */
     injectCashAdjustment?: number;
   }
@@ -657,9 +666,11 @@ export async function applyBtgExtractUpload(
     await ledger.reconcileCustody(ctx);
     const parseOptions = { includeLiqBolsa: true, ...(options?.parseOptions ?? {}) };
     let entries = await parseExtractUploadImportLines(file, parseOptions, openingBalance);
-    const liqBolsaSettlement = await settleLiqBolsaEntries(ctx, ledger, entries);
+    const liqBolsaSettlement = await settleLiqBolsaEntries(ctx, ledger, entries, {
+      keepUnmatchedAsCash: options?.keepUnmatchedLiqBolsaAsCash === true,
+    });
     entries = liqBolsaSettlement.entries;
-    if (liqBolsaSettlement.matched || liqBolsaSettlement.unresolved.length) {
+    if (liqBolsaSettlement.matched || liqBolsaSettlement.keptAsCash || liqBolsaSettlement.unresolved.length) {
       logReconcileEvent(
         liqBolsaSettlement.unresolved.length ? 'warn' : 'info',
         'btg-extract.liq-bolsa.business-events',
@@ -667,6 +678,7 @@ export async function applyBtgExtractUpload(
         {
           fileName: previewResult.fileName,
           matched: liqBolsaSettlement.matched,
+          keptAsCash: liqBolsaSettlement.keptAsCash,
           unresolved: liqBolsaSettlement.unresolved.length,
         }
       );
