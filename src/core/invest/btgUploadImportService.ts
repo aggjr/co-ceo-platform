@@ -606,6 +606,19 @@ export async function previewBtgExtractUpload(
   return parsed;
 }
 
+/**
+ * Linhas normalizadas do extrato e saldo inicial — usadas pelo buildMonthReconcileLedger
+ * para projetar o saldo via série de balanço em vez de entradas individuais classificadas.
+ */
+export async function getExtractNormalizedLines(file: BtgUploadFileInput): Promise<{
+  normalizedLines: string[];
+  openingBalance: number | null;
+}> {
+  const { raw, format } = await rawTextFromExtractUpload(file);
+  const lines = normalizeExtractLines(raw, format);
+  return { normalizedLines: lines, openingBalance: extractOpeningBalance(lines) };
+}
+
 /** Linhas do extrato prontas para import (mesma lógica do apply). */
 export async function parseExtractUploadImportLines(
   file: BtgUploadFileInput,

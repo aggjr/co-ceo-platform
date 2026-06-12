@@ -18,18 +18,18 @@ import {
 } from './btgBrokerageNoteParser';
 import { brokerageNotesToLedgerLines } from './btgBrokerageNoteLedgerTranslator';
 import { pdfBufferToLines } from './btgPdfTextExtract';
-import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
+import type { LedgerTransactionType } from './ledgerTypes';
 import { MAIN_CASH_TICKER } from './ledgerTypes';
 import { LedgerImportService } from './LedgerImportService';
-import { importLineExpectedCashNet } from './cashExtractDedup';
 import type { BtgExtractParseOptions } from './BtgExtractLineParser';
+import { extractMovementBlock, parseExtractCashSeries } from './btgExtractCashSeries';
 import {
   applyBtgBrokerageUpload,
   applyBtgExtractUpload,
   type BtgBrokerageImportPreview,
   type BtgExtractFileResult,
   type BtgUploadFileInput,
-  parseExtractUploadImportLines,
+  getExtractNormalizedLines,
   previewBtgBrokerageUpload,
   previewBtgExtractUpload,
 } from './btgUploadImportService';
@@ -140,37 +140,14 @@ export function stripBtgImportCashFromMonthForward(
   });
 }
 
-function projectedCashFromExtractLines(lines: LedgerImportLine[]): LedgerEvent[] {
-  const out: LedgerEvent[] = [];
-  for (const line of lines) {
-    // LIQ BOLSA (pending_settlement) é incluída: notas usam skip_financial_ledger=true,
-    // portanto o caixa de negócios vem exclusivamente do extrato via LIQ BOLSA.
-    // Não há dupla contagem porque nenhuma perna de caixa é criada pelas notas.
-    const net = importLineExpectedCashNet(line);
-    if (net == null || Math.abs(net) < 0.005) continue;
-    const d = String(line.date || '').slice(0, 10);
-    if (!d) continue;
-    out.push({
-      asset_id: `proj-ext-${line.broker_note_ref || d}`,
-      asset_ticker: MAIN_CASH_TICKER,
-      asset_type: 'cash',
-      transaction_type: line.operation as LedgerTransactionType,
-      transaction_date: d,
-      quantity: 1,
-      unit_price: net,
-      total_net_value: net,
-      broker_note_ref: line.broker_note_ref ? `${line.broker_note_ref}:CASH` : null,
-    });
-  }
-  return out;
-}
-
 /**
- * Livro para batimento do mês: remove caixa BTG do mês alvo em diante e simula o
- * extrato completo (incluindo LIQ BOLSA). Notas não contribuem com caixa porque
- * são importadas com skip_financial_ledger=true; todo o caixa vem do extrato.
- * Incluir LIQ BOLSA é essencial: liquidações D+2 do mês anterior que se liquidam
- * nos primeiros dias do mês corrente aparecem no extrato corrente, não no anterior.
+ * Livro para batimento do mês: remove caixa BTG do mês alvo em diante e projeta
+ * cada movimento do extrato usando a série de saldo bruta (parseExtractCashSeries).
+ *
+ * Usar a série de saldo em vez de entradas classificadas individualmente garante
+ * que entradas com descrição desconhecida (classificadas como 'skip') não criem
+ * discrepância na simulação — cada linha do extrato afeta o saldo projetado
+ * exatamente como afetaria o saldo real.
  */
 export async function buildMonthReconcileLedger(
   month: string,
@@ -181,11 +158,30 @@ export async function buildMonthReconcileLedger(
 
   if (extractFile?.contentBase64) {
     try {
-      const extractLines = await parseExtractUploadImportLines(
-        extractFile,
-        { includeLiqBolsa: true }
-      );
-      return [...stripped, ...projectedCashFromExtractLines(extractLines)];
+      const { normalizedLines, openingBalance } = await getExtractNormalizedLines(extractFile);
+      const block = extractMovementBlock(normalizedLines.join('\n'));
+      const series = parseExtractCashSeries(block, openingBalance ?? undefined);
+
+      let prevBalance = openingBalance ?? 0;
+      const projectedEvents: LedgerEvent[] = [];
+      for (let i = 0; i < series.length; i++) {
+        const point = series[i]!;
+        const signedCash = Math.round((point.balance - prevBalance) * 100) / 100;
+        prevBalance = point.balance;
+        if (Math.abs(signedCash) < 0.005) continue;
+        projectedEvents.push({
+          asset_id: `proj-ext-series-${point.date}-${i}`,
+          asset_ticker: MAIN_CASH_TICKER,
+          asset_type: 'cash',
+          transaction_type: 'cash_yield' as LedgerTransactionType,
+          transaction_date: point.date,
+          quantity: 1,
+          unit_price: signedCash,
+          total_net_value: signedCash,
+          broker_note_ref: `BTG-EXT-${point.date}#${String(i).padStart(3, '0')}`,
+        });
+      }
+      return [...stripped, ...projectedEvents];
     } catch {
       /* parse falha */
     }
