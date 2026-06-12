@@ -140,6 +140,10 @@ export function isFixedIncomeCategory(
     || type === 'fixed_income';
 }
 
+function isDefaultMarketPricedAssetType(assetType: string): boolean {
+  return ['stock', 'fii', 'etf', 'bdr'].includes(assetType.toLowerCase());
+}
+
 export function contributesToMarketPricedPatrimony(
   snapshot: AssetValuationSnapshot | undefined,
   assetType: string,
@@ -147,6 +151,7 @@ export function contributesToMarketPricedPatrimony(
 ): boolean {
   const type = assetType.toLowerCase();
   if (isCashCategory(type, ticker)) return false;
+  if (isDefaultMarketPricedAssetType(type)) return true;
   const category = categoryFor(snapshot, type);
   if (!category) {
     return !isOptionCategory(snapshot, type) && !isFixedIncomeCategory(snapshot, type);

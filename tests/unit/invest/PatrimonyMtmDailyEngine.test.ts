@@ -206,4 +206,37 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(r.series[0]?.patrimony).toBeCloseTo(5000, 0);
     expect(r.positionSnapshots?.[0]?.marketValue).toBeCloseTo(5000, 0);
   });
+
+  it('mantem acoes B3 no patrimonio mesmo com catalogo legado incompleto', () => {
+    const valuation = emptyAssetValuationSnapshot();
+    valuation.categories.set('stock', {
+      moduleCode: 'INVEST',
+      category: 'financial_asset',
+      subcategory: 'stock',
+      contributesToPatrimony: false,
+      requiresMarketQuote: false,
+      quoteSource: null,
+      valuationMode: 'historical_cost',
+      exchangeCode: null,
+      currencyCode: 'BRL',
+      settlementCounterpartyCode: null,
+      settlementContractTypeCode: null,
+      affectsPortfolio: true,
+      affectsFinancial: true,
+    });
+
+    const r = buildDailyPatrimonyMtmSeries(
+      [stockOpen(100, 40, '2026-04-17')],
+      '2026-04-17',
+      '2026-04-17',
+      {
+        fixedIncomeTotal: 0,
+        valuationContext: valuation,
+        quoteForDate: () => 41,
+      }
+    );
+
+    expect(r.series[0]?.positionsValue).toBeCloseTo(4100, 0);
+    expect(r.series[0]?.patrimony).toBeCloseTo(4100, 0);
+  });
 });
