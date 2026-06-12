@@ -4,19 +4,18 @@ import { isDuplicateManualOpeningCash } from './extractLedgerEnrichment';
 
 const CASH_TICKER_PREFIX = 'CAIXA';
 
-function isAutoPendingClear(e: LedgerEvent): boolean {
+function isAutoPending(e: LedgerEvent): boolean {
   const ref = String(e.broker_note_ref || '');
   return (
     String(e.transaction_type) === 'pending_settlement' &&
-    ref.startsWith(AUTO_D2_REF_PREFIX) &&
-    ref.endsWith(':CLEAR')
+    ref.startsWith(AUTO_D2_REF_PREFIX)
   );
 }
 
 /** Mesma regra do extrato BTG na UI: ignora abertura manual duplicada quando já há BTG-EXTRATO-OPENING. */
 export function cashLedgerEventsForBalance(
   entries: LedgerEvent[] | null | undefined,
-  options?: { includeAutoPendingClear?: boolean }
+  options?: { includeAutoPending?: boolean }
 ): LedgerEvent[] {
   const cashOnly = (entries || []).filter((e) =>
     isCashInvestTicker(String(e.asset_ticker || ''))
@@ -24,7 +23,7 @@ export function cashLedgerEventsForBalance(
   return cashOnly.filter(
     (e) =>
       !isDuplicateManualOpeningCash(e, cashOnly) &&
-      (options?.includeAutoPendingClear || !isAutoPendingClear(e))
+      (options?.includeAutoPending || !isAutoPending(e))
   );
 }
 
@@ -53,7 +52,7 @@ function sumOpenPendingOnCash(
 ): number {
   const byRef = new Map<string, number>();
 
-  for (const e of cashLedgerEventsForBalance(entries, { includeAutoPendingClear: true })) {
+  for (const e of cashLedgerEventsForBalance(entries, { includeAutoPending: true })) {
     if (String(e.transaction_type) !== 'pending_settlement') continue;
     const d = String(e.transaction_date || '').slice(0, 10);
     if (d && d > asOfDate) continue;
@@ -78,8 +77,7 @@ export function settledCashBalanceFromLedger(
   asOfDate?: string
 ): number {
   const asOf = (asOfDate || new Date().toISOString()).slice(0, 10);
-  const open = sumOpenPendingOnCash(entries, asOf);
-  return Math.round((cashBalanceFromLedger(entries, asOf) - open) * 100) / 100;
+  return cashBalanceFromLedger(entries, asOf);
 }
 
 /** Saldo para exibição = conta corrente liquidada. */
