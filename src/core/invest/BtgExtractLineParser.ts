@@ -153,8 +153,24 @@ export function classifyBtgDescription(
       notes: description,
     };
   }
+  if (d.includes('SALDO FINAL') && d.includes('RENDIMENTO PROVISIONADO')) {
+    return {
+      operation: 'cash_yield',
+      ticker: CASH_TICKER,
+      asset_type: 'cash',
+      notes: description,
+    };
+  }
 
   if (d.includes('TED ENVIADA')) {
+    return {
+      operation: 'capital_withdrawal',
+      ticker: CASH_TICKER,
+      asset_type: 'cash',
+      notes: description,
+    };
+  }
+  if (d.includes('BITO EM C/C VIA CIP')) {
     return {
       operation: 'capital_withdrawal',
       ticker: CASH_TICKER,
