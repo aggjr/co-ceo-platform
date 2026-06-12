@@ -8,6 +8,7 @@ const INVEST_OPERATION_POLICIES_TABLE = 'invest_operation_policies';
 const INVEST_CASH_ACCOUNT_POLICIES_TABLE = 'invest_cash_account_policies';
 const INVEST_BOOK_PERIODS_TABLE = 'invest_book_periods';
 const INVEST_RECONCILE_RUNS_TABLE = 'invest_reconcile_runs';
+const INVEST_POSITION_DAILY_TABLE = 'invest_position_daily';
 
 export type EnsureCoreSchemaResult = {
   marketMigrationApplied: boolean;
@@ -18,6 +19,7 @@ export type EnsureCoreSchemaResult = {
   investCashAccountPolicyMigrationApplied: boolean;
   investBookPeriodsMigrationApplied: boolean;
   investReconcileRunsMigrationApplied: boolean;
+  investPositionDailyMigrationApplied: boolean;
 };
 
 /**
@@ -81,6 +83,12 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
     investReconcileRunsMigrationApplied = true;
   }
 
+  let investPositionDailyMigrationApplied = false;
+  if (!(await tableExists(pool, INVEST_POSITION_DAILY_TABLE))) {
+    await runSqlFile(pool, '50_invest_position_daily.sql');
+    investPositionDailyMigrationApplied = true;
+  }
+
   return {
     marketMigrationApplied,
     platformJobMigrationApplied,
@@ -90,5 +98,6 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
     investCashAccountPolicyMigrationApplied,
     investBookPeriodsMigrationApplied,
     investReconcileRunsMigrationApplied,
+    investPositionDailyMigrationApplied,
   };
 }

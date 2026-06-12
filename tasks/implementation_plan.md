@@ -157,6 +157,23 @@ remapeamento de dados INVEST:
 6. Importacoes de historico devem ser validadas mes a mes. O mes seguinte so
    pode ser importado depois que o mes atual bater com extrato, caixa, transito,
    posicoes, patrimonio e diagnosticos.
+7. Importacao de extratos e notas deve ser incremental e idempotente. Reenviar
+   arquivos do mesmo mes ou um pacote parcial ampliado nao pode duplicar
+   lancamentos/eventos ja existentes; o sistema deve reconhecer o que ja foi
+   lancado no mesmo dia e inserir apenas fatos novos que alterem caixa,
+   transito ou carteira.
+8. O fechamento diario do cliente deve materializar o detalhe da carteira:
+   valor observado ou estimado de cada acao, FII, opcao, titulo publico,
+   CDB/outros ativos, alem de caixa liquidado e caixa em transito. Cada linha
+   deve registrar a fonte do preco/estimativa para auditoria.
+9. A curva de rentabilidade deve ser derivada desses fechamentos diarios
+   auditaveis. Ancoras de corretora servem para validacao ou calibracao
+   controlada de itens sem preco observado, nunca para esconder erro de caixa,
+   quantidade ou cotacao obrigatoria.
+10. Resultado por acao deve atribuir corretamente ganhos e perdas de calls,
+    puts, trades, daytrades, exercicios, vencimentos sem exercicio, dividendos,
+    JCP, locacao e bonificacoes. Opcoes exercidas ou viradas po devem compor a
+    coluna correta do ativo subjacente e do tipo de operacao.
 
 ### 4.1 Validacao local do mes 1 (BTG janeiro/2026)
 

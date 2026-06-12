@@ -85,6 +85,27 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(r.series.length).toBeGreaterThan(0);
   });
 
+  it('classifica opcoes sem cotacao como estimadas e zeradas apos vencimento', () => {
+    const entries: LedgerEvent[] = [
+      shortPut('PRIOQ43', 100, 5, '2026-01-05'),
+    ];
+
+    const beforeExpiry = buildDailyPatrimonyMtmSeries(entries, '2026-01-06', '2026-01-06', {
+      fixedIncomeTotal: 0,
+    });
+    const beforeSnapshot = beforeExpiry.positionSnapshots?.find((p) => p.ticker === 'PRIOQ43');
+    expect(beforeSnapshot?.priceSource).toBe('estimated_decay');
+    expect(beforeSnapshot?.closingPrice ?? 0).toBeGreaterThan(0);
+
+    const afterExpiry = buildDailyPatrimonyMtmSeries(entries, '2026-05-20', '2026-05-20', {
+      fixedIncomeTotal: 0,
+    });
+    const afterSnapshot = afterExpiry.positionSnapshots?.find((p) => p.ticker === 'PRIOQ43');
+    expect(afterSnapshot?.priceSource).toBe('expired_zero');
+    expect(afterSnapshot?.closingPrice).toBe(0);
+    expect(afterSnapshot?.marketValue).toBe(0);
+  });
+
   it('nao usa cotação atual quando quoteForDate está definido', () => {
     const entries: LedgerEvent[] = [stockOpen(100, 10, '2026-01-01')];
     const quoteForDate = (_ticker: string, date: string) =>

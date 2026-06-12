@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import pool from '../../config/database';
 import type { CoCeoDataGateway } from '../dal';
-import type { UserContext } from '../dal';
+import type { SecurePayload, UserContext } from '../dal';
 import { StorageMeter } from '../dal/StorageMeter';
 import { isMissingSchemaError } from '../dal/mysqlErrors';
 import type { DailyPatrimonyPoint } from './PatrimonyDailyEngine';
@@ -41,6 +41,24 @@ export type RecordPortfolioDayInput = {
   stockQuotes: Record<string, number>;
   source?: string;
   metadataExtra?: Record<string, unknown>;
+};
+
+export type PositionDailyRowInput = {
+  snapshotDate: string;
+  ticker: string;
+  assetType: string;
+  accountKey?: string;
+  brokerCode?: string | null;
+  currencyCode?: string;
+  quantity: number;
+  closingPrice: number;
+  totalValue: number;
+  managerialAvgPrice?: number | null;
+  managerialValue?: number | null;
+  unrealizedPnl?: number | null;
+  priceSource: string;
+  source?: string;
+  metadata?: Record<string, unknown> | null;
 };
 
 function toIsoDate(value: unknown): string {
@@ -171,6 +189,10 @@ export class PatrimonyDailyStore {
         `DELETE FROM invest_daily_snapshots WHERE organization_id = ? AND snapshot_date >= ?`,
         [ctx.organizationId, fromDate]
       );
+      await pool.query(
+        `DELETE FROM invest_position_daily WHERE organization_id = ? AND snapshot_date >= ?`,
+        [ctx.organizationId, fromDate]
+      );
       await StorageMeter.recalculateOrganizationUsage(pool, ctx.organizationId);
     } catch (err) {
       console.error('Falha ao invalidar patrimônio diário retroativo:', err);
@@ -226,6 +248,56 @@ export class PatrimonyDailyStore {
     }
 
     await this.upsertAssetSnapshotsBestEffort(ctx, input.snapshotDate, input.positionSnapshots);
+    await this.upsertPositionDailyRows(ctx, [
+      ...input.positionSnapshots.map((p): PositionDailyRowInput => {
+        const unrealized = Math.round((p.marketValue - p.managerialValue) * 100) / 100;
+        return {
+          snapshotDate: input.snapshotDate,
+          ticker: p.ticker,
+          assetType: p.assetType,
+          accountKey: 'PORTFOLIO',
+          quantity: p.quantity,
+          closingPrice: p.closingPrice,
+          totalValue: p.marketValue,
+          managerialAvgPrice: p.unitCost,
+          managerialValue: p.managerialValue,
+          unrealizedPnl: unrealized,
+          priceSource: p.priceSource,
+          source: input.source ?? 'mtm_economic',
+          metadata: {
+            asset_id: p.assetId,
+          },
+        };
+      }),
+      {
+        snapshotDate: input.snapshotDate,
+        ticker: 'CAIXA-BRL',
+        assetType: 'cash',
+        accountKey: 'SETTLED',
+        quantity: input.point.settledCash ?? input.point.cash,
+        closingPrice: 1,
+        totalValue: input.point.settledCash ?? input.point.cash,
+        managerialAvgPrice: 1,
+        managerialValue: input.point.settledCash ?? input.point.cash,
+        unrealizedPnl: 0,
+        priceSource: 'cash_ledger',
+        source: input.source ?? 'mtm_economic',
+      },
+      {
+        snapshotDate: input.snapshotDate,
+        ticker: 'CAIXA-TRANSIT',
+        assetType: 'in_transit',
+        accountKey: 'IN_TRANSIT',
+        quantity: input.point.cashInTransit ?? input.point.pendingSettlements,
+        closingPrice: 1,
+        totalValue: input.point.cashInTransit ?? input.point.pendingSettlements,
+        managerialAvgPrice: 1,
+        managerialValue: input.point.cashInTransit ?? input.point.pendingSettlements,
+        unrealizedPnl: 0,
+        priceSource: 'cash_ledger',
+        source: input.source ?? 'mtm_economic',
+      },
+    ]);
 
     return {
       id: recordId,
@@ -298,6 +370,59 @@ export class PatrimonyDailyStore {
         const code = (err as { code?: string })?.code;
         if (code === 'ER_NO_REFERENCED_ROW_2') continue;
         throw err;
+      }
+    }
+  }
+
+  private async upsertPositionDailyRows(
+    ctx: UserContext,
+    rows: PositionDailyRowInput[]
+  ): Promise<void> {
+    if (!ctx.organizationId) return;
+
+    for (const row of rows) {
+      const ticker = row.ticker.trim().toUpperCase();
+      const assetType = row.assetType.trim().toLowerCase();
+      const accountKey = (row.accountKey || 'DEFAULT').trim().toUpperCase();
+      const payload: SecurePayload = {
+        organization_id: ctx.organizationId,
+        snapshot_date: row.snapshotDate,
+        ticker,
+        asset_type: assetType,
+        account_key: accountKey,
+        broker_code: row.brokerCode ?? null,
+        currency_code: (row.currencyCode || 'BRL').trim().toUpperCase(),
+        quantity: row.quantity,
+        closing_price: row.closingPrice,
+        total_value: row.totalValue,
+        managerial_avg_price: row.managerialAvgPrice ?? null,
+        managerial_value: row.managerialValue ?? null,
+        unrealized_pnl: row.unrealizedPnl ?? null,
+        price_source: row.priceSource,
+        source: row.source ?? 'mtm_economic',
+        metadata: row.metadata ? JSON.stringify(row.metadata) : null,
+      };
+
+      const existing = await this.gateway.findWhere(
+        ctx,
+        'invest_position_daily',
+        {
+          organization_id: ctx.organizationId,
+          snapshot_date: row.snapshotDate,
+          ticker,
+          asset_type: assetType,
+          account_key: accountKey,
+        },
+        { limit: 1, columns: ['id'] }
+      );
+
+      if (existing[0]?.id) {
+        await this.gateway.update(ctx, 'invest_position_daily', String(existing[0].id), payload);
+      } else {
+        await this.gateway.insert(ctx, 'invest_position_daily', {
+          id: randomUUID(),
+          ...payload,
+        });
       }
     }
   }

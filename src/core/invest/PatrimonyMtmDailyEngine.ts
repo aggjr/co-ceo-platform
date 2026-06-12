@@ -63,6 +63,7 @@ export type PositionDailySnapshot = {
   unitCost: number;
   marketValue: number;
   managerialValue: number;
+  priceSource: 'market' | 'previous_market' | 'estimated_decay' | 'expired_zero' | 'cost';
 };
 
 function isCash(
@@ -130,31 +131,58 @@ function groupByDate(entries: LedgerEvent[]): Map<string, LedgerEvent[]> {
   return map;
 }
 
-function resolvePositionMark(
+function roundMoney(value: number): number {
+  const rounded = Math.round(value * 100) / 100;
+  return Math.abs(rounded) < 0.005 ? 0 : rounded;
+}
+
+function resolvePositionMarkWithSource(
   p: DayPosition,
   date: string,
   quoteForDate: PatrimonyMtmOptions['quoteForDate'],
   stockQuotes: StockQuoteMap,
-  lastKnownPrices: Map<string, number>
-): number | undefined {
+  lastKnownPrices: Map<string, number>,
+  valuationContext?: PatrimonyMtmOptions['valuationContext']
+): { price: number; source: PositionDailySnapshot['priceSource'] } | null {
   const historicalMode = quoteForDate != null;
   const daily = quoteForDate?.(p.ticker, date);
   if (daily != null && Number.isFinite(daily) && daily > 0) {
     lastKnownPrices.set(p.ticker, daily);
-    return daily;
+    return { price: daily, source: 'market' };
   }
   const lastKnown = lastKnownPrices.get(p.ticker);
-  if (lastKnown != null) return lastKnown;
+  if (lastKnown != null) return { price: lastKnown, source: 'previous_market' };
 
   if (!historicalMode) {
     const cur = stockQuotes[p.ticker];
     if (cur != null && Number.isFinite(cur) && cur > 0) {
       lastKnownPrices.set(p.ticker, cur);
-      return cur;
+      return { price: cur, source: 'market' };
     }
   }
-  if (p.unitCost > 0) return p.unitCost;
-  return undefined;
+  if (isOptionType(p.assetType, valuationContext)) {
+    return null;
+  }
+  if (p.unitCost > 0) return { price: p.unitCost, source: 'cost' };
+  return null;
+}
+
+function resolvePositionMark(
+  p: DayPosition,
+  date: string,
+  quoteForDate: PatrimonyMtmOptions['quoteForDate'],
+  stockQuotes: StockQuoteMap,
+  lastKnownPrices: Map<string, number>,
+  valuationContext?: PatrimonyMtmOptions['valuationContext']
+): number | undefined {
+  return resolvePositionMarkWithSource(
+    p,
+    date,
+    quoteForDate,
+    stockQuotes,
+    lastKnownPrices,
+    valuationContext
+  )?.price;
 }
 
 function ledgerThroughDate(entries: LedgerEvent[], date: string): LedgerEvent[] {
@@ -332,7 +360,14 @@ export function buildDailyPatrimonyMtmSeries(
     for (const p of positions.values()) {
       if (Math.abs(p.qty) < 0.0001) continue;
 
-      const dailyMark = resolvePositionMark(p, date, quoteForDate, stockQuotes, lastKnownPrices);
+      const dailyMark = resolvePositionMark(
+        p,
+        date,
+        quoteForDate,
+        stockQuotes,
+        lastKnownPrices,
+        valuationContext
+      );
       if (isFixedIncome(p.assetType, p.ticker, valuationContext)) {
         hasOpenFixedIncome = true;
         fixedIncomeDynamic += valueInBaseCurrency(
@@ -502,7 +537,14 @@ function snapshotOpenPositions(
   for (const p of positions.values()) {
     if (Math.abs(p.qty) < 0.0001) continue;
     if (isOptionType(p.assetType, options?.valuationContext)) {
-      const dailyMark = resolvePositionMark(p, asOf, quoteForDate, stockQuotes, lastKnownPrices);
+      const dailyMark = resolvePositionMark(
+        p,
+        asOf,
+        quoteForDate,
+        stockQuotes,
+        lastKnownPrices,
+        options?.valuationContext
+      );
       if (dailyMark != null) {
         optionsFromMarket += valueInBaseCurrency(p.qty * dailyMark, p.assetType, asOf, options);
       } else {
@@ -528,23 +570,33 @@ function snapshotOpenPositions(
     if (Math.abs(p.qty) < 0.0001) continue;
     if (isCash(p.assetType, p.ticker, options?.valuationContext)) continue;
     
-    let closing = resolvePositionMark(p, asOf, quoteForDate, stockQuotes, lastKnownPrices);
+    let resolved = resolvePositionMarkWithSource(
+      p,
+      asOf,
+      quoteForDate,
+      stockQuotes,
+      lastKnownPrices,
+      options?.valuationContext
+    );
+    let closing = resolved?.price;
+    let priceSource: PositionDailySnapshot['priceSource'] = resolved?.source ?? 'cost';
     if (closing == null || !Number.isFinite(closing)) {
       if (isOptionType(p.assetType, options?.valuationContext)) {
+        priceSource = p.expiry && asOf >= p.expiry ? 'expired_zero' : 'estimated_decay';
         if (optionsPlugTarget !== undefined) {
           const baseVal = optionTimeMark(p, asOf);
           const adjustedVal = (baseVal * plugFactor) + plugOffset;
-          closing = adjustedVal / Math.max(Math.abs(p.qty), 1);
+          closing = Math.abs(adjustedVal) / Math.max(Math.abs(p.qty), 1);
         } else {
-          closing = optionTimeMark(p, asOf) / Math.max(Math.abs(p.qty), 1);
+          closing = Math.abs(optionTimeMark(p, asOf)) / Math.max(Math.abs(p.qty), 1);
         }
       } else {
         closing = p.unitCost;
       }
     }
     
-    const marketValue = Math.round(valueInBaseCurrency(p.qty * closing, p.assetType, asOf, options) * 100) / 100;
-    const managerialValue = Math.round(valueInBaseCurrency(p.qty * p.unitCost, p.assetType, asOf, options) * 100) / 100;
+    const marketValue = roundMoney(valueInBaseCurrency(p.qty * closing, p.assetType, asOf, options));
+    const managerialValue = roundMoney(valueInBaseCurrency(p.qty * p.unitCost, p.assetType, asOf, options));
     out.push({
       assetId: p.assetId,
       ticker: p.ticker,
@@ -554,6 +606,7 @@ function snapshotOpenPositions(
       unitCost: Math.round(p.unitCost * 10000) / 10000,
       marketValue,
       managerialValue,
+      priceSource,
     });
   }
   return out.sort((a, b) => a.ticker.localeCompare(b.ticker));

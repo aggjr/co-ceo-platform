@@ -1,8 +1,11 @@
 import {
   mergeStoredPatrimonySeries,
+  PatrimonyDailyStore,
   trimZeroPatrimonyTailAfterLastStored,
 } from '../../../src/core/invest/PatrimonyDailyStore';
 import type { DailyPatrimonyPoint } from '../../../src/core/invest/PatrimonyDailyEngine';
+import { InMemoryGateway } from '../core/business-events/inMemoryGateway';
+import type { UserContext } from '../../../src/core/dal';
 
 describe('mergeStoredPatrimonySeries', () => {
   const computed: DailyPatrimonyPoint[] = [
@@ -116,5 +119,85 @@ describe('trimZeroPatrimonyTailAfterLastStored', () => {
     const trimmed = trimZeroPatrimonyTailAfterLastStored(series, stored);
     expect(trimmed.map((p) => p.date)).toEqual(['2026-05-21']);
     expect(trimmed[0]!.patrimony).toBeCloseTo(1_509_811.26, 2);
+  });
+});
+
+describe('PatrimonyDailyStore invest_position_daily', () => {
+  const ctx: UserContext = {
+    userId: 'tester',
+    organizationId: 'org-holding-001',
+    impersonatorId: null,
+    scope: 'node',
+  };
+
+  it('materializa posicoes, caixa liquidado e caixa em transito por dia', async () => {
+    const gateway = new InMemoryGateway();
+    const store = new PatrimonyDailyStore(gateway as any);
+    const point: DailyPatrimonyPoint = {
+      date: '2026-04-17',
+      patrimonyGross: 1_000,
+      pendingSettlements: -200,
+      scheduledCashPending: -200,
+      settledCash: 300,
+      cashInTransit: -200,
+      patrimony: 800,
+      cash: 300,
+      positionsValue: 700,
+      dailyReturn: null,
+    };
+
+    await store.upsertPortfolioDay(ctx, {
+      snapshotDate: '2026-04-17',
+      point,
+      patrimonyGross: 1_000,
+      fixedIncomeTotal: 0,
+      externalFlow: 0,
+      dailyReturnTwr: null,
+      cumulativeTwr: null,
+      quotesAsOf: '2026-04-17',
+      stockQuotes: { PRIO3: 50 },
+      source: 'mtm_economic',
+      positionSnapshots: [
+        {
+          assetId: 'asset-prio3',
+          ticker: 'PRIO3',
+          assetType: 'stock',
+          quantity: 10,
+          closingPrice: 50,
+          unitCost: 40,
+          marketValue: 500,
+          managerialValue: 400,
+          priceSource: 'market',
+        },
+      ],
+    });
+
+    const rows = gateway.dump('invest_position_daily')
+      .filter((r) => !r.deleted_at)
+      .sort((a, b) => String(a.ticker).localeCompare(String(b.ticker)));
+
+    expect(rows.map((r) => r.ticker)).toEqual(['CAIXA-BRL', 'CAIXA-TRANSIT', 'PRIO3']);
+    expect(rows.find((r) => r.ticker === 'PRIO3')).toMatchObject({
+      asset_type: 'stock',
+      quantity: 10,
+      closing_price: 50,
+      total_value: 500,
+      price_source: 'market',
+      account_key: 'PORTFOLIO',
+    });
+    expect(rows.find((r) => r.ticker === 'CAIXA-BRL')).toMatchObject({
+      asset_type: 'cash',
+      quantity: 300,
+      total_value: 300,
+      price_source: 'cash_ledger',
+      account_key: 'SETTLED',
+    });
+    expect(rows.find((r) => r.ticker === 'CAIXA-TRANSIT')).toMatchObject({
+      asset_type: 'in_transit',
+      quantity: -200,
+      total_value: -200,
+      price_source: 'cash_ledger',
+      account_key: 'IN_TRANSIT',
+    });
   });
 });
