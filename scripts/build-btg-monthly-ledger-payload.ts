@@ -34,6 +34,23 @@ function monthEnd(openingDate: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+function parseFinalCashLine(
+  lines: string[],
+  closingDate: string
+): { provisionedYield: number; finalBalance: number } {
+  const closingBr = `${closingDate.slice(8, 10)}/${closingDate.slice(5, 7)}/${closingDate.slice(2, 4)}`;
+  for (const line of lines) {
+    if (!line.startsWith(closingBr)) continue;
+    if (!/Saldo Final/i.test(line) || !/Rendimento Provisionado/i.test(line)) continue;
+    const nums = moneyValues(line);
+    if (nums.length >= 2) {
+      return { provisionedYield: nums[0]!, finalBalance: nums[nums.length - 1]! };
+    }
+    return { provisionedYield: 0, finalBalance: nums[0] ?? 0 };
+  }
+  return { provisionedYield: 0, finalBalance: 0 };
+}
+
 function inferOptionStrike(ticker: string, fallback?: number): number | undefined {
   const suffix = ticker.match(/(\d+)$/)?.[1];
   if (!suffix) return fallback;
@@ -439,6 +456,23 @@ async function buildPayload(pdfPath: string): Promise<LedgerImportPayload> {
           : line.event_source_ref,
       source_system: 'btg_monthly_statement.cash',
     } as LedgerImportLine);
+  }
+
+  const finalCashLine = parseFinalCashLine(lines, closingDate);
+  if (Math.abs(finalCashLine.provisionedYield) >= 0.005) {
+    entries.push({
+      date: closingDate,
+      ticker: 'CAIXA-BTG',
+      asset_type: 'cash',
+      operation: 'cash_yield',
+      quantity: 0,
+      unit_price: 0,
+      total_net_value: finalCashLine.provisionedYield,
+      broker_note_ref: ref('CASH-PROVISIONED-YIELD', closingDate),
+      event_source_ref: ref('CASH-PROVISIONED-YIELD', closingDate),
+      source_system: 'btg_monthly_statement.cash',
+      notes: 'Rendimento provisionado no saldo final BTG',
+    });
   }
 
   entries.sort((a, b) => {
