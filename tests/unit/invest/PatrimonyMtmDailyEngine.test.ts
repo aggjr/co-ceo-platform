@@ -239,4 +239,16 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(r.series[0]?.positionsValue).toBeCloseTo(4100, 0);
     expect(r.series[0]?.patrimony).toBeCloseTo(4100, 0);
   });
+
+  it('carrega posicoes anteriores ao inicio do filtro', () => {
+    const entries: LedgerEvent[] = [stockOpen(100, 40, '2026-01-01')];
+
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-04-17', '2026-04-17', {
+      fixedIncomeTotal: 0,
+      quoteForDate: () => 42,
+    });
+
+    expect(r.series[0]?.positionsValue).toBeCloseTo(4200, 0);
+    expect(r.series[0]?.patrimony).toBeCloseTo(4200, 0);
+  });
 });

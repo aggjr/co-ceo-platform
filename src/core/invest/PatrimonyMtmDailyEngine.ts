@@ -263,54 +263,62 @@ export function buildDailyPatrimonyMtmSeries(
     target: number;
   }> = [];
 
+  const applyPortfolioEvent = (e: LedgerEvent, date: string): void => {
+    const type = String(e.transaction_type);
+    const ticker = String(e.asset_ticker).toUpperCase();
+    const assetType = String(e.asset_type || inferAssetType(ticker));
+
+    if (type === 'pending_settlement') {
+      pendingSettlements += Number(e.total_net_value ?? 0);
+      return;
+    }
+
+    if (isCash(assetType, ticker, valuationContext)) {
+      return;
+    }
+
+    if (e.impacts_managerial_price === false || e.impacts_managerial_price === 0) {
+      return;
+    }
+
+    let pos = positions.get(e.asset_id);
+    if (!pos) {
+      const expiry = isOptionType(assetType, valuationContext)
+        ? inferOptionExpiryDate(ticker, Number(date.slice(0, 4)))
+        : null;
+      pos = {
+        assetId: e.asset_id,
+        ticker,
+        assetType,
+        qty: 0,
+        unitCost: 0,
+        expiry,
+        firstSeen: date,
+      };
+      positions.set(e.asset_id, pos);
+    }
+
+    const price = Number(e.unit_price);
+    if (price > 0) pos.unitCost = price;
+
+    if (type === 'opening_balance') {
+      pos.qty = Math.abs(Number(e.quantity));
+      return;
+    }
+
+    applyQty(pos, type, Number(e.quantity));
+  };
+
+  for (const e of sorted) {
+    const day = String(e.transaction_date || '').slice(0, 10);
+    if (!day || day >= from) continue;
+    applyPortfolioEvent(e, day);
+  }
+
   let lastResidual = 0;
   for (const date of calendar) {
     for (const e of byDay.get(date) || []) {
-      const type = String(e.transaction_type);
-      const ticker = String(e.asset_ticker).toUpperCase();
-      const assetType = String(e.asset_type || inferAssetType(ticker));
-
-      if (type === 'pending_settlement') {
-        pendingSettlements += Number(e.total_net_value ?? 0);
-        continue;
-      }
-
-      if (isCash(assetType, ticker, valuationContext)) {
-        continue;
-      }
-
-      if (e.impacts_managerial_price === false || e.impacts_managerial_price === 0) {
-        continue;
-      }
-
-      // Do NOT skip fixed income! Let it be accumulated in the positions map.
-
-      let pos = positions.get(e.asset_id);
-      if (!pos) {
-        const expiry = isOptionType(assetType, valuationContext)
-          ? inferOptionExpiryDate(ticker, Number(date.slice(0, 4)))
-          : null;
-        pos = {
-          assetId: e.asset_id,
-          ticker,
-          assetType,
-          qty: 0,
-          unitCost: 0,
-          expiry,
-          firstSeen: date,
-        };
-        positions.set(e.asset_id, pos);
-      }
-
-      const price = Number(e.unit_price);
-      if (price > 0) pos.unitCost = price;
-
-      if (type === 'opening_balance') {
-        pos.qty = Math.abs(Number(e.quantity));
-        continue;
-      }
-
-      applyQty(pos, type, Number(e.quantity));
+      applyPortfolioEvent(e, date);
     }
 
     const { cash, scheduledCashPending } = economicCashAtDate(sorted, date);
