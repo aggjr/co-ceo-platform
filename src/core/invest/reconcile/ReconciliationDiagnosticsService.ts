@@ -872,8 +872,9 @@ export class ReconciliationDiagnosticsService {
         });
       }
 
-      const closingTransit = transitTotal();
-      const closingCash = money(grossCash - closingTransit);
+      const closingCashSummary = buildCashInTransitSummary(sorted, date);
+      const closingTransit = money(closingCashSummary.inTransitNet);
+      const closingCash = money(closingCashSummary.settledCashBalance);
       const closingPortfolioValue = portfolioTotal();
       const closingPatrimonyValue = money(closingCash + closingTransit + closingPortfolioValue);
       const businessRow = this.buildDailyBusinessRow(date, businessGroups, unlinked);
