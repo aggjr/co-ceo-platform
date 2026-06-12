@@ -140,9 +140,9 @@ describe('PatrimonyDailyStore invest_position_daily', () => {
       scheduledCashPending: -200,
       settledCash: 300,
       cashInTransit: -200,
-      patrimony: 800,
+      patrimony: 600,
       cash: 300,
-      positionsValue: 700,
+      positionsValue: 500,
       dailyReturn: null,
     };
 
@@ -199,5 +199,50 @@ describe('PatrimonyDailyStore invest_position_daily', () => {
       price_source: 'cash_ledger',
       account_key: 'IN_TRANSIT',
     });
+  });
+
+  it('bloqueia fechamento diario quando o detalhe nao explica o agregado', async () => {
+    const gateway = new InMemoryGateway();
+    const store = new PatrimonyDailyStore(gateway as any);
+    const point: DailyPatrimonyPoint = {
+      date: '2026-04-17',
+      patrimonyGross: 1_000,
+      pendingSettlements: 0,
+      scheduledCashPending: 0,
+      settledCash: 300,
+      cashInTransit: 0,
+      patrimony: 900,
+      cash: 300,
+      positionsValue: 500,
+      dailyReturn: null,
+    };
+
+    await expect(
+      store.upsertPortfolioDay(ctx, {
+        snapshotDate: '2026-04-17',
+        point,
+        patrimonyGross: 1_000,
+        fixedIncomeTotal: 0,
+        externalFlow: 0,
+        dailyReturnTwr: null,
+        cumulativeTwr: null,
+        quotesAsOf: '2026-04-17',
+        stockQuotes: { PRIO3: 50 },
+        source: 'mtm_economic',
+        positionSnapshots: [
+          {
+            assetId: 'asset-prio3',
+            ticker: 'PRIO3',
+            assetType: 'stock',
+            quantity: 10,
+            closingPrice: 50,
+            unitCost: 40,
+            marketValue: 500,
+            managerialValue: 400,
+            priceSource: 'market',
+          },
+        ],
+      })
+    ).rejects.toThrow(/Divergencia invest_position_daily/);
   });
 });

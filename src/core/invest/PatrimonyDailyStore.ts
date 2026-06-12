@@ -61,6 +61,35 @@ export type PositionDailyRowInput = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type PositionDailyConsistencyResult = {
+  ok: boolean;
+  tolerance: number;
+  expected: {
+    patrimony: number;
+    cash: number;
+    cashInTransit: number;
+    positionsValue: number;
+    fixedIncomeTotal: number;
+  };
+  actual: {
+    patrimony: number;
+    cash: number;
+    cashInTransit: number;
+    positionsValue: number;
+    fixedIncomeTotal: number;
+  };
+  deltas: {
+    patrimony: number;
+    cash: number;
+    cashInTransit: number;
+    positionsValue: number;
+    fixedIncomeTotal: number;
+  };
+  estimatedRows: Array<{ ticker: string; assetType: string; totalValue: number; priceSource: string }>;
+};
+
+const POSITION_DAILY_TOLERANCE = 0.1;
+
 function toIsoDate(value: unknown): string {
   if (value instanceof Date) {
     const y = value.getUTCFullYear();
@@ -69,6 +98,23 @@ function toIsoDate(value: unknown): string {
     return `${y}-${m}-${d}`;
   }
   return String(value ?? '').slice(0, 10);
+}
+
+function round2(value: number): number {
+  const rounded = Math.round(value * 100) / 100;
+  return Math.abs(rounded) < 0.005 ? 0 : rounded;
+}
+
+function isCashPosition(assetType: string, ticker: string, accountKey: string): boolean {
+  return assetType === 'cash' || ticker === 'CAIXA-BRL' || accountKey === 'SETTLED';
+}
+
+function isTransitPosition(assetType: string, ticker: string, accountKey: string): boolean {
+  return assetType === 'in_transit' || ticker === 'CAIXA-TRANSIT' || accountKey === 'IN_TRANSIT';
+}
+
+function isFixedIncomePosition(assetType: string): boolean {
+  return assetType === 'fixed_income';
 }
 
 function rowToStored(row: Record<string, unknown>): StoredPortfolioDay {
@@ -247,8 +293,7 @@ export class PatrimonyDailyStore {
       await this.gateway.insert(ctx, 'invest_portfolio_daily', { id: recordId, ...payload });
     }
 
-    await this.upsertAssetSnapshotsBestEffort(ctx, input.snapshotDate, input.positionSnapshots);
-    await this.upsertPositionDailyRows(ctx, [
+    const positionDailyRows = [
       ...input.positionSnapshots.map((p): PositionDailyRowInput => {
         const unrealized = Math.round((p.marketValue - p.managerialValue) * 100) / 100;
         return {
@@ -297,7 +342,18 @@ export class PatrimonyDailyStore {
         priceSource: 'cash_ledger',
         source: input.source ?? 'mtm_economic',
       },
-    ]);
+    ];
+
+    await this.upsertAssetSnapshotsBestEffort(ctx, input.snapshotDate, input.positionSnapshots);
+    await this.upsertPositionDailyRows(ctx, positionDailyRows);
+    const consistency = await this.validatePositionDailyConsistency(ctx, input);
+    const finalMetadata = {
+      ...metadata,
+      position_daily_consistency: consistency,
+    };
+    await this.gateway.update(ctx, 'invest_portfolio_daily', recordId, {
+      metadata: JSON.stringify(finalMetadata),
+    });
 
     return {
       id: recordId,
@@ -317,7 +373,7 @@ export class PatrimonyDailyStore {
       cumulative_twr: input.cumulativeTwr,
       quotes_as_of: input.quotesAsOf,
       source: input.source ?? 'mtm_economic',
-      metadata,
+      metadata: finalMetadata,
     };
   }
 
@@ -425,6 +481,104 @@ export class PatrimonyDailyStore {
         });
       }
     }
+  }
+
+  async validatePositionDailyConsistency(
+    ctx: UserContext,
+    input: Pick<
+      RecordPortfolioDayInput,
+      'snapshotDate' | 'point' | 'fixedIncomeTotal'
+    >,
+    tolerance = POSITION_DAILY_TOLERANCE
+  ): Promise<PositionDailyConsistencyResult> {
+    if (!ctx.organizationId) {
+      throw new Error('organizationId obrigatorio para validar invest_position_daily.');
+    }
+
+    const rows = await this.gateway.findWhere(
+      ctx,
+      'invest_position_daily',
+      {
+        organization_id: ctx.organizationId,
+        snapshot_date: input.snapshotDate,
+      },
+      { limit: 10000 }
+    );
+
+    let cash = 0;
+    let cashInTransit = 0;
+    let positionsValue = 0;
+    let fixedIncomeTotal = 0;
+    const estimatedRows: PositionDailyConsistencyResult['estimatedRows'] = [];
+
+    for (const row of rows) {
+      const ticker = String(row.ticker ?? '').trim().toUpperCase();
+      const assetType = String(row.asset_type ?? '').trim().toLowerCase();
+      const accountKey = String(row.account_key ?? '').trim().toUpperCase();
+      const totalValue = Number(row.total_value ?? 0);
+      const priceSource = String(row.price_source ?? '');
+      if (!Number.isFinite(totalValue)) continue;
+
+      if (isCashPosition(assetType, ticker, accountKey)) {
+        cash += totalValue;
+      } else if (isTransitPosition(assetType, ticker, accountKey)) {
+        cashInTransit += totalValue;
+      } else if (isFixedIncomePosition(assetType)) {
+        fixedIncomeTotal += totalValue;
+      } else {
+        positionsValue += totalValue;
+      }
+
+      if (priceSource && priceSource !== 'market' && priceSource !== 'cash_ledger') {
+        estimatedRows.push({
+          ticker,
+          assetType,
+          totalValue: round2(totalValue),
+          priceSource,
+        });
+      }
+    }
+
+    const actual = {
+      patrimony: round2(cash + cashInTransit + positionsValue + fixedIncomeTotal),
+      cash: round2(cash),
+      cashInTransit: round2(cashInTransit),
+      positionsValue: round2(positionsValue),
+      fixedIncomeTotal: round2(fixedIncomeTotal),
+    };
+    const expected = {
+      patrimony: round2(input.point.patrimony),
+      cash: round2(input.point.settledCash ?? input.point.cash),
+      cashInTransit: round2(input.point.cashInTransit ?? input.point.pendingSettlements),
+      positionsValue: round2(input.point.positionsValue),
+      fixedIncomeTotal: round2(input.fixedIncomeTotal),
+    };
+    const deltas = {
+      patrimony: round2(actual.patrimony - expected.patrimony),
+      cash: round2(actual.cash - expected.cash),
+      cashInTransit: round2(actual.cashInTransit - expected.cashInTransit),
+      positionsValue: round2(actual.positionsValue - expected.positionsValue),
+      fixedIncomeTotal: round2(actual.fixedIncomeTotal - expected.fixedIncomeTotal),
+    };
+    const result: PositionDailyConsistencyResult = {
+      ok: Object.values(deltas).every((v) => Math.abs(v) <= tolerance),
+      tolerance,
+      expected,
+      actual,
+      deltas,
+      estimatedRows,
+    };
+
+    if (!result.ok) {
+      throw new Error(
+        `Divergencia invest_position_daily em ${input.snapshotDate}: ` +
+          `patrimonio ${deltas.patrimony}, caixa ${deltas.cash}, ` +
+          `transito ${deltas.cashInTransit}, posicoes ${deltas.positionsValue}, ` +
+          `renda fixa ${deltas.fixedIncomeTotal}.`
+      );
+    }
+
+    return result;
   }
 }
 
