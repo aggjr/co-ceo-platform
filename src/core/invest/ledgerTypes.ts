@@ -33,6 +33,12 @@ export const LEDGER_TRANSACTION_TYPES = [
    * Reduz apenas o PM Estrito (limitado a zero).
    */
   'amortization',
+  /**
+   * Movimento no extrato da corretora sem correspondência em nenhuma regra
+   * de classificação conhecida. Importado como lançamento de caixa para
+   * garantir batimento de saldo; deve ser investigado junto à corretora.
+   */
+  'extract_divergence',
 ] as const;
 
 /** Ticker sintético por corretora para lançamentos de extrato (caixa). */

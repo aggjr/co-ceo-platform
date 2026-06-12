@@ -949,7 +949,7 @@ export class InvestOperations {
         line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)
       );
       const direction =
-        op === 'cash_yield' && signedCash < 0
+        (op === 'cash_yield' || op === 'extract_divergence') && signedCash < 0
           ? 'out'
           : (policy.cashDirection as 'in' | 'out');
       const amount = Math.abs(

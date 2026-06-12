@@ -22,6 +22,7 @@ const PASSIVE_INCOME_OPS = new Set<LedgerTransactionType>([
   'jcp',
   'cash_yield',
   'securities_lending',
+  'extract_divergence',
 ]);
 const CAPITAL_OPS = new Set<LedgerTransactionType>(['capital_deposit', 'capital_withdrawal']);
 const PASSIVE_EXPENSE_OPS = new Set<LedgerTransactionType>(['fee', 'penalty_b3']);

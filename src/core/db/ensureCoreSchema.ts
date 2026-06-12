@@ -54,6 +54,8 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
     await runSqlFile(pool, '43_invest_operation_policy_catalog.sql');
     investOperationPolicyMigrationApplied = true;
   }
+  // Idempotente: adiciona extract_divergence caso ainda nao exista no catalogo.
+  await runSqlFile(pool, '49_extract_divergence_operation.sql');
 
   let investCashAccountPolicyMigrationApplied = false;
   if (!(await tableExists(pool, INVEST_CASH_ACCOUNT_POLICIES_TABLE))) {

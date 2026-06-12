@@ -376,7 +376,7 @@ export function classifyBtgDescription(
     };
   }
 
-  return { operation: 'skip', ticker: CASH_TICKER, skip: true, notes: description };
+  return { operation: 'extract_divergence', ticker: CASH_TICKER, asset_type: 'cash', skip: false, notes: description };
 }
 
 export function getBtgOperationSign(operation: string, description: string): number {
