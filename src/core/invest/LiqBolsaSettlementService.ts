@@ -71,6 +71,9 @@ export class LiqBolsaSettlementService {
     ctx: UserContext,
     input: LiqBolsaSettlementInput
   ): Promise<LiqBolsaMatchResult> {
+    const existing = await this.fetchExistingSettlement(ctx, input);
+    if (existing) return existing;
+
     const candidates = await this.fetchCandidates(ctx, input.settlementDate, input.accountId);
     if (!candidates.length) {
       return {
@@ -168,6 +171,43 @@ export class LiqBolsaSettlementService {
         String(a.source_ref ?? '').localeCompare(String(b.source_ref ?? '')) ||
         String(a.id).localeCompare(String(b.id))
     );
+  }
+
+  private async fetchExistingSettlement(
+    ctx: UserContext,
+    input: LiqBolsaSettlementInput
+  ): Promise<LiqBolsaMatchResult | null> {
+    const rows = (await this.gateway.findWhere(
+      ctx,
+      'financial_ledger_entries',
+      { transaction_date: input.settlementDate, description: 'LIQ BOLSA' },
+      { limit: 500 }
+    )) as FinancialLegRow[];
+
+    const matches = rows.filter((row) => {
+      if (String(row.status) !== 'cleared') return false;
+      if (input.accountId && String(row.account_id) !== input.accountId) return false;
+      const metadata = parseMetadata(row.metadata);
+      const extractRef = String(metadata.extract_line_ref ?? '');
+      return (
+        extractRef === input.extractLineRef ||
+        String(row.external_ref || '').startsWith(`${input.extractLineRef}#`)
+      );
+    });
+    if (!matches.length) return null;
+
+    const totalCentsSigned = matches.reduce((sum, row) => sum + centsFromLeg(row), 0);
+    if (Math.abs(totalCentsSigned - input.valueSignedCents) > MONEY_TOL_CENTS) return null;
+
+    const settledEvents = matches
+      .map((row) => String(parseMetadata(row.metadata).matched_business_event_id ?? row.business_event_id ?? ''))
+      .filter(Boolean);
+
+    return {
+      status: 'matched',
+      settledEvents,
+      totalCents: Math.abs(totalCentsSigned),
+    };
   }
 
   private findSubset(

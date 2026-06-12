@@ -110,4 +110,37 @@ describe('LiqBolsaSettlementService', () => {
     expect(gw.dump('financial_ledger_entries').filter((l) => l.status === 'cleared')).toHaveLength(0);
     expect(gw.dump('financial_ledger_entries')[0]!.status).toBe('pending');
   });
+
+  it('reaplicar mesma LIQ BOLSA ja liquidada retorna matched idempotente', async () => {
+    const gw = new InMemoryGateway();
+    const gateway = castGateway(gw);
+    await gateway.insert(ctx, 'financial_ledger_entries', {
+      id: 'cleared-liq',
+      account_id: 'acc-1',
+      business_event_id: 'be-old',
+      transaction_date: '2026-04-01',
+      settlement_date: '2026-04-01',
+      direction: 'in',
+      amount: 3503.68,
+      status: 'cleared',
+      external_ref: 'BTG-EXT-2026-04-01#01#BTG-NOTA-OLD',
+      description: 'LIQ BOLSA',
+      metadata: JSON.stringify({
+        kind: 'liq_bolsa_settlement',
+        extract_line_ref: 'BTG-EXT-2026-04-01#01',
+        matched_business_event_id: 'be-old',
+      }),
+    });
+
+    const result = await new LiqBolsaSettlementService(gateway).settle(ctx, {
+      extractLineRef: 'BTG-EXT-2026-04-01#01',
+      settlementDate: '2026-04-01',
+      valueSignedCents: 350368,
+    });
+
+    expect(result.status).toBe('matched');
+    if (result.status !== 'matched') throw new Error('expected matched');
+    expect(result.settledEvents).toEqual(['be-old']);
+    expect(gw.dump('financial_ledger_entries')).toHaveLength(1);
+  });
 });
