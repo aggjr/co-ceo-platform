@@ -508,6 +508,8 @@ async function buildPayload(pdfPath: string, previousPayloadPath?: string): Prom
 
   entries.sort((a, b) => {
     if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+    if (a.operation === 'revaluation' && b.operation !== 'revaluation') return 1;
+    if (a.operation !== 'revaluation' && b.operation === 'revaluation') return -1;
     return String(a.broker_note_ref || '').localeCompare(String(b.broker_note_ref || ''));
   });
 
