@@ -125,6 +125,7 @@ export class LedgerImportService {
     const openingDate = parseDate(payload.opening_date);
     const batchId = randomUUID();
     let inserted = 0;
+    let changed = 0;
 
     // Header agregador unico para todas as pernas do opening — bate com o
     // padrao adotado em scripts/backfill-opening-business-event.js
@@ -156,6 +157,7 @@ export class LedgerImportService {
       };
       const result = await this.operations.recordOperation(ctx, line);
       if (!result.skipped) inserted += 1;
+      if (!result.skipped || result.enriched) changed += 1;
     }
 
     // 2. Shorts de abertura (PUT/CALL vendida) → disposition com qty negativa.
@@ -178,6 +180,7 @@ export class LedgerImportService {
       };
       const result = await this.operations.recordOperation(ctx, line);
       if (!result.skipped) inserted += 1;
+      if (!result.skipped || result.enriched) changed += 1;
     }
 
     // 3. Lancamentos regulares (notas, extratos mensais).
@@ -218,11 +221,12 @@ export class LedgerImportService {
         date: parsedDate,
       });
       if (!result.skipped) inserted += 1;
+      if (!result.skipped || result.enriched) changed += 1;
     }
 
     const pendingSync = await this.syncAutoPendingSettlements(ctx);
 
-    if (inserted > 0) {
+    if (changed > 0) {
       // Find the earliest date in the imported entries (opening or entries)
       let minDate = openingDate;
       for (const line of allLines) {

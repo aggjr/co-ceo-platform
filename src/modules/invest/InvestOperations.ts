@@ -668,8 +668,17 @@ export class InvestOperations {
 
     const op = String(line.operation);
     const assetType = String(line.asset_type || inferAssetType(line.ticker));
-    if (assetType !== 'fixed_income') return false;
-    if (op !== 'buy' && op !== 'sell') return false;
+    if (assetType === 'cash') return false;
+    const repairableOps = new Set([
+      'buy',
+      'sell',
+      'put_buy',
+      'put_sell',
+      'call_buy',
+      'call_sell',
+      'option_exercise',
+    ]);
+    if (!repairableOps.has(op)) return false;
     if (line.impacts_managerial_price === false) return false;
 
     const quantity = Math.abs(Number(line.quantity ?? 0));
@@ -687,12 +696,28 @@ export class InvestOperations {
     const row = rows[0];
     if (!row) return false;
 
-    const quantityDelta = op === 'sell' ? -quantity : quantity;
+    const assetClass = assetType as InvestAssetClass;
+    const { item } = await this.inventoryRegistry.ensure(ic, {
+      category: 'financial_asset',
+      subcategory: InvestOperations.subcategoryOf(assetClass),
+      identifier: line.ticker.trim().toUpperCase(),
+      name: line.ticker.trim().toUpperCase(),
+    });
+
+    const quantityDelta =
+      op === 'sell' || op === 'put_sell' || op === 'call_sell'
+        ? -quantity
+        : op === 'option_exercise'
+        ? Number(line.quantity)
+        : quantity;
     const totalValue = Math.round(quantity * unitPrice * 100) / 100;
     const currentQty = Number(row.quantity_delta ?? 0);
     const currentUnit = Number(row.unit_value ?? 0);
     const currentTotal = Number(row.total_value ?? 0);
+    const currentItemId = String(row.patrimony_item_id ?? '');
+    const incomingItemId = String(item.id);
     if (
+      currentItemId === incomingItemId &&
       Math.abs(currentQty - quantityDelta) < 0.000001 &&
       Math.abs(currentUnit - unitPrice) < 0.000001 &&
       Math.abs(currentTotal - totalValue) < 0.01
@@ -702,20 +727,29 @@ export class InvestOperations {
 
     const meta = InvestOperations.parseRowMetadata(row.metadata);
     await this.gateway.update(ic, 'patrimony_ledger_entries', String(row.id), {
+      patrimony_item_id: incomingItemId,
       quantity_delta: quantityDelta,
       unit_value: unitPrice,
       total_value: totalValue,
       impacts_valuation: true,
+      notes: line.notes ?? (row.notes == null ? null : String(row.notes)),
       metadata: {
         ...meta,
         legacy_op: op,
         broker_note_ref: ref,
         total_net_value: Number(line.total_net_value ?? totalValue),
+        skip_financial_ledger: Boolean(line.skip_financial_ledger),
+        ...(line.option_strike != null && line.option_strike > 0
+          ? { option_strike: line.option_strike }
+          : {}),
         repaired_from_import: true,
         repaired_at: new Date().toISOString(),
       },
     });
-    await this.inventoryLedger.rebuildAndPersist(ic, String(row.patrimony_item_id));
+    await this.inventoryLedger.rebuildAndPersist(ic, incomingItemId);
+    if (currentItemId && currentItemId !== incomingItemId) {
+      await this.inventoryLedger.rebuildAndPersist(ic, currentItemId);
+    }
     return true;
   }
 
