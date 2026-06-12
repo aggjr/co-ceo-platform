@@ -1203,10 +1203,12 @@ export class InvestController {
     }
 
     const today = new Date().toISOString().slice(0, 10);
+    const from = String(req.query.from || '').slice(0, 10);
+    const to = String(req.query.to || today).slice(0, 10);
     const events = await this.ledger.listLedgerEvents(
       ctx,
       await this.ledgerStartDateFor(ctx),
-      today
+      to || today
     );
     const cashEvents = events.filter((e) => e.asset_type === 'cash');
     const tradeEvents = events.filter((e) => e.asset_type !== 'cash');
@@ -1236,6 +1238,10 @@ export class InvestController {
 
       const amount = ce.total_net_value;
       balance += amount;
+      const rowDate = String(ce.transaction_date || '').slice(0, 10);
+      if ((from && rowDate < from) || (to && rowDate > to)) {
+        continue;
+      }
       let obs = '';
       let originDate = '';
       let ticker = '';
