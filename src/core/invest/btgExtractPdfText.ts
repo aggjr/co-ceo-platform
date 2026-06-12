@@ -5,7 +5,7 @@
 
 import { parseBrNumber } from './BtgExtractLineParser';
 
-const DATE_LINE = /^(\d{2})\/(\d{2})\/(\d{4}|\d{2})\s*(.*)$/;
+const DATE_LINE = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})\s*(.*)$/;
 // Sinal negativo opcional ANTES do numero. Saldo do BTG fica negativo quando a
 // compra (ex. exercicio de PUT vendida) excede o caixa disponivel.
 const BR_AMOUNT = /-?\d{1,3}(?:\.\d{3})*,\d{2}/g;

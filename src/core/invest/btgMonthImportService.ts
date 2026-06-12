@@ -34,13 +34,8 @@ import {
   previewBtgExtractUpload,
 } from './btgUploadImportService';
 
-/**
- * Notas = patrimônio; caixa = extrato.
- * LIQ BOLSA é desabilitada aqui: na simulação de preview o LiqBolsaSettlementService
- * não roda, então parsear pending_settlement causaria dupla contagem no batimento
- * (o crédito/débito real já vem das notas de corretagem).
- */
-const MONTH_IMPORT_EXTRACT_OPTS: BtgExtractParseOptions = { includeLiqBolsa: false };
+/** Notas = patrimônio; caixa = extrato (inclui LIQ BOLSA agregada). */
+const MONTH_IMPORT_EXTRACT_OPTS: BtgExtractParseOptions = { includeLiqBolsa: true };
 
 export type BtgMonthImportPreview = {
   kind: 'month_import';
@@ -144,11 +139,6 @@ export function stripBtgImportCashFromMonthForward(
 function projectedCashFromExtractLines(lines: LedgerImportLine[]): LedgerEvent[] {
   const out: LedgerEvent[] = [];
   for (const line of lines) {
-    // Linhas pending_settlement (LIQ BOLSA) são marcadores para o LiqBolsaSettlementService
-    // casar com eventos de negócio durante o apply real. Na simulação de preview esse serviço
-    // não roda: incluir essas linhas causaria dupla contagem no batimento, pois o fluxo de
-    // caixa correspondente já está representado pelas notas de corretagem do mês.
-    if (line.operation === 'pending_settlement') continue;
     const net = importLineExpectedCashNet(line);
     if (net == null || Math.abs(net) < 0.005) continue;
     const d = String(line.date || '').slice(0, 10);
