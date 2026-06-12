@@ -35,12 +35,11 @@ import {
 } from './btgUploadImportService';
 
 /**
- * Notas = patrimônio; caixa = extrato.
- * LIQ BOLSA é desabilitada aqui: na simulação de preview o LiqBolsaSettlementService
- * não roda, então parsear pending_settlement causaria dupla contagem no batimento
- * (o crédito/débito real já vem das notas de corretagem).
+ * Notas = patrimônio (skip_financial_ledger=true); caixa vem exclusivamente do extrato.
+ * LIQ BOLSA deve ser incluída na simulação: ela representa liquidações D+2 do mês anterior
+ * que se liquidam no início do mês corrente — sem ela o saldo inicial não bate com o extrato.
  */
-const MONTH_IMPORT_EXTRACT_OPTS: BtgExtractParseOptions = { includeLiqBolsa: false };
+const MONTH_IMPORT_EXTRACT_OPTS_APPLY: BtgExtractParseOptions = { includeLiqBolsa: true };
 
 export type BtgMonthImportPreview = {
   kind: 'month_import';
@@ -144,11 +143,9 @@ export function stripBtgImportCashFromMonthForward(
 function projectedCashFromExtractLines(lines: LedgerImportLine[]): LedgerEvent[] {
   const out: LedgerEvent[] = [];
   for (const line of lines) {
-    // Linhas pending_settlement (LIQ BOLSA) são marcadores para o LiqBolsaSettlementService
-    // casar com eventos de negócio durante o apply real. Na simulação de preview esse serviço
-    // não roda: incluir essas linhas causaria dupla contagem no batimento, pois o fluxo de
-    // caixa correspondente já está representado pelas notas de corretagem do mês.
-    if (line.operation === 'pending_settlement') continue;
+    // LIQ BOLSA (pending_settlement) é incluída: notas usam skip_financial_ledger=true,
+    // portanto o caixa de negócios vem exclusivamente do extrato via LIQ BOLSA.
+    // Não há dupla contagem porque nenhuma perna de caixa é criada pelas notas.
     const net = importLineExpectedCashNet(line);
     if (net == null || Math.abs(net) < 0.005) continue;
     const d = String(line.date || '').slice(0, 10);
@@ -169,32 +166,31 @@ function projectedCashFromExtractLines(lines: LedgerImportLine[]): LedgerEvent[]
 }
 
 /**
- * Livro para batimento do mês: se já importado, usa o livro real; senão remove caixa
- * do mês do livro e simula notas + extrato uma vez (evita Δ ~55k por dupla contagem).
+ * Livro para batimento do mês: remove caixa BTG do mês alvo em diante e simula o
+ * extrato completo (incluindo LIQ BOLSA). Notas não contribuem com caixa porque
+ * são importadas com skip_financial_ledger=true; todo o caixa vem do extrato.
+ * Incluir LIQ BOLSA é essencial: liquidações D+2 do mês anterior que se liquidam
+ * nos primeiros dias do mês corrente aparecem no extrato corrente, não no anterior.
  */
 export async function buildMonthReconcileLedger(
-  ctx: UserContext,
-  ledger: LedgerImportService,
   month: string,
-  notesEvents: LedgerEvent[],
   extractFile: BtgUploadFileInput | undefined,
   baseLedger: LedgerEvent[]
 ): Promise<LedgerEvent[]> {
   const stripped = stripBtgImportCashFromMonthForward(baseLedger, month);
-  const baseWithNotes = [...stripped, ...notesEvents];
-  
+
   if (extractFile?.contentBase64) {
     try {
       const extractLines = await parseExtractUploadImportLines(
         extractFile,
-        MONTH_IMPORT_EXTRACT_OPTS
+        { includeLiqBolsa: true }
       );
-      return [...baseWithNotes, ...projectedCashFromExtractLines(extractLines)];
+      return [...stripped, ...projectedCashFromExtractLines(extractLines)];
     } catch {
       /* parse falha */
     }
   }
-  return baseWithNotes;
+  return stripped;
 }
 
 function evaluateMonthPreview(
@@ -307,10 +303,7 @@ export async function previewBtgMonthImport(
   const today = new Date().toISOString().slice(0, 10);
   const baseLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
   const reconcileLedger = await buildMonthReconcileLedger(
-    ctx,
-    ledger,
     monthNorm,
-    notes.simulatedLedgerLines ? projectedCashFromExtractLines(notes.simulatedLedgerLines) : [],
     extractFile,
     baseLedger
   );
@@ -396,7 +389,7 @@ export async function applyBtgMonthImport(
 
   const notesApply = await applyBtgBrokerageUpload(ctx, ledger, noteFiles);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
-    parseOptions: MONTH_IMPORT_EXTRACT_OPTS,
+    parseOptions: MONTH_IMPORT_EXTRACT_OPTS_APPLY,
     keepUnmatchedLiqBolsaAsCash: true,
   });
 

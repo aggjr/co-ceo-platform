@@ -103,10 +103,7 @@ describe('btgMonthImportService', () => {
     };
 
     const projected = await buildMonthReconcileLedger(
-      {} as never,
-      {} as never,
       '2026-04',
-      [],
       extractFile,
       events
     );
