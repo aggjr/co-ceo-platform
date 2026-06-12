@@ -17,6 +17,7 @@ export const BTG_MONTHS_2026: BtgMonthSpec[] = [
   { month: '2026-03', extractFile: 'Mar_2026.pdf', notesDirName: '004176105_20260301_20260331', label: 'Mar/2026' },
   { month: '2026-04', extractFile: 'Abr_2026.pdf', notesDirName: '004176105_20260401_20260430', label: 'Abr/2026' },
   { month: '2026-05', extractFile: 'Mai_2026.pdf', notesDirName: '004176105_20260426_20260525', label: 'Mai/2026' },
+  { month: '2026-06', extractFile: 'Jun_2026.pdf', notesDirName: '004176105_20260526_20260625', label: 'Jun/2026' },
 ];
 
 export function btgSourcesBase(): string {
