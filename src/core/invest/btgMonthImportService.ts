@@ -170,10 +170,6 @@ export async function buildMonthReconcileLedger(
   extractFile: BtgUploadFileInput | undefined,
   baseLedger: LedgerEvent[]
 ): Promise<LedgerEvent[]> {
-  if (isExtractMonthInLedger(baseLedger, month)) {
-    return baseLedger;
-  }
-
   const stripped = stripBtgImportCashFromMonthForward(baseLedger, month);
   if (extractFile?.contentBase64) {
     try {
@@ -228,7 +224,7 @@ function evaluateMonthPreview(
     extract.openingLedgerOk === true &&
     extract.closingLedgerOk === true;
 
-  const financialOk = reconciled && !extract.monthAlreadyImported;
+  const financialOk = reconciled;
 
   const financialParts: string[] = [];
   if (!extract.parseOk) financialParts.push(extract.parseError || 'extrato ilegível');
@@ -261,7 +257,7 @@ function evaluateMonthPreview(
   let resultDetail = '';
   if (resultOk) {
     resultDetail = extract.monthAlreadyImported
-      ? 'Mês importado: notas e extrato batem com o livro.'
+      ? 'Mês pronto para atualizar: notas e extrato batem; duplicados serão descartados e apenas novidades serão inseridas.'
       : 'Mês pronto para importar: notas e extrato coerentes com o livro (simulação pós-notas).';
   } else if (notesOk && extract.parseOk && extract.closingLedgerOk === false) {
     resultDetail =
@@ -367,7 +363,7 @@ export async function applyBtgMonthImport(
     };
   }
 
-  if (preview.extract.monthAlreadyImported) {
+  if (!preview.resultOk) {
     return {
       ...preview,
       applied: false,
@@ -376,23 +372,10 @@ export async function applyBtgMonthImport(
       extractInserted: 0,
       extractSkipped: 0,
       resultDetail:
-        'Extrato deste mês já consta no livro (BTG-EXT). Apague o mês antes de reimportar.',
+        preview.resultDetail ||
+        'Valide notas e extrato antes de gravar este mes.',
     };
   }
-
-  // if (!preview.financialOk) {
-  //   return {
-  //     ...preview,
-  //     applied: false,
-  //     notesInserted: 0,
-  //     notesSkipped: 0,
-  //     extractInserted: 0,
-  //     extractSkipped: 0,
-  //     resultDetail:
-  //       preview.financialDetail ||
-  //       'Batimento financeiro não OK — ajuste abertura ou extrato antes de gravar.',
-  //   };
-  // }
 
   const noteFiles = filterFilesForMonth(
     noteFilesAll.filter((f) => isPdfPath(f.name)),

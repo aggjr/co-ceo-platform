@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import {
+  buildMonthReconcileLedger,
   filterFilesForMonth,
   isMonthBtgImportCashEvent,
   stripBtgImportCashFromMonthForward,
@@ -69,5 +69,52 @@ describe('btgMonthImportService', () => {
     const stripped = stripBtgImportCashFromMonthForward(events, '2026-03');
     expect(stripped).toHaveLength(1);
     expect(stripped[0]?.transaction_date).toBe('2026-02-28');
+  });
+
+  it('buildMonthReconcileLedger reprojeta extrato quando mes ja tem lancamentos', async () => {
+    const events: LedgerEvent[] = [
+      {
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'cash_yield',
+        transaction_date: '2026-04-01',
+        total_net_value: 10,
+        broker_note_ref: 'BTG-EXT-2026-04-01#01',
+      } as LedgerEvent,
+      {
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'cash_yield',
+        transaction_date: '2026-03-31',
+        total_net_value: 100,
+        broker_note_ref: 'BTG-EXT-2026-03-31#01',
+      } as LedgerEvent,
+    ];
+    const extractFile = {
+      name: 'Extrato_202604.txt',
+      contentBase64: Buffer.from(
+        [
+          'Saldo Inicial 100,00',
+          '01/04/2026 Rendimento Disponivel - Saldo Remunerado 110,00 10,00',
+          '12/04/2026 Rendimento Disponivel - Saldo Remunerado 112,00 2,00',
+        ].join('\n'),
+        'utf8'
+      ).toString('base64'),
+    };
+
+    const projected = await buildMonthReconcileLedger(
+      {} as never,
+      {} as never,
+      '2026-04',
+      [],
+      extractFile,
+      events
+    );
+
+    expect(projected.some((e) => e.broker_note_ref === 'BTG-EXT-2026-04-01#01')).toBe(false);
+    expect(
+      projected.filter((e) => String(e.broker_note_ref || '').startsWith('BTG-EXT-2026-04'))
+    ).toHaveLength(2);
+    expect(projected.reduce((sum, e) => sum + Number(e.total_net_value || 0), 0)).toBeCloseTo(112);
   });
 });

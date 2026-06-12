@@ -157,7 +157,7 @@ export async function InvestIntegracaoMensalPage(container) {
   function refreshButtons() {
     const readyForValidation = Boolean(monthInput?.value && extractFile && noteFiles.length);
     if (btnValidate) btnValidate.disabled = !readyForValidation;
-    const okToApply = Boolean(lastPreview?.resultOk && !lastPreview?.monthAlreadyImported);
+    const okToApply = Boolean(lastPreview?.resultOk);
     if (btnApply) btnApply.disabled = !okToApply;
     if (readyBadge) {
       readyBadge.className = `monthly-badge ${okToApply ? 'monthly-badge--ok' : 'monthly-badge--idle'}`;
@@ -218,7 +218,7 @@ export async function InvestIntegracaoMensalPage(container) {
       const data = await runMonthImport(true);
       lastPreview = data?.preview || data;
       if (previewEl) previewEl.innerHTML = renderPreview(data);
-      const ok = Boolean(lastPreview?.resultOk && !lastPreview?.monthAlreadyImported);
+      const ok = Boolean(lastPreview?.resultOk);
       setStatus(ok ? 'Mês validado e pronto para aplicar.' : 'Validação encontrou bloqueios.', ok ? 'ok' : 'err');
     } catch (err) {
       lastPreview = null;
