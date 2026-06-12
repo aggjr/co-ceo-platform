@@ -78,6 +78,7 @@ export type BtgBrokerageImportPreview = {
   notesRaw: number;
   notesKept: number;
   ledgerLines: number;
+  simulatedLedgerEvents?: LedgerEvent[];
 };
 
 export type BtgExtractFileResult = {
@@ -815,6 +816,7 @@ export async function previewBtgBrokerageUpload(
   }
 
   const { kept: allKept } = dedupeBrokerageNotes(allNotes);
+  const finalLedgerLines = suppressBrokerageNoteCashLines(brokerageNotesToLedgerLines(allKept));
 
   return {
     kind: 'brokerage_notes',
@@ -823,7 +825,8 @@ export async function previewBtgBrokerageUpload(
     filesOk: fileResults.filter((f) => f.parseOk).length,
     notesRaw: allNotes.length,
     notesKept: allKept.length,
-    ledgerLines: suppressBrokerageNoteCashLines(brokerageNotesToLedgerLines(allKept)).length,
+    ledgerLines: finalLedgerLines.length,
+    simulatedLedgerEvents: finalLedgerLines,
   };
 }
 

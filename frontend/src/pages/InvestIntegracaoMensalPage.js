@@ -26,14 +26,15 @@ function formatBool(ok) {
 function renderPreview(data) {
   const p = data?.preview || data;
   if (!p) return '<p class="muted">Aguardando validação.</p>';
+  const e = p.extract || p;
   const rows = [
     ['Notas', formatBool(p.notesOk), p.notesDetail],
     ['Financeiro', formatBool(p.financialOk), p.financialDetail],
     ['Resultado', formatBool(p.resultOk), p.resultDetail],
-    ['Saldo inicial extrato', formatMoney(p.openingExtract), `Livro: ${formatMoney(p.openingLedgerBalance)}`],
-    ['Diferença inicial', formatMoney(p.openingLedgerDelta), ''],
-    ['Saldo final extrato', formatMoney(p.closingExtract), `Livro: ${formatMoney(p.closingLedgerBalance)}`],
-    ['Diferença final', formatMoney(p.closingLedgerDelta), ''],
+    ['Saldo inicial extrato', formatMoney(e.openingExtract), `Livro: ${formatMoney(e.openingLedgerBalance)}`],
+    ['Diferença inicial', formatMoney(e.openingLedgerDelta), ''],
+    ['Saldo final extrato', formatMoney(e.closingExtract), `Livro: ${formatMoney(e.closingLedgerBalance)}`],
+    ['Diferença final', formatMoney(e.closingLedgerDelta), ''],
   ];
   return `
     <table class="monthly-preview-table">

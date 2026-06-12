@@ -176,23 +176,25 @@ export async function buildMonthReconcileLedger(
   ctx: UserContext,
   ledger: LedgerImportService,
   month: string,
-  noteFiles: BtgUploadFileInput[],
+  notesEvents: LedgerEvent[],
   extractFile: BtgUploadFileInput | undefined,
   baseLedger: LedgerEvent[]
 ): Promise<LedgerEvent[]> {
   const stripped = stripBtgImportCashFromMonthForward(baseLedger, month);
+  const baseWithNotes = [...stripped, ...notesEvents];
+  
   if (extractFile?.contentBase64) {
     try {
       const extractLines = await parseExtractUploadImportLines(
         extractFile,
         MONTH_IMPORT_EXTRACT_OPTS
       );
-      return [...stripped, ...projectedCashFromExtractLines(extractLines)];
+      return [...baseWithNotes, ...projectedCashFromExtractLines(extractLines)];
     } catch {
       /* parse falha */
     }
   }
-  return stripped;
+  return baseWithNotes;
 }
 
 function evaluateMonthPreview(
@@ -308,7 +310,7 @@ export async function previewBtgMonthImport(
     ctx,
     ledger,
     monthNorm,
-    noteFiles,
+    notes.simulatedLedgerEvents || [],
     extractFile,
     baseLedger
   );
