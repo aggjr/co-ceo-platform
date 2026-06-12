@@ -31,6 +31,7 @@ export type StoredPortfolioDay = {
 export type RecordPortfolioDayInput = {
   snapshotDate: string;
   point: DailyPatrimonyPoint;
+  validationPoint?: DailyPatrimonyPoint;
   patrimonyGross: number;
   fixedIncomeTotal: number;
   externalFlow: number;
@@ -487,7 +488,7 @@ export class PatrimonyDailyStore {
     ctx: UserContext,
     input: Pick<
       RecordPortfolioDayInput,
-      'snapshotDate' | 'point' | 'fixedIncomeTotal'
+        'snapshotDate' | 'point' | 'validationPoint' | 'fixedIncomeTotal'
     >,
     tolerance = POSITION_DAILY_TOLERANCE
   ): Promise<PositionDailyConsistencyResult> {
@@ -547,10 +548,13 @@ export class PatrimonyDailyStore {
       fixedIncomeTotal: round2(fixedIncomeTotal),
     };
     const expected = {
-      patrimony: round2(input.point.patrimony),
-      cash: round2(input.point.settledCash ?? input.point.cash),
-      cashInTransit: round2(input.point.cashInTransit ?? input.point.pendingSettlements),
-      positionsValue: round2(input.point.positionsValue),
+      patrimony: round2((input.validationPoint ?? input.point).patrimony),
+      cash: round2((input.validationPoint ?? input.point).settledCash ?? (input.validationPoint ?? input.point).cash),
+      cashInTransit: round2(
+        (input.validationPoint ?? input.point).cashInTransit ??
+          (input.validationPoint ?? input.point).pendingSettlements
+      ),
+      positionsValue: round2((input.validationPoint ?? input.point).positionsValue),
       fixedIncomeTotal: round2(input.fixedIncomeTotal),
     };
     const deltas = {

@@ -287,9 +287,10 @@ export class PatrimonyDailyRecorder {
       throw new Error(`Sem patrimônio econômico calculado para ${date}.`);
     }
 
+    let economicMtm = mtm;
     let economicPoint = recordPoint;
     if (useCalibration) {
-      const economicMtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
+      economicMtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
         ...mtmOpts,
         calibrateToAnchors: false,
       });
@@ -324,7 +325,7 @@ export class PatrimonyDailyRecorder {
       cumulativeTwr = 0;
     }
 
-    const positions = mtm.positionSnapshots ?? [];
+    const positions = (useCalibration ? economicMtm.positionSnapshots : mtm.positionSnapshots) ?? [];
     const fixedIncomePositions = positions.filter(
       (p) => String(p.assetType) === 'fixed_income'
     );
@@ -337,6 +338,7 @@ export class PatrimonyDailyRecorder {
     const recorded = await this.store.upsertPortfolioDay(ctx, {
       snapshotDate: date,
       point: recordPoint,
+      validationPoint: economicPoint,
       patrimonyGross,
       fixedIncomeTotal: markedFixedIncomeTotal,
       externalFlow,
