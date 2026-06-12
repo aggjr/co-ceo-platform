@@ -1,4 +1,5 @@
 import { SettlementRulesService } from '../../../src/core/invest/SettlementRulesService';
+import { addBusinessDays, isB3BusinessHoliday } from '../../../src/core/invest/settlementCalendar';
 import { InMemoryGateway } from '../core/business-events/inMemoryGateway';
 import type { UserContext } from '../../../src/core/dal/types';
 import { SYSTEM_INSTALLER_USER_ID } from '../../../src/core/dal/types';
@@ -85,5 +86,24 @@ describe('SettlementRulesService', () => {
       'settlement_rule_candidates',
       ['stock', 'buy', '2026-01-06', '2026-01-06']
     );
+  });
+
+  it('liquidacao B3 pula feriado nacional de 21/04', async () => {
+    const gateway = new InMemoryGateway();
+    const service = new SettlementRulesService(gateway as any);
+
+    expect(isB3BusinessHoliday('2026-04-21')).toBe(true);
+    expect(addBusinessDays('2026-04-17', 2)).toBe('2026-04-22');
+    await expect(
+      service.resolveSettlementDate(
+        {
+          tradeDate: '2026-04-17',
+          assetType: 'stock',
+          transactionType: 'buy',
+          ticker: 'PRIO3',
+        },
+        nodeCtx
+      )
+    ).resolves.toBe('2026-04-22');
   });
 });

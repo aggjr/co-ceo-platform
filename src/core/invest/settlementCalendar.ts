@@ -191,7 +191,59 @@ function formatUtcDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Soma N dias úteis (sáb/dom não contam). Feriados B3: fase 2. */
+function addUtcDays(d: Date, days: number): Date {
+  const out = new Date(d.getTime());
+  out.setUTCDate(out.getUTCDate() + days);
+  return out;
+}
+
+function easterSundayUtc(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day, 12));
+}
+
+function b3HolidaySet(year: number): Set<string> {
+  const fixed = [
+    `${year}-01-01`,
+    `${year}-04-21`,
+    `${year}-05-01`,
+    `${year}-09-07`,
+    `${year}-10-12`,
+    `${year}-11-02`,
+    `${year}-11-15`,
+    `${year}-12-25`,
+  ];
+  const easter = easterSundayUtc(year);
+  return new Set([
+    ...fixed,
+    formatUtcDate(addUtcDays(easter, -48)), // Carnaval segunda
+    formatUtcDate(addUtcDays(easter, -47)), // Carnaval terca
+    formatUtcDate(addUtcDays(easter, -2)),  // Paixao de Cristo
+    formatUtcDate(addUtcDays(easter, 60)),  // Corpus Christi
+  ]);
+}
+
+export function isB3BusinessHoliday(isoDate: string): boolean {
+  const d = parseUtcDate(isoDate);
+  if (!d) return false;
+  const year = d.getUTCFullYear();
+  return b3HolidaySet(year).has(formatUtcDate(d));
+}
+
+/** Soma N dias úteis B3 (sáb/dom e feriados nacionais/B3 não contam). */
 export function addBusinessDays(isoDate: string, businessDays: number): string {
   let remaining = Math.max(0, Math.floor(businessDays));
   const d = parseUtcDate(isoDate);
@@ -200,6 +252,7 @@ export function addBusinessDays(isoDate: string, businessDays: number): string {
     d.setUTCDate(d.getUTCDate() + 1);
     const dow = d.getUTCDay();
     if (dow === 0 || dow === 6) continue;
+    if (isB3BusinessHoliday(formatUtcDate(d))) continue;
     remaining -= 1;
   }
   return formatUtcDate(d);

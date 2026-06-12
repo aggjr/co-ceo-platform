@@ -229,7 +229,7 @@ export async function InvestIntegracaoMensalPage(container) {
   });
 
   btnApply?.addEventListener('click', async () => {
-    if (!lastPreview?.resultOk || lastPreview?.monthAlreadyImported) return;
+    if (!lastPreview?.resultOk) return;
     btnApply.disabled = true;
     if (btnValidate) btnValidate.disabled = true;
     setStatus('Aplicando mês no servidor...');

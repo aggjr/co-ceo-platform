@@ -1,5 +1,6 @@
 import type { CoCeoDataGateway } from '../dal';
 import type { UserContext } from '../dal';
+import { SYSTEM_INSTALLER_USER_ID } from '../dal';
 import type { LedgerEvent } from './CustodyEngine';
 import type { InvestOperations } from '../../modules/invest';
 import { inferAssetType } from './assetClassifier';
@@ -16,6 +17,7 @@ export type AutoPendingSyncResult = {
   created: number;
   cleared: number;
   skipped: number;
+  repaired?: number;
 };
 
 type AutoPendingSettlementResolution = {
@@ -89,6 +91,7 @@ export async function syncAutoPendingSettlements(
   const today = (options.today || new Date().toISOString().slice(0, 10)).slice(0, 10);
   const pendingByRef = new Map<string, number>();
   const settlementRefs = new Set<string>();
+  const clearDateByRef = new Map<string, string>();
 
   for (const e of events) {
     if (String(e.transaction_type) !== 'pending_settlement') continue;
@@ -96,13 +99,25 @@ export async function syncAutoPendingSettlements(
     if (!rawRef.startsWith(AUTO_D2_REF_PREFIX)) continue;
     const baseRef = rawRef.endsWith(':CLEAR') ? rawRef.slice(0, -':CLEAR'.length) : rawRef;
     settlementRefs.add(baseRef);
+    if (rawRef.endsWith(':CLEAR')) {
+      clearDateByRef.set(baseRef, String(e.transaction_date || '').slice(0, 10));
+    }
     pendingByRef.set(baseRef, (pendingByRef.get(baseRef) ?? 0) + Number(e.total_net_value ?? 0));
   }
 
   let created = 0;
   let cleared = 0;
+  let repaired = 0;
   let skipped = 0;
   const settlementRules = new SettlementRulesService(gateway);
+  const installerCtx: UserContext | null = ctx.organizationId
+    ? {
+        userId: SYSTEM_INSTALLER_USER_ID,
+        organizationId: ctx.organizationId,
+        impersonatorId: null,
+        scope: 'global',
+      }
+    : null;
 
   for (const e of events) {
     if (!e.id) continue;
@@ -147,6 +162,26 @@ export async function syncAutoPendingSettlements(
 
     if (settlement.settleOn > today) continue;
 
+    const clearDate = clearDateByRef.get(ref);
+    if (clearDate && clearDate !== settlement.settleOn && installerCtx) {
+      const clearRef = `${ref}:CLEAR`;
+      const rows = await gateway.findWhere(
+        installerCtx,
+        'financial_ledger_entries',
+        { external_ref: `BROKER_REF:${clearRef}` },
+        { limit: 10 }
+      );
+      for (const row of rows) {
+        await gateway.update(installerCtx, 'financial_ledger_entries', String(row.id), {
+          transaction_date: settlement.settleOn,
+          settlement_date: settlement.settleOn,
+          description: `Liquidacao na conta - ${settlement.ruleLabel} - ${settlement.ticker} (${settlement.settleOn})`,
+        });
+        repaired += 1;
+      }
+      clearDateByRef.set(ref, settlement.settleOn);
+    }
+
     if (Math.abs(open) >= 0.01) {
       const result = await options.operations.recordOperation(ctx, {
         date: settlement.settleOn,
@@ -170,5 +205,5 @@ export async function syncAutoPendingSettlements(
     }
   }
 
-  return { created, cleared, skipped };
+  return { created, cleared, skipped, repaired };
 }
