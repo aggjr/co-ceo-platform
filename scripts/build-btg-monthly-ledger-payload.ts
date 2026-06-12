@@ -75,6 +75,46 @@ function ref(prefix: string, ...parts: Array<string | number>): string {
   return ['BTG-MONTHLY', prefix, ...parts].join(':');
 }
 
+function parseTransitIrrfLines(lines: string[]): LedgerImportLine[] {
+  const entries: LedgerImportLine[] = [];
+  let inTransit = false;
+  let seq = 0;
+  for (const line of lines) {
+    if (/Valores em tr[aâ]nsito/i.test(line)) {
+      inTransit = true;
+      continue;
+    }
+    if (!inTransit) continue;
+    if (/^Total\b/i.test(line)) {
+      inTransit = false;
+      continue;
+    }
+    const m = line.match(
+      /^(\d{2}\/\d{2}\/\d{2})\s+LIQ BOLSA \(IRRF\)\s+-\s+Preg[aã]o:(\d{2}\/\d{2}\/\d{4})\s+(-?[\d.]+,\d{2})/i
+    );
+    if (!m) continue;
+    seq += 1;
+    const settlementDate = isoDate(m[1]!);
+    const tradeDate = isoDate(m[2]!.replace(/\/(\d{4})$/, (_m, y) => `/${String(y).slice(2)}`));
+    entries.push({
+      date: tradeDate,
+      ticker: 'CAIXA-BTG',
+      asset_type: 'cash',
+      operation: 'pending_settlement',
+      quantity: 0,
+      unit_price: 0,
+      total_net_value: parseBr(m[3]!),
+      settlement_date: settlementDate,
+      settlement_status: 'pending',
+      broker_note_ref: ref('TRANSIT-IRRF', tradeDate, seq),
+      event_source_ref: eventRefForTradeDate(tradeDate),
+      source_system: 'btg_monthly_statement.transit',
+      notes: 'IRRF em transito informado no demonstrativo BTG',
+    });
+  }
+  return entries;
+}
+
 type LftLot = {
   acquisitionDate: string;
   quantity: number;
@@ -488,6 +528,8 @@ async function buildPayload(pdfPath: string, previousPayloadPath?: string): Prom
       source_system: 'btg_monthly_statement.cash',
     } as LedgerImportLine);
   }
+
+  entries.push(...parseTransitIrrfLines(lines));
 
   const finalCashLine = parseFinalCashLine(lines, closingDate);
   if (Math.abs(finalCashLine.provisionedYield) >= 0.005) {
