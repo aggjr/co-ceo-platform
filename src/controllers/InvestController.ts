@@ -66,6 +66,7 @@ import {
 } from '../core/invest/assetClassifier';
 import { resolveCashInvestDisplayBalance } from '../core/invest/cashInvestLedger';
 import { buildCashInTransitSummary } from '../core/invest/cashInTransit';
+import { AUTO_D2_REF_PREFIX } from '../core/invest/AutoPendingSettlementSync';
 import { loadOptionMarketCatalog } from '../core/invest/optionMarketCatalog';
 import { buildOptionStrikeMapFromLedgerEvents } from '../core/invest/optionStrikeFromLedger';
 import {
@@ -1226,6 +1227,12 @@ export class InvestController {
 
     for (const ce of cashEvents) {
       if (isDuplicateManualOpeningCash(ce, cashEvents)) continue;
+      if (
+        ce.transaction_type === 'pending_settlement' &&
+        String(ce.broker_note_ref || '').startsWith(AUTO_D2_REF_PREFIX)
+      ) {
+        continue;
+      }
 
       const amount = ce.total_net_value;
       balance += amount;
