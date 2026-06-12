@@ -115,6 +115,11 @@ export const MENU_CATALOG = [
         resourceKey: 'screen.invest.results',
       },
       {
+        label: 'Integração mensal',
+        path: '/invest/integracao-mensal',
+        resourceKey: 'screen.invest.results',
+      },
+      {
         label: 'Conciliação',
         path: '/invest/conciliacao',
         resourceKey: 'screen.invest.results',

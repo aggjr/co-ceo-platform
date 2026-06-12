@@ -79,6 +79,50 @@ export async function pickFilesFromFolder(opts = {}) {
   });
 }
 
+/**
+ * @param {{ extensions?: string[] }} opts
+ * @returns {Promise<{ file: { name: string, contentBase64: string }, files: Array<{ name: string, contentBase64: string }>, folderPath: string, fileCountLabel: string }>}
+ */
+export async function pickSingleFile(opts = {}) {
+  const exts = (opts.extensions || ['.pdf']).map((e) =>
+    e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`
+  );
+
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = false;
+    input.accept = exts.join(',');
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.addEventListener('change', async () => {
+      try {
+        const raw = [...(input.files || [])];
+        const matched = raw.find((f) => {
+          const n = f.name.toLowerCase();
+          return exts.some((ext) => n.endsWith(ext));
+        });
+        if (!matched) throw new Error('Nenhum arquivo compatível selecionado.');
+        const file = {
+          name: matched.name,
+          contentBase64: await readFileAsBase64(matched),
+        };
+        document.body.removeChild(input);
+        resolve({
+          file,
+          files: [file],
+          folderPath: matched.name,
+          fileCountLabel: fileCountLabel(1, matched.name),
+        });
+      } catch (e) {
+        document.body.removeChild(input);
+        reject(e);
+      }
+    });
+    input.click();
+  });
+}
+
 /** @returns {Promise<{ files: Array<{ name: string, contentBase64: string }>, folderPath: string, fileCountLabel: string }>} */
 export async function pickPdfFilesFromFolder() {
   return pickFilesFromFolder({ extensions: ['.pdf'] });

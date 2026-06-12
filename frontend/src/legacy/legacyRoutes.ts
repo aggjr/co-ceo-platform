@@ -24,6 +24,7 @@ import { InvestClosedTradesPage } from '../pages/InvestClosedTradesPage.js';
 import { InvestStockGainPivotPage } from '../pages/InvestStockGainPivotPage.js';
 import { InvestHistoricoOperacoesPage } from '../pages/InvestHistoricoOperacoesPage.js';
 import { InvestConciliacaoPage } from '../pages/InvestConciliacaoPage.js';
+import { InvestIntegracaoMensalPage } from '../pages/InvestIntegracaoMensalPage.js';
 import { QualityRegressionPage } from '../pages/QualityRegressionPage.js';
 
 export type LegacyRouteDef = {
@@ -54,6 +55,7 @@ export const LEGACY_ROUTES: LegacyRouteDef[] = [
   { path: '/invest/resultado', loader: InvestResultadoPage },
   { path: '/invest/ganhos-por-acao', loader: InvestStockGainPivotPage },
   { path: '/invest/historico-operacoes', loader: InvestHistoricoOperacoesPage },
+  { path: '/invest/integracao-mensal', loader: InvestIntegracaoMensalPage },
   { path: '/invest/conciliacao', loader: InvestConciliacaoPage },
   { path: '/invest/transacoes-finalizadas', loader: InvestClosedTradesPage },
 ];
