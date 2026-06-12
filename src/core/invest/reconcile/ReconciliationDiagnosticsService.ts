@@ -673,7 +673,11 @@ export class ReconciliationDiagnosticsService {
   } {
     const sorted = [...events].sort((a, b) =>
       String(a.transaction_date).localeCompare(String(b.transaction_date)) ||
-      String(a.id ?? '').localeCompare(String(b.id ?? ''))
+      (String(a.transaction_type) === 'revaluation' && String(b.transaction_type) !== 'revaluation'
+        ? 1
+        : String(a.transaction_type) !== 'revaluation' && String(b.transaction_type) === 'revaluation'
+          ? -1
+          : String(a.id ?? '').localeCompare(String(b.id ?? '')))
     );
     const firstDate =
       openingDate ||

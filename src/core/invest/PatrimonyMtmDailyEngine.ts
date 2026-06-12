@@ -235,7 +235,12 @@ export function buildDailyPatrimonyMtmSeries(
   const valuationContext = options?.valuationContext;
 
   const sorted = [...entries].sort((a, b) =>
-    String(a.transaction_date).localeCompare(String(b.transaction_date))
+    String(a.transaction_date).localeCompare(String(b.transaction_date)) ||
+    (String(a.transaction_type) === 'revaluation' && String(b.transaction_type) !== 'revaluation'
+      ? 1
+      : String(a.transaction_type) !== 'revaluation' && String(b.transaction_type) === 'revaluation'
+        ? -1
+        : String(a.id ?? '').localeCompare(String(b.id ?? '')))
   );
   const byDay = groupByDate(sorted);
   const flowsByDate = aggregateExternalFlowsByDate(entries, from, to);
