@@ -153,8 +153,11 @@ export function buildStockUnderlyingPivot(
     const qty = Math.abs(Number(e.quantity));
     const price = Number(e.unit_price);
 
-    const isBuy = ['buy', 'put_buy', 'call_buy', 'opening_balance', 'bonus'].includes(type);
-    const isSell = ['sell', 'put_sell', 'call_sell', 'option_exercise'].includes(type);
+    // option_exercise num SHORT fecha a posição (o comprador exerceu contra nós);
+    // numa posição LONG, o option_exercise é equivalente a vender (exercemos o direito).
+    const isExerciseOnShort = type === 'option_exercise' && s.qty < 0;
+    const isBuy = ['buy', 'put_buy', 'call_buy', 'opening_balance', 'bonus'].includes(type) || isExerciseOnShort;
+    const isSell = ['sell', 'put_sell', 'call_sell', 'option_exercise'].includes(type) && !isExerciseOnShort;
 
     if (isBuy) {
       if (s.qty < 0) {
@@ -286,21 +289,41 @@ export function buildStockUnderlyingPivot(
             }
           }
         } else if (assetType === 'option_put' || assetType === 'option_call') {
-          if (['sell', 'call_sell', 'put_sell', 'option_exercise'].includes(type)) {
-             if (closedQty > 0 && wasLong) {
+          const isCall = assetType === 'option_call';
+          const colShort = isCall ? 'venda_call' : 'venda_put';
+          const colLong  = isCall ? 'compra_call' : 'compra_put';
+
+          if (['call_sell', 'put_sell'].includes(type)) {
+            if (closedQty > 0 && wasLong) {
+              // Fechando posição LONG (venda de opção comprada): P&L vs custo
+              const cashOfClosed = qty > 0 ? tradeCash * (closedQty / qty) : tradeCash;
+              addToRow(row, colLong, cashOfClosed - costBasisClosed);
+            } else if (closedQty === 0) {
+              // Abrindo posição SHORT: prêmio recebido vai para venda_call/venda_put
+              addToRow(row, colShort, tradeCash);
+            }
+          } else if (['call_buy', 'put_buy'].includes(type)) {
+            if (closedQty > 0 && !wasLong) {
+              // Recompra de SHORT (closing short): subtrai custo de venda_call/venda_put
+              // tradeCash é negativo (pagamos para fechar); reduz o ganho acumulado
+              const cashOfClosed = qty > 0 ? tradeCash * (closedQty / qty) : tradeCash;
+              addToRow(row, colShort, cashOfClosed);
+            }
+            // Abertura de LONG: custo de capital, não entra nas colunas de resultado
+          } else if (type === 'option_exercise') {
+            if (closedQty > 0 && !wasLong) {
+              // Exercício de SHORT (comprador exerceu contra nós): opção vai a zero/intrínseco.
+              // Se houver fluxo de caixa na opção em si (ex: opção exercida pelo valor intrínseco),
+              // ajusta venda_call/venda_put; caso contrário (tradeCash = 0) mantém o prêmio intacto.
+              if (tradeCash !== 0) {
                 const cashOfClosed = qty > 0 ? tradeCash * (closedQty / qty) : tradeCash;
-                const pnl = cashOfClosed - costBasisClosed;
-                if (assetType === 'option_call') addToRow(row, 'compra_call', pnl);
-                else if (assetType === 'option_put') addToRow(row, 'compra_put', pnl);
-             }
-          } 
-          else if (['buy', 'call_buy', 'put_buy'].includes(type)) {
-             if (closedQty > 0 && !wasLong) {
-                const cashOfClosed = qty > 0 ? tradeCash * (closedQty / qty) : tradeCash;
-                const pnl = cashOfClosed + costBasisClosed;
-                if (assetType === 'option_call') addToRow(row, 'venda_call', pnl);
-                else if (assetType === 'option_put') addToRow(row, 'venda_put', pnl);
-             }
+                addToRow(row, colShort, cashOfClosed);
+              }
+            } else if (closedQty > 0 && wasLong) {
+              // Exercício de LONG (exercemos nosso direito): P&L vs custo
+              const cashOfClosed = qty > 0 ? tradeCash * (closedQty / qty) : tradeCash;
+              addToRow(row, colLong, cashOfClosed - costBasisClosed);
+            }
           }
         }
         break;
@@ -341,7 +364,9 @@ export function buildStockUnderlyingPivot(
     'compra_call',
     'venda_put',
     'compra_put',
-    'resultado_custodia',
+    // resultado_custodia exclui dos gainCols: prêmio de opções SHORT abertas já está
+    // em venda_call/venda_put no momento da abertura. resultado_custodia permanece como
+    // coluna informativa (quanto de prêmio ainda está "em aberto" no período).
     'dividendos',
     'jcp',
     'locacao_acao',
