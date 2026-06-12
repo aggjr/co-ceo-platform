@@ -23,7 +23,10 @@ import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonth
 import { fixedIncomeTotalFromLedger } from '../core/invest/patrimonyLedgerGates';
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
-import { PatrimonyDailyRebuildService } from '../core/invest/PatrimonyDailyRebuildService';
+import {
+  PatrimonyDailyRebuildService,
+  type PatrimonyRebuildResult,
+} from '../core/invest/PatrimonyDailyRebuildService';
 import { ReconciliationSessionService } from '../core/invest/reconcile/ReconciliationSessionService';
 import { ReconciliationAuditService } from '../core/invest/reconcile/ReconciliationAuditService';
 import type { ReconcileAction } from '../core/invest/reconcile/auditTypes';
@@ -131,6 +134,21 @@ type ThreePricesRow = {
   lotStart: string | null;
   premiumBenefit: number;
 };
+
+function monthBounds(month: string): { from: string; to: string } | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]);
+  if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 1 || monthIndex > 12) {
+    return null;
+  }
+  const lastDay = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
+  return {
+    from: `${match[1]}-${match[2]}-01`,
+    to: `${match[1]}-${match[2]}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
 
 type CustodyDetailRow = {
   assetId: string;
@@ -1468,7 +1486,41 @@ export class InvestController {
         extractFile,
         noteFiles
       );
-      return res.json({ success: true, dryRun: false, ...result });
+      let patrimonyRebuild: PatrimonyRebuildResult | { ok: false; error: string } | null = null;
+      if (result.applied) {
+        const bounds = monthBounds(result.month);
+        if (!bounds) {
+          patrimonyRebuild = {
+            ok: false,
+            error: `Mes invalido para rebuild diario: ${result.month}.`,
+          };
+        } else {
+          try {
+            patrimonyRebuild = await this.patrimonyRebuild.rebuild(ctx, bounds);
+          } catch (rebuildErr) {
+            const message =
+              rebuildErr instanceof Error
+                ? rebuildErr.message
+                : 'Falha ao reconstruir patrimonio diario do mes.';
+            patrimonyRebuild = { ok: false, error: message };
+          }
+        }
+      }
+
+      const rebuildError =
+        patrimonyRebuild != null && 'ok' in patrimonyRebuild && !patrimonyRebuild.ok
+          ? patrimonyRebuild.error
+          : null;
+      return res.json({
+        success: true,
+        dryRun: false,
+        ...result,
+        resultOk: result.resultOk && !rebuildError,
+        patrimonyRebuild,
+        resultDetail: rebuildError
+          ? `${result.resultDetail} Rebuild diario pendente: ${rebuildError}`
+          : result.resultDetail,
+      });
     } catch (err: unknown) {
       const status = (err as { httpStatus?: number }).httpStatus ?? 500;
       const message =
