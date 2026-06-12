@@ -78,7 +78,7 @@ export type BtgBrokerageImportPreview = {
   notesRaw: number;
   notesKept: number;
   ledgerLines: number;
-  simulatedLedgerEvents?: LedgerEvent[];
+  simulatedLedgerLines?: LedgerImportLine[];
 };
 
 export type BtgExtractFileResult = {
@@ -826,7 +826,7 @@ export async function previewBtgBrokerageUpload(
     notesRaw: allNotes.length,
     notesKept: allKept.length,
     ledgerLines: finalLedgerLines.length,
-    simulatedLedgerEvents: finalLedgerLines,
+    simulatedLedgerLines: finalLedgerLines,
   };
 }
 
