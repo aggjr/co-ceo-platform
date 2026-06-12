@@ -25,7 +25,6 @@ CREATE TABLE IF NOT EXISTS invest_position_daily (
     metadata JSON NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (organization_id) REFERENCES organizations(id),
     UNIQUE KEY uq_invest_position_daily_org_date_ticker_account (
       organization_id, snapshot_date, ticker, asset_type, account_key
     ),

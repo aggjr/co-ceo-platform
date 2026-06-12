@@ -1511,14 +1511,23 @@ export class InvestController {
         patrimonyRebuild != null && 'ok' in patrimonyRebuild && !patrimonyRebuild.ok
           ? patrimonyRebuild.error
           : null;
+      const rebuildWrittenDays =
+        patrimonyRebuild != null && !('ok' in patrimonyRebuild)
+          ? patrimonyRebuild.daysWritten
+          : null;
+      const rebuildValidationError =
+        rebuildError ??
+        (result.applied && rebuildWrittenDays === 0
+          ? 'Rebuild diario nao gravou nenhum dia; confira migrations e warnings.'
+          : null);
       return res.json({
         success: true,
         dryRun: false,
         ...result,
-        resultOk: result.resultOk && !rebuildError,
+        resultOk: result.resultOk && !rebuildValidationError,
         patrimonyRebuild,
-        resultDetail: rebuildError
-          ? `${result.resultDetail} Rebuild diario pendente: ${rebuildError}`
+        resultDetail: rebuildValidationError
+          ? `${result.resultDetail} Rebuild diario pendente: ${rebuildValidationError}`
           : result.resultDetail,
       });
     } catch (err: unknown) {
