@@ -11,10 +11,70 @@ function chartSeriesHasVariation(series: BenchmarkChartPoint[]): boolean {
   return Math.max(...levels) - Math.min(...levels) > 0.0001;
 }
 
+function daySerial(date: string): number {
+  return Math.round(new Date(`${date.slice(0, 10)}T12:00:00Z`).getTime() / 86_400_000);
+}
+
+function roundedChartPoint(
+  date: string,
+  cumulativeTwr: number,
+  baseFactor: number,
+  dailyFactor: number | null | undefined
+): BenchmarkChartPoint {
+  const relFactor = (1 + cumulativeTwr) / baseFactor;
+  return {
+    date,
+    indexedLevel: Math.round(100 * relFactor * 1_000_000) / 1_000_000,
+    periodReturnToDate: Math.round((relFactor - 1) * 1_000_000) / 1_000_000,
+    dailyFactor: dailyFactor ?? null,
+  };
+}
+
+function pointWithIndexedLevel(point: BenchmarkChartPoint, indexedLevel: number): BenchmarkChartPoint {
+  const roundedLevel = Math.round(indexedLevel * 1_000_000) / 1_000_000;
+  return {
+    ...point,
+    indexedLevel: roundedLevel,
+    periodReturnToDate: Math.round((roundedLevel / 100 - 1) * 1_000_000) / 1_000_000,
+  };
+}
+
+function sameIndexedLevel(a: BenchmarkChartPoint, b: BenchmarkChartPoint): boolean {
+  return Math.abs(Number(a.indexedLevel ?? 100) - Number(b.indexedLevel ?? 100)) < 0.000001;
+}
+
+function smoothFlatRuns(series: BenchmarkChartPoint[]): BenchmarkChartPoint[] {
+  if (series.length < 3) return series;
+
+  const out = series.map((point) => ({ ...point }));
+  let i = 0;
+  while (i < out.length - 2) {
+    let plateauEnd = i;
+    while (plateauEnd + 1 < out.length && sameIndexedLevel(out[i]!, out[plateauEnd + 1]!)) {
+      plateauEnd += 1;
+    }
+
+    const nextIndex = plateauEnd + 1;
+    if (plateauEnd > i && nextIndex < out.length && !sameIndexedLevel(out[i]!, out[nextIndex]!)) {
+      const start = Number(out[i]!.indexedLevel ?? 100);
+      const end = Number(out[nextIndex]!.indexedLevel ?? start);
+      const span = nextIndex - i;
+      for (let k = i + 1; k <= nextIndex; k += 1) {
+        const weight = (k - i) / span;
+        out[k] = pointWithIndexedLevel(out[k]!, start + (end - start) * weight);
+      }
+    }
+
+    i = Math.max(i + 1, nextIndex);
+  }
+
+  return out;
+}
+
 /**
  * Curva TWR a partir de fechamentos gravados (invest_portfolio_daily.cumulative_twr).
  * Rebasa no primeiro dia do período com dado gravado — mesma ideia do índice PRIO (série diária real).
- * Dias sem fechamento gravado repetem o último índice conhecido (não zeram o gráfico).
+ * Dias sem fechamento gravado entre dois pontos reais são interpolados para evitar degraus artificiais.
  */
 export function buildStoredTwrChartSeries(
   stored: StoredPortfolioDay[],
@@ -26,51 +86,66 @@ export function buildStoredTwrChartSeries(
   const byDate = new Map(stored.map((s) => [s.snapshot_date, s]));
   const from = periodFrom.slice(0, 10);
 
-  let baseCumulative: number | null = null;
-  for (const date of alignDates) {
-    if (date < from) continue;
-    const row = byDate.get(date);
-    if (row?.cumulative_twr != null) {
-      baseCumulative = row.cumulative_twr;
-      break;
-    }
-  }
-  if (baseCumulative === null) return [];
-  const baseFactor = 1 + baseCumulative;
+  const known = alignDates
+    .map((rawDate) => rawDate.slice(0, 10))
+    .filter((date) => date >= from)
+    .map((date) => {
+      const row = byDate.get(date);
+      return row?.cumulative_twr != null
+        ? {
+            date,
+            cumulativeTwr: row.cumulative_twr,
+            dailyFactor: row.daily_return_twr,
+          }
+        : null;
+    })
+    .filter(
+      (row): row is { date: string; cumulativeTwr: number; dailyFactor: number | null } =>
+        row !== null
+    )
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (!known.length) return [];
 
-  let lastPoint: BenchmarkChartPoint | null = null;
+  const firstKnown = known[0]!;
+  const lastKnown = known[known.length - 1]!;
+  const baseFactor = 1 + firstKnown.cumulativeTwr;
   const out: BenchmarkChartPoint[] = [];
+  let cursor = 0;
 
   for (const rawDate of alignDates) {
     const date = rawDate.slice(0, 10);
     const row = byDate.get(date);
     if (row?.cumulative_twr != null) {
-      const relFactor = (1 + row.cumulative_twr) / baseFactor;
-      const periodReturnToDate = Math.round((relFactor - 1) * 1_000_000) / 1_000_000;
-      const indexedLevel = Math.round(100 * relFactor * 1_000_000) / 1_000_000;
-      lastPoint = {
-        date,
-        indexedLevel,
-        periodReturnToDate,
-        dailyFactor: row.daily_return_twr,
-      };
-      out.push(lastPoint);
+      out.push(roundedChartPoint(date, row.cumulative_twr, baseFactor, row.daily_return_twr));
       continue;
     }
-    if (lastPoint) {
-      out.push({
-        date,
-        indexedLevel: lastPoint.indexedLevel,
-        periodReturnToDate: lastPoint.periodReturnToDate,
-        dailyFactor: row?.daily_return_twr ?? null,
-      });
+
+    if (date <= firstKnown.date) {
+      out.push(
+        roundedChartPoint(date, firstKnown.cumulativeTwr, baseFactor, row?.daily_return_twr)
+      );
+      continue;
+    }
+    if (date >= lastKnown.date) {
+      out.push(
+        roundedChartPoint(date, lastKnown.cumulativeTwr, baseFactor, row?.daily_return_twr)
+      );
+      continue;
+    }
+
+    while (cursor < known.length - 2 && known[cursor + 1]!.date < date) {
+      cursor += 1;
+    }
+    const prev = known[cursor]!;
+    const next = known[cursor + 1]!;
+    const span = daySerial(next.date) - daySerial(prev.date);
+    if (span <= 0) {
+      out.push(roundedChartPoint(date, prev.cumulativeTwr, baseFactor, row?.daily_return_twr));
     } else {
-      out.push({
-        date,
-        indexedLevel: 100,
-        periodReturnToDate: 0,
-        dailyFactor: row?.daily_return_twr ?? null,
-      });
+      const elapsed = daySerial(date) - daySerial(prev.date);
+      const weight = Math.min(1, Math.max(0, elapsed / span));
+      const interpolated = prev.cumulativeTwr + (next.cumulativeTwr - prev.cumulativeTwr) * weight;
+      out.push(roundedChartPoint(date, interpolated, baseFactor, row?.daily_return_twr));
     }
   }
 
@@ -94,11 +169,11 @@ export function resolvePortfolioIndexedForChart(
     storedTwrChart.length >= 2 ? storedTwrChart : [];
   const fromPatrimony = buildPatrimonyIndexedSeries(mergedSeries);
 
-  if (chartSeriesHasVariation(fromStored)) return fromStored;
-  if (chartSeriesHasVariation(fromPerformance)) return fromPerformance;
-  if (fromStored.length >= 2) return fromStored;
-  if (fromPerformance.length >= 2) return fromPerformance;
-  return fromPatrimony;
+  if (chartSeriesHasVariation(fromStored)) return smoothFlatRuns(fromStored);
+  if (chartSeriesHasVariation(fromPerformance)) return smoothFlatRuns(fromPerformance);
+  if (fromStored.length >= 2) return smoothFlatRuns(fromStored);
+  if (fromPerformance.length >= 2) return smoothFlatRuns(fromPerformance);
+  return smoothFlatRuns(fromPatrimony);
 }
 
 /** Patrimônio em R$ só dos dias gravados (para mesclar com série calculada). */
