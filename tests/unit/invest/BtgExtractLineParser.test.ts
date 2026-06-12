@@ -122,7 +122,7 @@ describe('BtgExtractLineParser', () => {
       expect(buy?.extract_category).toBe(1);
     });
 
-    it('compra de TD continua correta quando o PDF inverte saldo e movimento', () => {
+    it('compra de TD sem tabela de PU nao cria quantidade ficticia', () => {
       const entries = btgLinesToImportEntries(
         [
           'Saldo Inicial 60.955,87',
@@ -131,8 +131,31 @@ describe('BtgExtractLineParser', () => {
         60955.87
       );
       const buy = entries.find((e) => e.operation === 'buy');
-      expect(buy?.quantity).toBeCloseTo(54160.08, 4);
+      expect(buy?.quantity).toBe(0);
+      expect(buy?.unit_price).toBe(0);
       expect(buy?.total_net_value).toBeCloseTo(-54160.08, 4);
+      expect(buy?.impacts_managerial_price).toBe(false);
+    });
+
+    it('usa a tabela de movimentacao TD do PDF para quantidade e PU reais', () => {
+      const entries = btgLinesToImportEntries(
+        [
+          'LFT   08/01/25   01/03/31   Não   -   -   SELIC + 0,10%   33,00   18.823,200000   621.165,56   7.272,95   -   613.892,61',
+          '22/04/26',
+          'BACEN-BANCO CENTRAL DO BRASIL - RJ /',
+          'LFT',
+          'VENDA DEFINITIVA   25   18.759,450000   468.986,25   7.618,65   -   461.367,60',
+          'Saldo Inicial 38.275,33',
+          '22/04/2026 VENDA DE TESOURO DIRETO: LFT 01/03/2031 -307.892,70\t468.986,25',
+        ],
+        -776878.95
+      );
+      const sell = entries.find((e) => e.operation === 'sell');
+      expect(sell?.ticker).toBe('LFT-20310301');
+      expect(sell?.quantity).toBeCloseTo(25, 6);
+      expect(sell?.unit_price).toBeCloseTo(18759.45, 6);
+      expect(sell?.total_net_value).toBeCloseTo(468986.25, 2);
+      expect(sell?.impacts_managerial_price).toBeUndefined();
     });
 
     it('IRRF cobrado sobre TD vira cost_adjustment no LFT com mesmo event_source_ref da TD', () => {

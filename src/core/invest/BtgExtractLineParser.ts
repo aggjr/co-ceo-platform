@@ -104,11 +104,110 @@ export type BtgLedgerMapping = {
 const CASH_TICKER = MAIN_CASH_TICKER;
 const UNKNOWN_TESOURO_DIRETO_TICKER = 'TD-TESOURO-DIRETO';
 
+type TesouroDiretoMovement = {
+  date: string;
+  ticker: string;
+  operation: 'buy' | 'sell';
+  quantity: number;
+  unitPrice: number;
+  gross: number;
+  used?: boolean;
+};
+
 function parseLftTicker(description: string): string {
   const match = description.match(LFT_TICKER_RE);
   if (!match) return UNKNOWN_TESOURO_DIRETO_TICKER;
   const [, dd, mm, yyyy] = match;
   return `LFT-${yyyy}${mm}${dd}`;
+}
+
+function parseBrFlexible(raw: string): number {
+  const t = String(raw || '').trim();
+  if (!t || t === '-') return 0;
+  const neg = t.startsWith('-') || t.endsWith('-');
+  const n = Number(t.replace(/^-/, '').replace(/-$/, '').replace(/\./g, '').replace(',', '.'));
+  if (!Number.isFinite(n)) return 0;
+  return neg ? -Math.abs(n) : n;
+}
+
+function shortBrDateToIso(raw: string): string | null {
+  const m = String(raw || '').match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+  if (!m) return null;
+  return `20${m[3]}-${m[2]}-${m[1]}`;
+}
+
+function lftTickerFromShortMaturity(dd: string, mm: string, yy: string): string {
+  return `LFT-20${yy}${mm}${dd}`;
+}
+
+function inferLftTickerFromDocument(lines: string[]): string {
+  for (const raw of lines) {
+    const line = raw.replace(/\s+/g, ' ').trim();
+    const match = line.match(/\bLFT\b\s+\d{2}\/\d{2}\/\d{2}\s+(\d{2})\/(\d{2})\/(\d{2})/i);
+    if (match) return lftTickerFromShortMaturity(match[1]!, match[2]!, match[3]!);
+  }
+  return UNKNOWN_TESOURO_DIRETO_TICKER;
+}
+
+function extractTesouroDiretoMovements(lines: string[]): TesouroDiretoMovement[] {
+  const out: TesouroDiretoMovement[] = [];
+  let currentDate: string | null = null;
+  let currentTicker: string | null = null;
+  const documentLftTicker = inferLftTickerFromDocument(lines);
+
+  for (const raw of lines) {
+    const line = raw.replace(/\s+/g, ' ').trim();
+    const dateMatch = line.match(/^(\d{2}\/\d{2}\/\d{2})(?:\b|$)/);
+    if (dateMatch) {
+      currentDate = shortBrDateToIso(dateMatch[1]!);
+      currentTicker = null;
+      if (/\bLFT\b/i.test(line)) currentTicker = documentLftTicker;
+    }
+    if (/^LFT$/i.test(line)) {
+      currentTicker = documentLftTicker;
+      continue;
+    }
+    if (!currentDate || !currentTicker) continue;
+
+    const movement = line.match(
+      /^(COMPRA|VENDA)\s+DEFINITIVA\s+(-?[\d.,]+)\s+(-?[\d.]+,\d{4,6})\s+(-?[\d.]+,\d{2})\s+(?:-|(-?[\d.]+,\d{2}))\s+(?:-|(-?[\d.]+,\d{2}))\s+(-?[\d.]+,\d{2})/i
+    );
+    if (!movement) continue;
+
+    out.push({
+      date: currentDate,
+      ticker: currentTicker,
+      operation: movement[1]!.toUpperCase() === 'COMPRA' ? 'buy' : 'sell',
+      quantity: Math.abs(parseBrFlexible(movement[2]!)),
+      unitPrice: Math.abs(parseBrFlexible(movement[3]!)),
+      gross: Math.abs(parseBrFlexible(movement[4]!)),
+    });
+  }
+
+  return out;
+}
+
+function takeTesouroDiretoMovement(
+  rows: TesouroDiretoMovement[],
+  date: string,
+  ticker: string,
+  operation: 'buy' | 'sell',
+  gross: number
+): TesouroDiretoMovement | null {
+  const tolerance = 0.05;
+  let best: TesouroDiretoMovement | null = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const row of rows) {
+    if (row.used) continue;
+    if (row.date !== date || row.ticker !== ticker || row.operation !== operation) continue;
+    const delta = Math.abs(row.gross - Math.abs(gross));
+    if (delta <= tolerance && delta < bestDelta) {
+      best = row;
+      bestDelta = delta;
+    }
+  }
+  if (best) best.used = true;
+  return best;
 }
 
 /** Classifica linha do extrato → operação do livro-razão INVEST. */
@@ -332,6 +431,7 @@ export type BtgExtractEntry = {
   extract_category?: ExtractCategory;
   /** Se true e operation = 'cost_adjustment', custo sobe tambem o pmB. */
   applies_to_b3?: boolean;
+  impacts_managerial_price?: boolean;
 };
 
 function ymOf(isoDate: string): string {
@@ -391,6 +491,7 @@ export function btgLinesToImportEntries(
 ): BtgExtractEntry[] {
   const out: BtgExtractEntry[] = [];
   let prev = openingBalance ?? null;
+  const tesouroMovements = extractTesouroDiretoMovements(lines);
 
   // Buffer: ultima operacao TD spot por mes (para amarrar IRRF/taxa relacionada).
   // Em D ha a operacao TD; em D+1/D+2 caem IRRF/taxa. Como o extrato vem
@@ -450,6 +551,13 @@ export function btgLinesToImportEntries(
       map.ticker.startsWith('LFT-')
     ) {
       const ref = eventSourceRefForTd(parsed.date, map.ticker);
+      const tdMovement = takeTesouroDiretoMovement(
+        tesouroMovements,
+        parsed.date,
+        map.ticker,
+        map.operation,
+        parsed.movementAmount
+      );
       lastTdByYM.set(ym, {
         date: parsed.date,
         ticker: map.ticker,
@@ -459,14 +567,15 @@ export function btgLinesToImportEntries(
         date: parsed.date,
         ticker: map.ticker,
         operation: map.operation,
-        quantity: Math.abs(parsed.movementAmount),
-        unit_price: 1,
+        quantity: tdMovement ? tdMovement.quantity : 0,
+        unit_price: tdMovement ? tdMovement.unitPrice : 0,
         total_net_value: Math.round(net * 100) / 100,
         asset_type: map.asset_type,
         underlying_ticker: map.underlying_ticker,
         notes: map.notes ?? parsed.description,
         event_source_ref: ref,
         extract_category: 1,
+        impacts_managerial_price: tdMovement ? undefined : false,
       });
       continue;
     }

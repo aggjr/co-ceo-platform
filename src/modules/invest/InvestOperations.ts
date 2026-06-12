@@ -627,6 +627,67 @@ export class InvestOperations {
     return changed;
   }
 
+  private async repairExistingTradeFromImportLine(
+    ctx: UserContext,
+    line: LedgerImportLine,
+    ref: string
+  ): Promise<boolean> {
+    const orgId = ctx.organizationId;
+    if (!orgId) return false;
+
+    const op = String(line.operation);
+    const assetType = String(line.asset_type || inferAssetType(line.ticker));
+    if (assetType !== 'fixed_income') return false;
+    if (op !== 'buy' && op !== 'sell') return false;
+    if (line.impacts_managerial_price === false) return false;
+
+    const quantity = Math.abs(Number(line.quantity ?? 0));
+    const unitPrice = Math.abs(Number(line.unit_price ?? 0));
+    if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) return false;
+    if (quantity <= 0 || unitPrice <= 0) return false;
+
+    const ic = this.installerCtx(orgId);
+    const rows = await this.gateway.findWhere(
+      ic,
+      'patrimony_ledger_entries',
+      { external_ref: `BROKER_REF:${ref}` },
+      { limit: 1 }
+    );
+    const row = rows[0];
+    if (!row) return false;
+
+    const quantityDelta = op === 'sell' ? -quantity : quantity;
+    const totalValue = Math.round(quantity * unitPrice * 100) / 100;
+    const currentQty = Number(row.quantity_delta ?? 0);
+    const currentUnit = Number(row.unit_value ?? 0);
+    const currentTotal = Number(row.total_value ?? 0);
+    if (
+      Math.abs(currentQty - quantityDelta) < 0.000001 &&
+      Math.abs(currentUnit - unitPrice) < 0.000001 &&
+      Math.abs(currentTotal - totalValue) < 0.01
+    ) {
+      return false;
+    }
+
+    const meta = InvestOperations.parseRowMetadata(row.metadata);
+    await this.gateway.update(ic, 'patrimony_ledger_entries', String(row.id), {
+      quantity_delta: quantityDelta,
+      unit_value: unitPrice,
+      total_value: totalValue,
+      impacts_valuation: true,
+      metadata: {
+        ...meta,
+        legacy_op: op,
+        broker_note_ref: ref,
+        total_net_value: Number(line.total_net_value ?? totalValue),
+        repaired_from_import: true,
+        repaired_at: new Date().toISOString(),
+      },
+    });
+    await this.inventoryLedger.rebuildAndPersist(ic, String(row.patrimony_item_id));
+    return true;
+  }
+
   private static cashTickerToExternalId(ticker: string): string | null {
     const upper = ticker.toUpperCase();
     if (!upper.startsWith('CAIXA-')) return null;
@@ -714,6 +775,7 @@ export class InvestOperations {
     }
     const ref = line.broker_note_ref?.trim();
     if (ref && (await this.hasExistingByRef(ctx, ref))) {
+      const repaired = await this.repairExistingTradeFromImportLine(ctx, line, ref);
       const enriched = await this.enrichExistingFromImportLine(
         ctx,
         {
@@ -735,7 +797,7 @@ export class InvestOperations {
       return {
         skipped: true,
         reason: `broker_note_ref ${ref} ja registrado`,
-        enriched,
+        enriched: enriched || repaired,
         match: 'broker_note_ref',
       };
     }

@@ -223,6 +223,16 @@ function normalizeExtractLines(raw: string, format: BtgExtractFileFormat): strin
   return normalized.split(/\r?\n/).filter((l) => l.trim());
 }
 
+function extractParserContextLines(
+  raw: string,
+  format: BtgExtractFileFormat,
+  normalizedLines: string[]
+): string[] {
+  if (format !== 'pdf') return normalizedLines;
+  const rawLines = raw.split(/\r?\n/).filter((l) => l.trim());
+  return [...rawLines, ...normalizedLines];
+}
+
 function assignExtractRefs(entries: LedgerImportLine[]): LedgerImportLine[] {
   const byDate = new Map<string, number>();
   return entries.map((e) => {
@@ -297,9 +307,10 @@ function buildExtractPreview(
   format: BtgExtractFileFormat,
   lines: string[],
   openingBalance: number,
-  importRules?: import('./ledgerTypes').InvestImportRule[]
+  importRules?: import('./ledgerTypes').InvestImportRule[],
+  parserContextLines = lines
 ): BtgExtractImportPreview {
-  const entries = btgLinesToImportEntries(lines, openingBalance, undefined, { importRules });
+  const entries = btgLinesToImportEntries(parserContextLines, openingBalance, undefined, { importRules });
 
   const byOperation: Record<string, { count: number; total: number }> = {};
   let firstDate: string | null = null;
@@ -369,6 +380,7 @@ async function parseBtgExtractFile(
   try {
     const { raw, format } = await rawTextFromExtractUpload(file);
     const lines = normalizeExtractLines(raw, format);
+    const parserContextLines = extractParserContextLines(raw, format, lines);
     const openingBalance = extractOpeningBalance(lines) ?? resolvedOpeningBalance;
     if (openingBalance == null) {
       throw new GatewayError(
@@ -377,7 +389,7 @@ async function parseBtgExtractFile(
         400
       );
     }
-    const preview = buildExtractPreview(file, format, lines, openingBalance);
+    const preview = buildExtractPreview(file, format, lines, openingBalance, undefined, parserContextLines);
     return { path, fileName, preview };
   } catch (e) {
     return {
@@ -603,6 +615,7 @@ export async function parseExtractUploadImportLines(
 ): Promise<LedgerImportLine[]> {
   const { raw, format } = await rawTextFromExtractUpload(file);
   const lines = normalizeExtractLines(raw, format);
+  const parserContextLines = extractParserContextLines(raw, format, lines);
   const openingBalance = extractOpeningBalance(lines) ?? resolvedOpeningBalance;
   if (openingBalance == null) {
     throw new GatewayError(
@@ -614,7 +627,7 @@ export async function parseExtractUploadImportLines(
   const importRules =
     importRulesRepo && ctx ? await importRulesRepo.loadForBroker(ctx, 'BTG') : [];
   const mergedOptions = { ...options, importRules };
-  const rawEntries = btgLinesToImportEntries(lines, openingBalance, undefined, mergedOptions);
+  const rawEntries = btgLinesToImportEntries(parserContextLines, openingBalance, undefined, mergedOptions);
   return assignExtractRefs(
     rawEntries.map((e) => ({
       ...e,
@@ -652,6 +665,7 @@ export async function applyBtgExtractUpload(
   try {
     const { raw, format } = await rawTextFromExtractUpload(file);
     const lines = normalizeExtractLines(raw, format);
+    const parserContextLines = extractParserContextLines(raw, format, lines);
     const openingBalance = extractOpeningBalance(lines) ?? (await ledger.getOpeningLedgerBalance(ctx));
     if (openingBalance == null) {
       throw new GatewayError(
@@ -660,7 +674,7 @@ export async function applyBtgExtractUpload(
         400
       );
     }
-    const preview = buildExtractPreview(file, format, lines, openingBalance);
+    const preview = buildExtractPreview(file, format, lines, openingBalance, undefined, parserContextLines);
     previewResult = resultFromParsed({ path, fileName, preview }, null, null);
 
     await ledger.reconcileCustody(ctx);
