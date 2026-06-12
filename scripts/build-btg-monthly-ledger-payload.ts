@@ -89,6 +89,8 @@ type LftLot = {
 
 type OptionPosition = {
   ticker: string;
+  assetType: 'option_put' | 'option_call';
+  underlyingTicker: string;
   quantity: number;
   strike: number;
   expiration: string;
@@ -178,18 +180,20 @@ async function buildPayload(pdfPath: string, previousPayloadPath?: string): Prom
 
   const optionPositions: OptionPosition[] = [];
   for (const line of lines) {
-    const m = line.match(/^(PRIO[A-Z0-9]+)\s+PRIO3\s+(-?[\d.]+)\s+([\d,]+)\s+(\d{2}\/\d{2}\/\d{2})\s+(Put|Call)\s+vend/i);
+    const m = line.match(/^([A-Z]{4}[A-Z0-9]+)\s+([A-Z]{4}\d+)\s+(-?[\d.]+)\s+([\d,]+)\s+(\d{2}\/\d{2}\/\d{2})\s+(Put|Call)\s+(vend|compr)/i);
     if (!m) continue;
     const nums = moneyValues(line);
-    const quantity = Number(m[2]!.replace(/\./g, ''));
-    const strike = parseBr(m[3]!);
+    const quantity = Number(m[3]!.replace(/\./g, ''));
+    const strike = parseBr(m[4]!);
     const unitPrice = nums.length >= 2 ? nums[nums.length - 2]! : 0;
     const marketValue = nums.length >= 1 ? nums[nums.length - 1]! : 0;
     optionPositions.push({
       ticker: m[1]!.toUpperCase(),
+      assetType: m[6]!.toUpperCase() === 'CALL' ? 'option_call' : 'option_put',
+      underlyingTicker: m[2]!.toUpperCase(),
       quantity,
       strike,
-      expiration: isoDate(m[4]!),
+      expiration: isoDate(m[5]!),
       unitPrice,
       marketValue,
     });
@@ -273,19 +277,19 @@ async function buildPayload(pdfPath: string, previousPayloadPath?: string): Prom
 
   const soldOptionTickers = new Set<string>();
   for (const line of lines) {
-    const m = line.match(/^(\d{2}\/\d{2}\/\d{2})\s+VENDA\s+(Put|Call)\s+(PRIO[A-Z0-9]+)\s+(\d{2}\/\d{2}\/\d{2})\s+([\d,]+)\s+(-?[\d.]+)\s+(-?[\d.]+,\d{2})\s+(-?[\d.]+,\d{2})\s+(-?[\d,]+)/i);
+    const m = line.match(/^(\d{2}\/\d{2}\/\d{2})\s+(VENDA|COMPRA)\s+(Put|Call)\s+([A-Z]{4}[A-Z0-9]+)\s+(\d{2}\/\d{2}\/\d{2})\s+([\d,]+)\s+(-?[\d.]+)\s+(-?[\d.]+,\d{2})\s+(-?[\d.]+,\d{2})\s+(-|[\d,]+)/i);
     if (!m) continue;
     const date = isoDate(m[1]!);
-    const ticker = m[3]!.toUpperCase();
+    const ticker = m[4]!.toUpperCase();
     soldOptionTickers.add(ticker);
-    const quantity = Math.abs(Number(m[6]!.replace(/\./g, '')));
-    const premium = parseBr(m[5]!);
-    const paidReceived = Math.abs(parseBr(m[7]!));
-    const fees = Math.abs(parseBr(m[9]!));
+    const quantity = Math.abs(Number(m[7]!.replace(/\./g, '')));
+    const premium = parseBr(m[6]!);
+    const paidReceived = Math.abs(parseBr(m[8]!));
+    const fees = m[10] === '-' ? 0 : Math.abs(parseBr(m[10]!));
     entries.push({
       date,
       ticker,
-      asset_type: m[2]!.toUpperCase() === 'CALL' ? 'option_call' : 'option_put',
+      asset_type: m[3]!.toUpperCase() === 'CALL' ? 'option_call' : 'option_put',
       underlying_ticker: 'PRIO3',
       operation: optionTypeFromText(line),
       quantity,
@@ -293,7 +297,7 @@ async function buildPayload(pdfPath: string, previousPayloadPath?: string): Prom
       total_net_value: paidReceived,
       brokerage_fee: fees,
       option_strike: inferOptionStrike(ticker),
-      option_expiration: isoDate(m[4]!),
+      option_expiration: isoDate(m[5]!),
       skip_financial_ledger: true,
       broker_note_ref: ref('OPTION', date, ticker),
       event_source_ref: eventRefForTradeDate(date),
@@ -306,6 +310,8 @@ async function buildPayload(pdfPath: string, previousPayloadPath?: string): Prom
   if (prio3SaleQty > 0) {
     openingOptionPositions.push({
       ticker: 'PRIOA407',
+      assetType: 'option_call',
+      underlyingTicker: 'PRIO3',
       quantity: -prio3SaleQty,
       strike: prio3SalePrice,
       expiration: '2026-01-16',
@@ -325,10 +331,10 @@ async function buildPayload(pdfPath: string, previousPayloadPath?: string): Prom
         : 0;
     openingPositions.push({
       ticker: pos.ticker,
-      asset_type: pos.ticker[4] === 'A' ? 'option_call' : 'option_put',
+      asset_type: pos.assetType,
       quantity: pos.quantity,
       avg_price: allocated / Math.abs(pos.quantity || 1),
-      underlying_ticker: 'PRIO3',
+      underlying_ticker: pos.underlyingTicker,
       option_strike: pos.strike,
       notes: 'Abertura estimada proporcionalmente pelo notional das opcoes em aberto',
     });
@@ -444,8 +450,8 @@ async function buildPayload(pdfPath: string, previousPayloadPath?: string): Prom
     entries.push({
       date: closingDate,
       ticker: pos.ticker,
-      asset_type: pos.ticker[4] === 'A' ? 'option_call' : 'option_put',
-      underlying_ticker: 'PRIO3',
+      asset_type: pos.assetType,
+      underlying_ticker: pos.underlyingTicker,
       operation: 'revaluation',
       quantity: 0,
       unit_price: Math.abs(pos.marketValue) / Math.abs(pos.quantity || 1),
