@@ -767,7 +767,6 @@ export class ReconciliationDiagnosticsService {
             }
             return;
           }
-          grossCash += value;
           const prev = pendingByRef.get(baseRef);
           pendingByRef.set(baseRef, {
             amount: money((prev?.amount ?? 0) + value),
