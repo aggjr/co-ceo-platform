@@ -23,6 +23,18 @@ describe('cashExtractDedup', () => {
     expect(importLineExpectedCashNet(line)).toBe(284035.8);
   });
 
+  it('importLineExpectedCashNet preserva sinal de pending_settlement', () => {
+    const line: LedgerImportLine = {
+      date: '2026-04-22',
+      ticker: 'CAIXA-BTG',
+      operation: 'pending_settlement',
+      quantity: 0,
+      unit_price: 0,
+      total_net_value: -821929.04,
+    };
+    expect(importLineExpectedCashNet(line)).toBe(-821929.04);
+  });
+
   it('findBtgExtractCashDuplicates encontra par EXTRACT/EXT', () => {
     const events = [
       {

@@ -58,6 +58,9 @@ export function importLineExpectedCashNet(line: LedgerImportLine): number | null
     const n = Math.abs(raw) || fromQty;
     return n >= 0.01 ? roundCashNet(-n) : null;
   }
+  if (op === 'pending_settlement') {
+    return Math.abs(raw) >= 0.01 ? roundCashNet(raw) : null;
+  }
   if (TRADE_OPS.has(op) || OPTION_OPS.has(op) || op === 'option_exercise') {
     const gross = Math.abs(raw) || fromQty;
     if (gross < 0.01) return null;
