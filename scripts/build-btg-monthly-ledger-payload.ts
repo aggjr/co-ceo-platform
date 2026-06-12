@@ -106,7 +106,7 @@ function parseTransitIrrfLines(lines: string[]): LedgerImportLine[] {
       total_net_value: parseBr(m[3]!),
       settlement_date: settlementDate,
       settlement_status: 'pending',
-      broker_note_ref: ref('TRANSIT-IRRF', tradeDate, seq),
+      broker_note_ref: `AUTO-D2:${ref('TRANSIT-IRRF', tradeDate, seq)}`,
       event_source_ref: eventRefForTradeDate(tradeDate),
       source_system: 'btg_monthly_statement.transit',
       notes: 'IRRF em transito informado no demonstrativo BTG',
