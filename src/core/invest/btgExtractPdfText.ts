@@ -5,7 +5,7 @@
 
 import { parseBrNumber } from './BtgExtractLineParser';
 
-const DATE_LINE = /^(\d{2})\/(\d{2})\/(\d{4})\s*(.*)$/;
+const DATE_LINE = /^(\d{2})\/(\d{2})\/(\d{2}|\d{4})\s*(.*)$/;
 // Sinal negativo opcional ANTES do numero. Saldo do BTG fica negativo quando a
 // compra (ex. exercicio de PUT vendida) excede o caixa disponivel.
 const BR_AMOUNT = /-?\d{1,3}(?:\.\d{3})*,\d{2}/g;
@@ -61,7 +61,7 @@ function formatBr(n: number): string {
 }
 
 function isNoiseLine(line: string): boolean {
-  const t = line.trim();
+  const t = cleanPdfLine(line);
   if (!t) return true;
   if (/^\d de \d+$/.test(t)) return true;
   if (/^(Extrato|Conta Corrente|Período|Emitido|AUGUSTO|CPF:|Conta Corrente:|Agência:|Banco:|Informações|SAC|Ouvidoria|DataDescrição)/i.test(t)) {
@@ -70,6 +70,14 @@ function isNoiseLine(line: string): boolean {
   if (/^Total de (Créditos|Débitos)/i.test(t)) return true;
   if (/^1\.665\.|^1\.613\.|^6\.397,36Saldo Final/.test(t)) return true;
   return false;
+}
+
+function cleanPdfLine(line: string): string {
+  return line.replace(/\0/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeYear(raw: string): string {
+  return raw.length === 2 ? `20${raw}` : raw;
 }
 
 type RawTuple = {
@@ -161,7 +169,16 @@ function resolveSequence(opening: number, tuples: RawTuple[]): Resolution[] {
  * Converte texto cru do pdf-parse em bloco “Movimentação - Conta Corrente” normalizado.
  */
 export function normalizeBtgExtractPdfText(raw: string): string {
-  const lines = raw.split(/\r?\n/);
+  const rawLines = raw.split(/\r?\n/);
+  const start = rawLines.findIndex((line) => {
+    const t = cleanPdfLine(line).toLowerCase();
+    return (
+      t.includes('corrente - moviment') ||
+      t.includes('movimentacao - conta corrente') ||
+      t.includes('movimentação - conta corrente')
+    );
+  });
+  const lines = start >= 0 ? rawLines.slice(start + 1) : rawLines;
   const out: string[] = [
     'Extrato de Conta Corrente',
     'Movimentação - Conta Corrente',
@@ -174,17 +191,24 @@ export function normalizeBtgExtractPdfText(raw: string): string {
 
   // ---- Passada 1: coleta todas as tuplas (data, descrição, [a, b]) sem resolver.
   for (const rawLine of lines) {
-    const line = rawLine.trim();
+    const line = cleanPdfLine(rawLine);
     if (isNoiseLine(line)) continue;
 
-    if (/Saldo Inicial/i.test(line)) {
+    const openingLine = line.match(DATE_LINE);
+    if (/Saldo\s+(Inicial|Anterior)/i.test(line)) {
+      const amounts = extractBrAmountsFromGluedLine(line);
+      if (amounts[0] != null) opening = amounts[0];
+      pendingDesc = null;
+      continue;
+    }
+    if (openingLine && /Saldo\s+(Inicial|Anterior)/i.test(openingLine[4] || '')) {
       const amounts = extractBrAmountsFromGluedLine(line);
       if (amounts[0] != null) opening = amounts[0];
       pendingDesc = null;
       continue;
     }
 
-    if (line.startsWith('Total de')) break;
+    if (line.startsWith('Total de') || /Saldo\s+Final/i.test(line)) break;
 
     const dateMatch = line.match(DATE_LINE);
     if (dateMatch) {
@@ -195,7 +219,7 @@ export function normalizeBtgExtractPdfText(raw: string): string {
         tuples.push({
           dd: dd!,
           mm: mm!,
-          yyyy: yyyy!,
+          yyyy: normalizeYear(yyyy!),
           description: rest,
           amounts: [amounts[amounts.length - 2]!, amounts[amounts.length - 1]!],
         });
@@ -214,7 +238,7 @@ export function normalizeBtgExtractPdfText(raw: string): string {
         tuples.push({
           dd: dd!,
           mm: mm!,
-          yyyy: yyyy!,
+          yyyy: normalizeYear(yyyy!),
           description: rest!.trim(),
           amounts: [amounts[0]!, amounts[1]!],
         });

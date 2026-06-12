@@ -3,6 +3,7 @@ import type { Pool } from 'mysql2/promise';
 import { CoCeoDataGateway } from '../core/dal';
 import { GatewayError } from '../core/dal/errors';
 import { HoldingPurgeKeepOpeningService } from '../core/invest/HoldingPurgeKeepOpeningService';
+import { HoldingFullResetService } from '../core/invest/HoldingFullResetService';
 import { LedgerImportService } from '../core/invest/LedgerImportService';
 import { OpeningBalanceMigrationService } from '../core/invest/OpeningBalanceMigrationService';
 import { PatrimonyDailyRebuildService } from '../core/invest/PatrimonyDailyRebuildService';
@@ -15,6 +16,7 @@ import { logReconcileEvent, logReconcileFailure } from '../core/invest/reconcile
 
 export class ReconcileController {
   private readonly holdingPurge: HoldingPurgeKeepOpeningService;
+  private readonly holdingFullReset: HoldingFullResetService;
   private readonly openingMigration: OpeningBalanceMigrationService;
   private readonly ledger: LedgerImportService;
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
@@ -29,6 +31,7 @@ export class ReconcileController {
     pool: Pool
   ) {
     this.holdingPurge = new HoldingPurgeKeepOpeningService(gateway, pool);
+    this.holdingFullReset = new HoldingFullResetService(pool);
     this.openingMigration = new OpeningBalanceMigrationService(gateway);
     this.ledger = new LedgerImportService(gateway);
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
@@ -79,6 +82,51 @@ export class ReconcileController {
       });
     } catch (error: unknown) {
       const detail = logReconcileFailure('reset-holding', orgId ?? undefined, error);
+      const status = error instanceof GatewayError ? error.httpStatus : 500;
+      return res.status(status).json({
+        success: false,
+        error: detail.message,
+        errorDetail: detail,
+      });
+    }
+  };
+
+  /**
+   * POST /api/invest/reconcile/reset-holding-full
+   *
+   * Reset completo do livro INVEST da holding. Nao preserva abertura.
+   * Uso exclusivo para remapeamento a partir dos arquivos-fonte.
+   */
+  resetHoldingFull = async (req: Request, res: Response): Promise<Response> => {
+    const ctx = req.userContext!;
+    const orgId = ctx.organizationId;
+    try {
+      if (!orgId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Selecione a holding antes de executar o reset completo.',
+        });
+      }
+      if (req.body?.confirm !== 'RESET_HOLDING_INVEST_FULL') {
+        return res.status(400).json({
+          success: false,
+          error: 'Confirmacao obrigatoria: confirm = RESET_HOLDING_INVEST_FULL.',
+        });
+      }
+
+      const result = await this.holdingFullReset.reset(
+        ctx,
+        String(req.body?.reason || 'Remapeamento completo do INVEST')
+      );
+
+      return res.json({
+        success: true,
+        message:
+          'Reset completo concluido. Reimporte a abertura e valide o mes antes de avancar.',
+        report: result,
+      });
+    } catch (error: unknown) {
+      const detail = logReconcileFailure('reset-holding-full', orgId ?? undefined, error);
       const status = error instanceof GatewayError ? error.httpStatus : 500;
       return res.status(status).json({
         success: false,

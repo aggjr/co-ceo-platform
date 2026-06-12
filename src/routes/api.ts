@@ -199,6 +199,13 @@ router.post(
 );
 
 router.post(
+  '/invest/reconcile/reset-holding-full',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  reconcile.resetHoldingFull.bind(reconcile)
+);
+
+router.post(
   '/invest/reconcile/migrate-opening-balance',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:write'),

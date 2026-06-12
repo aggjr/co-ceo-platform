@@ -216,9 +216,10 @@ function normalizeExtractLines(raw: string, format: BtgExtractFileFormat): strin
   if (format === 'csv') {
     return btgExtractCsvToNormalizedLines(raw);
   }
-  const normalized = raw.includes('Movimentação - Conta Corrente')
-    ? normalizeBtgExtractPdfText(raw)
-    : raw;
+  const normalized =
+    format === 'pdf' || raw.includes('Movimentação - Conta Corrente')
+      ? normalizeBtgExtractPdfText(raw)
+      : raw;
   return normalized.split(/\r?\n/).filter((l) => l.trim());
 }
 

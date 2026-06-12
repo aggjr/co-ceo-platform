@@ -129,7 +129,73 @@ Exemplo conceitual:
 
 ## 4. Separacao obrigatoria: global vs tenant
 
-### 4.1 Dados globais
+### 4.0 Regras operacionais inviolaveis
+
+Estas regras valem para qualquer reset, importacao, conciliacao, reparo ou
+remapeamento de dados INVEST:
+
+1. Mutacoes de dados devem passar pelo wrapper oficial (`CoCeoDataGateway`) ou
+   por servicos de dominio que o utilizem. SQL direto so e aceitavel em servico
+   oficial de manutencao quando existir justificativa tecnica, auditoria do
+   escopo e recalculo explicito do hodometro.
+2. Sempre que a base de uma organizacao for apagada ou remapeada em massa, o
+   hodometro (`organization_storage_ledger` / `storage_bytes_used`) deve ser
+   zerado ou recalculado no mesmo fluxo. Ao iniciar a reimportacao, os novos
+   dados devem voltar a contabilizar normalmente via gateway/storage meter.
+3. E proibido usar dados, saldos, datas, tickers, strikes, vencimentos, regras
+   de liquidacao, fontes ou heuristicas hardcoded. Dados devem vir dos arquivos
+   reais, catalogos globais, configuracoes, migrations/seeds canonicas ou
+   parametros explicitos.
+4. Dados globais reutilizaveis do modulo INVEST devem ficar fora do tenant:
+   cotacoes, instrumentos, metadados de opcoes, strikes, vencimentos, indices e
+   regras de fonte/precedencia. Dados de cliente devem ficar no tenant:
+   quantidades, compras, vendas, custos, caixa, transito, posicoes e eventos.
+5. Toda alteracao financeira ou patrimonial precisa estar ligada a um
+   `business_event`. Um evento pode ligar ativo a financeiro, financeiro a
+   financeiro ou ativo a ativo, mas nao deve existir perna financeira ou
+   patrimonial sem fato gerador rastreavel.
+6. Importacoes de historico devem ser validadas mes a mes. O mes seguinte so
+   pode ser importado depois que o mes atual bater com extrato, caixa, transito,
+   posicoes, patrimonio e diagnosticos.
+
+### 4.1 Validacao local do mes 1 (BTG janeiro/2026)
+
+Fonte local: `Downloads/Extrato Mensal 004176105.pdf`, copiado apenas para
+analise em `local-import/btg-downloads/Jan_2026.pdf`.
+
+Achados derivados do PDF, sem hardcode:
+
+1. Caixa operacional do extrato de investimento:
+   - saldo anterior em 01/01/2026: R$ 58.758,79;
+   - saldo final em 31/01/2026: R$ 3.614,36.
+2. Sumario patrimonial do demonstrativo:
+   - patrimonio liquido em 31/12/2025: R$ 1.204.852,77;
+   - patrimonio liquido em 31/01/2026: R$ 1.307.469,31;
+   - renda fixa liquida em 31/01/2026: R$ 1.331.511,57;
+   - derivativos em 31/01/2026: -R$ 27.656,62.
+3. LFT 01/03/2031:
+   - posicao final: 73,89 cotas a R$ 18.196,290000;
+   - compras de janeiro: 3,00 + 10,00 + 2,89 = 15,89 cotas;
+   - abertura inferida: 58,00 cotas. Portanto, a abertura anterior
+     `1 x valor_total` e invalida.
+4. PRIO3:
+   - abertura inferida: 5.400 acoes, vendidas em 16/01/2026;
+   - valor liquido da venda: R$ 219.983,99.
+5. Opcoes:
+   - posicao final em 31/01/2026 contem PRION410, PRION415, PRION44,
+     PRION45, PRION460, PRION470, PRIOQ43 e PRIOR407;
+   - movimentos de janeiro contem vendas de PRIOM/PRION, vencimentos e
+     exercicio de PRIOA407;
+   - quando nao houver preco historico exato de abertura, estimar por metodo
+     explicito e auditavel, nunca por constante fixa escondida.
+
+Bloqueio antes de aplicar no servidor: o parser de caixa ja fecha os saldos
+mensais apos aceitar o formato mensal do BTG, mas a importacao patrimonial nao
+pode usar o valor financeiro como quantidade de LFT. O parser/importador mensal
+precisa ler os blocos de custodia/movimentacao do demonstrativo para gerar
+quantidade e preco unitario corretos.
+
+### 4.2 Dados globais
 
 Dados globais nao pertencem a um cliente especifico. Devem ser gravados sem
 `organization_id`.
@@ -152,7 +218,7 @@ Tabelas atuais relacionadas:
 - `module_categories`
 - `invest_options_market`
 
-### 4.2 Dados especificos de cliente
+### 4.3 Dados especificos de cliente
 
 Dados de cliente pertencem a uma organizacao/holding. Devem respeitar isolamento
 tenant.
