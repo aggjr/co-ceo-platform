@@ -173,6 +173,63 @@ describe('InvestOperations — agrupamento de pernas por event_source_ref (Saida
     expect(legs).toHaveLength(1);
   });
 
+  it('reimport com mesmo broker_note_ref repara ticker/quantidade de perna patrimonial antiga', async () => {
+    const gw = new InMemoryGateway();
+    await seedCatalog(gw);
+    const { ops } = buildOps(gw);
+
+    const ref = 'BTG-NOTA-31444906#2026-04-17#6';
+    const first = await ops.recordOperation(ctx, {
+      date: '2026-04-17',
+      ticker: 'PRIOP650E',
+      asset_type: 'stock',
+      operation: 'buy',
+      quantity: 1,
+      unit_price: 260000,
+      total_net_value: -260000,
+      broker_note_ref: ref,
+      skip_financial_ledger: true,
+      notes: 'Import antigo com ticker de exercicio',
+    });
+    expect(first.skipped).toBe(false);
+
+    const second = await ops.recordOperation(ctx, {
+      date: '2026-04-17',
+      ticker: 'PRIO3',
+      asset_type: 'stock',
+      operation: 'buy',
+      quantity: 4000,
+      unit_price: 65,
+      total_net_value: -260077.39,
+      broker_note_ref: ref,
+      skip_financial_ledger: true,
+      notes: 'Exercicio/atribuicao - PRIOP650E',
+    });
+    expect(second).toMatchObject({
+      skipped: true,
+      enriched: true,
+      match: 'broker_note_ref',
+    });
+
+    const activeLegs = gw.dump('patrimony_ledger_entries').filter((r) => !r.deleted_at);
+    expect(activeLegs).toHaveLength(1);
+    const repaired = activeLegs[0]!;
+    expect(repaired.quantity_delta).toBe(4000);
+    expect(repaired.unit_value).toBe(65);
+    expect(repaired.total_value).toBe(260000);
+
+    const items = gw.dump('patrimony_items').filter((r) => !r.deleted_at);
+    const repairedItem = items.find((item) => item.id === repaired.patrimony_item_id);
+    expect(repairedItem?.identifier).toBe('PRIO3');
+    const meta =
+      typeof repaired.metadata === 'string'
+        ? JSON.parse(repaired.metadata)
+        : (repaired.metadata as Record<string, unknown>);
+    expect(meta.repaired_from_import).toBe(true);
+    expect(meta.skip_financial_ledger).toBe(true);
+    expect(meta.total_net_value).toBe(-260077.39);
+  });
+
   it('linhas com event_source_ref distintos => headers distintos mesmo no mesmo dia/ticker', async () => {
     const gw = new InMemoryGateway();
     await seedCatalog(gw);
