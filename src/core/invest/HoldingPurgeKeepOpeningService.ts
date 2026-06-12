@@ -21,6 +21,7 @@ const AUX_ORG_TABLES = [
   'invest_broker_custody_snapshot_lines',
   'invest_broker_custody_snapshots',
   'invest_portfolio_daily',
+  'invest_position_daily',
   'invest_daily_snapshots',
   'invest_ledger_entries',
   'invest_assets',

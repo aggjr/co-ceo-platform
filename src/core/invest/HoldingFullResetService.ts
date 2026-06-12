@@ -27,6 +27,7 @@ const DELETE_STEPS = [
   { name: 'invest_reconciliation_day_log', sql: 'DELETE FROM invest_reconciliation_day_log WHERE organization_id = ?' },
   { name: 'invest_reconciliation_sessions', sql: 'DELETE FROM invest_reconciliation_sessions WHERE organization_id = ?' },
   { name: 'invest_portfolio_daily', sql: 'DELETE FROM invest_portfolio_daily WHERE organization_id = ?' },
+  { name: 'invest_position_daily', sql: 'DELETE FROM invest_position_daily WHERE organization_id = ?' },
   { name: 'invest_daily_snapshots', sql: 'DELETE FROM invest_daily_snapshots WHERE organization_id = ?' },
   {
     name: 'invest_patrimony_monthly_anchors',

@@ -110,6 +110,7 @@ describe('HoldingPurgeKeepOpeningService', () => {
     expect(pf.openingDate).toBe('2025-07-01');
     expect(pf.openingRef).toBe('OPENING:2025-07-01');
     expect(pf.purgePreview?.patrimonyLegsToRemove).toBe(10);
+    expect(pf.purgePreview?.auxRowsToRemove.invest_position_daily).toBe(5);
   });
 
   it('preflight não pede escolha quando só abertura', async () => {
