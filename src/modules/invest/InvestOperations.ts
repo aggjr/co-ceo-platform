@@ -817,9 +817,15 @@ export class InvestOperations {
         eventDate: line.date,
       });
       const accountId = cashResolution.accountId;
-      const direction = policy.cashDirection as 'in' | 'out';
+      const signedCash = Number(
+        line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)
+      );
+      const direction =
+        op === 'cash_yield' && signedCash < 0
+          ? 'out'
+          : (policy.cashDirection as 'in' | 'out');
       const amount = Math.abs(
-        Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price))
+        signedCash
       );
       if (amount === 0) return { skipped: true, reason: 'amount zero' };
 

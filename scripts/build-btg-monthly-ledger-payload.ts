@@ -382,9 +382,9 @@ async function buildPayload(pdfPath: string, previousPayloadPath?: string): Prom
   let pendingMovementTicker: string | null = null;
   let buySeq = 0;
   for (const line of lines) {
-    const dateOnly = line.match(/^(\d{2}\/\d{2}\/\d{2})$/);
-    if (dateOnly) {
-      pendingMovementDate = isoDate(dateOnly[1]!);
+    const datePrefix = line.match(/^(\d{2}\/\d{2}\/\d{2})(?:\b|$)/);
+    if (datePrefix) {
+      pendingMovementDate = isoDate(datePrefix[1]!);
       pendingMovementTicker = null;
       continue;
     }
