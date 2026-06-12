@@ -30,15 +30,15 @@ function storedRow(
 }
 
 describe('buildStoredTwrChartSeries', () => {
-  it('propaga último índice conhecido em dias sem fechamento gravado', () => {
+  it('interpola dias sem fechamento gravado entre dois pontos reais', () => {
     const chart = buildStoredTwrChartSeries(
       [storedRow('2026-01-02', 0), storedRow('2026-01-05', 0.05, 0.02)],
       ['2026-01-02', '2026-01-03', '2026-01-04', '2026-01-05'],
       '2026-01-02'
     );
     expect(chart[0]!.indexedLevel).toBe(100);
-    expect(chart[1]!.indexedLevel).toBe(100);
-    expect(chart[2]!.indexedLevel).toBe(100);
+    expect(chart[1]!.indexedLevel).toBeCloseTo(101.6667, 4);
+    expect(chart[2]!.indexedLevel).toBeCloseTo(103.3333, 4);
     expect(chart[3]!.indexedLevel).toBeCloseTo(105, 1);
   });
 });
