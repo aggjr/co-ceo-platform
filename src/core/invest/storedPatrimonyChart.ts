@@ -30,6 +30,47 @@ function roundedChartPoint(
   };
 }
 
+function pointWithIndexedLevel(point: BenchmarkChartPoint, indexedLevel: number): BenchmarkChartPoint {
+  const roundedLevel = Math.round(indexedLevel * 1_000_000) / 1_000_000;
+  return {
+    ...point,
+    indexedLevel: roundedLevel,
+    periodReturnToDate: Math.round((roundedLevel / 100 - 1) * 1_000_000) / 1_000_000,
+  };
+}
+
+function sameIndexedLevel(a: BenchmarkChartPoint, b: BenchmarkChartPoint): boolean {
+  return Math.abs(Number(a.indexedLevel ?? 100) - Number(b.indexedLevel ?? 100)) < 0.000001;
+}
+
+function smoothFlatRuns(series: BenchmarkChartPoint[]): BenchmarkChartPoint[] {
+  if (series.length < 3) return series;
+
+  const out = series.map((point) => ({ ...point }));
+  let i = 0;
+  while (i < out.length - 2) {
+    let plateauEnd = i;
+    while (plateauEnd + 1 < out.length && sameIndexedLevel(out[i]!, out[plateauEnd + 1]!)) {
+      plateauEnd += 1;
+    }
+
+    const nextIndex = plateauEnd + 1;
+    if (plateauEnd > i && nextIndex < out.length && !sameIndexedLevel(out[i]!, out[nextIndex]!)) {
+      const start = Number(out[i]!.indexedLevel ?? 100);
+      const end = Number(out[nextIndex]!.indexedLevel ?? start);
+      const span = nextIndex - i;
+      for (let k = i + 1; k <= nextIndex; k += 1) {
+        const weight = (k - i) / span;
+        out[k] = pointWithIndexedLevel(out[k]!, start + (end - start) * weight);
+      }
+    }
+
+    i = Math.max(i + 1, nextIndex);
+  }
+
+  return out;
+}
+
 /**
  * Curva TWR a partir de fechamentos gravados (invest_portfolio_daily.cumulative_twr).
  * Rebasa no primeiro dia do período com dado gravado — mesma ideia do índice PRIO (série diária real).
@@ -128,11 +169,11 @@ export function resolvePortfolioIndexedForChart(
     storedTwrChart.length >= 2 ? storedTwrChart : [];
   const fromPatrimony = buildPatrimonyIndexedSeries(mergedSeries);
 
-  if (chartSeriesHasVariation(fromStored)) return fromStored;
-  if (chartSeriesHasVariation(fromPerformance)) return fromPerformance;
-  if (fromStored.length >= 2) return fromStored;
-  if (fromPerformance.length >= 2) return fromPerformance;
-  return fromPatrimony;
+  if (chartSeriesHasVariation(fromStored)) return smoothFlatRuns(fromStored);
+  if (chartSeriesHasVariation(fromPerformance)) return smoothFlatRuns(fromPerformance);
+  if (fromStored.length >= 2) return smoothFlatRuns(fromStored);
+  if (fromPerformance.length >= 2) return smoothFlatRuns(fromPerformance);
+  return smoothFlatRuns(fromPatrimony);
 }
 
 /** Patrimônio em R$ só dos dias gravados (para mesclar com série calculada). */
