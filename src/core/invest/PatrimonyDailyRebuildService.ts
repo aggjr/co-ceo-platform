@@ -11,6 +11,8 @@ import { DailyCloseMaterializeService } from './reconcile/DailyCloseMaterializeS
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 import { ModuleCategories } from '../module-registry';
+import pool from '../../config/database';
+import { ensureInvestPositionDailySchema } from '../db/ensureCoreSchema';
 
 export type PatrimonyRebuildResult = {
   from: string;
@@ -101,6 +103,7 @@ export class PatrimonyDailyRebuildService {
     }
 
     const orgId = ctx.organizationId;
+    await ensureInvestPositionDailySchema(pool);
     const today = new Date().toISOString().slice(0, 10);
     const period = await this.resolvePeriodOrNull(ctx);
     const events = await this.ledger.listLedgerEvents(

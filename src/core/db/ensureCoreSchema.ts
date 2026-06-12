@@ -22,6 +22,14 @@ export type EnsureCoreSchemaResult = {
   investPositionDailyMigrationApplied: boolean;
 };
 
+export async function ensureInvestPositionDailySchema(pool: Pool): Promise<boolean> {
+  if (await tableExists(pool, INVEST_POSITION_DAILY_TABLE)) {
+    return false;
+  }
+  await runSqlFile(pool, '50_invest_position_daily.sql');
+  return true;
+}
+
 /**
  * Garante tabelas globais exigidas pela API atual (mercado + monitor de jobs).
  * Idempotente: só aplica o .sql quando a tabela âncora não existe.
@@ -84,10 +92,7 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
   }
 
   let investPositionDailyMigrationApplied = false;
-  if (!(await tableExists(pool, INVEST_POSITION_DAILY_TABLE))) {
-    await runSqlFile(pool, '50_invest_position_daily.sql');
-    investPositionDailyMigrationApplied = true;
-  }
+  investPositionDailyMigrationApplied = await ensureInvestPositionDailySchema(pool);
 
   return {
     marketMigrationApplied,
