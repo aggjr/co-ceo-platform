@@ -114,6 +114,15 @@ export function classifyBtgDescription(
 ): BtgLedgerMapping {
   const d = description.toUpperCase();
 
+  if (d.includes('REEMBOLSO DE CUST')) {
+    return {
+      operation: 'cash_yield',
+      ticker: CASH_TICKER,
+      asset_type: 'cash',
+      notes: description,
+    };
+  }
+
   if (rules && rules.length > 0) {
     const sortedRules = [...rules].sort((a, b) => a.priority - b.priority);
     for (const rule of sortedRules) {
@@ -409,7 +418,9 @@ export function btgLinesToImportEntries(
     if (map.skip || map.operation === 'skip') continue;
 
     const sign = getBtgOperationSign(map.operation, parsed.description);
-    const net = sign * Math.abs(parsed.movementAmount);
+    const net = Number.isFinite(parsed.signedCash)
+      ? parsed.signedCash
+      : sign * Math.abs(parsed.movementAmount);
     const ym = ymOf(parsed.date);
 
     // Caso 1A — operacao TD spot (compra/venda): registra no buffer mensal.
@@ -519,7 +530,7 @@ export function btgLinesToImportEntries(
     // securities_lending (income); demais viram cost_adjustment em PRIO3.
     if (BTC_PRIO3_DESC_RE.test(upperDesc)) {
       const ref = eventSourceRefForBtcPrio3(ym);
-      const isIncome = /REMUNERA[ÇC][ÃA]O/i.test(upperDesc);
+      const isIncome = upperDesc.includes('REMUNERA') && parsed.signedCash >= 0;
       if (isIncome) {
         // Remuneracao de aluguel: income do caixa, agrupado no header mensal BTC.
         out.push({
