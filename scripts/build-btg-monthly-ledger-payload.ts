@@ -96,7 +96,15 @@ type OptionPosition = {
   marketValue: number;
 };
 
-async function buildPayload(pdfPath: string): Promise<LedgerImportPayload> {
+function previousProvisionedYield(previousPayloadPath?: string): number {
+  if (!previousPayloadPath) return 0;
+  const previous = JSON.parse(fs.readFileSync(previousPayloadPath, 'utf8').replace(/^\uFEFF/, '')) as LedgerImportPayload;
+  return (previous.entries || [])
+    .filter((entry) => String(entry.broker_note_ref || '').includes('CASH-PROVISIONED-YIELD'))
+    .reduce((sum, entry) => sum + Number(entry.total_net_value || 0), 0);
+}
+
+async function buildPayload(pdfPath: string, previousPayloadPath?: string): Promise<LedgerImportPayload> {
   const raw = await pdfBufferToText(fs.readFileSync(pdfPath));
   const lines = raw.split(/\r?\n/).map(clean).filter(Boolean);
 
@@ -197,6 +205,23 @@ async function buildPayload(pdfPath: string): Promise<LedgerImportPayload> {
       notes: 'Saldo anterior do extrato BTG mensal',
     },
   ];
+
+  const yieldToReverse = previousProvisionedYield(previousPayloadPath);
+  if (Math.abs(yieldToReverse) >= 0.005) {
+    entries.push({
+      date: openingDate,
+      ticker: 'CAIXA-BTG',
+      asset_type: 'cash',
+      operation: 'cash_yield',
+      quantity: 0,
+      unit_price: 0,
+      total_net_value: -yieldToReverse,
+      broker_note_ref: ref('CASH-PROVISIONED-YIELD-REVERSAL', openingDate),
+      event_source_ref: ref('CASH-PROVISIONED-YIELD-REVERSAL', openingDate),
+      source_system: 'btg_monthly_statement.cash',
+      notes: 'Estorno do rendimento provisionado no fechamento anterior',
+    });
+  }
 
   if (openingLftQty > 0) {
     openingPositions.push({
@@ -491,9 +516,9 @@ async function buildPayload(pdfPath: string): Promise<LedgerImportPayload> {
 async function main() {
   const pdfPath = process.argv[2];
   if (!pdfPath) {
-    throw new Error('Uso: ts-node scripts/build-btg-monthly-ledger-payload.ts <extrato.pdf>');
+    throw new Error('Uso: ts-node scripts/build-btg-monthly-ledger-payload.ts <extrato.pdf> [payload-mes-anterior.json]');
   }
-  const payload = await buildPayload(pdfPath);
+  const payload = await buildPayload(pdfPath, process.argv[3]);
   process.stdout.write(JSON.stringify(payload, null, 2));
 }
 
