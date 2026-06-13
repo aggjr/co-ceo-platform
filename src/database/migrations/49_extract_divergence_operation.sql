@@ -9,7 +9,7 @@ INSERT INTO invest_operation_types (operation_code, canonical_name, description)
 VALUES (
   'extract_divergence',
   'Extrato Divergente',
-  'Movimento no extrato da corretora sem classificacao conhecida. Importado para batimento de saldo; requer investigacao junto a corretora.'
+  'Movimento no extrato da corretora sem classificacao conhecida. Importado para batimento de saldo e requer investigacao junto a corretora.'
 )
 ON DUPLICATE KEY UPDATE
   canonical_name = VALUES(canonical_name),
