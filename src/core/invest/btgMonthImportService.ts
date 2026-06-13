@@ -3,6 +3,8 @@
  */
 import type { UserContext } from '../dal';
 import { GatewayError } from '../dal';
+import pool from '../../config/database';
+import { ensureExtractDivergenceOperation } from '../db/ensureCoreSchema';
 import type { LedgerEvent } from './CustodyEngine';
 import { isCashInvestTicker } from './cashInvestLedger';
 import {
@@ -384,6 +386,7 @@ export async function applyBtgMonthImport(
   );
 
   const notesApply = await applyBtgBrokerageUpload(ctx, ledger, noteFiles);
+  await ensureExtractDivergenceOperation(pool);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
     parseOptions: MONTH_IMPORT_EXTRACT_OPTS_APPLY,
     keepUnmatchedLiqBolsaAsCash: true,
