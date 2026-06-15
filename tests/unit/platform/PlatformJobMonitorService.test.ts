@@ -4,7 +4,9 @@ import type { OptionMarketSyncReport } from '../../../src/core/invest/OptionMark
 describe('evaluateOptionsMarketSyncReport', () => {
   const base: OptionMarketSyncReport = {
     underlyings: ['PRIO3', 'ITUB4'],
+    tickersInUse: ['PRIOA407'],
     rowsParsed: 100,
+    rowsKept: 1,
     inserted: 10,
     updated: 90,
     errors: [],
@@ -24,8 +26,8 @@ describe('evaluateOptionsMarketSyncReport', () => {
     expect(o.title).toMatch(/falhas/i);
   });
 
-  it('warning quando nenhuma linha parseada', () => {
-    const o = evaluateOptionsMarketSyncReport({ ...base, rowsParsed: 0 });
+  it('warning quando nenhuma linha do cliente foi mantida', () => {
+    const o = evaluateOptionsMarketSyncReport({ ...base, rowsKept: 0 });
     expect(o.status).toBe('warning');
   });
 });

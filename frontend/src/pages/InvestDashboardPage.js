@@ -1,4 +1,5 @@
 import '../styles/invest-dashboard.css';
+import '../styles/excel-table.css';
 import { apiRequest } from '../api/client.js';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
@@ -10,6 +11,7 @@ import {
   destroyHoldingPatrimonyChart,
 } from '../lib/holdingPatrimonyChart.js';
 import { formatDateBr } from '../lib/dateFormat.js';
+import { formatBrl } from '../lib/portfolioDisplay.js';
 import { loadInvestUiContext, periodDefaults } from '../lib/investUiContext.js';
 
 const D = 'div';
@@ -69,6 +71,102 @@ function chartLegendLabel(data) {
   return 'Patrimônio diário (livro-razão)';
 }
 
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatPct(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '-';
+  const value = Number(n) * 100;
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}%`;
+}
+
+function signedBrl(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '-';
+  const value = Number(n);
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${formatBrl(value)}`;
+}
+
+function renderAuditTable(rows) {
+  const data = Array.isArray(rows) ? rows : [];
+  if (!data.length) return '<p class="muted">Sem linhas de auditoria no periodo.</p>';
+
+  const body = data.map((row) => {
+    const flags = row.flags?.length ? row.flags.join(', ') : '';
+    const estimated = [
+      row.estimatedRows ? `${row.estimatedRows} estim.` : '',
+      row.blackScholesRows ? `${row.blackScholesRows} BS` : '',
+      row.costRows ? `${row.costRows} custo` : '',
+      row.previousMarketRows ? `${row.previousMarketRows} ant.` : '',
+      row.expiredZeroRows ? `${row.expiredZeroRows} venc.` : '',
+    ].filter(Boolean).join(' / ');
+    const tickers = (row.estimatedTickers || []).join(', ');
+    return `
+      <tr class="${flags ? 'patrimony-audit-row--warn' : ''}">
+        <td>${escapeHtml(formatDateBr(row.date))}</td>
+        <td class="num">${formatBrl(row.patrimony)}</td>
+        <td class="num">${row.economicPatrimony == null ? '-' : formatBrl(row.economicPatrimony)}</td>
+        <td class="num">${signedBrl(row.deltaVsPrevious)}</td>
+        <td class="num">${formatPct(row.deltaPctVsPrevious)}</td>
+        <td class="num">${formatBrl(row.cash)}</td>
+        <td class="num">${formatBrl(row.cashInTransit)}</td>
+        <td class="num">${formatBrl(row.positionsValue)}</td>
+        <td class="num">${formatBrl(row.fixedIncome)}</td>
+        <td class="num">${signedBrl(row.externalFlow)}</td>
+        <td class="num">${formatPct(row.dailyReturnTwr)}</td>
+        <td>${escapeHtml(row.source || '-')}</td>
+        <td>${escapeHtml(row.quotesAsOf || '-')}</td>
+        <td class="num">${Number(row.positionRows || 0)}</td>
+        <td>${escapeHtml(estimated || '-')}</td>
+        <td>${escapeHtml(tickers || '-')}</td>
+        <td>${escapeHtml(flags || '-')}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="patrimony-audit-header">
+      <h2>Auditoria diaria detalhada</h2>
+      <span class="muted">${data.length} dia(s), com alertas para saltos e precos estimados.</span>
+    </div>
+    <div class="excel-table-wrap patrimony-audit-wrap">
+      <table class="excel-table patrimony-audit-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th class="num">Patrimonio</th>
+            <th class="num">Economico</th>
+            <th class="num">Delta dia</th>
+            <th class="num">Delta %</th>
+            <th class="num">Caixa</th>
+            <th class="num">Transito</th>
+            <th class="num">Posicoes</th>
+            <th class="num">Renda fixa</th>
+            <th class="num">Fluxo ext.</th>
+            <th class="num">TWR dia</th>
+            <th>Fonte</th>
+            <th>Cotacoes ate</th>
+            <th class="num">Linhas</th>
+            <th>Estimativas</th>
+            <th>Tickers em risco</th>
+            <th>Flags</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>
+  `;
+}
+
 function bindPatrimonyChart(container, initialBounds) {
   const fromInput = container.querySelector('#patrimony-from');
   const toInput = container.querySelector('#patrimony-to');
@@ -76,6 +174,7 @@ function bindPatrimonyChart(container, initialBounds) {
   const summaryHost = container.querySelector('#patrimony-summary');
   const chartHost = container.querySelector('#patrimony-chart-host');
   const metaHost = container.querySelector('#patrimony-meta');
+  const auditHost = container.querySelector('#patrimony-audit');
   let bounds = initialBounds;
 
   const load = async () => {
@@ -147,8 +246,12 @@ function bindPatrimonyChart(container, initialBounds) {
           : to;
         metaHost.textContent = `Período: ${formatDateBr(from)} → ${formatDateBr(displayTo)} · ${series.length} dia(s).`;
       }
+      if (auditHost) {
+        auditHost.innerHTML = renderAuditTable(data.dailyAudit || []);
+      }
     } catch (err) {
       if (summaryHost) summaryHost.innerHTML = '';
+      if (auditHost) auditHost.innerHTML = '';
       const banner = document.createElement(D);
       banner.className = 'error-banner';
       if (err.status === 404) {
@@ -210,6 +313,9 @@ export async function InvestDashboardPage(container) {
         <${D} id="patrimony-chart-host" class="patrimony-chart-panel">
           <p class="muted">Carregando...</p>
         </${D}>
+      </${D}>
+      <${D} id="patrimony-audit" class="patrimony-audit-host">
+        <p class="muted">Carregando auditoria...</p>
       </${D}>
     </${D}>
   </${D}>`;

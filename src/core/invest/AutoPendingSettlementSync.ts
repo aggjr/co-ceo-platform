@@ -131,9 +131,9 @@ export async function syncAutoPendingSettlements(
       );
       for (const row of rows) {
         await gateway.update(installerCtx, 'financial_ledger_entries', String(row.id), {
-          deleted_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
           status: 'cancelled',
         });
+        await gateway.softDelete(installerCtx, 'financial_ledger_entries', String(row.id));
         removed += 1;
       }
     }

@@ -210,11 +210,12 @@ export class LedgerEventProjection {
         ? String(row.external_ref)
         : null;
 
-      // Convencao legada: quantity sempre positiva (abs) em opening_balance;
-      // o lado short eh inferido pelo asset_type (option_call/put) + sinal de
-      // total_net_value. Para acquisition/disposition do legado, quantity vinha
-      // signed (positivo para buy, negativo para sell). Replicamos isso.
-      const legacyQty = movementType === 'opening_balance'
+      // Opening de opcoes precisa preservar o sinal para que o MTM diario
+      // carregue shorts herdados como obrigacao, nao como posicao comprada.
+      const isOptionOpening =
+        movementType === 'opening_balance' &&
+        (assetClass === 'option_call' || assetClass === 'option_put');
+      const legacyQty = movementType === 'opening_balance' && !isOptionOpening
         ? Math.abs(signedQty)
         : signedQty;
 

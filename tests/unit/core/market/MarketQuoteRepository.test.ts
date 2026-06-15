@@ -46,4 +46,15 @@ describe('MarketQuoteRepository', () => {
 
     await expect(repo.getHistoricalClose(ctx, 'PRIO3', '2026-01-05')).resolves.toBeNull();
   });
+
+  it('buildQuoteForDateFn retorna apenas cotacao exata', () => {
+    const repo = new MarketQuoteRepository({} as never);
+    const quoteMap = new Map<string, Map<string, number>>([
+      ['PRIO3', new Map([['2026-01-02', 42]])],
+    ]);
+    const quoteForDate = repo.buildQuoteForDateFn(quoteMap);
+
+    expect(quoteForDate('PRIO3', '2026-01-02')).toBe(42);
+    expect(quoteForDate('PRIO3', '2026-01-03')).toBeUndefined();
+  });
 });

@@ -336,7 +336,8 @@ export class MarketQuoteRepository {
   /**
    * Converte o mapa { ticker → { date → price } } num callback (ticker, date) → number | undefined
    * compatível com PatrimonyMtmOptions.quoteForDate.
-   * Para datas sem cotação exata devolve a cotação mais recente disponível antes da data.
+   * Retorna apenas cotação exata. O motor MTM mantém lastKnownPrices e marca fallback como
+   * previous_market, preservando a trilha de auditoria em invest_position_daily.
    */
   buildQuoteForDateFn(
     quoteMap: Map<string, Map<string, number>>
@@ -344,19 +345,7 @@ export class MarketQuoteRepository {
     return (ticker: string, date: string): number | undefined => {
       const byDate = quoteMap.get(ticker.toUpperCase());
       if (!byDate || byDate.size === 0) return undefined;
-      // Cotação exata
-      const exact = byDate.get(date);
-      if (exact !== undefined) return exact;
-      // Cotação mais recente antes da data (fallback para feriados / fins de semana)
-      let best: number | undefined;
-      let bestDate = '';
-      for (const [d, p] of byDate) {
-        if (d <= date && d > bestDate) {
-          bestDate = d;
-          best = p;
-        }
-      }
-      return best;
+      return byDate.get(date);
     };
   }
 

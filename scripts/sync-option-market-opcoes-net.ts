@@ -39,9 +39,11 @@ async function main() {
     underlyings: explicitUnderlyings.length ? explicitUnderlyings : undefined,
   });
 
-  console.log('Sincronização opcoes.net → invest_options_market');
-  console.log(`  Ações-mãe: ${report.underlyings.join(', ') || '(nenhuma)'}`);
+  console.log('Sincronizacao opcoes.net -> invest_options_market');
+  console.log(`  Acoes-mae: ${report.underlyings.join(', ') || '(nenhuma)'}`);
+  console.log(`  Tickers do(s) cliente(s): ${report.tickersInUse.join(', ') || '(nenhum)'}`);
   console.log(`  Linhas parseadas (vigentes): ${report.rowsParsed}`);
+  console.log(`  Linhas mantidas no catalogo: ${report.rowsKept}`);
   console.log(`  Inseridas: ${report.inserted}  Atualizadas: ${report.updated}`);
   if (report.errors.length) {
     console.log('  Erros:');

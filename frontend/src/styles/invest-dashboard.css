@@ -208,3 +208,53 @@
   margin-top: 12px;
   font-size: 12px;
 }
+
+.patrimony-audit-host {
+  margin-top: 18px;
+  min-width: 0;
+}
+
+.patrimony-audit-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 0 10px;
+}
+
+.patrimony-audit-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #dab177;
+}
+
+.patrimony-audit-wrap {
+  max-height: 460px;
+}
+
+.patrimony-audit-table {
+  min-width: 1520px;
+  font-size: 11px;
+}
+
+.patrimony-audit-table th,
+.patrimony-audit-table td {
+  padding: 6px 8px;
+}
+
+.patrimony-audit-table td {
+  white-space: nowrap;
+}
+
+.patrimony-audit-table td:nth-child(16),
+.patrimony-audit-table td:nth-child(17) {
+  min-width: 180px;
+  max-width: 320px;
+  white-space: normal;
+}
+
+.patrimony-audit-row--warn td {
+  background: rgba(218, 177, 119, 0.08) !important;
+}

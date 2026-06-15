@@ -106,6 +106,91 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(afterSnapshot?.marketValue).toBe(0);
   });
 
+  it('estima opcao sem cotacao por Black-Scholes usando preco da acao', () => {
+    const entries: LedgerEvent[] = [
+      shortPut('PRIOQ43', 100, 1, '2026-01-05'),
+    ];
+
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-06', '2026-01-06', {
+      fixedIncomeTotal: 0,
+      quoteForDate: (ticker) => (ticker === 'PRIO3' ? 40 : undefined),
+      riskFreeAnnual: 0.1,
+      optionVolatilityAnnual: 0.3,
+      optionContractForTicker: () => ({
+        underlyingTicker: 'PRIO3',
+        optionType: 'PUT',
+        strikePrice: 43,
+        expirationDate: '2026-05-15',
+      }),
+    });
+    const snapshot = r.positionSnapshots?.find((p) => p.ticker === 'PRIOQ43');
+    const day = r.series[0]!;
+
+    expect(snapshot?.priceSource).toBe('black_scholes');
+    expect(snapshot?.closingPrice ?? 0).toBeGreaterThan(0);
+    expect(snapshot?.marketValue ?? 0).toBeLessThan(0);
+    expect(day.positionsValue).toBeCloseTo(snapshot?.marketValue ?? 0, 0);
+  });
+
+  it('preserva sinal vendido em opcao de abertura estimada por Black-Scholes', () => {
+    const entries: LedgerEvent[] = [
+      {
+        asset_id: 'open-put',
+        asset_ticker: 'PRIOQ43',
+        asset_type: 'option_put',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-01',
+        quantity: -100,
+        unit_price: 1,
+        total_net_value: -100,
+        impacts_managerial_price: true,
+        metadata: {
+          option_strike: 43,
+          option_expiration: '2026-05-15',
+          underlying_ticker: 'PRIO3',
+          option_type: 'PUT',
+        },
+      },
+    ];
+
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-01', {
+      fixedIncomeTotal: 0,
+      quoteForDate: (ticker) => (ticker === 'PRIO3' ? 40 : undefined),
+    });
+    const snapshot = r.positionSnapshots?.find((p) => p.ticker === 'PRIOQ43');
+
+    expect(snapshot?.quantity).toBe(-100);
+    expect(snapshot?.priceSource).toBe('black_scholes');
+    expect(snapshot?.marketValue ?? 0).toBeLessThan(0);
+  });
+
+  it('zera opcao vencida antes de reaproveitar ultima cotacao ou Black-Scholes', () => {
+    const entries: LedgerEvent[] = [
+      shortPut('PRIOQ43', 100, 1, '2026-01-05'),
+    ];
+
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-05-14', '2026-05-16', {
+      fixedIncomeTotal: 0,
+      quoteForDate: (ticker, date) => {
+        if (ticker === 'PRIOQ43' && date === '2026-05-14') return 2;
+        if (ticker === 'PRIO3') return 40;
+        return undefined;
+      },
+      optionContractForTicker: () => ({
+        underlyingTicker: 'PRIO3',
+        optionType: 'PUT',
+        strikePrice: 43,
+        expirationDate: '2026-05-15',
+      }),
+    });
+
+    const expired = r.positionSnapshots?.find((p) => p.ticker === 'PRIOQ43');
+
+    expect(expired?.priceSource).toBe('expired_zero');
+    expect(expired?.closingPrice).toBe(0);
+    expect(expired?.marketValue).toBe(0);
+  });
+
   it('nao usa cotação atual quando quoteForDate está definido', () => {
     const entries: LedgerEvent[] = [stockOpen(100, 10, '2026-01-01')];
     const quoteForDate = (_ticker: string, date: string) =>
@@ -271,5 +356,21 @@ describe('PatrimonyMtmDailyEngine', () => {
 
     expect(r.series[0]?.positionsValue).toBeCloseTo(4200, 0);
     expect(r.series[0]?.patrimony).toBeCloseTo(4200, 0);
+  });
+
+  it('marca cotacao carregada de dia anterior como previous_market', () => {
+    const entries: LedgerEvent[] = [stockOpen(100, 10, '2026-01-01')];
+    const quoteForDate = (_ticker: string, date: string) =>
+      date === '2026-01-01' ? 20 : undefined;
+
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-02', {
+      quoteForDate,
+      fixedIncomeTotal: 0,
+    });
+    const day2 = r.series.find((p) => p.date === '2026-01-02');
+    const snapshot = r.positionSnapshots?.find((p) => p.ticker === 'PRIO3');
+
+    expect(day2?.patrimony).toBeCloseTo(2000, 0);
+    expect(snapshot?.priceSource).toBe('previous_market');
   });
 });

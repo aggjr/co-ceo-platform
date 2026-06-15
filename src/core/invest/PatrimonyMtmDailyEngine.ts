@@ -1,5 +1,6 @@
 import type { LedgerEvent } from './CustodyEngine';
 import { inferAssetType } from './assetClassifier';
+import { inferUnderlyingTicker } from './assetClassifier';
 import type { DailyPatrimonyPoint, PatrimonyDailyResult } from './PatrimonyDailyEngine';
 import {
   computePortfolioPerformance,
@@ -9,6 +10,8 @@ import {
 import { buildCashInTransitSummary } from './cashInTransit';
 import { computeSharpeRatio, dailyReturnsFromPatrimony } from './sharpeRatio';
 import { inferOptionExpiryDate } from './optionExpiry';
+import { inferOptionStrikeFromTicker } from './optionExpiry';
+import { blackScholesOptionPrice, type OptionSide } from './optionBlackScholes';
 import {
   interpolatePatrimonyTarget,
   loadPatrimonyAnchors,
@@ -26,6 +29,9 @@ type DayPosition = {
   assetId: string;
   ticker: string;
   assetType: string;
+  underlyingTicker: string | null;
+  optionType: OptionSide | null;
+  strike: number | null;
   qty: number;
   /** Prêmio médio (opções) ou PM (ações). */
   unitCost: number;
@@ -52,6 +58,13 @@ export type PatrimonyMtmOptions = {
   quoteForDate?: (ticker: string, date: string) => number | undefined;
   valuationContext?: AssetValuationSnapshot;
   fxRateForDate?: (fromCurrency: string, toCurrency: string, date: string) => number | undefined;
+  optionContractForTicker?: (ticker: string) => {
+    underlyingTicker?: string | null;
+    optionType?: 'CALL' | 'PUT' | 'call' | 'put' | null;
+    strikePrice?: number | null;
+    expirationDate?: string | null;
+  } | undefined;
+  optionVolatilityAnnual?: number;
 };
 
 export type PositionDailySnapshot = {
@@ -63,7 +76,7 @@ export type PositionDailySnapshot = {
   unitCost: number;
   marketValue: number;
   managerialValue: number;
-  priceSource: 'market' | 'previous_market' | 'estimated_decay' | 'expired_zero' | 'cost';
+  priceSource: 'market' | 'previous_market' | 'black_scholes' | 'estimated_decay' | 'expired_zero' | 'cost';
 };
 
 function isCash(
@@ -136,12 +149,107 @@ function roundMoney(value: number): number {
   return Math.abs(rounded) < 0.005 ? 0 : rounded;
 }
 
+function parsePositiveNumber(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function normalizeOptionSide(value: unknown, assetType: string): OptionSide | null {
+  const side = String(value ?? '').trim().toLowerCase();
+  if (side === 'call') return 'call';
+  if (side === 'put') return 'put';
+  const type = assetType.toLowerCase();
+  if (type === 'option_call') return 'call';
+  if (type === 'option_put') return 'put';
+  return null;
+}
+
+function optionContractFromEvent(
+  e: LedgerEvent,
+  assetType: string,
+  options?: PatrimonyMtmOptions
+): {
+  underlyingTicker: string | null;
+  optionType: OptionSide | null;
+  strike: number | null;
+  expiration: string | null;
+} {
+  const ticker = String(e.asset_ticker || '').toUpperCase();
+  const external = options?.optionContractForTicker?.(ticker);
+  const meta = e.metadata ?? {};
+  const optionType = normalizeOptionSide(
+    external?.optionType ?? meta.option_type ?? meta.optionSide,
+    assetType
+  );
+  const strike =
+    parsePositiveNumber(external?.strikePrice) ??
+    parsePositiveNumber(meta.option_strike) ??
+    parsePositiveNumber(meta.strike_price) ??
+    inferOptionStrikeFromTicker(ticker);
+  const expiration =
+    external?.expirationDate?.slice(0, 10) ??
+    (typeof meta.option_expiration === 'string' ? meta.option_expiration.slice(0, 10) : null) ??
+    (typeof meta.expiration_date === 'string' ? meta.expiration_date.slice(0, 10) : null) ??
+    inferOptionExpiryDate(ticker, Number(String(e.transaction_date || '').slice(0, 4)));
+  const underlyingTicker = String(
+    external?.underlyingTicker ??
+    meta.underlying_ticker ??
+    e.underlying_ticker ??
+    inferUnderlyingTicker(ticker)
+  ).toUpperCase();
+
+  return {
+    underlyingTicker: underlyingTicker || null,
+    optionType,
+    strike,
+    expiration,
+  };
+}
+
+function resolveUnderlyingMark(
+  ticker: string | null,
+  date: string,
+  quoteForDate: PatrimonyMtmOptions['quoteForDate'],
+  lastKnownPrices: Map<string, number>
+): number | null {
+  if (!ticker) return null;
+  const key = ticker.toUpperCase();
+  const daily = quoteForDate?.(key, date);
+  if (daily != null && Number.isFinite(daily) && daily > 0) {
+    lastKnownPrices.set(key, daily);
+    return daily;
+  }
+  return lastKnownPrices.get(key) ?? null;
+}
+
+function blackScholesMark(
+  p: DayPosition,
+  date: string,
+  quoteForDate: PatrimonyMtmOptions['quoteForDate'],
+  lastKnownPrices: Map<string, number>,
+  options?: PatrimonyMtmOptions
+): number | null {
+  if (!p.optionType || !p.strike || !p.expiry) return null;
+  const spot = resolveUnderlyingMark(p.underlyingTicker, date, quoteForDate, lastKnownPrices);
+  if (spot == null) return null;
+  return blackScholesOptionPrice({
+    side: p.optionType,
+    spot,
+    strike: p.strike,
+    valuationDate: date,
+    expirationDate: p.expiry,
+    riskFreeAnnual: options?.riskFreeAnnual,
+    volatilityAnnual: options?.optionVolatilityAnnual,
+  });
+}
+
 function resolvePositionMarkWithSource(
   p: DayPosition,
   date: string,
   quoteForDate: PatrimonyMtmOptions['quoteForDate'],
   stockQuotes: StockQuoteMap,
   lastKnownPrices: Map<string, number>,
+  options?: PatrimonyMtmOptions,
   valuationContext?: PatrimonyMtmOptions['valuationContext']
 ): { price: number; source: PositionDailySnapshot['priceSource'] } | null {
   const historicalMode = quoteForDate != null;
@@ -149,6 +257,9 @@ function resolvePositionMarkWithSource(
   if (daily != null && Number.isFinite(daily) && daily > 0) {
     lastKnownPrices.set(p.ticker, daily);
     return { price: daily, source: 'market' };
+  }
+  if (isOptionType(p.assetType, valuationContext) && p.expiry && date >= p.expiry) {
+    return { price: 0, source: 'expired_zero' };
   }
   const lastKnown = lastKnownPrices.get(p.ticker);
   if (lastKnown != null) return { price: lastKnown, source: 'previous_market' };
@@ -161,6 +272,8 @@ function resolvePositionMarkWithSource(
     }
   }
   if (isOptionType(p.assetType, valuationContext)) {
+    const bs = blackScholesMark(p, date, quoteForDate, lastKnownPrices, options);
+    if (bs != null) return { price: bs, source: 'black_scholes' };
     return null;
   }
   if (p.unitCost > 0) return { price: p.unitCost, source: 'cost' };
@@ -173,6 +286,7 @@ function resolvePositionMark(
   quoteForDate: PatrimonyMtmOptions['quoteForDate'],
   stockQuotes: StockQuoteMap,
   lastKnownPrices: Map<string, number>,
+  options?: PatrimonyMtmOptions,
   valuationContext?: PatrimonyMtmOptions['valuationContext']
 ): number | undefined {
   return resolvePositionMarkWithSource(
@@ -181,6 +295,7 @@ function resolvePositionMark(
     quoteForDate,
     stockQuotes,
     lastKnownPrices,
+    options,
     valuationContext
   )?.price;
 }
@@ -311,26 +426,38 @@ export function buildDailyPatrimonyMtmSeries(
 
     let pos = positions.get(e.asset_id);
     if (!pos) {
-      const expiry = isOptionType(assetType, valuationContext)
-        ? inferOptionExpiryDate(ticker, Number(date.slice(0, 4)))
+      const contract = isOptionType(assetType, valuationContext)
+        ? optionContractFromEvent(e, assetType, options)
         : null;
       pos = {
         assetId: e.asset_id,
         ticker,
         assetType,
+        underlyingTicker: contract?.underlyingTicker ?? null,
+        optionType: contract?.optionType ?? null,
+        strike: contract?.strike ?? null,
         qty: 0,
         unitCost: 0,
-        expiry,
+        expiry: contract?.expiration ?? null,
         firstSeen: date,
       };
       positions.set(e.asset_id, pos);
+    } else if (isOptionType(assetType, valuationContext) && (!pos.strike || !pos.expiry || !pos.underlyingTicker)) {
+      const contract = optionContractFromEvent(e, assetType, options);
+      pos.underlyingTicker = pos.underlyingTicker ?? contract.underlyingTicker;
+      pos.optionType = pos.optionType ?? contract.optionType;
+      pos.strike = pos.strike ?? contract.strike;
+      pos.expiry = pos.expiry ?? contract.expiration;
     }
 
     const price = Number(e.unit_price);
     if (price > 0) pos.unitCost = price;
 
     if (type === 'opening_balance') {
-      pos.qty = Math.abs(Number(e.quantity));
+      const openingQty = Number(e.quantity);
+      pos.qty = isOptionType(assetType, valuationContext)
+        ? openingQty
+        : Math.abs(openingQty);
       return;
     }
 
@@ -366,6 +493,7 @@ export function buildDailyPatrimonyMtmSeries(
         quoteForDate,
         stockQuotes,
         lastKnownPrices,
+        options,
         valuationContext
       );
       if (isFixedIncome(p.assetType, p.ticker, valuationContext)) {
@@ -543,6 +671,7 @@ function snapshotOpenPositions(
         quoteForDate,
         stockQuotes,
         lastKnownPrices,
+        options,
         options?.valuationContext
       );
       if (dailyMark != null) {
@@ -576,6 +705,7 @@ function snapshotOpenPositions(
       quoteForDate,
       stockQuotes,
       lastKnownPrices,
+      options,
       options?.valuationContext
     );
     let closing = resolved?.price;

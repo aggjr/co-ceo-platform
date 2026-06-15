@@ -7,7 +7,9 @@ import { OptionMarketRepository } from './OptionMarketRepository';
 
 export type OptionMarketSyncReport = {
   underlyings: string[];
+  tickersInUse: string[];
   rowsParsed: number;
+  rowsKept: number;
   inserted: number;
   updated: number;
   errors: Array<{ underlying: string; message: string }>;
@@ -46,30 +48,37 @@ export class OptionMarketSyncService {
 
   /** Custódia real em patrimony_items (não exige invest_position_ext). */
   async listUnderlyingsWithOptionsInUse(ctx: UserContext): Promise<string[]> {
+    const tickers = await this.listOptionTickersInUse(ctx);
+    return [...new Set(tickers.map((ticker) => inferUnderlyingTicker(ticker)))].sort();
+  }
+
+  async listOptionTickersInUse(ctx: UserContext): Promise<string[]> {
     const rows = ctx.organizationId
       ? await this.gateway.readQuery(
           optionMarketGlobalCtx,
-          'invest_open_option_tickers_for_org',
+          'invest_option_tickers_for_org',
           [ctx.organizationId]
         )
-      : await this.gateway.readQuery(optionMarketGlobalCtx, 'invest_open_option_tickers', []);
-    const underlyings = new Set<string>();
+      : await this.gateway.readQuery(optionMarketGlobalCtx, 'invest_option_tickers', []);
+    const tickers = new Set<string>();
     for (const row of rows) {
       const ticker = String(row.ticker ?? '').toUpperCase();
       if (!ticker || !isOptionTicker(ticker)) continue;
-      underlyings.add(inferUnderlyingTicker(ticker));
+      tickers.add(ticker);
     }
-    return [...underlyings].sort();
+    return [...tickers].sort();
   }
 
   async syncFromOpcoesNet(
     ctx: UserContext,
     options?: { underlyings?: string[]; asOfDate?: string; delayMs?: number; reuseSessionCache?: boolean }
   ): Promise<OptionMarketSyncReport> {
+    const tickersInUse = await this.listOptionTickersInUse(ctx);
+    const tickerAllowList = new Set(tickersInUse);
     const underlyings =
       options?.underlyings?.length
         ? options.underlyings.map((u) => u.trim().toUpperCase())
-        : await this.listUnderlyingsWithOptionsInUse(ctx);
+        : [...new Set(tickersInUse.map((ticker) => inferUnderlyingTicker(ticker)))].sort();
 
     const asOfDate = options?.asOfDate ?? new Date().toISOString().slice(0, 10);
     const delayMs = options?.delayMs ?? 400;
@@ -87,6 +96,7 @@ export class OptionMarketSyncService {
     }
 
     let rowsParsed = 0;
+    let rowsKept = 0;
     let inserted = 0;
     let updated = 0;
     const errors: OptionMarketSyncReport['errors'] = [];
@@ -101,7 +111,9 @@ export class OptionMarketSyncService {
         const expirations = await fetchOpcoesNetOptionsChainAll(underlying);
         const parsed = parseOpcoesNetExpirations(underlying, expirations, asOfDate);
         rowsParsed += parsed.length;
-        const result = await this.marketRepo.upsertMany(optionMarketGlobalCtx, parsed);
+        const scoped = parsed.filter((row) => tickerAllowList.has(row.ticker));
+        rowsKept += scoped.length;
+        const result = await this.marketRepo.upsertMany(optionMarketGlobalCtx, scoped);
         inserted += result.inserted;
         updated += result.updated;
         if (underlyingCacheKey) optionMarketUnderlyingCache.add(underlyingCacheKey);
@@ -117,7 +129,9 @@ export class OptionMarketSyncService {
 
     const report = {
       underlyings,
+      tickersInUse,
       rowsParsed,
+      rowsKept,
       inserted,
       updated,
       errors,

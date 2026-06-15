@@ -140,7 +140,7 @@ describe('LedgerEventProjection', () => {
     expect(events[0].skip_financial_ledger).toBe(true);
   });
 
-  it('projeta opening_balance de PUT vendida (quantity_delta negativo) com qty abs e net signed', async () => {
+  it('projeta opening_balance de PUT vendida preservando quantity_delta negativo', async () => {
     const gw = makeGateway({
       patrimony_items: [
         {
@@ -182,7 +182,7 @@ describe('LedgerEventProjection', () => {
     expect(e.asset_type).toBe('option_put');
     expect(e.underlying_ticker).toBe('PRIO3');
     expect(e.transaction_type).toBe('opening_balance');
-    expect(e.quantity).toBe(31200);
+    expect(e.quantity).toBe(-31200);
     expect(e.total_net_value).toBeCloseTo(-31200 * 1.426748, 3);
   });
 

@@ -1,4 +1,4 @@
-﻿# Plano Canonico para Agentes - Market Data, Valuation e Conciliacao INVEST
+# Plano Canonico para Agentes - Market Data, Valuation e Conciliacao INVEST
 
 Este arquivo e a unica fonte de planejamento operacional dentro de `tasks/`.
 Todo agente deve ler este documento antes de alterar codigo relacionado a INVEST,
@@ -466,6 +466,10 @@ Cada valor usado no fechamento deve ter origem rastreavel:
 
 Estimativas sao permitidas, mas precisam ser marcadas como estimativas e
 precisam ser conciliadas contra ancoras quando existirem.
+
+### 8.1 Dias Uteis e Feriados
+
+Nao devemos considerar nem sabados, nem domingos e nem feriados nacionais como dias uteis para bolsa. Dessa forma, nao terao dados nestes dias nem no patrimonio e nem em nenhum relatorio.
 
 ## 9. Eventos de negocio
 

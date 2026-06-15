@@ -2,7 +2,7 @@ import { PatrimonyDailyRecorder } from '../../../src/core/invest/PatrimonyDailyR
 import type { CoCeoDataGateway } from '../../../src/core/dal';
 
 describe('PatrimonyDailyRecorder quote requirements', () => {
-  it('exige cotacao diaria exata para acoes, mas permite estimativa para renda fixa e opcoes', () => {
+  it('exige cotacao diaria exata para acoes, mas permite estimativa para opcoes e renda fixa', () => {
     const recorder = new PatrimonyDailyRecorder({} as CoCeoDataGateway) as unknown as {
       requiresExactDailyQuote: (assetType: string, ticker: string) => boolean;
     };

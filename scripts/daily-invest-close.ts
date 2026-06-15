@@ -48,7 +48,7 @@ async function main() {
       console.log('  Faltando cotação:', r.stockQuotes.missing.join(', '));
     }
     if (r.options) {
-      console.log('  Opções opcoes.net:', r.options.rowsParsed, 'linhas');
+      console.log('  Opcoes opcoes.net:', r.options.rowsKept, 'linhas do cliente', `(${r.options.rowsParsed} lidas)`);
     }
     console.log('  Patrimônio (gravado):', r.patrimony.recorded.patrimony.toLocaleString('pt-BR'));
     console.log('  Econômico (auditoria):', r.patrimony.economicPatrimony.toLocaleString('pt-BR'));

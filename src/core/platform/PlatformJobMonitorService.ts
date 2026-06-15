@@ -27,23 +27,23 @@ export function evaluateOptionsMarketSyncReport(
     return {
       status: 'error',
       title: 'Sync opcoes.net com falhas',
-      body: `${report.errors.length} ação(ões)-mãe com erro. ${detail}`,
+      body: `${report.errors.length} acao(oes)-mae com erro. ${detail}`,
       summary: report as unknown as Record<string, unknown>,
       errorMessage: detail,
     };
   }
-  if (report.underlyings.length > 0 && report.rowsParsed === 0) {
+  if (report.underlyings.length > 0 && report.rowsKept === 0) {
     return {
       status: 'warning',
       title: 'Sync opcoes.net sem linhas',
-      body: `Nenhuma opção vigente importada para: ${report.underlyings.join(', ')}.`,
+      body: `Nenhuma opcao do cliente encontrada na grade para: ${report.underlyings.join(', ')}.`,
       summary: report as unknown as Record<string, unknown>,
     };
   }
   return {
     status: 'success',
-    title: 'Sync opcoes.net concluído',
-    body: `${report.rowsParsed} opções em ${report.underlyings.length} ação(ões)-mãe (${report.inserted} novas, ${report.updated} atualizadas).`,
+    title: 'Sync opcoes.net concluido',
+    body: `${report.rowsKept} opcoes do cliente mantidas de ${report.rowsParsed} opcoes lidas em ${report.underlyings.length} acao(oes)-mae (${report.inserted} novas, ${report.updated} atualizadas).`,
     summary: report as unknown as Record<string, unknown>,
   };
 }

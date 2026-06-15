@@ -178,6 +178,33 @@ type PatrimonyChartPoint = {
   source: string;
 };
 
+type PatrimonyDailyAuditRow = {
+  date: string;
+  patrimony: number;
+  economicPatrimony: number | null;
+  deltaVsPrevious: number | null;
+  deltaPctVsPrevious: number | null;
+  cash: number;
+  cashInTransit: number;
+  positionsValue: number;
+  fixedIncome: number;
+  externalFlow: number;
+  dailyReturnTwr: number | null;
+  source: string;
+  quotesAsOf: string | null;
+  positionRows: number;
+  estimatedRows: number;
+  costRows: number;
+  previousMarketRows: number;
+  blackScholesRows: number;
+  marketRows: number;
+  expiredZeroRows: number;
+  estimatedTickers: string[];
+  consistencyOk: boolean | null;
+  consistencyDelta: number | null;
+  flags: string[];
+};
+
 function enumerateIsoDates(from: string, to: string): string[] {
   const out: string[] = [];
   const start = new Date(`${from}T12:00:00Z`);
@@ -203,6 +230,29 @@ function portfolioRowMatchesAssetClass(
   if (assetClass === 'fixedIncome') return isFi || isCash;
   if (assetClass === 'equities') return !isOpt && !isFi && !isCash;
   return true;
+}
+
+function parseJsonObject(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === 'object') return value as Record<string, unknown>;
+  if (typeof value !== 'string') return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function roundAuditMoney(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  const rounded = Math.round(value * 100) / 100;
+  return Math.abs(rounded) < 0.005 ? 0 : rounded;
+}
+
+function isoDateFromRow(value: unknown): string {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value ?? '').slice(0, 10);
 }
 
 export class InvestController {
@@ -711,6 +761,7 @@ export class InvestController {
     const calibrateToAnchors = useBtgAnchorCurve;
     const fixedIncomeTotal = fixedIncomeTotalFromLedger(events);
     const valuationSnapshot = await this.valuationContext.load(ctx);
+    const optionCatalog = await loadOptionMarketCatalog(this.gateway, ctx.organizationId);
     const fxByPairDate = new Map<string, number>();
     const foreignCurrencies = [
       ...new Set([...valuationSnapshot.currencyByType.values()].filter((currency) => currency !== 'BRL')),
@@ -740,6 +791,17 @@ export class InvestController {
               calibrateToAnchors: method === 'mtm_btg_calibrated' || method === 'mtm_economic_calibrated',
               quoteForDate,
               valuationContext: valuationSnapshot,
+              optionContractForTicker: (ticker: string) => {
+                const row = optionCatalog.get(ticker.toUpperCase());
+                return row
+                  ? {
+                      underlyingTicker: row.underlyingTicker,
+                      optionType: row.optionType,
+                      strikePrice: row.strikePrice,
+                      expirationDate: row.expirationDate,
+                    }
+                  : undefined;
+              },
               fxRateForDate: (fromCurrency: string, toCurrency: string, date: string) =>
                 fxByPairDate.get(
                   `${fromCurrency.toUpperCase()}/${toCurrency.toUpperCase()}/${date.slice(0, 10)}`
@@ -750,6 +812,62 @@ export class InvestController {
     const storedDays = useBtgAnchorCurve
       ? []
       : filterStoredDaysForChartMethod(storedDaysRaw, method);
+    const positionAuditByDate = new Map<string, {
+      positionRows: number;
+      estimatedRows: number;
+      costRows: number;
+      previousMarketRows: number;
+      blackScholesRows: number;
+      marketRows: number;
+      expiredZeroRows: number;
+      estimatedTickers: string[];
+    }>();
+    try {
+      const [positionAuditRows] = await pool.query<mysql.RowDataPacket[]>(
+        `SELECT
+           snapshot_date,
+           COUNT(*) AS position_rows,
+           SUM(CASE WHEN price_source IN ('black_scholes', 'estimated_decay', 'cost', 'previous_market', 'expired_zero') THEN 1 ELSE 0 END) AS estimated_rows,
+           SUM(CASE WHEN price_source = 'cost' THEN 1 ELSE 0 END) AS cost_rows,
+           SUM(CASE WHEN price_source = 'previous_market' THEN 1 ELSE 0 END) AS previous_market_rows,
+           SUM(CASE WHEN price_source = 'black_scholes' THEN 1 ELSE 0 END) AS black_scholes_rows,
+           SUM(CASE WHEN price_source = 'market' THEN 1 ELSE 0 END) AS market_rows,
+           SUM(CASE WHEN price_source = 'expired_zero' THEN 1 ELSE 0 END) AS expired_zero_rows,
+           GROUP_CONCAT(
+             CASE
+               WHEN price_source IN ('black_scholes', 'estimated_decay', 'cost', 'previous_market', 'expired_zero')
+               THEN CONCAT(ticker, ':', price_source)
+               ELSE NULL
+             END
+             ORDER BY ABS(total_value) DESC SEPARATOR ', '
+           ) AS estimated_tickers
+         FROM invest_position_daily
+         WHERE organization_id = ?
+           AND snapshot_date BETWEEN ? AND ?
+         GROUP BY snapshot_date
+         ORDER BY snapshot_date`,
+        [ctx.organizationId, from, to]
+      );
+      for (const row of positionAuditRows) {
+        const date = isoDateFromRow(row.snapshot_date);
+        positionAuditByDate.set(date, {
+          positionRows: Number(row.position_rows ?? 0),
+          estimatedRows: Number(row.estimated_rows ?? 0),
+          costRows: Number(row.cost_rows ?? 0),
+          previousMarketRows: Number(row.previous_market_rows ?? 0),
+          blackScholesRows: Number(row.black_scholes_rows ?? 0),
+          marketRows: Number(row.market_rows ?? 0),
+          expiredZeroRows: Number(row.expired_zero_rows ?? 0),
+          estimatedTickers: String(row.estimated_tickers ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .slice(0, 12),
+        });
+      }
+    } catch (err) {
+      if (!isMissingSchemaError(err)) throw err;
+    }
     let storedDates: string[] = [];
     if (storedDays.length > 0) {
       const merged = mergeStoredPatrimonySeries(result.series, storedDays);
@@ -851,6 +969,72 @@ export class InvestController {
               1_000_000,
           }
         : null;
+    const resultByDate = new Map(result.series.map((p) => [String(p.date).slice(0, 10), p]));
+    const auditDates = [
+      ...new Set([
+        ...result.series.map((p) => String(p.date).slice(0, 10)),
+        ...storedDaysRaw.map((s) => s.snapshot_date),
+        ...positionAuditByDate.keys(),
+      ]),
+    ].sort();
+    let previousPatrimony: number | null = null;
+    const dailyAudit: PatrimonyDailyAuditRow[] = auditDates.map((date) => {
+      const point = resultByDate.get(date);
+      const stored = storedDaysRaw.find((s) => s.snapshot_date === date) ?? null;
+      const positionAudit = positionAuditByDate.get(date);
+      const metadata = parseJsonObject(stored?.metadata);
+      const economicPatrimony = roundAuditMoney(Number(metadata?.economic_patrimony));
+      const consistency = parseJsonObject(metadata?.position_daily_consistency);
+      const consistencyDeltas = parseJsonObject(consistency?.deltas);
+      const consistencyDelta = roundAuditMoney(Number(consistencyDeltas?.patrimony));
+      const patrimony = Number(point?.patrimony ?? stored?.patrimony ?? 0);
+      const deltaVsPrevious =
+        previousPatrimony != null ? roundAuditMoney(patrimony - previousPatrimony) : null;
+      const deltaPctVsPrevious =
+        previousPatrimony != null && previousPatrimony !== 0
+          ? Math.round(((patrimony - previousPatrimony) / previousPatrimony) * 1_000_000) / 1_000_000
+          : null;
+      previousPatrimony = patrimony;
+
+      const flags: string[] = [];
+      if (deltaPctVsPrevious != null && Math.abs(deltaPctVsPrevious) >= 0.02) flags.push('salto >= 2%');
+      if ((positionAudit?.estimatedRows ?? 0) > 0) flags.push('preco estimado');
+      if ((positionAudit?.blackScholesRows ?? 0) > 0) flags.push('black-scholes');
+      if ((positionAudit?.costRows ?? 0) > 0) flags.push('marcado a custo');
+      if ((positionAudit?.previousMarketRows ?? 0) > 0) flags.push('cotacao anterior');
+      if (consistency?.ok === false) flags.push('inconsistencia snapshot');
+      if (stored && point && Math.abs(Number(stored.patrimony) - Number(point.patrimony)) > 1) {
+        flags.push('gravado difere da serie');
+      }
+
+      return {
+        date,
+        patrimony: roundAuditMoney(patrimony) ?? 0,
+        economicPatrimony,
+        deltaVsPrevious,
+        deltaPctVsPrevious,
+        cash: roundAuditMoney(Number(point?.settledCash ?? point?.cash ?? stored?.cash ?? 0)) ?? 0,
+        cashInTransit:
+          roundAuditMoney(Number(point?.cashInTransit ?? point?.pendingSettlements ?? stored?.cash_in_transit ?? 0)) ?? 0,
+        positionsValue: roundAuditMoney(Number(point?.positionsValue ?? stored?.positions_value ?? 0)) ?? 0,
+        fixedIncome: roundAuditMoney(Number(stored?.fixed_income_total ?? metadata?.rf_marked ?? 0)) ?? 0,
+        externalFlow: roundAuditMoney(Number(stored?.external_flow ?? 0)) ?? 0,
+        dailyReturnTwr: stored?.daily_return_twr ?? null,
+        source: stored?.source ?? result.meta.method,
+        quotesAsOf: stored?.quotes_as_of ?? null,
+        positionRows: positionAudit?.positionRows ?? 0,
+        estimatedRows: positionAudit?.estimatedRows ?? 0,
+        costRows: positionAudit?.costRows ?? 0,
+        previousMarketRows: positionAudit?.previousMarketRows ?? 0,
+        blackScholesRows: positionAudit?.blackScholesRows ?? 0,
+        marketRows: positionAudit?.marketRows ?? 0,
+        expiredZeroRows: positionAudit?.expiredZeroRows ?? 0,
+        estimatedTickers: positionAudit?.estimatedTickers ?? [],
+        consistencyOk: typeof consistency?.ok === 'boolean' ? consistency.ok : null,
+        consistencyDelta,
+        flags,
+      };
+    });
 
     return res.json({
       success: true,
@@ -862,6 +1046,7 @@ export class InvestController {
       portfolioIndexed,
       cdiComparison,
       cashInTransit,
+      dailyAudit,
       btgReference,
       extractReconciliation: {
         ...extractReconciliation,
