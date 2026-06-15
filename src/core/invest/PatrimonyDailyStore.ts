@@ -221,9 +221,9 @@ export class PatrimonyDailyStore {
   }
 
   /**
-   * Apaga as consolidações a partir de uma data de corte.
-   * Isso força o gráfico histórico a recalcular tudo dinamicamente
-   * do dia da alteração em diante, caso novos dados retroativos entrem.
+   * Apaga as consolidacoes a partir de uma data de corte.
+   * Isso forca o grafico historico a recalcular tudo dinamicamente
+   * do dia da alteracao em diante, caso novos dados retroativos entrem.
    */
   async invalidateFromDate(ctx: UserContext, fromDate: string): Promise<void> {
     if (!ctx.organizationId) return;
@@ -242,13 +242,13 @@ export class PatrimonyDailyStore {
       );
       await StorageMeter.recalculateOrganizationUsage(pool, ctx.organizationId);
     } catch (err) {
-      console.error('Falha ao invalidar patrimônio diário retroativo:', err);
+      console.error('Falha ao invalidar patrimonio diario retroativo:', err);
     }
   }
 
   async upsertPortfolioDay(ctx: UserContext, input: RecordPortfolioDayInput): Promise<StoredPortfolioDay> {
     if (!ctx.organizationId) {
-      throw new Error('organizationId obrigatório para gravar patrimônio diário.');
+      throw new Error('organizationId obrigatorio para gravar patrimonio diario.');
     }
     await ensurePortfolioDailyCashColumns();
     const orgId = ctx.organizationId;
@@ -379,8 +379,8 @@ export class PatrimonyDailyStore {
   }
 
   /**
-   * Snapshots por ativo — best-effort (FK legada invest_assets pode falhar até migração).
-   * O fechamento em invest_portfolio_daily sempre é gravado.
+   * Snapshots por ativo - best-effort (FK legada invest_assets pode falhar ate migracao).
+   * O fechamento em invest_portfolio_daily sempre e gravado.
    */
   private async upsertAssetSnapshotsBestEffort(
     ctx: UserContext,
@@ -587,8 +587,8 @@ export class PatrimonyDailyStore {
 }
 
 /**
- * Fechamentos gravados (mtm_economic) substituem o dia na curva quando existem —
- * patrimônio e TWR vêm de invest_portfolio_daily (fechamento das 23h).
+ * Fechamentos gravados (mtm_economic) substituem o dia na curva quando existem -
+ * patrimonio e TWR vem de invest_portfolio_daily (fechamento das 23h).
  */
 export function filterStoredDaysForChartMethod(
   stored: StoredPortfolioDay[],
@@ -599,12 +599,14 @@ export function filterStoredDaysForChartMethod(
     return stored.filter((s) => s.source === 'mtm_btg_calibrated');
   }
   if (m === 'mtm_economic') {
-    return stored.filter((s) => s.source === 'mtm_economic');
+    return stored.filter(
+      (s) => s.source === 'mtm_economic' || s.source === 'mtm_btg_calibrated'
+    );
   }
   return stored;
 }
 
-/** Substitui dias gravados na série calculada; inclui dias só em invest_portfolio_daily. */
+/** Substitui dias gravados na serie calculada; inclui dias so em invest_portfolio_daily. */
 export function mergeStoredPatrimonySeries(
   computed: DailyPatrimonyPoint[],
   stored: StoredPortfolioDay[]
@@ -644,21 +646,12 @@ export function mergeStoredPatrimonySeries(
   return { series, storedDates };
 }
 
-/** Remove dias só calculados após o último fechamento gravado com patrimônio zero. */
+/** Remove a cauda calculada apos o ultimo fechamento gravado. */
 export function trimZeroPatrimonyTailAfterLastStored(
   series: DailyPatrimonyPoint[],
   stored: StoredPortfolioDay[]
 ): DailyPatrimonyPoint[] {
   if (!stored.length || !series.length) return series;
   const lastStoredDate = stored[stored.length - 1]!.snapshot_date;
-  let trimmed = series;
-  while (trimmed.length > 0) {
-    const last = trimmed[trimmed.length - 1]!;
-    if (last.date > lastStoredDate && last.patrimony === 0) {
-      trimmed = trimmed.slice(0, -1);
-    } else {
-      break;
-    }
-  }
-  return trimmed;
+  return series.filter((point) => point.date <= lastStoredDate);
 }

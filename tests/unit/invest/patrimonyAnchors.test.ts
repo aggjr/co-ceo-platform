@@ -9,7 +9,7 @@ describe('patrimonyAnchors (BTG holding)', () => {
     expect(p).toBeCloseTo(1_212_435.41, 2);
   });
 
-  it('atinge âncora de 31/01/2026', () => {
+  it('atinge ancora de 31/01/2026', () => {
     const p = interpolatePatrimonyTarget('2026-01-31', HOLDING_BTG_PATRIMONY_ANCHORS);
     expect(p).toBeCloseTo(1_320_481.6, 2);
   });
@@ -35,13 +35,33 @@ describe('filterStoredDaysForChartMethod', () => {
       source: 'mtm_economic',
       metadata: null,
     },
+    {
+      id: '2',
+      organization_id: 'org',
+      snapshot_date: '2026-01-31',
+      patrimony: 550_000,
+      patrimony_gross: 550_000,
+      cash: 0,
+      positions_value: 550_000,
+      pending_settlements: 0,
+      fixed_income_total: 0,
+      external_flow: 0,
+      daily_return_simple: null,
+      daily_return_twr: null,
+      cumulative_twr: null,
+      quotes_as_of: null,
+      source: 'mtm_btg_calibrated',
+      metadata: null,
+    },
   ];
 
-  it('não mescla mtm_economic na curva mtm_btg', () => {
-    expect(filterStoredDaysForChartMethod(stored, 'mtm_btg')).toHaveLength(0);
+  it('mescla apenas fechamento calibrado na curva mtm_btg', () => {
+    const filtered = filterStoredDaysForChartMethod(stored, 'mtm_btg');
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0]!.source).toBe('mtm_btg_calibrated');
   });
 
-  it('mantém mtm_economic no modo econômico', () => {
-    expect(filterStoredDaysForChartMethod(stored, 'mtm_economic')).toHaveLength(1);
+  it('mantem fechamentos gravados autoritativos no modo economico', () => {
+    expect(filterStoredDaysForChartMethod(stored, 'mtm_economic')).toHaveLength(2);
   });
 });
