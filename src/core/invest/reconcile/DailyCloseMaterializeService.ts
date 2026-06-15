@@ -151,7 +151,11 @@ export class DailyCloseMaterializeService {
     };
   }
 
-  async materializeDay(ctx: UserContext, date: string): Promise<MaterializeDayReport> {
+  async materializeDay(
+    ctx: UserContext,
+    date: string,
+    opts?: { initialLoad?: boolean }
+  ): Promise<MaterializeDayReport> {
     const day = date.slice(0, 10);
     const startedAt = Date.now();
     logReconcileEvent('info', 'daily-close.materialize.start', ctx.organizationId ?? undefined, {
@@ -165,7 +169,9 @@ export class DailyCloseMaterializeService {
     let economicPatrimony: number | null = null;
     let patrimonyValidation: MaterializeDayReport['patrimonyValidation'] = null;
     try {
-      const rec = await this.recorder.recordDay(ctx, day);
+      const rec = await this.recorder.recordDay(ctx, day, {
+        initialLoad: opts?.initialLoad === true,
+      });
       patrimonyValidation = this.assertPatrimonyCoherent(day, rec);
       patrimonyRecorded = true;
       economicPatrimony = rec.economicPatrimony;

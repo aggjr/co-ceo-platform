@@ -31,6 +31,12 @@ export type PatrimonyRebuildOptions = {
   from?: string;
   to?: string;
   lastTrustedDate?: string;
+  /**
+   * Reconstrução de carga inicial: habilita estimativa por âncoras mensais para
+   * dias passados sem cotação real. Padrão `false` (econômico) — recálculos
+   * recorrentes nunca estimam. Ver PatrimonyDailyRecorder.recordDay.
+   */
+  initialLoad?: boolean;
   onProgress?: (daysWritten: number, daysSkipped: number, currentDay: string) => void;
 };
 
@@ -169,7 +175,9 @@ export class PatrimonyDailyRebuildService {
           continue;
         }
         try {
-          await this.recorder.recordDay(ctx, day);
+          await this.recorder.recordDay(ctx, day, {
+            initialLoad: opts.initialLoad === true,
+          });
           daysWritten += 1;
         } catch (err) {
           daysSkipped += 1;

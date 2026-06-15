@@ -16,6 +16,10 @@ import { inferAssetType, isOptionTicker } from './assetClassifier';
 import {
   AssetValuationContext,
   requiresMarketQuoteForAsset,
+  isB3EquitySpotAsset,
+  isFixedIncomeCategory,
+  isOptionCategory,
+  type AssetValuationSnapshot,
 } from './valuation/AssetValuationContext';
 import { FxRateRepository } from '../market/FxRateRepository';
 import { InvestOperationPolicyService } from './InvestOperationPolicyService';
@@ -59,12 +63,20 @@ export class PatrimonyDailyRecorder {
     return dow === 0 || dow === 6;
   }
 
-  private requiresExactDailyQuote(assetType: string, ticker: string): boolean {
-    const type = assetType.toLowerCase();
-    if (type === 'fixed_income') return false;
-    if (type === 'option_call' || type === 'option_put' || type.includes('option')) return false;
-    if (isOptionTicker(ticker)) return false;
-    return true;
+  /**
+   * Define quais ativos exigem cotação de mercado EXATA do dia (e portanto
+   * bloqueiam o fechamento se faltar). Regra dirigida pelo catálogo de valoração:
+   * apenas ativos à vista de bolsa (equity spot B3 — ações/FII/ETF/BDR) bloqueiam.
+   * Opções e renda fixa são estimáveis e não bloqueiam o fechamento.
+   */
+  private requiresExactDailyQuote(
+    snapshot: AssetValuationSnapshot,
+    assetType: string,
+    ticker: string
+  ): boolean {
+    if (isOptionCategory(snapshot, assetType) || isOptionTicker(ticker)) return false;
+    if (isFixedIncomeCategory(snapshot, assetType)) return false;
+    return isB3EquitySpotAsset(snapshot, assetType, ticker);
   }
 
   private async quotedTickersOpenOnDate(
@@ -88,7 +100,7 @@ export class PatrimonyDailyRecorder {
         : null;
       if (expiry && date >= expiry) continue;
       if (!requiresMarketQuoteForAsset(valuationSnapshot, assetType, ticker)) continue;
-      if (!this.requiresExactDailyQuote(assetType, ticker)) continue;
+      if (!this.requiresExactDailyQuote(valuationSnapshot, assetType, ticker)) continue;
       const type = String(e.transaction_type ?? '');
       const qty = Math.abs(Number(e.quantity ?? 0));
       if (!Number.isFinite(qty) || qty <= 0) continue;
@@ -194,13 +206,31 @@ export class PatrimonyDailyRecorder {
   }
 
   /**
-   * Grava fechamento diário: patrimônio principal alinhado à custódia BTG quando há âncoras;
-   * mantém série econômica em metadata para auditoria e evolução futura.
+   * Grava o fechamento diário de patrimônio.
+   *
+   * Dois modos, mutuamente exclusivos:
+   *
+   * - Modo padrão ("diário"/econômico): usado pelo job diário e por qualquer
+   *   recálculo recorrente. Valora exclusivamente por dado real de mercado
+   *   (cotações em `market_quotes_daily`, alimentadas pelas fontes mapeadas em
+   *   ordem de prioridade). Opção sem cotação cai para Black-Scholes/decaimento
+   *   no motor — NUNCA usa "plug" de âncora. É o estado canônico do dia.
+   *
+   * - Modo carga inicial (`opts.initialLoad === true`): EXCLUSIVO da primeira
+   *   carga de dados de um cliente. Permite a calibração por âncoras mensais do
+   *   home broker para reconstruir o histórico passado quando não há cotação
+   *   real disponível na web para aquele dia. A estimativa é apenas o resíduo
+   *   (alvo da âncora menos o que já foi marcado a mercado), distribuído nas
+   *   opções estimadas. Não deve rodar no fluxo recorrente.
+   *
+   * Regra de prioridade da valoração (ambos os modos): cotação real do dia >
+   * último mercado conhecido > Black-Scholes (opção) > custo. Só no modo carga
+   * inicial, após essa cadeia, entra a estimativa por âncora.
    */
   async recordDay(
     ctx: UserContext,
     snapshotDate?: string,
-    opts?: { economicOnly?: boolean }
+    opts?: { initialLoad?: boolean }
   ): Promise<RecordDailyPatrimonyResult> {
     const date = (snapshotDate || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const anchors = await this.anchorsRepo.loadForOrganization(ctx);
@@ -237,7 +267,9 @@ export class PatrimonyDailyRecorder {
     const rfForEconomic = rfLedger;
 
     const useCalibration =
-      !opts?.economicOnly && hasAnchors && (await shouldUseBtgAnchorCalibration(ctx, events, this.policyService));
+      opts?.initialLoad === true &&
+      hasAnchors &&
+      (await shouldUseBtgAnchorCalibration(ctx, events, this.policyService));
     const valuationSnapshot = await this.valuationContext.load(ctx);
     const optionCatalog = ctx.organizationId
       ? await loadOptionMarketCatalog(this.gateway, ctx.organizationId)

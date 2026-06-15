@@ -195,7 +195,7 @@ async function main() {
   }
 
   const recorder = new PatrimonyDailyRecorder(gateway);
-  const saved = await recorder.recordDay(ctx, AS_OF);
+  const saved = await recorder.recordDay(ctx, AS_OF, { initialLoad: true });
   console.log('\nFechamento gravado:', saved.snapshotDate, 'patrimônio', saved.recorded.patrimony);
 
   await pool.end();

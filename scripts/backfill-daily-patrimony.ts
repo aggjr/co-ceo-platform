@@ -39,7 +39,7 @@ async function main() {
   while (current <= end) {
     const targetDate = current.toISOString().slice(0, 10);
     try {
-      const result = await recorder.recordDay(ctx, targetDate);
+      const result = await recorder.recordDay(ctx, targetDate, { initialLoad: true });
       console.log(`[${targetDate}] Gravado: ${result.recorded.patrimony.toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'})} (TWR Acumulado: ${result.recorded.cumulative_twr != null ? (result.recorded.cumulative_twr * 100).toFixed(4) + '%' : '—'})`);
     } catch (e: any) {
       console.warn(`[${targetDate}] Aviso: ${e.message}`);

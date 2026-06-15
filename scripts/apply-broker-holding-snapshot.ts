@@ -48,7 +48,7 @@ async function main() {
   const ctx = { ...installerContext(), organizationId: ORG, scope: 'node' as const };
   const recorder = new PatrimonyDailyRecorder(gateway);
   console.log('\nGravando fechamento do dia…');
-  const saved = await recorder.recordDay(ctx, result.asOf);
+  const saved = await recorder.recordDay(ctx, result.asOf, { initialLoad: true });
   console.log('  Patrimônio gravado:', saved.recorded.patrimony.toLocaleString('pt-BR'));
 
   await pool.end();

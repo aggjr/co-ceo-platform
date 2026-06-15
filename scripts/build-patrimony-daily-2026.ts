@@ -1,19 +1,26 @@
 /**
- * Gera série patrimonial diária 2026 e grava em data/invest/patrimony-daily-2026.json.
- * Com --persist, grava também em invest_portfolio_daily (cache; API não recalcula esses dias).
+ * CARGA INICIAL — reconstrução da série patrimonial diária histórica de um cliente.
+ *
+ * Esta rotina é EXCLUSIVA da primeira carga de dados de uma organização: reconstrói
+ * o histórico passado calibrando pelas âncoras mensais do home broker quando NÃO há
+ * cotação real na web para o dia. Não deve ser usada no fluxo recorrente — o job
+ * diário grava o fechamento econômico (dado real) — ver PatrimonyDailyRecorder.recordDay.
+ *
+ * As âncoras vêm do banco (invest_patrimony_monthly_anchors, por organização). Faça o
+ * seed das âncoras antes de rodar (PatrimonyMonthlyAnchorsSeedService). Sem âncoras no
+ * banco, a rotina aborta — não há fallback hardcoded.
  *
  *   node ./node_modules/ts-node/dist/bin.js scripts/build-patrimony-daily-2026.ts
  *   node ./node_modules/ts-node/dist/bin.js scripts/build-patrimony-daily-2026.ts --persist
+ *
+ * Sem --persist apenas imprime o resumo; com --persist grava em invest_portfolio_daily.
  */
-import fs from 'fs';
-import path from 'path';
 import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import { CoCeoDataGateway } from '../src/core/dal';
 import { installerContext } from '../src/database/seeds/lib/installerContext';
 import { LedgerImportService } from '../src/core/invest/LedgerImportService';
 import { buildDailyPatrimonyMtmSeries } from '../src/core/invest/PatrimonyMtmDailyEngine';
-import { HOLDING_BTG_PATRIMONY_ANCHORS } from '../src/core/invest/btgPatrimonyAnchorReference';
 import { PatrimonyMonthlyAnchorsRepository } from '../src/core/invest/PatrimonyMonthlyAnchorsRepository';
 import { PatrimonyDailyStore } from '../src/core/invest/PatrimonyDailyStore';
 import { aggregateExternalFlowsByDate } from '../src/core/invest/portfolioPerformance';
@@ -62,30 +69,20 @@ async function main() {
 
   const anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
   const anchors = await anchorsRepo.loadForOrganization(ctx);
+  if (!anchors.month_ends.length) {
+    throw new Error(
+      `Sem âncoras mensais no banco para ${ORG}. Rode o seed (PatrimonyMonthlyAnchorsSeedService) ` +
+        'antes da carga inicial — não há fallback hardcoded.'
+    );
+  }
   const events = await ledger.listLedgerEvents(ctx, '2025-12-01', '2026-12-31');
-  const calibrate =
-    anchors.month_ends.length > 0 &&
-    events.some((e) => String(e.transaction_type) === 'opening_balance');
+  const calibrate = events.some((e) => String(e.transaction_type) === 'opening_balance');
   const result = buildDailyPatrimonyMtmSeries(events, '2026-01-01', '2026-12-31', {
-    anchors: anchors.month_ends.length ? anchors : HOLDING_BTG_PATRIMONY_ANCHORS,
+    anchors,
     stockQuotes,
-    fixedIncomeTotal: Number(anchors.fixed_income_total ?? HOLDING_BTG_PATRIMONY_ANCHORS.fixed_income_total ?? 0),
+    fixedIncomeTotal: Number(anchors.fixed_income_total ?? 0),
     calibrateToAnchors: calibrate,
   });
-
-  const outPath = path.join(__dirname, '..', 'data', 'invest', 'patrimony-daily-2026.json');
-  fs.writeFileSync(
-    outPath,
-    JSON.stringify(
-      {
-        generated_at: new Date().toISOString(),
-        organization_id: ORG,
-        ...result,
-      },
-      null,
-      2
-    )
-  );
 
   const monthEnds = ['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30', '2026-05-18', '2026-05-19', '2026-05-31'];
   console.log('Patrimônio (fim de mês):');
@@ -98,7 +95,7 @@ async function main() {
       target != null ? `(BTG ${target.toFixed(2)})` : ''
     );
   }
-  console.log('Salvo:', outPath, `(${result.series.length} dias)`);
+  console.log(`Série calculada: ${result.series.length} dias (use --persist para gravar).`);
 
   if (persistDb) {
     const today = new Date().toISOString().slice(0, 10);

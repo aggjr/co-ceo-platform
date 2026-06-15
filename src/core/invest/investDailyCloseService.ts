@@ -67,6 +67,8 @@ export async function runInvestDailyCloseForOrg(
     options = null;
   }
 
+  // Job diário recorrente: modo econômico (dado real de mercado). A estimativa
+  // por âncoras é exclusiva da carga inicial — ver PatrimonyDailyRecorder.recordDay.
   const patrimony = await recorder.recordDay(ctx, date);
 
   return {

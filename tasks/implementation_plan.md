@@ -1583,4 +1583,33 @@ Antes de concluir:
 5. Toda estimativa precisa ser auditavel e conciliavel contra ancoras.
 6. O refresh do usuario atual tem prioridade absoluta sobre background.
 
+## 18. Carga inicial vs. fechamento diario (patrimonio)
+
+Doc detalhado: `docs/architecture/invest_carga_inicial_vs_diario.md`.
+
+Decisao aplicada:
+
+- Estimativa por ancoras mensais do home broker e **exclusiva da carga inicial**
+  (`PatrimonyDailyRecorder.recordDay(ctx, date, { initialLoad: true })`).
+- Job diario e qualquer recalculo recorrente rodam em **modo economico**
+  (default): so dado real de mercado; opcao sem cotacao usa Black-Scholes/
+  decaimento, nunca o "plug" de ancora.
+- Prioridade de valoracao: cotacao real do dia > ultimo mercado conhecido >
+  Black-Scholes (opcao) > custo; ancora so na carga inicial, como passo final.
+- Ancoras vem do banco (`invest_patrimony_monthly_anchors`); sem fallback
+  hardcoded no caminho de carga (`build-patrimony-daily-2026.ts` aborta sem seed).
+
+### 18.1 Backlog desta frente (a confirmar com o arquiteto)
+
+- **U-01** Unificar `invest_portfolio_daily` + `invest_position_daily` numa
+  estrutura unica com valores individuais, quantidades, totais por ativo e total
+  geral (auditoria + desenho do patrimonio diario). Hoje sao duas tabelas com
+  reconciliacao cruzada.
+- **U-02** Translator de upload dos JSON do home broker (fechamentos mensais +
+  carteira atualizada) -> seed de `invest_patrimony_monthly_anchors` e livro,
+  substituindo `btgPatrimonyAnchorReference.ts` (ainda hardcoded para
+  `org-holding-001`).
+- **U-03** Job diario com horario alvo ~19h parametrizado (envs
+  `INVEST_CRON_*_AT`) e ordem de prioridade de fontes por ativo (ligado a M-01).
+
 

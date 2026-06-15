@@ -68,7 +68,7 @@ async function main() {
   console.log('Posições tocadas:', snap.positionsTouched, '| faltantes:', snap.positionsMissing.join(', ') || '(nenhum)');
 
   const recorder = new PatrimonyDailyRecorder(gateway);
-  const saved = await recorder.recordDay(ctx, snapshot.referenceDate);
+  const saved = await recorder.recordDay(ctx, snapshot.referenceDate, { initialLoad: true });
   console.log('\nPatrimônio gravado:', saved.recorded.patrimony.toLocaleString('pt-BR'));
 
   await pool.end();
