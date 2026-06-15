@@ -1,4 +1,7 @@
-import { buildStockUnderlyingPivot } from '../../../src/core/invest/StockUnderlyingPivotEngine';
+import {
+  buildStockUnderlyingPivot,
+  enrichStockPivotWithQuotes,
+} from '../../../src/core/invest/StockUnderlyingPivotEngine';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 
 function ev(partial: Partial<LedgerEvent> & Pick<LedgerEvent, 'transaction_type' | 'transaction_date'>): LedgerEvent {
@@ -116,5 +119,38 @@ describe('buildStockUnderlyingPivot', () => {
     const r = buildStockUnderlyingPivot(entries, '2026-01-01', '2026-12-31');
     const row = r.rows.find((x) => x.underlying === 'PRIO3');
     expect(row?.resultado_custodia).toBeCloseTo(150, 0);
+  });
+
+  it('preenche PM e cotacao atual no pivot por acao', () => {
+    const pivot = buildStockUnderlyingPivot(
+      [
+        ev({
+          asset_id: 's1',
+          transaction_type: 'buy',
+          transaction_date: '2026-03-10',
+          quantity: 100,
+          unit_price: 40,
+          total_net_value: -4000,
+        }),
+        ev({
+          asset_id: 'd1',
+          transaction_type: 'dividend',
+          transaction_date: '2026-03-11',
+          quantity: 0,
+          unit_price: 0,
+          total_net_value: 10,
+        }),
+      ],
+      '2026-01-01',
+      '2026-12-31'
+    );
+
+    const enriched = enrichStockPivotWithQuotes(pivot, {
+      PRIO3: { lastPrice: 42.5 },
+    });
+    const row = enriched.rows.find((x) => x.underlying === 'PRIO3');
+
+    expect(row?.preco_estrito).toBeCloseTo(40, 4);
+    expect(row?.cotacao_atual).toBeCloseTo(42.5, 4);
   });
 });

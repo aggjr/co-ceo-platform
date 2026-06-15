@@ -13,8 +13,10 @@ import { aggregateExternalFlowsByDate } from './portfolioPerformance';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { inferAssetType, isOptionTicker } from './assetClassifier';
-import { ModuleCategories } from '../module-registry';
-import { AssetValuationContext } from './valuation/AssetValuationContext';
+import {
+  AssetValuationContext,
+  requiresMarketQuoteForAsset,
+} from './valuation/AssetValuationContext';
 import { FxRateRepository } from '../market/FxRateRepository';
 import { InvestOperationPolicyService } from './InvestOperationPolicyService';
 import { inferOptionExpiryDate } from './optionExpiry';
@@ -35,7 +37,6 @@ export class PatrimonyDailyRecorder {
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly anchorsRepo: PatrimonyMonthlyAnchorsRepository;
-  private readonly categories: ModuleCategories;
   private readonly valuationContext: AssetValuationContext;
   private readonly fxRates: FxRateRepository;
   private readonly policyService: InvestOperationPolicyService;
@@ -47,7 +48,6 @@ export class PatrimonyDailyRecorder {
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.anchorsRepo = new PatrimonyMonthlyAnchorsRepository(gateway);
-    this.categories = new ModuleCategories(gateway);
     this.valuationContext = new AssetValuationContext(gateway);
     this.fxRates = new FxRateRepository(gateway);
     this.policyService = new InvestOperationPolicyService(gateway);
@@ -73,6 +73,7 @@ export class PatrimonyDailyRecorder {
     date: string
   ): Promise<string[]> {
     const qtyByTicker = new Map<string, number>();
+    const valuationSnapshot = await this.valuationContext.load(ctx);
     const sorted = [...events].sort((a, b) =>
       String(a.transaction_date ?? '').localeCompare(String(b.transaction_date ?? ''))
     );
@@ -86,7 +87,7 @@ export class PatrimonyDailyRecorder {
         ? inferOptionExpiryDate(ticker, Number(date.slice(0, 4)))
         : null;
       if (expiry && date >= expiry) continue;
-      if (!(await this.categories.requiresMarketQuote(ctx, assetType))) continue;
+      if (!requiresMarketQuoteForAsset(valuationSnapshot, assetType, ticker)) continue;
       if (!this.requiresExactDailyQuote(assetType, ticker)) continue;
       const type = String(e.transaction_type ?? '');
       const qty = Math.abs(Number(e.quantity ?? 0));
@@ -137,13 +138,14 @@ export class PatrimonyDailyRecorder {
     if (!ctx.organizationId) return { quotes: {}, quotesAsOf: null };
     const targetDate = (asOf || new Date().toISOString().slice(0, 10)).slice(0, 10);
     const assets = await this.assetProjection.listActiveAssets(ctx);
+    const valuationSnapshot = await this.valuationContext.load(ctx);
 
     const tickers: string[] = [];
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
       const type = String(row.asset_type || inferAssetType(ticker));
-      if (!(await this.categories.requiresMarketQuote(ctx, type))) continue;
+      if (!requiresMarketQuoteForAsset(valuationSnapshot, type, ticker)) continue;
       tickers.push(ticker);
     }
 
@@ -164,7 +166,7 @@ export class PatrimonyDailyRecorder {
       }
 
       const assetType = String(row.asset_type || inferAssetType(ticker));
-      if (await this.categories.requiresMarketQuote(ctx, assetType)) {
+      if (requiresMarketQuoteForAsset(valuationSnapshot, assetType, ticker)) {
         continue;
       }
       if (!isOptionTicker(ticker)) {

@@ -42,12 +42,16 @@ export const STOCK_PIVOT_COLUMN_LABELS: Record<StockPivotColumnKey, string> = {
 export type StockPivotRow = Record<StockPivotColumnKey, number> & {
   underlying: string;
   label: string;
+  preco_estrito: number | null;
+  cotacao_atual: number | null;
 };
 
 function emptyRow(underlying: string): StockPivotRow {
   const row = {
     underlying,
     label: underlying,
+    preco_estrito: null,
+    cotacao_atual: null,
   } as StockPivotRow;
   for (const col of STOCK_PIVOT_COLUMNS) row[col] = 0;
   return row;
@@ -346,6 +350,13 @@ export function buildStockUnderlyingPivot(
     const ticker = String(pos.underlying || pos.ticker || '').toUpperCase();
     if (!isStockUnderlying(ticker)) continue;
     const row = getRow(ticker);
+    if (
+      (pos.assetType === 'stock' || pos.assetType === 'fii' || pos.assetType === 'etf' || pos.assetType === 'bdr') &&
+      pos.quantity > 0 &&
+      pos.avgPrice > 0
+    ) {
+      row.preco_estrito = Math.round(pos.avgPrice * 10000) / 10000;
+    }
     
     // Resultado de custódia: apenas prêmio de opções vendidas ainda abertas.
     // Não entra custo da ação comprada (isso é capital investido, não ganho/perda).
@@ -406,5 +417,17 @@ export function enrichStockPivotWithQuotes(
   pivot: StockUnderlyingPivotResult,
   quotesByTicker: Record<string, { lastPrice?: number }>
 ): StockUnderlyingPivotResult {
-  return pivot;
+  const rows = pivot.rows.map((row) => {
+    const quote = quotesByTicker[String(row.underlying || '').toUpperCase()]?.lastPrice;
+    const cotacao =
+      quote != null && Number.isFinite(quote) && quote > 0
+        ? Math.round(quote * 10000) / 10000
+        : row.cotacao_atual ?? null;
+    return { ...row, cotacao_atual: cotacao };
+  });
+  return {
+    ...pivot,
+    rows,
+    totals: { ...pivot.totals, preco_estrito: null, cotacao_atual: null },
+  };
 }

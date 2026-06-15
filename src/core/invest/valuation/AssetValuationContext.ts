@@ -1,6 +1,7 @@
 import type { CoCeoDataGateway, UserContext } from '../../dal';
 import { ModuleCategories } from '../../module-registry';
 import type { ModuleCategoryRow } from '../../module-registry';
+import { inferAssetType, isOptionTicker } from '../assetClassifier';
 
 export type AssetValuationCategory = {
   moduleCode: string;
@@ -144,6 +145,81 @@ function isDefaultMarketPricedAssetType(assetType: string): boolean {
   return ['stock', 'fii', 'etf', 'bdr'].includes(assetType.toLowerCase());
 }
 
+function defaultAssetTypeForQuote(assetType: string, ticker = ''): string {
+  const type = assetType.toLowerCase();
+  const inferred = inferAssetType(ticker || assetType).toLowerCase();
+  if (!type || type === 'stock') return inferred;
+  if (
+    [
+      'cash',
+      'stock',
+      'fii',
+      'etf',
+      'bdr',
+      'fixed_income',
+      'option_call',
+      'option_put',
+    ].includes(type)
+  ) {
+    return type;
+  }
+  return ticker ? inferred : type;
+}
+
+export function isB3EquitySpotAsset(
+  snapshot: AssetValuationSnapshot | undefined,
+  assetType: string,
+  ticker = ''
+): boolean {
+  const type = assetType.toLowerCase();
+  const category = categoryFor(snapshot, type);
+  if (category) {
+    return (
+      category.settlementContractTypeCode === 'B3_EQUITY_SPOT' ||
+      isDefaultMarketPricedAssetType(type)
+    );
+  }
+  return isDefaultMarketPricedAssetType(defaultAssetTypeForQuote(type, ticker));
+}
+
+export function requiresMarketQuoteForAsset(
+  snapshot: AssetValuationSnapshot | undefined,
+  assetType: string,
+  ticker = ''
+): boolean {
+  const type = assetType.toLowerCase();
+  if (isCashCategory(type, ticker)) return false;
+  const category = categoryFor(snapshot, type);
+  if (category) {
+    return category.requiresMarketQuote || isB3EquitySpotAsset(snapshot, type, ticker);
+  }
+  const inferred = defaultAssetTypeForQuote(type, ticker);
+  return (
+    isDefaultMarketPricedAssetType(inferred) ||
+    inferred === 'fixed_income' ||
+    inferred === 'option_call' ||
+    inferred === 'option_put' ||
+    isOptionTicker(ticker)
+  );
+}
+
+export function quoteSourceForAsset(
+  snapshot: AssetValuationSnapshot | undefined,
+  assetType: string,
+  ticker = ''
+): string | null {
+  const type = assetType.toLowerCase();
+  const category = categoryFor(snapshot, type);
+  if (category?.quoteSource) return category.quoteSource;
+  const inferred = defaultAssetTypeForQuote(type, ticker);
+  if (isDefaultMarketPricedAssetType(inferred)) return 'brapi';
+  if (inferred === 'option_call' || inferred === 'option_put' || isOptionTicker(ticker)) {
+    return 'opcoes_net';
+  }
+  if (inferred === 'fixed_income') return 'tesouro_direto';
+  return null;
+}
+
 export function contributesToMarketPricedPatrimony(
   snapshot: AssetValuationSnapshot | undefined,
   assetType: string,
@@ -151,12 +227,13 @@ export function contributesToMarketPricedPatrimony(
 ): boolean {
   const type = assetType.toLowerCase();
   if (isCashCategory(type, ticker)) return false;
-  if (isDefaultMarketPricedAssetType(type)) return true;
   const category = categoryFor(snapshot, type);
-  if (!category) {
-    return !isOptionCategory(snapshot, type) && !isFixedIncomeCategory(snapshot, type);
+  if (isB3EquitySpotAsset(snapshot, type, ticker)) return true;
+  if (category) {
+    return category.contributesToPatrimony && category.valuationMode === 'market_price';
   }
-  return category.contributesToPatrimony && category.valuationMode === 'market_price';
+  if (isDefaultMarketPricedAssetType(defaultAssetTypeForQuote(type, ticker))) return true;
+  return !isOptionCategory(snapshot, type) && !isFixedIncomeCategory(snapshot, type);
 }
 
 export function currencyFor(

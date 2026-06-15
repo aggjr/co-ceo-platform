@@ -12,6 +12,18 @@ export type UpsertOptionMarketResult = {
 export class OptionMarketRepository {
   constructor(private readonly gateway: CoCeoDataGateway) {}
 
+  async hasContract(ctx: UserContext, ticker: string): Promise<boolean> {
+    const clean = ticker.trim().toUpperCase();
+    if (!clean) return false;
+    const rows = await this.gateway.findWhere(
+      ctx,
+      'invest_options_market',
+      { ticker: clean },
+      { limit: 1, columns: ['ticker'] }
+    );
+    return rows.length > 0;
+  }
+
   async upsertMany(
     ctx: UserContext,
     rows: ParsedOptionMarketRow[]
@@ -49,5 +61,16 @@ export class OptionMarketRepository {
     }
 
     return { inserted, updated };
+  }
+
+  async pruneUnused(ctx: UserContext): Promise<number> {
+    const rows = await this.gateway.readQuery(ctx, 'invest_options_market_unused_tickers', []);
+    let deleted = 0;
+    for (const row of rows) {
+      const ticker = String(row.ticker ?? '').trim().toUpperCase();
+      if (!ticker) continue;
+      deleted += await this.gateway.deleteMatching(ctx, 'invest_options_market', { ticker });
+    }
+    return deleted;
   }
 }

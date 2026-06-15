@@ -6,10 +6,14 @@ import {
   runMonitoredPlatformJob,
   type PlatformJobOutcome,
 } from '../core/platform/PlatformJobMonitorService';
-import { OptionMarketSyncService } from '../core/invest/OptionMarketSyncService';
+import {
+  OptionMarketSyncService,
+  type OptionQuoteSyncReport,
+} from '../core/invest/OptionMarketSyncService';
 import { StockMarketSyncService } from '../core/market/StockMarketSyncService';
 import { scheduleDailyWallClock } from './cronSchedule';
 import {
+  brazilClosingDateIso,
   evaluateInvestDailyCloseResult,
   resolveInvestCronOrganizationIds,
   runInvestDailyCloseForOrg,
@@ -101,10 +105,28 @@ export async function runOptionMarketSyncJob(pool = getCronPool()): Promise<void
     const gateway = new CoCeoDataGateway(pool);
     const ctx = authBootstrapContext();
     const service = new OptionMarketSyncService(gateway);
+    const closingDate = brazilClosingDateIso();
+    const orgIds = resolveInvestCronOrganizationIds();
     const report = await runMonitoredPlatformJob(
       gateway,
       'options-market',
-      () => service.syncFromOpcoesNet(ctx),
+      async () => {
+        const quoteSync: OptionQuoteSyncReport[] = [];
+        for (const orgId of orgIds) {
+          quoteSync.push(
+            await service.syncOpenOptionQuotesFromOpcoesNet(
+              { ...ctx, organizationId: orgId, scope: 'node' },
+              closingDate
+            )
+          );
+        }
+        const catalog = await service.syncFromOpcoesNet(ctx, {
+          asOfDate: closingDate,
+          onlyMissingContracts: true,
+          pruneUnused: true,
+        });
+        return { ...catalog, quoteSync };
+      },
       evaluateOptionsMarketSyncReport
     );
     console.log('[cron:options-market] relatório:', JSON.stringify(report));
@@ -134,9 +156,9 @@ export function startInvestMarketCron(): void {
   }
 
   const timeZone = process.env.INVEST_CRON_TZ || 'America/Sao_Paulo';
-  const optionsAt = parseHourMinute(process.env.INVEST_CRON_OPTIONS_AT || '03:15', 3, 15);
-  const stocksAt = parseHourMinute(process.env.INVEST_CRON_STOCKS_AT || '19:05', 19, 5);
-  const patrimonyAt = parseHourMinute(process.env.INVEST_CRON_PATRIMONY_AT || '23:00', 23, 0);
+  const optionsAt = parseHourMinute(process.env.INVEST_CRON_OPTIONS_AT || '20:05', 20, 5);
+  const stocksAt = parseHourMinute(process.env.INVEST_CRON_STOCKS_AT || '20:20', 20, 20);
+  const patrimonyAt = parseHourMinute(process.env.INVEST_CRON_PATRIMONY_AT || '21:00', 21, 0);
 
   console.log(
     `[cron] invest ativo — opções.net ${String(optionsAt.hour).padStart(2, '0')}:${String(optionsAt.minute).padStart(2, '0')}, ações brapi ${String(stocksAt.hour).padStart(2, '0')}:${String(stocksAt.minute).padStart(2, '0')}, fechamento patrimônio ${String(patrimonyAt.hour).padStart(2, '0')}:${String(patrimonyAt.minute).padStart(2, '0')} (${timeZone})`

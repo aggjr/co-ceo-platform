@@ -17,8 +17,9 @@ import { OptionMarketSyncService } from '../src/core/invest/OptionMarketSyncServ
 dotenv.config();
 
 async function main() {
-  const explicitUnderlyings = process.argv
-    .slice(2)
+  const args = process.argv.slice(2);
+  const forceRefresh = args.includes('--force');
+  const explicitUnderlyings = args
     .map((a) => a.trim().toUpperCase())
     .filter((a) => a && !a.startsWith('--'));
 
@@ -37,6 +38,8 @@ async function main() {
 
   const report = await service.syncFromOpcoesNet(ctx, {
     underlyings: explicitUnderlyings.length ? explicitUnderlyings : undefined,
+    onlyMissingContracts: !forceRefresh,
+    pruneUnused: true,
   });
 
   console.log('Sincronizacao opcoes.net -> invest_options_market');
@@ -44,7 +47,9 @@ async function main() {
   console.log(`  Tickers do(s) cliente(s): ${report.tickersInUse.join(', ') || '(nenhum)'}`);
   console.log(`  Linhas parseadas (vigentes): ${report.rowsParsed}`);
   console.log(`  Linhas mantidas no catalogo: ${report.rowsKept}`);
+  console.log(`  Contratos ja conhecidos: ${report.contractsAlreadyKnown ?? 0}`);
   console.log(`  Inseridas: ${report.inserted}  Atualizadas: ${report.updated}`);
+  console.log(`  Antigas removidas: ${report.pruned ?? 0}`);
   if (report.errors.length) {
     console.log('  Erros:');
     for (const e of report.errors) {

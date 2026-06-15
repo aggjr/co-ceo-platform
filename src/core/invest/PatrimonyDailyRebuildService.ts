@@ -10,9 +10,12 @@ import { logReconcileFailure } from './reconcile/reconcileErrorDetail';
 import { DailyCloseMaterializeService } from './reconcile/DailyCloseMaterializeService';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
-import { ModuleCategories } from '../module-registry';
 import pool from '../../config/database';
 import { ensureInvestPositionDailySchema } from '../db/ensureCoreSchema';
+import {
+  AssetValuationContext,
+  requiresMarketQuoteForAsset,
+} from './valuation/AssetValuationContext';
 
 export type PatrimonyRebuildResult = {
   from: string;
@@ -68,7 +71,7 @@ export class PatrimonyDailyRebuildService {
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly assetProjection: InvestAssetProjection;
   private readonly dailyClose: DailyCloseMaterializeService;
-  private readonly categories: ModuleCategories;
+  private readonly valuation: AssetValuationContext;
   private readonly periods: InvestBookPeriodService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
@@ -78,7 +81,7 @@ export class PatrimonyDailyRebuildService {
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
     this.dailyClose = new DailyCloseMaterializeService(gateway);
-    this.categories = new ModuleCategories(gateway);
+    this.valuation = new AssetValuationContext(gateway);
     this.periods = new InvestBookPeriodService(gateway);
   }
 
@@ -215,12 +218,13 @@ export class PatrimonyDailyRebuildService {
 
   private async listQuotedAssetTickers(ctx: UserContext): Promise<string[]> {
     const assets = await this.assetProjection.listActiveAssets(ctx);
+    const valuationSnapshot = await this.valuation.load(ctx);
     const tickers: string[] = [];
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
       const type = String(row.asset_type ?? '');
-      if (!(await this.categories.requiresMarketQuote(ctx, type))) continue;
+      if (!requiresMarketQuoteForAsset(valuationSnapshot, type, ticker)) continue;
       tickers.push(ticker);
     }
     return tickers;

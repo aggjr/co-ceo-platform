@@ -42,6 +42,7 @@ export type GatewayReadQueryKey =
   | 'invest_open_option_tickers_for_org'
   | 'invest_options_market_for_org'
   | 'invest_options_market_strikes'
+  | 'invest_options_market_unused_tickers'
   | 'market_quotes_bulk_range'
   | 'ui_menu_nodes_active'
   | 'ui_texts_resolved_for_org'
@@ -463,6 +464,19 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
             AND m.expiration_date = ?
             AND m.strike_price > 0
           ORDER BY m.strike_price`,
+  },
+  invest_options_market_unused_tickers: {
+    requiresGlobalScope: true,
+    sql: `SELECT m.ticker
+          FROM invest_options_market m
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM patrimony_items pi
+            WHERE pi.source_module = 'INVEST'
+              AND pi.deleted_at IS NULL
+              AND pi.identifier = m.ticker
+          )
+          ORDER BY m.ticker`,
   },
   platform_admin_alerts_unread: {
     requiresGlobalScope: true,

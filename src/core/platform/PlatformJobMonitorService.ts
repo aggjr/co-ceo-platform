@@ -32,6 +32,17 @@ export function evaluateOptionsMarketSyncReport(
       errorMessage: detail,
     };
   }
+  const quoteMissing = report.quoteSync?.flatMap((q) => q.missing) ?? [];
+  if (quoteMissing.length > 0) {
+    return {
+      status: 'warning',
+      title: 'Sync opcoes.net com cotacoes faltantes',
+      body:
+        `${quoteMissing.length} opcao(oes) abertas sem cotacao opcoes.net: ` +
+        `${quoteMissing.slice(0, 8).join(', ')}${quoteMissing.length > 8 ? '...' : ''}.`,
+      summary: report as unknown as Record<string, unknown>,
+    };
+  }
   if (report.underlyings.length > 0 && report.rowsKept === 0) {
     return {
       status: 'warning',
@@ -43,7 +54,11 @@ export function evaluateOptionsMarketSyncReport(
   return {
     status: 'success',
     title: 'Sync opcoes.net concluido',
-    body: `${report.rowsKept} opcoes do cliente mantidas de ${report.rowsParsed} opcoes lidas em ${report.underlyings.length} acao(oes)-mae (${report.inserted} novas, ${report.updated} atualizadas).`,
+    body:
+      `${report.rowsKept} opcoes do cliente mantidas de ${report.rowsParsed} opcoes lidas em ` +
+      `${report.underlyings.length} acao(oes)-mae (${report.inserted} novas, ${report.updated} atualizadas` +
+      `${report.pruned ? `, ${report.pruned} antigas removidas` : ''}).` +
+      `${report.quoteSync?.length ? ` Cotacoes salvas: ${report.quoteSync.reduce((sum, q) => sum + q.quotesSaved, 0)}.` : ''}`,
     summary: report as unknown as Record<string, unknown>,
   };
 }

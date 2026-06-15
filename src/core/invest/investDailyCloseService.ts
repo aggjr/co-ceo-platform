@@ -57,7 +57,12 @@ export async function runInvestDailyCloseForOrg(
 
   let options: OptionMarketSyncReport | null = null;
   try {
-    options = await optionSync.syncFromOpcoesNet(ctx);
+    options = await optionSync.syncFromOpcoesNet(ctx, {
+      asOfDate: date,
+      onlyMissingContracts: true,
+      pruneUnused: true,
+      reuseSessionCache: true,
+    });
   } catch {
     options = null;
   }

@@ -17,8 +17,13 @@ import {
 } from '../market/ExternalStockQuoteProvider';
 import { fetchTesouroDiretoQuotes } from './TesouroDiretoQuoteProvider';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
-import { ModuleCategories } from '../module-registry';
 import { FxRateRepository } from '../market/FxRateRepository';
+import {
+  AssetValuationContext,
+  type AssetValuationSnapshot,
+  quoteSourceForAsset,
+  requiresMarketQuoteForAsset,
+} from './valuation/AssetValuationContext';
 
 export type QuoteSyncQuote = {
   ticker: string;
@@ -53,14 +58,14 @@ export type SnapshotOptionRow = {
 export class InvestQuoteSyncService {
   private readonly assetProjection: InvestAssetProjection;
   private readonly marketQuotes: MarketQuoteRepository;
-  private readonly categories: ModuleCategories;
   private readonly fxRates: FxRateRepository;
+  private readonly valuation: AssetValuationContext;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.assetProjection = new InvestAssetProjection(gateway);
     this.marketQuotes = new MarketQuoteRepository(gateway);
-    this.categories = new ModuleCategories(gateway);
     this.fxRates = new FxRateRepository(gateway);
+    this.valuation = new AssetValuationContext(gateway);
   }
 
   private addQuoteTarget(targets: Map<string, Set<string>>, source: string | null, ticker: string): void {
@@ -72,29 +77,30 @@ export class InvestQuoteSyncService {
     targets.set(cleanSource, list);
   }
 
-  private async addCategoryQuoteTarget(
-    ctx: UserContext,
+  private addCategoryQuoteTarget(
     targets: Map<string, Set<string>>,
     ticker: string,
-    subcategory: string
-  ): Promise<void> {
-    if (!(await this.categories.requiresMarketQuote(ctx, subcategory))) return;
-    this.addQuoteTarget(targets, await this.categories.defaultQuoteSource(ctx, subcategory), ticker);
+    subcategory: string,
+    snapshot: AssetValuationSnapshot
+  ): void {
+    if (!requiresMarketQuoteForAsset(snapshot, subcategory, ticker)) return;
+    this.addQuoteTarget(targets, quoteSourceForAsset(snapshot, subcategory, ticker), ticker);
   }
 
   private async listQuoteTargetsBySource(ctx: UserContext): Promise<Map<string, Set<string>>> {
     if (!ctx.organizationId) return new Map();
     const assets = await this.assetProjection.listActiveAssets(ctx);
+    const snapshot = await this.valuation.load(ctx);
     const targets = new Map<string, Set<string>>();
     for (const row of assets) {
       const ticker = String(row.asset_ticker ?? '').toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
       const subcategory = String(row.asset_type || inferAssetType(ticker));
-      await this.addCategoryQuoteTarget(ctx, targets, ticker, subcategory);
+      this.addCategoryQuoteTarget(targets, ticker, subcategory, snapshot);
 
       const underlying = inferUnderlyingTicker(ticker);
       if (underlying) {
-        await this.addCategoryQuoteTarget(ctx, targets, underlying, inferAssetType(underlying));
+        this.addCategoryQuoteTarget(targets, underlying, inferAssetType(underlying), snapshot);
       }
     }
     return targets;

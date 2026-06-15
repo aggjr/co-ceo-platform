@@ -94,7 +94,15 @@ describe('InvestQuoteSyncService catalog routing', () => {
       { ticker: 'ITUB4', price: 39.5, asOf: '2026-06-05', source: 'brapi', kind: 'close' },
     ]);
     jest.mocked(fetchOpcoesNetOptionQuotes).mockResolvedValue([
-      { ticker: 'ITUBF420', price: 0.42, asOf: '2026-06-05' },
+      {
+        ticker: 'ITUBF420',
+        price: 0.42,
+        asOf: '2026-06-05',
+        strikePrice: 42,
+        expirationDate: '2026-06-19',
+        optionType: 'CALL',
+        underlyingTicker: 'ITUB4',
+      },
     ]);
     jest.mocked(fetchTesouroDiretoQuotes).mockResolvedValue([
       {
@@ -135,5 +143,30 @@ describe('InvestQuoteSyncService catalog routing', () => {
     const lftQuote = gw.dump('market_quotes_daily').find((r) => r.ticker === 'LFT-20310301');
     expect(lftQuote?.closing_price).toBe(1_002_500.12);
     expect(lftQuote?.source).toBe('computed_cdi');
+  });
+
+  it('busca cotacao B3 para acao mesmo com catalogo legado incompleto', async () => {
+    const gw = new InMemoryGateway();
+    await seedAsset(gw, 'PRIO3', 'acao');
+
+    jest.mocked(fetchB3Quotes).mockResolvedValue([
+      { ticker: 'PRIO3', price: 64.87, asOf: '2026-06-05', source: 'brapi', kind: 'close' },
+    ]);
+    jest.mocked(fetchOpcoesNetOptionQuotes).mockResolvedValue([]);
+    jest.mocked(fetchTesouroDiretoQuotes).mockResolvedValue([]);
+
+    const report = await new InvestQuoteSyncService(castGateway(gw)).syncFromBrapi(
+      ctx,
+      '2026-06-05'
+    );
+
+    expect(fetchB3Quotes).toHaveBeenCalledWith(
+      ['PRIO3'],
+      expect.objectContaining({ asOfDate: '2026-06-05' })
+    );
+    expect(report.requested).toBe(1);
+    expect(report.missing).toEqual([]);
+    expect(gw.dump('market_quotes_daily').find((r) => r.ticker === 'PRIO3')?.closing_price)
+      .toBe(64.87);
   });
 });

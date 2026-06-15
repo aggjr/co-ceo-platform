@@ -14,13 +14,13 @@ import { InvestAssetProjection } from '../../../modules/invest/sync/InvestAssetP
 import type { SecurePayload } from '../../dal/types';
 import { inferAssetType } from '../assetClassifier';
 import { logReconcileEvent, logReconcileFailure } from './reconcileErrorDetail';
-import { ModuleCategories } from '../../module-registry';
 import { FxRateRepository } from '../../market/FxRateRepository';
 import { fetchPtaxUsdBrl } from '../../market/PtaxFxProvider';
 import {
   AssetValuationContext,
   contributesToMarketPricedPatrimony,
   isOptionCategory,
+  requiresMarketQuoteForAsset,
 } from '../valuation/AssetValuationContext';
 import { InvestBookPeriodService } from '../InvestBookPeriodService';
 
@@ -67,7 +67,6 @@ export class DailyCloseMaterializeService {
   private readonly ledger: LedgerImportService;
   private readonly marketQuotes: MarketQuoteRepository;
   private readonly assetProjection: InvestAssetProjection;
-  private readonly categories: ModuleCategories;
   private readonly fxRates: FxRateRepository;
   private readonly valuation: AssetValuationContext;
   private readonly threePricesFactory: ThreePricesContextFactory;
@@ -81,7 +80,6 @@ export class DailyCloseMaterializeService {
     this.ledger = new LedgerImportService(gateway);
     this.marketQuotes = new MarketQuoteRepository(gateway);
     this.assetProjection = new InvestAssetProjection(gateway);
-    this.categories = new ModuleCategories(gateway);
     this.fxRates = new FxRateRepository(gateway);
     this.valuation = new AssetValuationContext(gateway);
     this.threePricesFactory = new ThreePricesContextFactory(gateway);
@@ -116,6 +114,8 @@ export class DailyCloseMaterializeService {
     const optionReport = await this.optionMarket.syncFromOpcoesNet(ctx, {
       asOfDate: day,
       reuseSessionCache: true,
+      onlyMissingContracts: true,
+      pruneUnused: true,
     });
     logReconcileEvent('info', 'daily-close.quotes.done', ctx.organizationId ?? undefined, {
       date: day,
@@ -308,7 +308,7 @@ export class DailyCloseMaterializeService {
     for (const asset of assets) {
       const ticker = String(asset.ticker ?? '').trim().toUpperCase();
       if (!ticker || ticker.startsWith('CAIXA-')) continue;
-      if (await this.categories.requiresMarketQuote(ctx, String(asset.assetType))) {
+      if (requiresMarketQuoteForAsset(valuationSnapshot, String(asset.assetType), ticker)) {
         quoteTickers.add(ticker);
       }
     }
@@ -348,7 +348,11 @@ export class DailyCloseMaterializeService {
 
       const mq = marketQuoteMap.get(ticker);
       const lastPrice = mq?.price ?? null;
-      const requiresQuote = await this.categories.requiresMarketQuote(ctx, String(asset.assetType));
+      const requiresQuote = requiresMarketQuoteForAsset(
+        valuationSnapshot,
+        String(asset.assetType),
+        ticker
+      );
 
       await this.upsertPositionExt(ctx, asset.assetId, asset.assetType, {
         pm_estrito: pmA,

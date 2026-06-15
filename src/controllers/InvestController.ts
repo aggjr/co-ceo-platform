@@ -121,7 +121,7 @@ import { seedMarketBenchmarks } from '../core/market/MarketBenchmarkSeeder';
 import { StockMarketSyncService } from '../core/market/StockMarketSyncService';
 import {
   AssetValuationContext,
-  categoryFor,
+  isB3EquitySpotAsset,
 } from '../core/invest/valuation/AssetValuationContext';
 import { FxRateRepository } from '../core/market/FxRateRepository';
 
@@ -380,15 +380,17 @@ export class InvestController {
     );
     const strikeHints = { ledgerStrikeByTicker, marketCatalog };
     const valuationSnapshot = await this.valuationContext.load(ctx);
-    const isB3EquitySpotType = (assetType: string): boolean =>
-      categoryFor(valuationSnapshot, assetType)?.settlementContractTypeCode === 'B3_EQUITY_SPOT';
+    const isB3EquitySpotType = (assetType: string, ticker = ''): boolean =>
+      isB3EquitySpotAsset(valuationSnapshot, assetType, ticker);
+    const isB3EquitySpotTicker = (assetType: string, ticker: string): boolean =>
+      isB3EquitySpotAsset(valuationSnapshot, assetType, ticker);
 
     const quoteTickers = new Set<string>();
     for (const r of rowsMerged) {
       const t = String(r.asset_ticker ?? '').trim().toUpperCase();
       if (!t || t.startsWith('CAIXA-')) continue;
       const type = String(r.asset_type ?? '').toLowerCase();
-      if (isB3EquitySpotType(type)) {
+      if (isB3EquitySpotTicker(type, t)) {
         quoteTickers.add(t);
         continue;
       }
@@ -478,8 +480,9 @@ export class InvestController {
             })()
           : (filtered.metadata as { underlying_ticker?: string }) || {};
       const assetTypeForPm = String(filtered.asset_type ?? '');
+      const ticker = String(filtered.asset_ticker ?? '').toUpperCase();
       const three =
-        isB3EquitySpotType(assetTypeForPm)
+        isB3EquitySpotType(assetTypeForPm, ticker)
           ? resolveEquityThreePricesForPortfolioRow(
               filtered,
               threeByUnderlying,
@@ -492,13 +495,12 @@ export class InvestController {
               threeByUnderlying,
               Number(filtered.managerial_avg_price ?? 0)
             );
-      const ticker = String(filtered.asset_ticker ?? '').toUpperCase();
       const mq = marketQuoteMap.get(ticker);
       const marketQuote = mq
         ? { price: mq.price, asOf: mq.date }
         : null;
 
-      if (isB3EquitySpotType(assetTypeForPm) && three.strict <= 0 && marketQuote && marketQuote.price > 0) {
+      if (isB3EquitySpotType(assetTypeForPm, ticker) && three.strict <= 0 && marketQuote && marketQuote.price > 0) {
         three.strict = marketQuote.price;
         three.b3 = marketQuote.price;
         three.managerial = marketQuote.price;
@@ -507,7 +509,7 @@ export class InvestController {
       const item = enrichPortfolioRow(filtered, three, strikeHints, marketQuote);
       const assetType = String(item.assetType ?? '');
       if (
-        isB3EquitySpotType(assetType) &&
+        isB3EquitySpotType(assetType, ticker) &&
         Math.abs(item.quantity) > 1e-6
       ) {
         const und = String(

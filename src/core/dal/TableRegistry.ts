@@ -217,6 +217,7 @@ const TABLES: TableDefinition[] = [
   def('invest_options_market', 'global', {
     softDelete: false,
     primaryKey: 'ticker',
+    allowHardDelete: true,
     countsTowardStorage: false,
   }),
   def('invest_import_rules', 'global', {

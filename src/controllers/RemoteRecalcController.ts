@@ -7,11 +7,11 @@ import { ThreePricesContextFactory } from '../core/invest/ThreePricesContextFact
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../modules/invest/sync/InvestAssetProjection';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
-import { ModuleCategories } from '../core/module-registry';
 import {
   AssetValuationContext,
   contributesToMarketPricedPatrimony,
   isOptionCategory,
+  requiresMarketQuoteForAsset,
 } from '../core/invest/valuation/AssetValuationContext';
 import type { CoCeoDataGateway } from '../core/dal';
 import type { SecurePayload } from '../core/dal/types';
@@ -19,14 +19,12 @@ import type { SecurePayload } from '../core/dal/types';
 export class RemoteRecalcController {
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly ledger: LedgerImportService;
-  private readonly categories: ModuleCategories;
   private readonly valuation: AssetValuationContext;
   private readonly threePricesFactory: ThreePricesContextFactory;
 
   constructor(private gateway: CoCeoDataGateway) {
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.ledger = new LedgerImportService(gateway);
-    this.categories = new ModuleCategories(gateway);
     this.valuation = new AssetValuationContext(gateway);
     this.threePricesFactory = new ThreePricesContextFactory(gateway);
   }
@@ -108,9 +106,10 @@ export class RemoteRecalcController {
       const marketQuoteRepo = new MarketQuoteRepository(this.gateway);
       const quoteTickers = new Set<string>();
       for (const asset of assets) {
-        if (!asset.ticker) continue;
-        if (!(await this.categories.requiresMarketQuote(ctx, String(asset.assetType)))) continue;
-        quoteTickers.add(String(asset.ticker).trim().toUpperCase());
+        const ticker = String(asset.ticker ?? '').trim().toUpperCase();
+        if (!ticker) continue;
+        if (!requiresMarketQuoteForAsset(valuationSnapshot, String(asset.assetType), ticker)) continue;
+        quoteTickers.add(ticker);
       }
       const marketCtx = authBootstrapContext();
       const marketQuoteList = Array.from(quoteTickers);
@@ -161,7 +160,11 @@ export class RemoteRecalcController {
         const lastPrice =
           marketQuoteMap.get(ticker)?.price ??
           (pmC && pmC > 0 ? pmC : null);
-        const requiresQuote = await this.categories.requiresMarketQuote(ctx, String(asset.assetType));
+        const requiresQuote = requiresMarketQuoteForAsset(
+          valuationSnapshot,
+          String(asset.assetType),
+          ticker
+        );
 
         const payload: SecurePayload = {
           pm_estrito: pmA,
