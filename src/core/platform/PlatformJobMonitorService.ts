@@ -51,6 +51,14 @@ export function evaluateOptionsMarketSyncReport(
       summary: report as unknown as Record<string, unknown>,
     };
   }
+  const unquotedKnown = report.quoteSync?.reduce(
+    (sum, q) => sum + (q.unquotedKnownContracts?.length ?? 0),
+    0
+  ) ?? 0;
+  const expiredSkipped = report.quoteSync?.reduce(
+    (sum, q) => sum + (q.expiredSkipped?.length ?? 0),
+    0
+  ) ?? 0;
   return {
     status: 'success',
     title: 'Sync opcoes.net concluido',
@@ -58,7 +66,9 @@ export function evaluateOptionsMarketSyncReport(
       `${report.rowsKept} opcoes do cliente mantidas de ${report.rowsParsed} opcoes lidas em ` +
       `${report.underlyings.length} acao(oes)-mae (${report.inserted} novas, ${report.updated} atualizadas` +
       `${report.pruned ? `, ${report.pruned} antigas removidas` : ''}).` +
-      `${report.quoteSync?.length ? ` Cotacoes salvas: ${report.quoteSync.reduce((sum, q) => sum + q.quotesSaved, 0)}.` : ''}`,
+      `${report.quoteSync?.length ? ` Cotacoes salvas: ${report.quoteSync.reduce((sum, q) => sum + q.quotesSaved, 0)}.` : ''}` +
+      `${unquotedKnown ? ` Sem ultimo negocio no opcoes.net: ${unquotedKnown}.` : ''}` +
+      `${expiredSkipped ? ` Vencidas ignoradas: ${expiredSkipped}.` : ''}`,
     summary: report as unknown as Record<string, unknown>,
   };
 }

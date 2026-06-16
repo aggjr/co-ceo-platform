@@ -30,4 +30,41 @@ describe('evaluateOptionsMarketSyncReport', () => {
     const o = evaluateOptionsMarketSyncReport({ ...base, rowsKept: 0 });
     expect(o.status).toBe('warning');
   });
+
+  it('warning quando opcao aberta fica sem contrato/cotacao', () => {
+    const o = evaluateOptionsMarketSyncReport({
+      ...base,
+      quoteSync: [
+        {
+          date: '2026-06-16',
+          tickersInUse: ['PRIOX999'],
+          quotesSaved: 0,
+          missing: ['PRIOX999'],
+          contractsInserted: 0,
+          contractsUpdated: 0,
+        },
+      ],
+    });
+    expect(o.status).toBe('warning');
+    expect(o.title).toMatch(/cotacoes faltantes/i);
+  });
+
+  it('nao gera warning quando contrato conhecido nao teve ultimo negocio', () => {
+    const o = evaluateOptionsMarketSyncReport({
+      ...base,
+      quoteSync: [
+        {
+          date: '2026-06-16',
+          tickersInUse: ['PRION415'],
+          quotesSaved: 0,
+          missing: [],
+          unquotedKnownContracts: ['PRION415'],
+          contractsInserted: 0,
+          contractsUpdated: 0,
+        },
+      ],
+    });
+    expect(o.status).toBe('success');
+    expect(o.body).toMatch(/Sem ultimo negocio/);
+  });
 });

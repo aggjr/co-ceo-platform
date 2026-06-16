@@ -111,6 +111,11 @@ export async function runOptionMarketSyncJob(pool = getCronPool()): Promise<void
       gateway,
       'options-market',
       async () => {
+        const catalog = await service.syncFromOpcoesNet(ctx, {
+          asOfDate: closingDate,
+          onlyMissingContracts: true,
+          pruneUnused: true,
+        });
         const quoteSync: OptionQuoteSyncReport[] = [];
         for (const orgId of orgIds) {
           quoteSync.push(
@@ -120,11 +125,6 @@ export async function runOptionMarketSyncJob(pool = getCronPool()): Promise<void
             )
           );
         }
-        const catalog = await service.syncFromOpcoesNet(ctx, {
-          asOfDate: closingDate,
-          onlyMissingContracts: true,
-          pruneUnused: true,
-        });
         return { ...catalog, quoteSync };
       },
       evaluateOptionsMarketSyncReport
