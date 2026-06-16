@@ -5,10 +5,13 @@ coverage
 reports
 .env
 .env.*
+deploy-credentials.env
 .git
 .gitignore
+.vscode
 *.log
 .DS_Store
+desktop.ini
 .claude
 .cursor
 terminals
@@ -16,3 +19,19 @@ agent-transcripts
 **/*.md
 !README.md
 database/dumps/*.sql
+dump.sql
+*.zip
+*.xlsx
+*.xls
+*.csv
+*.tmp
+*.bak
+fuzzing_report.json
+ledger_rows.json
+schema_parsed.json
+schema_dump_*.txt
+output.txt
+local-import
+temp_xlsx
+dados importação
+Dados Obtidos do HomeBroker
