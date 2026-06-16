@@ -6,6 +6,10 @@ import { BrokerCustodySnapshotRepository } from '../BrokerCustodySnapshotReposit
 import { parseBrokerCustodySnapshotJson } from '../brokerCustodySnapshotImport';
 import { PatrimonyMonthlyAnchorsSeedService } from '../PatrimonyMonthlyAnchorsSeedService';
 import { normalizePatrimonyAnchorInput } from '../patrimonyAnchors';
+import {
+  isHomeBrokerPortfolioSnapshot,
+  translateHomeBrokerPortfolioSnapshot,
+} from '../homeBrokerPortfolioTranslator';
 import { logReconcileEvent } from './reconcileErrorDetail';
 
 export type HomeBrokerSnapshotUploadResult = {
@@ -28,9 +32,11 @@ function decodeJsonFile(file: BtgUploadFileInput): unknown {
 /**
  * Importa fechamentos do home broker para a fase de homologacao.
  *
- * Aceita dois formatos JSON:
- * - snapshot detalhado de custodia (`positions[]` + `composition`)
+ * Aceita tres formatos JSON:
  * - arquivo simples de ancoras mensais (`month_ends[]` ou `{ mes, patrimonio_final }`)
+ * - carteira atualizada do home broker (`patrimonio` + `acoes`/`opcoes`) — traduzida
+ *   para o schema canonico por `translateHomeBrokerPortfolioSnapshot`
+ * - snapshot detalhado de custodia ja no schema canonico (`positions[]` + `composition`)
  */
 export class HomeBrokerSnapshotUploadService {
   private readonly snapshots: BrokerCustodySnapshotRepository;
@@ -76,7 +82,10 @@ export class HomeBrokerSnapshotUploadService {
           continue;
         }
 
-        const input = parseBrokerCustodySnapshotJson(raw);
+        const snapshotRaw = isHomeBrokerPortfolioSnapshot(raw)
+          ? translateHomeBrokerPortfolioSnapshot(raw)
+          : raw;
+        const input = parseBrokerCustodySnapshotJson(snapshotRaw);
         logReconcileEvent('info', 'homebroker.file.snapshot', ctx.organizationId, {
           fileName: file.name,
           referenceDate: input.referenceDate,

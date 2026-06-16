@@ -1605,10 +1605,19 @@ Decisao aplicada:
   estrutura unica com valores individuais, quantidades, totais por ativo e total
   geral (auditoria + desenho do patrimonio diario). Hoje sao duas tabelas com
   reconciliacao cruzada.
-- **U-02** Translator de upload dos JSON do home broker (fechamentos mensais +
-  carteira atualizada) -> seed de `invest_patrimony_monthly_anchors` e livro,
-  substituindo `btgPatrimonyAnchorReference.ts` (ainda hardcoded para
-  `org-holding-001`).
+- **U-02** Translator de upload dos JSON do home broker -> seed de
+  `invest_patrimony_monthly_anchors` + cotacoes/posicoes.
+  - **Feito:** fechamentos mensais (`{ mes, patrimonio_inicial/final }`) ja viram
+    ancoras via `normalizePatrimonyAnchorInput`; carteira atualizada
+    (`patrimonio` + `acoes`/`opcoes`) agora e traduzida para o schema canonico de
+    custodia por `homeBrokerPortfolioTranslator.ts`, ligada no
+    `HomeBrokerSnapshotUploadService` (3o formato aceito) ->
+    `applyBrokerHoldingSnapshot` (cotacoes, `patrimony_items`, ancora do dia + RF).
+  - **Pendente:** (a) aposentar `btgPatrimonyAnchorReference.ts` (ancoras hardcoded
+    para `org-holding-001`) depois que o seed por upload virar o caminho padrao;
+    (b) movimentacao transacional (livro) continua vindo das notas de corretagem
+    (`btgBrokerageNoteLedgerTranslator`) — o snapshot de carteira semeia
+    posicao/cotacao/ancora, nao transacoes.
 - **U-03** Job diario com horario alvo ~19h parametrizado (envs
   `INVEST_CRON_*_AT`) e ordem de prioridade de fontes por ativo (ligado a M-01).
 
