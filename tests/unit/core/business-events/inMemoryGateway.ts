@@ -83,6 +83,31 @@ export class InMemoryGateway {
     row.deleted_at = this.nextTs();
   }
 
+  async deleteMatching(
+    ctx: UserContext,
+    table: string,
+    match: SecurePayload
+  ): Promise<number> {
+    const t = this.tables.get(table);
+    if (!t) return 0;
+    const ids: string[] = [];
+    for (const [id, row] of t.entries()) {
+      if (row.organization_id && ctx.organizationId && row.organization_id !== ctx.organizationId) {
+        continue;
+      }
+      let ok = true;
+      for (const [k, v] of Object.entries(match)) {
+        if (row[k] !== v) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) ids.push(id);
+    }
+    for (const id of ids) t.delete(id);
+    return ids.length;
+  }
+
   async findById(ctx: UserContext, table: string, id: string): Promise<InMemoryRow | null> {
     const t = this.tables.get(table);
     if (!t) return null;

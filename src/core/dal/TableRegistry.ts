@@ -83,7 +83,7 @@ const TABLES: TableDefinition[] = [
   // financial_accounts + financial_ledger_entries.
   def('invest_daily_snapshots', 'tenant', { softDelete: false }),
   def('invest_portfolio_daily', 'tenant', { softDelete: false }),
-  def('invest_position_daily', 'tenant', { softDelete: false }),
+  def('invest_position_daily', 'tenant', { softDelete: false, allowHardDelete: true }),
   def('invest_reconciliation_sessions', 'tenant', { softDelete: false }),
   def('invest_reconciliation_day_log', 'tenant', {
     softDelete: false,

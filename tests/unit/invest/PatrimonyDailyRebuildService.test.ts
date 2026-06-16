@@ -102,7 +102,7 @@ describe('PatrimonyDailyRebuildService', () => {
     expect(invalidateFromDate).toHaveBeenCalledWith(ctx, '2026-01-02');
     expect(recordDay).toHaveBeenCalled();
     for (const call of recordDay.mock.calls) {
-      expect(call[2]).toBeUndefined();
+      expect(call[2]).toEqual({ initialLoad: false });
     }
     expect(result.daysWritten).toBeGreaterThan(0);
     expect(reconcileCustody).toHaveBeenCalledWith(ctx);
