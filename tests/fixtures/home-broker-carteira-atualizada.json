@@ -1,0 +1,25 @@
+{
+  "data_referencia": "2026-06-05",
+  "patrimonio": {
+    "total": 1430890.51,
+    "renda_variavel": { "valor": 1214004.19 },
+    "renda_fixa": { "valor": 209823.33 },
+    "conta_investimento": { "valor": 21193.10 },
+    "valores_em_transito": { "valor": 775.75 },
+    "derivativos": { "valor": -14905.86 }
+  },
+  "acoes": {
+    "valor_total": 1213995.0,
+    "ativos": [
+      { "ticker": "BBAS3", "quantidade": 6000, "preco_mercado": 19.53, "saldo_bruto": 117180.0 },
+      { "ticker": "PRIO3", "quantidade": 12700, "preco_mercado": 62.59, "saldo_bruto": 794893.0 }
+    ]
+  },
+  "opcoes": {
+    "resultado_total": -14905.86,
+    "posicoes": [
+      { "codigo": "BBASG216", "quantidade": -6000, "premio_atual": 0.28, "premio_medio": 0.30, "valor_mercado": -1668.01 },
+      { "codigo": "PRIOQ69", "quantidade": -1000, "premio_atual": 5.69, "premio_medio": 6.99, "valor_mercado": -5689.98 }
+    ]
+  }
+}
