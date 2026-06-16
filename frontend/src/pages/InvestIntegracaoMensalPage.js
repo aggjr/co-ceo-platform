@@ -63,11 +63,37 @@ function renderApplyResult(data) {
   `;
 }
 
-export async function InvestIntegracaoMensalPage(container) {
+function resolveImportMode(path) {
+  const p = String(path || window.location.pathname || '');
+  if (p.includes('/novas-movimentacoes')) {
+    return {
+      key: 'incremental',
+      title: 'Novas movimentacoes',
+      lead: 'Insira somente arquivos novos para manter o sistema atualizado. O importador valida o mes e descarta movimentos ja gravados.',
+      validateLabel: 'Validar novidades',
+      actionLabel: 'Aplicar novidades',
+      appliedStatus: 'Novas movimentacoes aplicadas. Materializando carteira e patrimonio...',
+      doneStatus: 'Novas movimentacoes aplicadas e materializacao concluida.',
+    };
+  }
+  return {
+    key: 'initial_load',
+    title: 'Carga inicial',
+    lead: 'Use para montar a base inicial a partir do extrato mensal e das notas do mesmo mes, com validacao antes da gravacao.',
+    validateLabel: 'Validar carga inicial',
+    actionLabel: 'Aplicar carga inicial',
+    appliedStatus: 'Carga inicial aplicada. Materializando carteira e patrimonio...',
+    doneStatus: 'Carga inicial aplicada e materializacao concluida.',
+  };
+}
+
+export async function InvestIntegracaoMensalPage(container, path) {
   if (!isAuthenticated()) {
     navigate('/login');
     return;
   }
+
+  const mode = resolveImportMode(path);
 
   if (isGlobalSession()) {
     await renderShell(container, {
@@ -131,7 +157,7 @@ export async function InvestIntegracaoMensalPage(container) {
     </div>
   `;
 
-  await renderShell(container, { title: 'INVEST - Integração mensal', contentHtml });
+  await renderShell(container, { title: `INVEST - ${mode.title}`, contentHtml });
 
   const monthInput = container.querySelector('#monthly-month');
   const btnPickExtract = container.querySelector('#monthly-pick-extract');
@@ -144,6 +170,15 @@ export async function InvestIntegracaoMensalPage(container) {
   const previewEl = container.querySelector('#monthly-preview');
   const readyBadge = container.querySelector('#monthly-ready-badge');
   const applyResultEl = container.querySelector('#monthly-apply-result');
+  const heroKicker = container.querySelector('.monthly-header .monthly-kicker');
+  const heroTitle = container.querySelector('.monthly-header h1');
+  const heroLead = container.querySelector('.monthly-header .muted');
+
+  if (heroKicker) heroKicker.textContent = 'Input de Dados';
+  if (heroTitle) heroTitle.textContent = mode.title;
+  if (heroLead) heroLead.textContent = mode.lead;
+  if (btnValidate) btnValidate.textContent = mode.validateLabel;
+  if (btnApply) btnApply.textContent = mode.actionLabel;
 
   let extractFile = null;
   let noteFiles = [];
@@ -178,7 +213,7 @@ export async function InvestIntegracaoMensalPage(container) {
     if (!month || !extractFile || !noteFiles.length) return null;
     return apiRequest('/api/invest/import/btg-month', {
       method: 'POST',
-      body: { month, dryRun, extractFile, noteFiles },
+      body: { month, dryRun, extractFile, noteFiles, importMode: mode.key },
     });
   }
 
@@ -243,9 +278,9 @@ export async function InvestIntegracaoMensalPage(container) {
         setStatus('O servidor não aplicou o mês. Confira o detalhe.', 'err');
         return;
       }
-      setStatus('Mês aplicado. Materializando carteira e patrimônio...');
+      setStatus(mode.appliedStatus);
       await apiRequest('/api/invest/reconcile/recalc-all', { method: 'POST', body: {} });
-      setStatus('Mês aplicado e materialização concluída.', 'ok');
+      setStatus(mode.doneStatus, 'ok');
     } catch (err) {
       setStatus(err.message || 'Falha ao aplicar o mês.', 'err');
     } finally {
