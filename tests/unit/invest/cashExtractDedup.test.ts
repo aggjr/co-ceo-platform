@@ -4,7 +4,7 @@ import {
   importLineExpectedCashNet,
 } from '../../../src/core/invest/cashExtractDedup';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
-import type { LedgerImportLine } from '../../../src/core/invest/ledgerTypes';
+import { LEDGER_TRANSACTION_TYPES, type LedgerImportLine } from '../../../src/core/invest/ledgerTypes';
 import {
   buildLedgerDedupIndex,
   lookupDuplicate,
@@ -59,6 +59,25 @@ describe('cashExtractDedup', () => {
     expect(dups).toHaveLength(1);
     expect(dups[0]!.extractEventId).toBe('dup1');
     expect(dups[0]!.twinRef).toBe('BTG-EXT-2026-05-18#3');
+  });
+
+  it('reconhece os dois tipos de diferença desconhecida no catálogo', () => {
+    expect(LEDGER_TRANSACTION_TYPES).toContain('extract_divergence');
+    expect(LEDGER_TRANSACTION_TYPES).toContain('cash_balance_gap');
+  });
+
+  it('cash_balance_gap não é tratado como renda/despesa/trade na dedup de caixa', () => {
+    // Sem mapeamento em importLineExpectedCashNet => não casa por valor com
+    // outros lançamentos; o resíduo explícito não some na deduplicação.
+    const line: LedgerImportLine = {
+      date: '2026-05-31',
+      ticker: 'CAIXA-BTG',
+      operation: 'cash_balance_gap',
+      quantity: 0,
+      unit_price: 0,
+      total_net_value: -123.45,
+    };
+    expect(importLineExpectedCashNet(line)).toBeNull();
   });
 
   it('lookupDuplicate por cash_net evita reimportar extrato', () => {

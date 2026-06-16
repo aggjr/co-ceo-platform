@@ -39,6 +39,15 @@ export const LEDGER_TRANSACTION_TYPES = [
    * garantir batimento de saldo; deve ser investigado junto à corretora.
    */
   'extract_divergence',
+  /**
+   * Diferença de saldo desconhecida: resíduo entre o saldo calculado pelo
+   * sistema (livro razão) e o saldo informado pela corretora, SEM lançamento
+   * correspondente no extrato. Diferente de `extract_divergence` (que é uma
+   * linha real do extrato sem classificação). Lançado como evento de caixa
+   * explícito e filtrável (substitui o antigo plug silencioso) para que o
+   * usuário investigue e questione a corretora. Ver migration 51.
+   */
+  'cash_balance_gap',
 ] as const;
 
 /** Ticker sintético por corretora para lançamentos de extrato (caixa). */

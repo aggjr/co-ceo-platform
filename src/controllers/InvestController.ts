@@ -1174,9 +1174,12 @@ export class InvestController {
 
     const from = req.body?.from ? String(req.body.from).slice(0, 10) : undefined;
     const to = req.body?.to ? String(req.body.to).slice(0, 10) : undefined;
+    // Carga inicial: habilita estimativa por âncoras mensais para dias passados
+    // sem cotação real (opções). Padrão econômico (false). Ver PatrimonyDailyRecorder.
+    const initialLoad = req.body?.initialLoad === true || req.body?.initialLoad === 'true';
 
     try {
-      const result = await this.patrimonyRebuild.rebuild(ctx, { from, to });
+      const result = await this.patrimonyRebuild.rebuild(ctx, { from, to, initialLoad });
       return res.json({ success: true, ...result });
     } catch (err) {
       console.error('[rebuildPatrimonyDaily]', err);
@@ -1410,6 +1413,19 @@ export class InvestController {
     const today = new Date().toISOString().slice(0, 10);
     const from = String(req.query.from || '').slice(0, 10);
     const to = String(req.query.to || today).slice(0, 10);
+    // Filtro opcional por tipo de operação (operation_code), lista separada por
+    // vírgula. Ex.: ?type=extract_divergence,cash_balance_gap para listar só as
+    // "diferenças desconhecidas" a questionar com a corretora.
+    const typeFilterRaw = String(req.query.type || '').trim();
+    const typeFilter = typeFilterRaw
+      ? new Set(
+          typeFilterRaw
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean)
+        )
+      : null;
+    const UNKNOWN_DIFFERENCE_OPS = new Set(['extract_divergence', 'cash_balance_gap']);
     const events = await this.ledger.listLedgerEvents(
       ctx,
       await this.ledgerStartDateFor(ctx),
@@ -1445,6 +1461,10 @@ export class InvestController {
       balance += amount;
       const rowDate = String(ce.transaction_date || '').slice(0, 10);
       if ((from && rowDate < from) || (to && rowDate > to)) {
+        continue;
+      }
+      const operationCode = String(ce.transaction_type || '');
+      if (typeFilter && !typeFilter.has(operationCode)) {
         continue;
       }
       let obs = '';
@@ -1501,6 +1521,11 @@ export class InvestController {
         return m ? `${m[3]}/${m[2]}/${m[1]}` : iso || '';
       };
 
+      const isUnknownDifference = UNKNOWN_DIFFERENCE_OPS.has(operationCode);
+      if (isUnknownDifference && !obs) {
+        obs = 'Diferença desconhecida — questionar corretora';
+      }
+
       rows.push({
         id: ce.id,
         date: ce.transaction_date || '',
@@ -1512,6 +1537,8 @@ export class InvestController {
         originDate: isoDateToBr(originDate),
         ticker,
         noteNum,
+        operationCode,
+        isUnknownDifference,
         observation: obs,
       });
     }

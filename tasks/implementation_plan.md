@@ -1621,4 +1621,33 @@ Decisao aplicada:
 - **U-03** Job diario com horario alvo ~19h parametrizado (envs
   `INVEST_CRON_*_AT`) e ordem de prioridade de fontes por ativo (ligado a M-01).
 
+### 18.2 Diferenca de caixa desconhecida (evento de negocio)
+
+Decisao do arquiteto: diferencas de caixa sem explicacao viram eventos de negocio
+filtraveis para questionar a corretora. Modelado no nivel `operation_code` (como
+todo o resto: dividend, cash_yield, fee, cost_adjustment sao operation_codes
+distintos sob o kind `cash_movement`). Dois tipos:
+
+- `extract_divergence` (ja existia) — linha REAL do extrato sem classificacao.
+  Gerada pelo `BtgExtractLineParser` (fallback) e agora filtravel.
+- `cash_balance_gap` (migration 51) — RESIDUO entre saldo do sistema e saldo da
+  corretora sem lancamento correspondente. Evento explicito (substitui o plug
+  silencioso desativado). `cash_direction='signed'`, `is_external_flow_for_twr=FALSE`.
+
+Filtro: `GET /api/invest/cash/extract?type=extract_divergence,cash_balance_gap`
+(cada linha expoe `operationCode` + `isUnknownDifference`). Migration 51 e
+idempotente e aplicada no boot via `ensureCashBalanceGapOperation`.
+
+Pendente (fase 2, depois da carga em producao): gerar `cash_balance_gap`
+automaticamente a partir do residuo de reconciliacao (`ReconciliationDiagnosticsService`),
+quando houver diferenca confirmada contra o snapshot da corretora.
+
+### 18.3 Carga inicial via API (gráfico aderente)
+
+`POST /api/invest/patrimony-daily/rebuild` agora aceita `initialLoad: true` no
+corpo — habilita a calibracao por ancoras na reconstrucao (dias passados de opcao
+sem cotacao). Option C e demais recalculos seguem economicos por padrao. Fluxo de
+carga inicial por API: upload dos JSON (Option C) seeda ancoras + aplica snapshot;
+depois `rebuild { initialLoad: true, from, to }` para o grafico bater com a corretora.
+
 

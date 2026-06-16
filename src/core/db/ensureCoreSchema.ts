@@ -34,6 +34,10 @@ export async function ensureExtractDivergenceOperation(pool: Pool): Promise<void
   await runSqlFile(pool, '49_extract_divergence_operation.sql');
 }
 
+export async function ensureCashBalanceGapOperation(pool: Pool): Promise<void> {
+  await runSqlFile(pool, '51_invest_cash_balance_gap_operation.sql');
+}
+
 /**
  * Garante tabelas globais exigidas pela API atual (mercado + monitor de jobs).
  * Idempotente: só aplica o .sql quando a tabela âncora não existe.
@@ -70,6 +74,8 @@ export async function ensureCoreSchema(pool: Pool): Promise<EnsureCoreSchemaResu
   }
   // Idempotente: adiciona extract_divergence caso ainda nao exista no catalogo.
   await ensureExtractDivergenceOperation(pool);
+  // Idempotente: adiciona cash_balance_gap (diferenca de saldo desconhecida).
+  await ensureCashBalanceGapOperation(pool);
 
   let investCashAccountPolicyMigrationApplied = false;
   if (!(await tableExists(pool, INVEST_CASH_ACCOUNT_POLICIES_TABLE))) {
