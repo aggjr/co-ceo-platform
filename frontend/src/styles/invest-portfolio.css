@@ -388,18 +388,8 @@
   font-weight: 600;
 }
 
-.portfolio-qty--long,
-.portfolio-excel-section .portfolio-qty--long {
-  color: #34d399;
-  font-weight: 600;
-}
-
 .portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-qty--short {
   color: #c7364a !important;
-}
-
-.portfolio-excel-section .coceo-excel-grid-host .table-wrapper table tbody tr.hoverable-row:hover td .portfolio-qty--long {
-  color: #047857 !important;
 }
 
 .portfolio-excel-section .portfolio-options-call-total strong {

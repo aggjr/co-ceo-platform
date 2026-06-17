@@ -401,15 +401,8 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
   },
   invest_open_option_tickers: {
     requiresGlobalScope: true,
-    sql: `SELECT DISTINCT
-            pi.identifier AS ticker,
-            COALESCE(DATE(ioe.expiration_date), DATE(m.expiration_date)) AS expiration_date
+    sql: `SELECT DISTINCT pi.identifier AS ticker
           FROM patrimony_items pi
-          LEFT JOIN invest_option_ext ioe
-            ON ioe.patrimony_item_id = pi.id
-           AND ioe.organization_id = pi.organization_id
-          LEFT JOIN invest_options_market m
-            ON m.ticker = pi.identifier
           WHERE pi.source_module = 'INVEST'
             AND pi.status = 'active'
             AND pi.deleted_at IS NULL
@@ -441,15 +434,8 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
   },
   invest_open_option_tickers_for_org: {
     requiresGlobalScope: true,
-    sql: `SELECT DISTINCT
-            pi.identifier AS ticker,
-            COALESCE(DATE(ioe.expiration_date), DATE(m.expiration_date)) AS expiration_date
+    sql: `SELECT DISTINCT pi.identifier AS ticker
           FROM patrimony_items pi
-          LEFT JOIN invest_option_ext ioe
-            ON ioe.patrimony_item_id = pi.id
-           AND ioe.organization_id = pi.organization_id
-          LEFT JOIN invest_options_market m
-            ON m.ticker = pi.identifier
           WHERE pi.organization_id = ?
             AND pi.source_module = 'INVEST'
             AND pi.status = 'active'

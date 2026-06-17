@@ -258,9 +258,6 @@ function renderQuantityCell(row, digits = 0) {
   if (q < 0) {
     span.className = 'portfolio-qty--short';
     span.title = 'Posição líquida vendida (quantidade negativa)';
-  } else if (q > 0) {
-    span.className = 'portfolio-qty--long';
-    span.title = 'Posição líquida comprada (quantidade positiva)';
   }
   return span;
 }

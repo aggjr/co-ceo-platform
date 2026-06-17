@@ -12,8 +12,6 @@ export type OptionQuoteSyncReport = {
   tickersInUse: string[];
   quotesSaved: number;
   missing: string[];
-  unquotedKnownContracts?: string[];
-  expiredSkipped?: string[];
   contractsInserted: number;
   contractsUpdated: number;
 };
@@ -49,13 +47,6 @@ const optionMarketUnderlyingCache = new Set<string>();
 function optionMarketCacheKey(ctx: UserContext, underlyings: string[]): string {
   const owner = ctx.organizationId ? `org:${ctx.organizationId}` : 'global';
   return `${owner}|${underlyings.join(',')}`;
-}
-
-function toIsoDate(value: unknown): string | null {
-  if (!value) return null;
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  const s = String(value).slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
 }
 
 /**
@@ -216,36 +207,6 @@ export class OptionMarketSyncService {
         tickersInUse: [],
         quotesSaved: 0,
         missing: [],
-        unquotedKnownContracts: [],
-        expiredSkipped: [],
-        contractsInserted: 0,
-        contractsUpdated: 0,
-      };
-    }
-
-    const expiredSkipped: string[] = [];
-    const knownContractTickers = new Set<string>();
-    const activeTickers = new Set<string>();
-    for (const row of rows) {
-      const ticker = String(row.ticker ?? '').trim().toUpperCase();
-      if (!ticker || !isOptionTicker(ticker)) continue;
-      const expirationDate = toIsoDate(row.expiration_date);
-      if (expirationDate && expirationDate < day) {
-        expiredSkipped.push(ticker);
-        continue;
-      }
-      if (expirationDate) knownContractTickers.add(ticker);
-      activeTickers.add(ticker);
-    }
-    tickers.splice(0, tickers.length, ...[...activeTickers].sort());
-    if (!tickers.length) {
-      return {
-        date: day,
-        tickersInUse: [],
-        quotesSaved: 0,
-        missing: [],
-        unquotedKnownContracts: [],
-        expiredSkipped,
         contractsInserted: 0,
         contractsUpdated: 0,
       };
@@ -255,17 +216,12 @@ export class OptionMarketSyncService {
     const quoteByTicker = new Map(quotes.map((q) => [q.ticker, q]));
     let quotesSaved = 0;
     const missing: string[] = [];
-    const unquotedKnownContracts: string[] = [];
     const contractRows: ParsedOptionMarketRow[] = [];
 
     for (const ticker of tickers) {
       const q = quoteByTicker.get(ticker);
       if (!q) {
-        if (knownContractTickers.has(ticker)) {
-          unquotedKnownContracts.push(ticker);
-        } else {
-          missing.push(ticker);
-        }
+        missing.push(ticker);
         continue;
       }
       await this.quotesRepo.upsertQuote(optionMarketGlobalCtx, {
@@ -306,8 +262,6 @@ export class OptionMarketSyncService {
       tickersInUse: tickers,
       quotesSaved,
       missing,
-      unquotedKnownContracts,
-      expiredSkipped,
       contractsInserted: contractResult.inserted,
       contractsUpdated: contractResult.updated,
     };

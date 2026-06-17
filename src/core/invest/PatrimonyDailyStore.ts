@@ -4,7 +4,6 @@ import type { CoCeoDataGateway } from '../dal';
 import type { SecurePayload, UserContext } from '../dal';
 import { StorageMeter } from '../dal/StorageMeter';
 import { isMissingSchemaError } from '../dal/mysqlErrors';
-import { authBootstrapContext } from '../auth/authBootstrapContext';
 import type { DailyPatrimonyPoint } from './PatrimonyDailyEngine';
 import type { PositionDailySnapshot } from './PatrimonyMtmDailyEngine';
 
@@ -244,7 +243,6 @@ export class PatrimonyDailyStore {
       await StorageMeter.recalculateOrganizationUsage(pool, ctx.organizationId);
     } catch (err) {
       console.error('Falha ao invalidar patrimonio diario retroativo:', err);
-      throw err;
     }
   }
 
@@ -286,6 +284,15 @@ export class PatrimonyDailyStore {
       source: input.source ?? 'mtm_economic',
       metadata: JSON.stringify(metadata),
     };
+
+    let recordId: string;
+    if (existing[0]?.id) {
+      recordId = String(existing[0].id);
+      await this.gateway.update(ctx, 'invest_portfolio_daily', recordId, payload);
+    } else {
+      recordId = randomUUID();
+      await this.gateway.insert(ctx, 'invest_portfolio_daily', { id: recordId, ...payload });
+    }
 
     const positionDailyRows = [
       ...input.positionSnapshots.map((p): PositionDailyRowInput => {
@@ -338,36 +345,16 @@ export class PatrimonyDailyStore {
       },
     ];
 
-    const previousPositionDailyRows = await this.loadPositionDailyRowsForDate(
-      ctx,
-      input.snapshotDate
-    );
     await this.upsertAssetSnapshotsBestEffort(ctx, input.snapshotDate, input.positionSnapshots);
-    let consistency: PositionDailyConsistencyResult;
-    try {
-      await this.replacePositionDailyRows(ctx, input.snapshotDate, positionDailyRows);
-      consistency = await this.validatePositionDailyConsistency(ctx, input);
-    } catch (err) {
-      await this.restorePositionDailyRows(ctx, input.snapshotDate, previousPositionDailyRows);
-      throw err;
-    }
+    await this.upsertPositionDailyRows(ctx, positionDailyRows);
+    const consistency = await this.validatePositionDailyConsistency(ctx, input);
     const finalMetadata = {
       ...metadata,
       position_daily_consistency: consistency,
     };
-    const finalPayload = {
-      ...payload,
+    await this.gateway.update(ctx, 'invest_portfolio_daily', recordId, {
       metadata: JSON.stringify(finalMetadata),
-    };
-
-    let recordId: string;
-    if (existing[0]?.id) {
-      recordId = String(existing[0].id);
-      await this.gateway.update(ctx, 'invest_portfolio_daily', recordId, finalPayload);
-    } else {
-      recordId = randomUUID();
-      await this.gateway.insert(ctx, 'invest_portfolio_daily', { id: recordId, ...finalPayload });
-    }
+    });
 
     return {
       id: recordId,
@@ -444,86 +431,11 @@ export class PatrimonyDailyStore {
     }
   }
 
-  private async deletePositionDailyRowsForDate(
+  private async upsertPositionDailyRows(
     ctx: UserContext,
-    snapshotDate: string
-  ): Promise<void> {
-    if (!ctx.organizationId) return;
-    const existing = await this.gateway.findWhere(
-      ctx,
-      'invest_position_daily',
-      {
-        organization_id: ctx.organizationId,
-        snapshot_date: snapshotDate,
-      },
-      { limit: 10000, columns: ['id'] }
-    );
-    const installerCtx = authBootstrapContext();
-    for (const row of existing) {
-      const id = String(row.id ?? '');
-      if (!id) continue;
-      await this.gateway.deleteMatching(installerCtx, 'invest_position_daily', { id });
-    }
-  }
-
-  private async loadPositionDailyRowsForDate(
-    ctx: UserContext,
-    snapshotDate: string
-  ): Promise<Record<string, unknown>[]> {
-    if (!ctx.organizationId) return [];
-    return this.gateway.findWhere(
-      ctx,
-      'invest_position_daily',
-      {
-        organization_id: ctx.organizationId,
-        snapshot_date: snapshotDate,
-      },
-      { limit: 10000 }
-    );
-  }
-
-  private positionDailyRowToPayload(row: Record<string, unknown>): SecurePayload {
-    return {
-      id: String(row.id),
-      organization_id: String(row.organization_id),
-      snapshot_date: toIsoDate(row.snapshot_date),
-      ticker: String(row.ticker ?? '').trim().toUpperCase(),
-      asset_type: String(row.asset_type ?? '').trim().toLowerCase(),
-      account_key: String(row.account_key ?? 'DEFAULT').trim().toUpperCase(),
-      broker_code: row.broker_code == null ? null : String(row.broker_code),
-      currency_code: String(row.currency_code ?? 'BRL').trim().toUpperCase(),
-      quantity: Number(row.quantity ?? 0),
-      closing_price: Number(row.closing_price ?? 0),
-      total_value: Number(row.total_value ?? 0),
-      managerial_avg_price:
-        row.managerial_avg_price == null ? null : Number(row.managerial_avg_price),
-      managerial_value: row.managerial_value == null ? null : Number(row.managerial_value),
-      unrealized_pnl: row.unrealized_pnl == null ? null : Number(row.unrealized_pnl),
-      price_source: String(row.price_source ?? ''),
-      source: String(row.source ?? 'mtm_economic'),
-      metadata: row.metadata ?? null,
-    };
-  }
-
-  private async restorePositionDailyRows(
-    ctx: UserContext,
-    snapshotDate: string,
-    previousRows: Record<string, unknown>[]
-  ): Promise<void> {
-    if (!ctx.organizationId) return;
-    await this.deletePositionDailyRowsForDate(ctx, snapshotDate);
-    for (const row of previousRows) {
-      await this.gateway.insert(ctx, 'invest_position_daily', this.positionDailyRowToPayload(row));
-    }
-  }
-
-  private async replacePositionDailyRows(
-    ctx: UserContext,
-    snapshotDate: string,
     rows: PositionDailyRowInput[]
   ): Promise<void> {
     if (!ctx.organizationId) return;
-    await this.deletePositionDailyRowsForDate(ctx, snapshotDate);
 
     for (const row of rows) {
       const ticker = row.ticker.trim().toUpperCase();
@@ -548,10 +460,27 @@ export class PatrimonyDailyStore {
         metadata: row.metadata ? JSON.stringify(row.metadata) : null,
       };
 
-      await this.gateway.insert(ctx, 'invest_position_daily', {
-        id: randomUUID(),
-        ...payload,
-      });
+      const existing = await this.gateway.findWhere(
+        ctx,
+        'invest_position_daily',
+        {
+          organization_id: ctx.organizationId,
+          snapshot_date: row.snapshotDate,
+          ticker,
+          asset_type: assetType,
+          account_key: accountKey,
+        },
+        { limit: 1, columns: ['id'] }
+      );
+
+      if (existing[0]?.id) {
+        await this.gateway.update(ctx, 'invest_position_daily', String(existing[0].id), payload);
+      } else {
+        await this.gateway.insert(ctx, 'invest_position_daily', {
+          id: randomUUID(),
+          ...payload,
+        });
+      }
     }
   }
 

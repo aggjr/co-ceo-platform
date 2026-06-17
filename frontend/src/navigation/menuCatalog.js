@@ -115,21 +115,9 @@ export const MENU_CATALOG = [
         resourceKey: 'screen.invest.results',
       },
       {
-        label: 'Input de Dados',
-        path: '/invest/input-dados',
+        label: 'Integração mensal',
+        path: '/invest/integracao-mensal',
         resourceKey: 'screen.invest.results',
-        children: [
-          {
-            label: 'Carga inicial',
-            path: '/invest/input-dados/carga-inicial',
-            resourceKey: 'screen.invest.results',
-          },
-          {
-            label: 'Novas movimentacoes',
-            path: '/invest/input-dados/novas-movimentacoes',
-            resourceKey: 'screen.invest.results',
-          },
-        ],
       },
       {
         label: 'Conciliação',

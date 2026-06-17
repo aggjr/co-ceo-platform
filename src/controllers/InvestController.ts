@@ -1670,8 +1670,6 @@ export class InvestController {
     const extractFile = req.body?.extractFile as BtgUploadFileInput | undefined;
     const noteFiles = req.body?.noteFiles as BtgUploadFileInput[] | undefined;
     const dryRun = Boolean(req.body?.dryRun);
-    const importMode =
-      req.body?.importMode === 'incremental' ? 'incremental' : 'initial_load';
     if (!extractFile?.name || !extractFile?.contentBase64) {
       return res.status(400).json({
         success: false,
@@ -1693,7 +1691,7 @@ export class InvestController {
           extractFile,
           noteFiles
         );
-        return res.json({ success: true, dryRun: true, importMode, preview });
+        return res.json({ success: true, dryRun: true, preview });
       }
       const result = await applyBtgMonthImport(
         ctx,
@@ -1739,7 +1737,6 @@ export class InvestController {
       return res.json({
         success: true,
         dryRun: false,
-        importMode,
         ...result,
         resultOk: result.resultOk && !rebuildValidationError,
         patrimonyRebuild,
