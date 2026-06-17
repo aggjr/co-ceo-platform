@@ -1,6 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { runSqlFile, tableExists } from '../db/sqlMigrationRunner';
 import { LOCALE, MENU, TEXTS } from '../../database/seeds/008_ui_catalog';
 
 export type UiCatalogApplyResult = {
@@ -12,39 +11,13 @@ export type UiCatalogApplyResult = {
   sample: Array<{ text_key: string; default_text: string }>;
 };
 
-async function tableExists(pool: Pool, name: string): Promise<boolean> {
-  const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT COUNT(*) AS n FROM information_schema.tables
-     WHERE table_schema = DATABASE() AND table_name = ?`,
-    [name]
+function isKindColumnEnumError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    /Data truncated for column 'kind'/i.test(msg) ||
+    /Incorrect enum value.*kind/i.test(msg) ||
+    /'description'.*kind/i.test(msg)
   );
-  return Number(rows[0]?.n ?? 0) > 0;
-}
-
-function migrationsDir(): string {
-  const candidates = [
-    path.join(process.cwd(), 'src', 'database', 'migrations'),
-    path.join(__dirname, '../../database/migrations'),
-    path.join(__dirname, '../../../src/database/migrations'),
-  ];
-  for (const dir of candidates) {
-    if (fs.existsSync(path.join(dir, '22_ui_invest_menu_swap_portfolio_options_paths.sql'))) {
-      return dir;
-    }
-  }
-  return candidates[0]!;
-}
-
-async function runSqlFile(pool: Pool, fileName: string): Promise<void> {
-  const full = path.join(migrationsDir(), fileName);
-  const sql = fs.readFileSync(full, 'utf8');
-  const statements = sql
-    .split(';')
-    .map((s) => s.replace(/--[^\n]*/g, '').trim())
-    .filter((s) => s.length > 0);
-  for (const stmt of statements) {
-    await pool.query(stmt);
-  }
 }
 
 export async function applyUiCatalog(pool: Pool): Promise<UiCatalogApplyResult> {
@@ -92,18 +65,16 @@ export async function applyUiCatalog(pool: Pool): Promise<UiCatalogApplyResult> 
     try {
       await upsert();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
       // Produção antiga: coluna `kind` pode não suportar 'description' ainda.
-      if (/Data truncated for column 'kind'/i.test(msg)) {
+      if (isKindColumnEnumError(e)) {
         // Reaplica migration e tenta novamente.
         await runSqlFile(pool, '32_ui_text_kind_description.sql');
         try {
           await upsert();
           continue;
         } catch (e2) {
-          const msg2 = e2 instanceof Error ? e2.message : String(e2);
           // Fallback: mantém apply funcionando convertendo description → field_label.
-          if (/Data truncated for column 'kind'/i.test(msg2) && t.kind === 'description') {
+          if (isKindColumnEnumError(e2) && t.kind === 'description') {
             await upsert('field_label');
             continue;
           }

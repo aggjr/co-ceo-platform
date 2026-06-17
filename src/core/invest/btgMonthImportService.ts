@@ -540,12 +540,13 @@ export async function previewBtgMonthImport(
 
   let liqBolsaOk = true;
   let liqBolsaDetail = '';
-  if (noteFiles.length && extract.parseOk) {
+  const pdfsForLiq = noteFilesAll.filter((f) => isPdfPath(f.name));
+  if (pdfsForLiq.length && extract.parseOk) {
     const liq = await assessLiqBolsaStrictForMonth(
       ctx,
       ledger,
       monthNorm,
-      noteFiles,
+      pdfsForLiq,
       extractFile,
       { ignoreDbPending: opts?.simulateFreshImport === true }
     );
@@ -786,12 +787,20 @@ export function assessLiqBolsaFromPendingPools(
     .slice(0, 5)
     .map((u) => `${u.date}: ${u.net} (${u.reason})`)
     .join('; ');
+  const earlyMonthGap = unresolved.some(
+    (u) =>
+      u.reason.includes('Nenhum evento candidato') &&
+      Number(u.date.slice(8, 10)) <= 10
+  );
+  const priorHint = earlyMonthGap
+    ? ' Inclua PDFs de notas do mês anterior (liquidações D+1/D+2 cruzam o mês).'
+    : '';
   return {
     ok: false,
     unresolved,
     detail:
       `LIQ BOLSA sem casamento com eventos de negocio (${unresolved.length}). ` +
-      `Corrija notas/eventos pendentes antes de importar. ${details}`,
+      `Corrija notas/eventos pendentes antes de importar. ${details}.${priorHint}`,
   };
 }
 
