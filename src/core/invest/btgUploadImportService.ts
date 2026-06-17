@@ -17,6 +17,7 @@ import {
 import { normalizeBtgExtractPdfText } from './btgExtractPdfText';
 import { pdfBufferToLines, pdfBufferToText } from './btgPdfTextExtract';
 import { LedgerImportService } from './LedgerImportService';
+import { buildBtgExtractResolvers } from './buildBtgExtractResolvers';
 import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
 import {
   extractMovementBlock,
@@ -243,6 +244,9 @@ function assignExtractRefs(entries: LedgerImportLine[]): LedgerImportLine[] {
       ...e,
       operation: e.operation as LedgerTransactionType,
       broker_note_ref: `BTG-EXT-${e.date}#${String(seq).padStart(2, '0')}`,
+      source_system: 'btg_extract',
+      counterparty: 'BTG Pactual',
+      extract_category: e.extract_category,
     };
   });
 }
@@ -625,7 +629,8 @@ export async function parseExtractUploadImportLines(
   options?: import('./BtgExtractLineParser').BtgExtractParseOptions,
   resolvedOpeningBalance?: number,
   importRulesRepo?: InvestImportRulesRepository,
-  ctx?: UserContext
+  ctx?: UserContext,
+  ledger?: LedgerImportService
 ): Promise<LedgerImportLine[]> {
   const { raw, format } = await rawTextFromExtractUpload(file);
   const lines = normalizeExtractLines(raw, format);
@@ -641,7 +646,18 @@ export async function parseExtractUploadImportLines(
   const importRules =
     importRulesRepo && ctx ? await importRulesRepo.loadForBroker(ctx, 'BTG') : [];
   const mergedOptions = { ...options, importRules };
-  const rawEntries = btgLinesToImportEntries(parserContextLines, openingBalance, undefined, mergedOptions);
+  let resolvers: import('./BtgExtractLineParser').BtgExtractResolvers | undefined;
+  if (ledger && ctx?.organizationId && typeof ledger.listLedgerEvents === 'function') {
+    const today = new Date().toISOString().slice(0, 10);
+    const events = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+    resolvers = buildBtgExtractResolvers(events);
+  }
+  const rawEntries = btgLinesToImportEntries(
+    parserContextLines,
+    openingBalance,
+    resolvers,
+    mergedOptions
+  );
   return assignExtractRefs(
     rawEntries.map((e) => ({
       ...e,
@@ -693,7 +709,14 @@ export async function applyBtgExtractUpload(
 
     await ledger.reconcileCustody(ctx);
     const parseOptions = { includeLiqBolsa: true, ...(options?.parseOptions ?? {}) };
-    let entries = await parseExtractUploadImportLines(file, parseOptions, openingBalance);
+    let entries = await parseExtractUploadImportLines(
+      file,
+      parseOptions,
+      openingBalance,
+      undefined,
+      ctx,
+      ledger
+    );
     const liqBolsaSettlement = await settleLiqBolsaEntries(ctx, ledger, entries, {
       keepUnmatchedAsCash: options?.keepUnmatchedLiqBolsaAsCash === true,
     });

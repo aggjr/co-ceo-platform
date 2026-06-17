@@ -6,6 +6,7 @@ export type BusinessEventKind =
   | 'broker_note_loan'
   | 'cash_movement'
   | 'cash_yield_event'
+  | 'treasury_direct'
   | 'corporate_action'
   // STOCKSPIN (futuro)
   | 'inventory_purchase'

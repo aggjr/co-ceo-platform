@@ -38,7 +38,7 @@ function isPdfName(name: string): boolean {
 function bareNoteNumber(ref: string | undefined): string {
   const r = String(ref || '');
   const m = r.match(/(\d{4,})/);
-  return m ? m[1] : r.replace(/^BTG-NOTA-?/i, '') || '—';
+  return m ? m[1] : r.replace(/^(?:B3|BTG)-NOTA-?/i, '') || '—';
 }
 
 export function noteRowKey(noteNumber: string, pregaoDate: string, lineNo: number): string {

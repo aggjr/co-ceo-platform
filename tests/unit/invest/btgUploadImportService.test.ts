@@ -31,6 +31,7 @@ Cont corrente - Movimentacao
     const imported: unknown[] = [];
     const ledger = {
       getOpeningLedgerBalance: jest.fn(async () => 100),
+      listLedgerEvents: jest.fn(async () => []),
       reconcileCustody: jest.fn(async () => ({ positions: 0 })),
       settleLiqBolsa: jest.fn(async () => ({
         status: 'blocked',

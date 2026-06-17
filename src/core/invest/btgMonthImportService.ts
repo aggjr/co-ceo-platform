@@ -172,7 +172,7 @@ export function isMonthBtgImportCashEvent(event: LedgerEvent, month: string): bo
   const ref = String(event.broker_note_ref || '');
   if (/OPENING:\d{4}-\d{2}-\d{2}/i.test(ref)) return false;
   if (ref.startsWith('BTG-EXT-')) return true;
-  if (ref.includes('BTG-NOTA') || ref.includes(':CASH')) return true;
+  if (ref.includes('B3-NOTA') || ref.includes('BTG-NOTA') || ref.includes(':CASH')) return true;
   return false;
 }
 

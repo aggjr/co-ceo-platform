@@ -151,7 +151,7 @@ export type LedgerImportLine = {
    * BusinessEventRegistry.ensureByRef.
    *
    * Padroes adotados:
-   *   - 'BTG-NOTA-{noteNumber}' → 1 header por nota de corretagem
+   *   - 'B3-NOTA-{noteNumber}' → 1 header por nota de corretagem (padrao B3)
    *   - 'OPENING:{date}'        → 1 header para o opening
    *   - vazio                   → cada linha vira 1 header avulso (cash_movement)
    *
@@ -175,6 +175,8 @@ export type LedgerImportLine = {
    * Ver tabela em MovementType.cost_adjustment.
    */
   applies_to_b3?: boolean;
+  /** Categoria do extrato BTG (1 patrimonial, 2 fee mensal, 3 cash puro). */
+  extract_category?: 1 | 2 | 3;
 };
 
 export type OpeningShortOptionLine = {

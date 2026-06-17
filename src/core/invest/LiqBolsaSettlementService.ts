@@ -120,6 +120,7 @@ export class LiqBolsaSettlementService {
       'broker_note_spot',
       'broker_note_option',
       'broker_note_loan',
+      'treasury_direct',
       'buy',
       'sell',
       'put_buy',

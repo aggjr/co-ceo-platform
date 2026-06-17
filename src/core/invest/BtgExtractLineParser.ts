@@ -4,6 +4,9 @@
  */
 import { MAIN_CASH_TICKER } from './ledgerTypes';
 import type { InvestImportRule } from './ledgerTypes';
+import { inferAssetType } from './assetClassifier';
+
+const B3_TICKER_RE = /\b([A-Z]{4}\d{1,2})\b/;
 
 const LFT_TICKER_RE = /LFT\s+(\d{2})\/(\d{2})\/(\d{4})/i;
 
@@ -210,6 +213,13 @@ function takeTesouroDiretoMovement(
   return best;
 }
 
+/** Ticker B3 em descricoes de provento (ex.: "DIVIDENDO PRIO3"). */
+function parseProventoTickerFromDescription(description: string): string | null {
+  const upper = description.toUpperCase();
+  const m = upper.match(B3_TICKER_RE);
+  return m ? m[1]! : null;
+}
+
 /** Classifica linha do extrato → operação do livro-razão INVEST. */
 export function classifyBtgDescription(
   description: string,
@@ -299,6 +309,26 @@ export function classifyBtgDescription(
     };
   }
 
+  const proventoTicker = parseProventoTickerFromDescription(description);
+  if (d.includes('DIVIDENDO') || d.includes('DIVIDENDOS')) {
+    return {
+      operation: 'dividend',
+      ticker: proventoTicker ?? CASH_TICKER,
+      asset_type: proventoTicker ? inferAssetType(proventoTicker) : 'cash',
+      underlying_ticker: proventoTicker ?? undefined,
+      notes: description,
+    };
+  }
+  if (d.includes('JCP') || d.includes('JUROS SOBRE CAPITAL')) {
+    return {
+      operation: 'jcp',
+      ticker: proventoTicker ?? CASH_TICKER,
+      asset_type: proventoTicker ? inferAssetType(proventoTicker) : 'cash',
+      underlying_ticker: proventoTicker ?? undefined,
+      notes: description,
+    };
+  }
+
   if (d.includes('JUROS SOBRE SALDO NEGATIVO') || d.includes('IOF SOBRE SALDO NEGATIVO')) {
     return {
       operation: 'penalty_b3',
@@ -384,7 +414,7 @@ export function getBtgOperationSign(operation: string, description: string): num
   if (['buy', 'capital_withdrawal', 'penalty_b3'].includes(operation)) {
     return -1;
   }
-  if (['sell', 'capital_deposit', 'cash_yield'].includes(operation)) {
+  if (['sell', 'capital_deposit', 'cash_yield', 'dividend', 'jcp'].includes(operation)) {
     return 1;
   }
   if (operation === 'fee') {

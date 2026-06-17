@@ -51,12 +51,12 @@ function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Número da nota BTG (6+ dígitos) extraído de qualquer formato de ref. */
+/** Número da nota B3 (6+ dígitos) extraído de qualquer formato de ref. */
 export function extractBareNoteNumber(ref: string | null | undefined): string | null {
   const r = String(ref || '').trim();
   if (!r) return null;
   const m =
-    r.match(/BTG-NOTA-(\d{6,})/i) ||
+    r.match(/(?:B3|BTG)-NOTA-(\d{6,})/i) ||
     r.match(/(?:^|#)(\d{6,})(?:#|$)/) ||
     r.match(/^(\d{6,})$/);
   return m ? m[1]! : null;

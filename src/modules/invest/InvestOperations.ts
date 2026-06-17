@@ -23,6 +23,7 @@ import { inferAssetType, inferUnderlyingTicker } from '../../core/invest/assetCl
 import { SettlementRulesService } from '../../core/invest/SettlementRulesService';
 import { inferOptionExpiryDate } from '../../core/invest/optionExpiry';
 import type { LedgerImportLine } from '../../core/invest/ledgerTypes';
+import { inferBusinessEventKind } from '../../core/invest/inferBusinessEventKind';
 import { InvestOperationPolicyService } from '../../core/invest/InvestOperationPolicyService';
 import { InvestCashAccountPolicy } from '../../core/invest/InvestCashAccountPolicy';
 import {
@@ -896,7 +897,8 @@ export class InvestOperations {
       assetType,
       eventDate: line.date,
     });
-    const businessEventId = await this.resolveOrCreateEvent(ctx, line, policy.businessEventKind);
+    const eventKind = inferBusinessEventKind(line, policy.businessEventKind) as BusinessEventKind;
+    const businessEventId = await this.resolveOrCreateEvent(ctx, line, eventKind);
 
     // Opening_balance vai pelo caminho dedicado. Repassa businessEventId pra
     // garantir rastreabilidade no header OPENING:{date}.
@@ -1234,34 +1236,43 @@ export class InvestOperations {
       return { skipped: true, reason: `operacao não suportada no fluxo patrimonial: ${op}` };
     }
 
-    const { entry: tradePatEntry } = await this.inventoryLedger.recordMovement(ctx, {
-      itemId: item.id,
-      transactionDate: line.date,
-      movementType,
-      quantityDelta,
-      unitValue: Number(line.unit_price),
-      notes: line.notes ?? op,
-      externalRef: ref ? `BROKER_REF:${ref}` : undefined,
-      businessEventId,
-      metadata: {
-        legacy_op: op,
-        broker_note_ref: ref ?? null,
-        total_net_value: Number(
-          line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)
-        ),
-        skip_financial_ledger: Boolean(line.skip_financial_ledger),
-        ...(line.option_strike != null && line.option_strike > 0
-          ? { option_strike: line.option_strike }
-          : {}),
-        ...((line.brokerage_fee ?? 0) + (line.b3_fees ?? 0) + (line.irrf_tax ?? 0) > 0
-          ? {
-              brokerage_fee: line.brokerage_fee ?? 0,
-              b3_fees: line.b3_fees ?? 0,
-              irrf_tax: line.irrf_tax ?? 0,
-            }
-          : {}),
-      },
-    });
+    const skipPatrimonyLeg =
+      line.impacts_managerial_price === false && Math.abs(Number(line.quantity)) < 1e-9;
+
+    let tradePatEntry: { id: string };
+    if (skipPatrimonyLeg) {
+      tradePatEntry = { id: '' };
+    } else {
+      const recorded = await this.inventoryLedger.recordMovement(ctx, {
+        itemId: item.id,
+        transactionDate: line.date,
+        movementType,
+        quantityDelta,
+        unitValue: Number(line.unit_price),
+        notes: line.notes ?? op,
+        externalRef: ref ? `BROKER_REF:${ref}` : undefined,
+        businessEventId,
+        metadata: {
+          legacy_op: op,
+          broker_note_ref: ref ?? null,
+          total_net_value: Number(
+            line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)
+          ),
+          skip_financial_ledger: Boolean(line.skip_financial_ledger),
+          ...(line.option_strike != null && line.option_strike > 0
+            ? { option_strike: line.option_strike }
+            : {}),
+          ...((line.brokerage_fee ?? 0) + (line.b3_fees ?? 0) + (line.irrf_tax ?? 0) > 0
+            ? {
+                brokerage_fee: line.brokerage_fee ?? 0,
+                b3_fees: line.b3_fees ?? 0,
+                irrf_tax: line.irrf_tax ?? 0,
+              }
+            : {}),
+        },
+      });
+      tradePatEntry = recorded.entry;
+    }
 
     const isOptionTrade =
       assetClass === 'option_call' || assetClass === 'option_put' || policy.isOptionTrade;
@@ -1347,11 +1358,12 @@ export class InvestOperations {
             cash_policy_id: cashResolution.policyId,
           },
         });
-        await this.inventoryLedger.linkToFinancialLedger(ctx, tradePatEntry.id, tradeFinEntry.id);
-        await this.financialLedger.linkToPatrimonyLedger(ctx, tradeFinEntry.id, tradePatEntry.id);
+        if (tradePatEntry.id) {
+          await this.inventoryLedger.linkToFinancialLedger(ctx, tradePatEntry.id, tradeFinEntry.id);
+          await this.financialLedger.linkToPatrimonyLedger(ctx, tradeFinEntry.id, tradePatEntry.id);
+        }
       }
     }
-    // split/bonus/revaluation: cashDirection=null → sem perna financeira.
     // Estas operacoes corporativas nao geram fluxo de caixa e legitimamente
     // existem apenas no livro patrimonial.
 
