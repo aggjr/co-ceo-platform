@@ -422,7 +422,6 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
           ORDER BY pi.identifier`,
   },
   invest_option_tickers_for_org: {
-    requiresGlobalScope: true,
     sql: `SELECT DISTINCT pi.identifier AS ticker
           FROM patrimony_items pi
           WHERE pi.organization_id = ?
@@ -433,7 +432,6 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
           ORDER BY pi.identifier`,
   },
   invest_open_option_tickers_for_org: {
-    requiresGlobalScope: true,
     sql: `SELECT DISTINCT pi.identifier AS ticker
           FROM patrimony_items pi
           WHERE pi.organization_id = ?
@@ -446,7 +444,6 @@ export const GATEWAY_READ_QUERIES: Record<GatewayReadQueryKey, GatewayReadQueryD
           ORDER BY pi.identifier`,
   },
   invest_options_market_for_org: {
-    requiresGlobalScope: true,
     sql: `SELECT m.ticker, m.underlying_ticker, m.option_type, m.strike_price, m.expiration_date
           FROM invest_options_market m
           INNER JOIN patrimony_items pi

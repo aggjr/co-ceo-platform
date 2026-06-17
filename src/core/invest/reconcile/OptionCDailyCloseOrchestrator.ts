@@ -363,18 +363,26 @@ export class OptionCDailyCloseOrchestrator {
       const quoteSync = new InvestQuoteSyncService(this.gateway);
       const quotesFetched = await quoteSync.syncHistoricalFromBrapi(ctx);
       logStep(rt, `Cotações atualizadas: ${quotesFetched} registro(s) global(is).`);
+    } catch (err) {
+      logStep(
+        rt,
+        `⚠️ Falha ao baixar cotações Brapi: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
 
+    try {
       logStep(rt, 'Baixando cotações de opções pendentes...');
       const optionQuoteSync = new OptionHistoricalSyncService(this.gateway);
       await optionQuoteSync.syncMissingOptions(ctx);
       logStep(rt, 'Verificação de opções pendentes concluída.');
-      rt.quotesSynced = true;
     } catch (err) {
       logStep(
         rt,
-        `⚠️ Falha ao baixar cotações históricas: ${err instanceof Error ? err.message : String(err)}`
+        `⚠️ Falha ao verificar opções pendentes: ${err instanceof Error ? err.message : String(err)}`
       );
     }
+
+    rt.quotesSynced = true;
   }
 
   private async closeNextMonth(ctx: UserContext, rt: OptionCRuntime) {
