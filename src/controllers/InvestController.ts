@@ -1796,7 +1796,8 @@ export class InvestController {
           ctx,
           this.ledger,
           noteFiles,
-          extractFiles
+          extractFiles,
+          { resetFirst: req.body?.resetFirst === true }
         );
         return res.json({ success: true, dryRun: true, preview });
       }

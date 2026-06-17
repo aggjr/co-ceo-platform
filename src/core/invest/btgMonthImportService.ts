@@ -330,12 +330,33 @@ function evaluateMonthPreview(
   return { notesOk, financialOk, resultOk, notesDetail, financialDetail, resultDetail };
 }
 
+export type PreviewBtgMonthImportOptions = {
+  /** Livro simulado (prévia em lote). Se omitido, lê o banco. */
+  baseLedger?: LedgerEvent[];
+  /** Fechamento do extrato anterior na cadeia mensal. */
+  previousClosingExtract?: number | null;
+  /** Ignora BTG-EXT já gravados — simula purge + reimportação. */
+  simulateFreshImport?: boolean;
+};
+
+/** Equivalente ao purge: só pernas de abertura (patrimônio + caixa OPENING). */
+export function filterLedgerOpeningOnly(events: LedgerEvent[]): LedgerEvent[] {
+  return events.filter((e) => {
+    const ref = String(e.broker_note_ref || '');
+    const type = String(e.transaction_type || '');
+    if (type === 'opening_balance') return true;
+    if (/OPENING:\d{4}-\d{2}-\d{2}/i.test(ref)) return true;
+    return false;
+  });
+}
+
 export async function previewBtgMonthImport(
   ctx: UserContext,
   ledger: LedgerImportService,
   month: string,
   extractFile: BtgUploadFileInput,
-  noteFilesAll: BtgUploadFileInput[]
+  noteFilesAll: BtgUploadFileInput[],
+  opts?: PreviewBtgMonthImportOptions
 ): Promise<BtgMonthImportPreview> {
   const monthNorm = String(month || '').trim().slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(monthNorm)) {
@@ -352,7 +373,8 @@ export async function previewBtgMonthImport(
 
   const notes = await previewBtgBrokerageUpload(noteFiles);
   const today = new Date().toISOString().slice(0, 10);
-  const baseLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+  const dbLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+  const baseLedger = opts?.baseLedger ?? dbLedger;
   const reconcileLedger = await buildMonthReconcileLedger(
     monthNorm,
     extractFile,
@@ -368,13 +390,21 @@ export async function previewBtgMonthImport(
       fileName: parsedExtract.fileName,
       preview: parsedExtract.preview,
     };
-    const recon = buildExtractReconcileFields(parsed, reconcileLedger, null, {
-      tolerance: MONTH_IMPORT_CASH_TOLERANCE,
-    });
+    const recon = buildExtractReconcileFields(
+      parsed,
+      reconcileLedger,
+      opts?.previousClosingExtract ?? null,
+      {
+        tolerance: MONTH_IMPORT_CASH_TOLERANCE,
+      }
+    );
+    const monthAlreadyImported = opts?.simulateFreshImport
+      ? false
+      : isExtractMonthInLedger(dbLedger, monthNorm);
     extract = {
       ...parsedExtract,
       ...recon,
-      monthAlreadyImported: isExtractMonthInLedger(baseLedger, monthNorm),
+      monthAlreadyImported,
     };
   }
 
@@ -413,17 +443,24 @@ export type BtgBatchImportPreview = {
   chainOk: boolean;
   resultOk: boolean;
   summary: string;
+  simulatedFreshImport: boolean;
+};
+
+export type PreviewBtgBatchImportOptions = {
+  /** Simula purge + reimportação do período (ignora meses já no banco). */
+  resetFirst?: boolean;
 };
 
 /**
  * Prévia de todos os meses detectados nos extratos — sem gravar.
- * Idempotência: meses já importados e coerentes aparecem como already_imported.
+ * Simula a cadeia mês a mês; com resetFirst, parte só da abertura.
  */
 export async function previewBtgBatchImport(
   ctx: UserContext,
   ledger: LedgerImportService,
   noteFilesAll: BtgUploadFileInput[],
-  extractFiles: BtgUploadFileInput[]
+  extractFiles: BtgUploadFileInput[],
+  options?: PreviewBtgBatchImportOptions
 ): Promise<BtgBatchImportPreview> {
   if (!extractFiles?.length) {
     throw new GatewayError('INVALID_PAYLOAD', 'Envie ao menos um extrato BTG.', 400);
@@ -441,17 +478,30 @@ export async function previewBtgBatchImport(
     );
   }
 
+  const resetFirst = options?.resetFirst === true;
+  const today = new Date().toISOString().slice(0, 10);
+  const dbLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+  let workingLedger = resetFirst ? filterLedgerOpeningOnly(dbLedger) : dbLedger;
+
   const months: BtgBatchMonthPreview[] = [];
   let prevClosing: number | null = null;
   let chainOk = true;
 
   for (const entry of plan) {
+    const alreadyInDb = isExtractMonthInLedger(dbLedger, entry.month);
+    const simulateFresh = resetFirst || !alreadyInDb;
+
     const preview = await previewBtgMonthImport(
       ctx,
       ledger,
       entry.month,
       entry.extractFile,
-      noteFilesAll
+      noteFilesAll,
+      {
+        baseLedger: workingLedger,
+        previousClosingExtract: prevClosing,
+        simulateFreshImport: simulateFresh,
+      }
     );
 
     if (
@@ -467,7 +517,17 @@ export async function previewBtgBatchImport(
 
     let status: BtgBatchMonthStatus = 'blocked';
     if (preview.resultOk) {
-      status = preview.extract.monthAlreadyImported ? 'already_imported' : 'ready';
+      if (!resetFirst && alreadyInDb) {
+        status = 'already_imported';
+        workingLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+      } else {
+        status = 'ready';
+        workingLedger = await buildMonthReconcileLedger(
+          entry.month,
+          entry.extractFile,
+          workingLedger
+        );
+      }
     }
 
     months.push({ ...preview, status });
@@ -481,6 +541,9 @@ export async function previewBtgBatchImport(
 
   const parts: string[] = [];
   parts.push(`${plan.length} mês(es): ${plan[0]!.month} → ${plan[plan.length - 1]!.month}`);
+  if (resetFirst) {
+    parts.push('simulação com limpeza (só abertura)');
+  }
   if (monthsReady) parts.push(`${monthsReady} pronto(s) para importar`);
   if (monthsAlreadyImported) parts.push(`${monthsAlreadyImported} já importado(s)`);
   if (monthsBlocked) parts.push(`${monthsBlocked} com bloqueio`);
@@ -496,6 +559,7 @@ export async function previewBtgBatchImport(
     chainOk,
     resultOk,
     summary: parts.join(' · '),
+    simulatedFreshImport: resetFirst,
   };
 }
 

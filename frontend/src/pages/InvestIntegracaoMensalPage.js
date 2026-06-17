@@ -301,8 +301,13 @@ export async function InvestIntegracaoMensalPage(container) {
       lastPreview = data?.preview;
       if (previewEl) previewEl.innerHTML = renderBatchPreview(lastPreview);
       const ok = Boolean(lastPreview?.resultOk);
+      const simNote = lastPreview?.simulatedFreshImport
+        ? ' (simulação a partir da abertura — meses no banco serão regravados na importação)'
+        : '';
       setStatus(
-        ok ? lastPreview.summary || 'Período validado.' : 'Validação encontrou bloqueios — confira a tabela.',
+        ok
+          ? `${lastPreview.summary || 'Período validado.'}${simNote}`
+          : 'Validação encontrou bloqueios — confira a tabela. Se janeiro já foi importado com erro, marque "Limpar dados" e valide de novo.',
         ok ? 'ok' : 'err'
       );
     } catch (err) {
