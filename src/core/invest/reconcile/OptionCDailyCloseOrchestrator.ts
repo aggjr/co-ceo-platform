@@ -53,6 +53,9 @@ type OptionCRuntime = {
   extractFiles: BtgUploadFileInput[];
   monthPlan: MonthExtractPlanEntry[];
   quotesSynced: boolean;
+  previousClosingExtract: number | null;
+  monthsApplied: string[];
+  monthsSkipped: string[];
 };
 
 const runsById = new Map<string, OptionCRuntime>();
@@ -119,6 +122,9 @@ export class OptionCDailyCloseOrchestrator {
           extractFiles: [],
           monthPlan: [],
           quotesSynced: false,
+          previousClosingExtract: null,
+          monthsApplied: [],
+          monthsSkipped: [],
         });
       }
       return persisted;
@@ -203,6 +209,9 @@ export class OptionCDailyCloseOrchestrator {
       extractFiles: input.extractFiles,
       monthPlan,
       quotesSynced: false,
+      previousClosingExtract: null,
+      monthsApplied: [],
+      monthsSkipped: [],
       state: {
         runId,
         organizationId: ctx.organizationId,
@@ -416,12 +425,13 @@ export class OptionCDailyCloseOrchestrator {
       this.ledger,
       month,
       planEntry.extractFile,
-      rt.notesFiles
+      rt.notesFiles,
+      { previousClosingExtract: rt.previousClosingExtract }
     );
 
     logStep(
       rt,
-      `Importação ${month}: notas ${importResult.notesOk ? 'OK' : 'pendente'}, caixa ${importResult.financialOk ? 'OK' : 'pendente'} — ${importResult.resultDetail}`
+      `Importação ${month}: notas ${importResult.notesOk ? 'OK' : 'pendente'} (${importResult.notesFilesInMonth} PDF(s)), caixa ${importResult.financialOk ? 'OK' : 'pendente'} — ${importResult.resultDetail}`
     );
 
     if (!importResult.applied) {
@@ -431,7 +441,10 @@ export class OptionCDailyCloseOrchestrator {
         importResult.extract.parseError ||
         `Falha ao importar mês ${month}.`;
       logStep(rt, `⚠️ Mês ${month} não gravado: ${blockMsg}`);
+      rt.monthsSkipped.push(month);
       if (rt.state.mode !== 'homologation') {
+        rt.state.runStatus = 'error';
+        rt.state.runError = blockMsg;
         return {
           status: 'blocked' as const,
           day: month,
@@ -442,6 +455,10 @@ export class OptionCDailyCloseOrchestrator {
       }
       logStep(rt, `Homologação: avançando para o próximo mês sem gravar ${month}.`);
     } else {
+      rt.monthsApplied.push(month);
+      if (importResult.extract.closingExtract != null) {
+        rt.previousClosingExtract = importResult.extract.closingExtract;
+      }
       logStep(
         rt,
         `Gravado ${month}: notas +${importResult.notesInserted}/-${importResult.notesSkipped}, extrato +${importResult.extractInserted}/-${importResult.extractSkipped}.`
@@ -567,8 +584,22 @@ export class OptionCDailyCloseOrchestrator {
 
     rt.state.phase = 'done';
     rt.state.extractPending = false;
-    rt.state.runStatus = 'done';
-    logStep(rt, '🎉 Opção C concluída. Confira Resultado histórico e Ações/FIIs.');
+
+    if (rt.monthsSkipped.length > 0) {
+      rt.state.runStatus = 'error';
+      rt.state.runError = `${rt.monthsSkipped.length} mês(es) não gravado(s): ${rt.monthsSkipped.join(', ')}`;
+      logStep(
+        rt,
+        `❌ Importação incompleta — gravados: ${rt.monthsApplied.join(', ') || 'nenhum'}; pulados: ${rt.monthsSkipped.join(', ')}.`
+      );
+    } else {
+      rt.state.runStatus = 'done';
+      logStep(rt, '🎉 Opção C concluída. Confira Resultado histórico e Ações/FIIs.');
+    }
+
+    if (rt.monthsApplied.length > 0) {
+      logStep(rt, `Meses gravados (${rt.monthsApplied.length}): ${rt.monthsApplied.join(', ')}.`);
+    }
 
     if (this.runRepo) {
       try {

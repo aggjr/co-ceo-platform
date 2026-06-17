@@ -217,7 +217,7 @@ export async function InvestIntegracaoMensalPage(container) {
         dryRun,
         async: !dryRun,
         resetFirst: resetCheckbox?.checked === true,
-        mode: 'homologation',
+        mode: dryRun ? 'homologation' : 'strict',
         noteFiles,
         extractFiles,
         homeBrokerFiles,
@@ -234,18 +234,25 @@ export async function InvestIntegracaoMensalPage(container) {
 
   async function pollRunStatus(runId) {
     stopPolling();
+    let lastLogIndex = 0;
     pollTimer = setInterval(async () => {
       try {
         const data = await apiRequest(`/api/invest/reconcile/option-c/status/${encodeURIComponent(runId)}`);
         const state = data?.state;
         if (!state) return;
-        const last = state.activityLog?.[state.activityLog.length - 1];
-        if (last) appendLog(logEl, last);
+        const log = state.activityLog || [];
+        for (let i = lastLogIndex; i < log.length; i += 1) {
+          appendLog(logEl, log[i]);
+        }
+        lastLogIndex = log.length;
         if (state.phase === 'done' || state.runStatus === 'error') {
           stopPolling();
+          const failed = state.runStatus === 'error';
           setStatus(
-            state.phase === 'done' ? 'Importação concluída.' : `Erro: ${state.runError || 'processo bloqueado'}`,
-            state.phase === 'done' ? 'ok' : 'err'
+            failed
+              ? `Importação incompleta: ${state.runError || 'processo bloqueado'}`
+              : 'Importação concluída.',
+            failed ? 'err' : 'ok'
           );
           if (btnApply) btnApply.disabled = false;
           if (btnValidate) btnValidate.disabled = false;

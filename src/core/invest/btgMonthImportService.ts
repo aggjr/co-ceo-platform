@@ -147,10 +147,29 @@ export function filterFilesForMonth(files: BtgUploadFileInput[], month: string):
     'nov',
     'dez',
   ];
+  const monthNamesFull = [
+    'janeiro',
+    'fevereiro',
+    'marco',
+    'março',
+    'abril',
+    'maio',
+    'junho',
+    'julho',
+    'agosto',
+    'setembro',
+    'outubro',
+    'novembro',
+    'dezembro',
+  ];
   const mi = Number(m) - 1;
   const monLabel = monthNames[mi];
   if (monLabel) {
-    needles.push(`${monLabel}_${y}`, `${monLabel}-${y}`, `${monLabel}${y}`);
+    needles.push(`${monLabel}_${y}`, `${monLabel}-${y}`, `${monLabel}${y}`, `/${monLabel}/`);
+  }
+  const monFull = monthNamesFull[mi];
+  if (monFull) {
+    needles.push(`/${monFull}/`, `\\${monFull}\\`, `${monFull}_${y}`, `${monFull}-${y}`);
   }
 
   return files.filter((f) => {
@@ -158,6 +177,40 @@ export function filterFilesForMonth(files: BtgUploadFileInput[], month: string):
     if (/_summary\.pdf$/i.test(p)) return false;
     return needles.some((n) => p.includes(n.replace(/\\/g, '/')));
   });
+}
+
+function decodeUploadBase64(file: BtgUploadFileInput): Buffer {
+  return Buffer.from(file.contentBase64, 'base64');
+}
+
+/**
+ * Notas do mês: primeiro por pasta/nome; depois por data de pregão dentro do PDF (padrão B3).
+ */
+export async function resolveNoteFilesForMonth(
+  files: BtgUploadFileInput[],
+  month: string
+): Promise<BtgUploadFileInput[]> {
+  const monthNorm = month.slice(0, 7);
+  const pdfs = files.filter((f) => isPdfPath(f.name));
+  const byPath = filterFilesForMonth(pdfs, monthNorm);
+  const seen = new Set(byPath.map((f) => f.name));
+  const out = [...byPath];
+
+  for (const file of pdfs) {
+    if (seen.has(file.name)) continue;
+    try {
+      const lines = await pdfBufferToLines(decodeUploadBase64(file));
+      const notes = parseBtgBrokerageNoteBlocks(lines, file.name);
+      const inMonth = notes.some((n) => String(n.pregaoDate || '').slice(0, 7) === monthNorm);
+      if (inMonth) {
+        out.push(file);
+        seen.add(file.name);
+      }
+    } catch {
+      /* PDF ilegível — ignorado */
+    }
+  }
+  return out;
 }
 
 function isPdfPath(name: string): boolean {
@@ -366,7 +419,7 @@ export async function previewBtgMonthImport(
     throw new GatewayError('INVALID_PAYLOAD', 'Envie o extrato do mês (PDF ou CSV).', 400);
   }
 
-  const noteFiles = filterFilesForMonth(
+  const noteFiles = await resolveNoteFilesForMonth(
     noteFilesAll.filter((f) => isPdfPath(f.name)),
     monthNorm
   );
@@ -563,14 +616,30 @@ export async function previewBtgBatchImport(
   };
 }
 
+export type BtgMonthImportApplyOptions = {
+  /** Fechamento do extrato do mês anterior (cadeia de saldos). */
+  previousClosingExtract?: number | null;
+};
+
 export async function applyBtgMonthImport(
   ctx: UserContext,
   ledger: LedgerImportService,
   month: string,
   extractFile: BtgUploadFileInput,
-  noteFilesAll: BtgUploadFileInput[]
+  noteFilesAll: BtgUploadFileInput[],
+  applyOpts?: BtgMonthImportApplyOptions
 ): Promise<BtgMonthImportApplyResult> {
-  const preview = await previewBtgMonthImport(ctx, ledger, month, extractFile, noteFilesAll);
+  const previewOpts: PreviewBtgMonthImportOptions = {
+    previousClosingExtract: applyOpts?.previousClosingExtract ?? null,
+  };
+  const preview = await previewBtgMonthImport(
+    ctx,
+    ledger,
+    month,
+    extractFile,
+    noteFilesAll,
+    previewOpts
+  );
 
   if (!preview.notesOk || !preview.extract.parseOk) {
     return {
@@ -599,7 +668,7 @@ export async function applyBtgMonthImport(
     };
   }
 
-  const noteFiles = filterFilesForMonth(
+  const noteFiles = await resolveNoteFilesForMonth(
     noteFilesAll.filter((f) => isPdfPath(f.name)),
     preview.month
   );

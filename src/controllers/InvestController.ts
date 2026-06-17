@@ -1774,7 +1774,7 @@ export class InvestController {
     const homeBrokerFiles = (req.body?.homeBrokerFiles as BtgUploadFileInput[]) ?? [];
     const dryRun = Boolean(req.body?.dryRun);
     const resetFirst = req.body?.resetFirst === true;
-    const mode = req.body?.mode === 'strict' ? 'strict' : 'homologation';
+    const mode = req.body?.mode === 'homologation' ? 'homologation' : 'strict';
     const asyncRun = req.body?.async === true;
 
     if (!extractFiles.length) {

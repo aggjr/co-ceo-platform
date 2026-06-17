@@ -8,6 +8,21 @@ import {
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 
 describe('btgMonthImportService', () => {
+  it('filterFilesForMonth reconhece fevereiro no caminho', () => {
+    const files = [
+      { name: 'Notas/fevereiro_2026/nota.pdf', contentBase64: 'x' },
+      { name: 'Notas/marco_2026/nota.pdf', contentBase64: 'x' },
+    ];
+    const fev = filterFilesForMonth(files, '2026-02');
+    expect(fev.map((f) => f.name)).toContain('Notas/fevereiro_2026/nota.pdf');
+    expect(fev.map((f) => f.name)).not.toContain('Notas/marco_2026/nota.pdf');
+  });
+
+  it('filterFilesForMonth reconhece /02/ no caminho', () => {
+    const files = [{ name: 'BTG/2026/02/nota.pdf', contentBase64: 'x' }];
+    const fev = filterFilesForMonth(files, '2026-02');
+    expect(fev).toHaveLength(1);
+  });
   it('filterFilesForMonth por pasta 2026-01', () => {
     const files = [
       { name: 'Notas/2026-01/nota1.pdf', contentBase64: 'x' },
