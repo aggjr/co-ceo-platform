@@ -184,10 +184,8 @@ export class OptionCDailyCloseOrchestrator {
     }
 
     const sessionDataMode =
-      input.resetFirst &&
-      (input.dataMode === 'reset_from_opening' || input.dataMode === undefined)
-        ? undefined
-        : input.dataMode;
+      input.dataMode ??
+      (input.resetFirst ? ('recover' as const) : undefined);
 
     const started = await this.session.startSession(ctx, {
       phase: 'notes',

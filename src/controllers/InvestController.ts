@@ -1811,6 +1811,7 @@ export class InvestController {
           extractFiles,
           homeBrokerFiles,
           resetFirst,
+          dataMode: 'recover',
           mode,
         });
         started.runStatus = 'running';
@@ -1843,6 +1844,7 @@ export class InvestController {
         extractFiles,
         homeBrokerFiles,
         resetFirst,
+        dataMode: 'recover',
         mode,
         delayMs: 0,
       });
