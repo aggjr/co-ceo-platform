@@ -111,6 +111,38 @@ describe('LiqBolsaSettlementService', () => {
     expect(gw.dump('financial_ledger_entries')[0]!.status).toBe('pending');
   });
 
+  it('encontra candidatos pela perna pending mesmo com settles_on do header divergente', async () => {
+    const gw = new InMemoryGateway();
+    const gateway = castGateway(gw);
+    await gateway.insert(ctx, 'business_events', {
+      id: 'be-multi',
+      source_ref: 'B3-NOTA-99',
+      event_kind: 'broker_note_option',
+      occurred_on: '2026-01-02',
+      settles_on: '2026-01-06',
+      total_net: -500,
+    });
+    await gateway.insert(ctx, 'financial_ledger_entries', {
+      id: 'pending-jan7',
+      account_id: 'acc-1',
+      business_event_id: 'be-multi',
+      transaction_date: '2026-01-02',
+      settlement_date: '2026-01-07',
+      direction: 'out',
+      amount: 1797.6,
+      status: 'pending',
+      external_ref: 'BROKER_REF:B3-NOTA-99#2026-01-02#1:PENDING',
+    });
+
+    const result = await new LiqBolsaSettlementService(gateway).settle(ctx, {
+      extractLineRef: 'BTG-EXT-2026-01-07#01',
+      settlementDate: '2026-01-07',
+      valueSignedCents: -179760,
+    });
+
+    expect(result.status).toBe('matched');
+  });
+
   it('reaplicar mesma LIQ BOLSA ja liquidada retorna matched idempotente', async () => {
     const gw = new InMemoryGateway();
     const gateway = castGateway(gw);

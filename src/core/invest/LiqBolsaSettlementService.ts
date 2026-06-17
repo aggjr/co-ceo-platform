@@ -132,37 +132,46 @@ export class LiqBolsaSettlementService {
       'securities_lending',
       'brokerage_note',
     ]);
-    const events = (await this.gateway.findWhere(
+    const pendingLegRows = (await this.gateway.findWhere(
       ctx,
-      'business_events',
-      { settles_on: settlementDate },
+      'financial_ledger_entries',
+      { settlement_date: settlementDate, status: 'pending' },
       { limit: 500 }
-    )) as BusinessEventCandidateRow[];
+    )) as FinancialLegRow[];
+
+    const byEventId = new Map<string, { event: BusinessEventCandidateRow; legs: FinancialLegRow[] }>();
+    for (const leg of pendingLegRows) {
+      if (accountId && String(leg.account_id) !== accountId) continue;
+      const settles = String(leg.settlement_date ?? leg.transaction_date ?? '').slice(0, 10);
+      if (settles !== settlementDate) continue;
+      const eventId = String(leg.business_event_id ?? '');
+      if (!eventId) continue;
+
+      let bucket = byEventId.get(eventId);
+      if (!bucket) {
+        const event = (await this.gateway.findById(
+          ctx,
+          'business_events',
+          eventId
+        )) as BusinessEventCandidateRow | null;
+        if (!event || !bolsaKinds.has(String(event.event_kind))) continue;
+        bucket = { event, legs: [] };
+        byEventId.set(eventId, bucket);
+      }
+      bucket.legs.push(leg);
+    }
 
     const candidates: LiqBolsaCandidate[] = [];
-    for (const event of events) {
-      if (!bolsaKinds.has(String(event.event_kind))) continue;
-      const legs = (await this.gateway.findWhere(
-        ctx,
-        'financial_ledger_entries',
-        { business_event_id: String(event.id) },
-        { limit: 100 }
-      )) as FinancialLegRow[];
-      const pendingLegs = legs.filter((leg) => {
-        if (String(leg.status) !== 'pending') return false;
-        if (accountId && String(leg.account_id) !== accountId) return false;
-        const settles = String(leg.settlement_date ?? leg.transaction_date ?? '').slice(0, 10);
-        return settles === settlementDate;
-      });
-      const pendingCents = pendingLegs.reduce((sum, leg) => sum + centsFromLeg(leg), 0);
+    for (const { event, legs } of byEventId.values()) {
+      const pendingCents = legs.reduce((sum, leg) => sum + centsFromLeg(leg), 0);
       if (pendingCents === 0) continue;
-      const resolvedAccountId = accountId ?? String(pendingLegs[0]?.account_id ?? '');
+      const resolvedAccountId = accountId ?? String(legs[0]?.account_id ?? '');
       if (!resolvedAccountId) continue;
       candidates.push({
         ...event,
         pendingCents,
         accountId: resolvedAccountId,
-        pendingLegIds: pendingLegs.map((leg) => String(leg.id)),
+        pendingLegIds: legs.map((leg) => String(leg.id)),
       });
     }
 

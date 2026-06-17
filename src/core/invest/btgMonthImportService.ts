@@ -18,8 +18,11 @@ import {
 import {
   dedupeBrokerageNotes,
   parseBtgBrokerageNoteBlocks,
+  type BtgBrokerageNote,
 } from './btgBrokerageNoteParser';
 import { brokerageNotesToLedgerLines } from './btgBrokerageNoteLedgerTranslator';
+import { mapBrokerOrderToLedger } from './brokerOrderMapper';
+import { cashSettlementDate } from './settlementCalendar';
 import { pdfBufferToLines } from './btgPdfTextExtract';
 import type { LedgerTransactionType } from './ledgerTypes';
 import { MAIN_CASH_TICKER } from './ledgerTypes';
@@ -203,6 +206,42 @@ function decodeUploadBase64(file: BtgUploadFileInput): Buffer {
   return Buffer.from(file.contentBase64, 'base64');
 }
 
+/** Nota entra no mês se o pregão OU alguma liquidação D+N cair no YYYY-MM. */
+function noteAffectsMonth(note: BtgBrokerageNote, monthNorm: string): boolean {
+  if (String(note.pregaoDate || '').slice(0, 7) === monthNorm) return true;
+  for (const trade of note.trades) {
+    if (note.category === 'LOAN') {
+      const ticker = (trade.underlyingStock || trade.ticker || '').toUpperCase();
+      const settle = cashSettlementDate(
+        note.pregaoDate,
+        'securities_lending',
+        'securities_lending',
+        ticker
+      );
+      if (settle.slice(0, 7) === monthNorm) return true;
+      continue;
+    }
+    const mapped = mapBrokerOrderToLedger({
+      ticker: trade.ticker,
+      direction: trade.side,
+      quantity: Math.abs(Number(trade.quantity) || 0),
+      avgPrice: Number(trade.unitPrice) || 0,
+      date: note.pregaoDate,
+      broker_note_ref: 'preview',
+    });
+    for (const line of mapped) {
+      const settle = cashSettlementDate(
+        note.pregaoDate,
+        line.asset_type || 'stock',
+        line.operation,
+        line.ticker
+      );
+      if (settle.slice(0, 7) === monthNorm) return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Notas do mês: primeiro por pasta/nome; depois por data de pregão dentro do PDF (padrão B3).
  */
@@ -221,7 +260,7 @@ export async function resolveNoteFilesForMonth(
     try {
       const lines = await pdfBufferToLines(decodeUploadBase64(file));
       const notes = parseBtgBrokerageNoteBlocks(lines, file.name);
-      const inMonth = notes.some((n) => String(n.pregaoDate || '').slice(0, 7) === monthNorm);
+      const inMonth = notes.some((n) => noteAffectsMonth(n, monthNorm));
       if (inMonth) {
         out.push(file);
         seen.add(file.name);
