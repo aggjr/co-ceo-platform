@@ -20,7 +20,7 @@ import {
   parseBtgBrokerageNoteBlocks,
   type BtgBrokerageNote,
 } from './btgBrokerageNoteParser';
-import { brokerageNotesToLedgerLines, suppressBrokerageNoteCashLines, BROKERAGE_NOTE_CASH_OPS } from './btgBrokerageNoteLedgerTranslator';
+import { brokerageNotesToLedgerLines, suppressBrokerageNoteCashLines, BROKERAGE_NOTE_PENDING_OPS } from './btgBrokerageNoteLedgerTranslator';
 import { mapBrokerOrderToLedger } from './brokerOrderMapper';
 import { cashSettlementDate } from './settlementCalendar';
 import { pdfBufferToLines } from './btgPdfTextExtract';
@@ -733,7 +733,7 @@ function isLiqBolsaExtractLine(line: LedgerImportLine): boolean {
 
 function signedCentsFromSkipFinancialLine(line: LedgerImportLine): number | null {
   if (line.skip_financial_ledger !== true) return null;
-  if (!BROKERAGE_NOTE_CASH_OPS.has(line.operation as LedgerTransactionType)) return null;
+  if (!BROKERAGE_NOTE_PENDING_OPS.has(line.operation as LedgerTransactionType)) return null;
   const signed =
     Math.round(
       Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)) * 100

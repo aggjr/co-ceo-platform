@@ -1,4 +1,5 @@
 import {
+  assessLiqBolsaFromPendingPools,
   buildMonthReconcileLedger,
   filterFilesForMonth,
   isMonthBtgImportCashEvent,
@@ -128,5 +129,17 @@ describe('btgMonthImportService', () => {
       projected.filter((e) => String(e.broker_note_ref || '').startsWith('BTG-EXT-2026-04'))
     ).toHaveLength(2);
     expect(projected.reduce((sum, e) => sum + Number(e.total_net_value || 0), 0)).toBeCloseTo(112);
+  });
+
+  it('LIQ 06/01 casa bruto da nota PRIOM385 menos taxas separadas (399,48)', () => {
+    const result = assessLiqBolsaFromPendingPools(
+      '2026-01',
+      {
+        '2026-01-06': [40_000, -11, -27, -14],
+      },
+      [{ date: '2026-01-06', signedCents: 39_948 }]
+    );
+    expect(result.ok).toBe(true);
+    expect(result.unresolved).toHaveLength(0);
   });
 });

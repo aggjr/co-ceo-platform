@@ -2,8 +2,9 @@
  * Insere o saldo inicial em 01/01/2026 da carteira da holding (org-holding-001)
  * direto no servidor de produção via gateway de dados (CoCeoDataGateway).
  *
- * Fonte: posicao homebroker + B3 em 31/12/2025 (carteira do titular da holding).
- * Patrimônio alvo: R$ 1.212.435,41 (longos R$ 1.266.082,44 + shorts -R$ 53.647,02).
+ * Fonte: posição home broker + B3 em 31/12/2025 (carteira do titular da holding).
+ * Cutover 01/01/2026: PM de abertura = saldo líquido BTG da perna ÷ quantidade
+ * (histórico anterior não entra; daí em diante o livro recalcula sobre novas entradas).
  *
  * Idempotência: `LedgerImportService.importOpeningOnly` checa por
  * `broker_note_ref = 'OPENING-BTG-2026-01-01'` por ticker + tipo. Rodar de
@@ -27,6 +28,18 @@ const HOLDING_ORG_ID = 'org-holding-001';
 const HOLDING_OWNER_EMAIL = 'augustoggomes@yahoo.com.br';
 const OPENING_DATE = '2026-01-01';
 
+/** Ações PRIO3 em custódia BTG na abertura (home broker 31/12/2025). */
+const OPENING_PRIO3_QTY = 5_400;
+/** Saldo líquido RV PRIO3 na abertura (extrato BTG). PM = net ÷ qty. */
+const OPENING_PRIO3_NET = 223_668.58;
+const OPENING_PRIO3_UNIT = OPENING_PRIO3_NET / OPENING_PRIO3_QTY;
+
+/** Cotas LFT em custódia BTG na abertura (home broker 31/12/2025). */
+const OPENING_LFT_COTAS = 58;
+/** Saldo líquido LFT na abertura (extrato BTG). PM = net ÷ cotas. */
+const OPENING_LFT_NET = 1_032_969.97;
+const OPENING_LFT_UNIT = OPENING_LFT_NET / OPENING_LFT_COTAS;
+
 const PAYLOAD: OpeningImportPayload = {
   opening_date: OPENING_DATE,
   source_label: 'Homebroker BTG + posição B3 em 31/12/2025',
@@ -34,9 +47,9 @@ const PAYLOAD: OpeningImportPayload = {
     {
       ticker: 'PRIO3',
       asset_type: 'stock',
-      quantity: 5_400,
-      avg_price: 38.33,
-      notes: 'PetroRio (ação ordinária)',
+      quantity: OPENING_PRIO3_QTY,
+      avg_price: OPENING_PRIO3_UNIT,
+      notes: `PetroRio — PM abertura ${OPENING_PRIO3_UNIT.toFixed(4)} (R$ ${OPENING_PRIO3_NET.toFixed(2)} ÷ ${OPENING_PRIO3_QTY})`,
     },
     {
       ticker: 'CAIXA-BTG',
@@ -48,9 +61,9 @@ const PAYLOAD: OpeningImportPayload = {
     {
       ticker: 'LFT-20310301',
       asset_type: 'fixed_income',
-      quantity: 1,
-      avg_price: 1_000_341.65,
-      notes: 'Tesouro LFT 01/03/2031 (custódia BTG) — quantity=1, unit_price=valor financeiro',
+      quantity: OPENING_LFT_COTAS,
+      avg_price: OPENING_LFT_UNIT,
+      notes: `Tesouro LFT 01/03/2031 — PM abertura ${OPENING_LFT_UNIT.toFixed(4)} (R$ ${OPENING_LFT_NET.toFixed(2)} ÷ ${OPENING_LFT_COTAS})`,
     },
   ],
   opening_short_options: [
@@ -180,7 +193,7 @@ async function run() {
     console.log(`\nLongos:     R$ ${totalLong.toFixed(2)}`);
     console.log(`Shorts:    -R$ ${Math.abs(totalShort).toFixed(2)}`);
     console.log(`Patrimônio (longos - |shorts|): R$ ${(totalLong - Math.abs(totalShort)).toFixed(2)}`);
-    console.log(`Alvo informado:                 R$ 1212435.41`);
+    console.log(`Alvo PRIO3 (5.400 × PM ${OPENING_PRIO3_UNIT.toFixed(4)}): R$ ${OPENING_PRIO3_NET.toFixed(2)}`);
   } finally {
     await pool.end();
   }

@@ -40,8 +40,22 @@ const OPENING_EXPECTED: Array<{
   quantity: number;
   unit_price: number;
 }> = [
-  { ref: `${OPENING_BATCH}:PRIO3`, ticker: 'PRIO3', asset_type: 'stock', operation: 'opening_balance', quantity: 5400, unit_price: 38.33 },
-  { ref: `${OPENING_BATCH}:LFT-20310301`, ticker: 'LFT-20310301', asset_type: 'fixed_income', operation: 'opening_balance', quantity: 1, unit_price: 1_000_341.65 },
+  {
+    ref: `${OPENING_BATCH}:PRIO3`,
+    ticker: 'PRIO3',
+    asset_type: 'stock',
+    operation: 'opening_balance',
+    quantity: 5400,
+    unit_price: 223_668.58 / 5400,
+  },
+  {
+    ref: `${OPENING_BATCH}:LFT-20310301`,
+    ticker: 'LFT-20310301',
+    asset_type: 'fixed_income',
+    operation: 'opening_balance',
+    quantity: 58,
+    unit_price: 1_032_969.97 / 58,
+  },
   { ref: `${OPENING_BATCH}:PRIOQ43`, ticker: 'PRIOQ43', asset_type: 'option_put', operation: 'opening_balance', quantity: -31200, unit_price: 1.426748 },
   { ref: `${OPENING_BATCH}:PRIOR407`, ticker: 'PRIOR407', asset_type: 'option_put', operation: 'opening_balance', quantity: -6300, unit_price: 0.912254 },
   { ref: `${OPENING_BATCH}:PRIOA407`, ticker: 'PRIOA407', asset_type: 'option_call', operation: 'opening_balance', quantity: -5400, unit_price: 0.626905 },

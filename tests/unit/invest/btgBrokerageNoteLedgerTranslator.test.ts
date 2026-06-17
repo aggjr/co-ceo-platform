@@ -33,8 +33,10 @@ describe('btgBrokerageNoteLedgerTranslator', () => {
   it('mapeia venda de PUT para put_sell', () => {
     const lines = brokerageNotesToLedgerLines([
       note({
-        dedupeKey: 'O|1|2026-01-10',
+        dedupeKey: 'O|1|2026-01-05',
+        pregaoDate: '2026-01-05',
         noteNumber: '27421483',
+        netSettlement: 399.48,
         trades: [
           {
             negotiation: '1-BOVESPA',
@@ -54,15 +56,24 @@ describe('btgBrokerageNoteLedgerTranslator', () => {
           },
         ],
         settlementTax: 0.11,
+        registrationTax: 0.27,
         emoluments: 0.14,
       }),
     ]);
-    expect(lines).toHaveLength(1);
-    expect(lines[0].operation).toBe('put_sell');
-    expect(lines[0].ticker).toBe('PRIOM385');
-    expect(lines[0].broker_note_ref).toContain(BTG_NOTE_LEDGER_REF_PREFIX);
-    expect(lines[0].b3_fees).toBeCloseTo(0.25, 2);
-    expect(lines[0].total_net_value).toBeCloseTo(399.75, 2);
+    const trade = lines.find((l) => l.operation === 'put_sell');
+    const fees = lines.filter((l) => l.operation === 'fee');
+    expect(trade).toBeDefined();
+    expect(trade!.ticker).toBe('PRIOM385');
+    expect(trade!.broker_note_ref).toContain(BTG_NOTE_LEDGER_REF_PREFIX);
+    expect(trade!.b3_fees).toBeCloseTo(0.52, 2);
+    expect(trade!.total_net_value).toBeCloseTo(400, 2);
+    expect(fees).toHaveLength(3);
+    expect(fees.every((f) => f.broker_note_ref?.includes('#1#FEE-'))).toBe(true);
+    expect(fees.reduce((s, l) => s + Math.abs(Number(l.total_net_value)), 0)).toBeCloseTo(0.52, 2);
+    const netPending =
+      Number(trade!.total_net_value) +
+      fees.reduce((s, l) => s + Number(l.total_net_value), 0);
+    expect(netPending).toBeCloseTo(399.48, 2);
   });
 
   it('mapeia exercício para buy no underlying', () => {
@@ -131,6 +142,65 @@ describe('btgBrokerageNoteLedgerTranslator', () => {
     expect(lines[0].total_net_value).toBe(0);
   });
 
+  it('nota com dois itens: bruto por trade e taxas rateadas por item', () => {
+    const lines = brokerageNotesToLedgerLines([
+      note({
+        dedupeKey: 'O|2|2026-01-07',
+        pregaoDate: '2026-01-07',
+        noteNumber: '27422000',
+        netSettlement: 1_499.4,
+        trades: [
+          {
+            negotiation: '1-BOVESPA',
+            side: 'V',
+            marketType: 'OPCAO DE VENDA 01/26',
+            operationLabel: 'Venda opção',
+            sideLabel: 'Venda',
+            maturity: '01/26',
+            specification: '',
+            ticker: 'PRIOA410',
+            underlyingStock: 'PRIO3',
+            isExercise: false,
+            quantity: 1000,
+            unitPrice: 1,
+            grossValue: 1_000,
+            dc: 'C',
+          },
+          {
+            negotiation: '1-BOVESPA',
+            side: 'V',
+            marketType: 'OPCAO DE VENDA 01/26',
+            operationLabel: 'Venda opção',
+            sideLabel: 'Venda',
+            maturity: '01/26',
+            specification: '',
+            ticker: 'PRIOA415',
+            underlyingStock: 'PRIO3',
+            isExercise: false,
+            quantity: 500,
+            unitPrice: 1,
+            grossValue: 500,
+            dc: 'C',
+          },
+        ],
+        settlementTax: 0.2,
+        registrationTax: 0.2,
+        emoluments: 0.2,
+      }),
+    ]);
+    const trades = lines.filter((l) => l.operation === 'put_sell' || l.operation === 'call_sell');
+    const fees = lines.filter((l) => l.operation === 'fee');
+    expect(trades).toHaveLength(2);
+    expect(trades[0]!.total_net_value).toBeCloseTo(1_000, 2);
+    expect(trades[1]!.total_net_value).toBeCloseTo(500, 2);
+    expect(fees.some((f) => f.broker_note_ref?.includes('#1#FEE-'))).toBe(true);
+    expect(fees.some((f) => f.broker_note_ref?.includes('#2#FEE-'))).toBe(true);
+    const netPending =
+      trades.reduce((s, l) => s + Number(l.total_net_value), 0) +
+      fees.reduce((s, l) => s + Number(l.total_net_value), 0);
+    expect(netPending).toBeCloseTo(1_499.4, 2);
+  });
+
   it('maps regular SPOT stock note to buy', () => {
     const lines = brokerageNotesToLedgerLines([
       note({
@@ -138,6 +208,7 @@ describe('btgBrokerageNoteLedgerTranslator', () => {
         noteNumber: '27994604',
         category: 'SPOT',
         pregaoDate: '2026-02-10',
+        emoluments: 0,
         trades: [
           {
             negotiation: '1-BOVESPA',
@@ -178,9 +249,17 @@ describe('btgBrokerageNoteLedgerTranslator', () => {
         unit_price: 42.5,
         total_net_value: -21250,
       },
+      {
+        date: '2026-01-05',
+        ticker: 'PRIOM385',
+        asset_type: 'option_put',
+        operation: 'fee',
+        quantity: 0,
+        unit_price: 0.11,
+        total_net_value: -0.11,
+      },
     ]);
-    expect(suppressed[0].total_net_value).toBe(-21250);
-    expect(suppressed[0].unit_price).toBe(42.5);
     expect(suppressed[0].skip_financial_ledger).toBe(true);
+    expect(suppressed[1].skip_financial_ledger).toBe(true);
   });
 });

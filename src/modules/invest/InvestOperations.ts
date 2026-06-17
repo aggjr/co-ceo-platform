@@ -693,7 +693,7 @@ export class InvestOperations {
       assetType,
       eventDate: line.date,
     });
-    if (!policy.isTrade && !policy.isOptionTrade) return false;
+    if (!policy.isTrade && !policy.isOptionTrade && !policy.isPassiveExpense) return false;
 
     const signedNet = Math.round(
       Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)) * 100
@@ -1114,12 +1114,12 @@ export class InvestOperations {
         eventDate: line.date,
       });
       const accountId = cashResolution.accountId;
-      const amount = Math.abs(
-        Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price))
-      );
+      const signedNet = Math.round(
+        Number(line.total_net_value ?? -(Number(line.unit_price) || 0)) * 100
+      ) / 100;
+      const amount = Math.abs(signedNet);
       if (amount === 0) return { skipped: true, reason: 'amount zero' };
 
-      // GAP 3: perna patrimonial para despesas quando o ticker eh de ativo (nao caixa)
       let patrimonyEntryId: string | null = null;
       if (!isCash) {
         const expAssetClass = assetType as InvestAssetClass;
@@ -1148,7 +1148,36 @@ export class InvestOperations {
         patrimonyEntryId = patEntry.id;
       }
 
-      // GAP 4: metadata enriquecido
+      if (line.skip_financial_ledger === true) {
+        const settleOn = String(line.settlement_date ?? line.date).slice(0, 10);
+        const finEntry = await this.financialLedger.record(ctx, {
+          accountId,
+          transactionDate: line.date,
+          direction: signedNet >= 0 ? 'in' : 'out',
+          amount,
+          description: line.notes ?? `Expectativa liquidacao ${settleOn} — ${op} ${ticker}`,
+          status: 'pending',
+          settlementDate: settleOn,
+          businessEventId,
+          externalRef: ref ? `BROKER_REF:${ref}:PENDING` : null,
+          metadata: {
+            legacy_op: 'pending_settlement',
+            broker_note_ref: ref ?? null,
+            skip_financial_ledger: true,
+            target_ticker: ticker,
+            broker_code: cashResolution.brokerCode,
+            cash_ticker: cashResolution.cashTicker,
+            currency_code: cashResolution.currencyCode,
+            cash_policy_id: cashResolution.policyId,
+          },
+        });
+        if (patrimonyEntryId) {
+          await this.inventoryLedger.linkToFinancialLedger(ctx, patrimonyEntryId, finEntry.id);
+          await this.financialLedger.linkToPatrimonyLedger(ctx, finEntry.id, patrimonyEntryId);
+        }
+        return { skipped: false };
+      }
+
       const expFinMeta: Record<string, unknown> = {
         legacy_op: op,
         broker_note_ref: ref ?? null,

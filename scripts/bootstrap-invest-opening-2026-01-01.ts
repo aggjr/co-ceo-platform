@@ -9,8 +9,7 @@
  *   - module_categories com seeds do INVEST
  *   - invest_position_ext, invest_option_ext
  *
- * Comportamento: idempotente. Se ja existirem registros (CAIXA-BTG, PRIO3
- * etc.) ele apenas reaproveita os ids — nao duplica.
+ * Cutover 01/01/2026: PM de abertura = saldo líquido BTG da perna ÷ quantidade.
  *
  * Uso:
  *   $env:REMOTE_DB_PASSWORD = "<...>"
@@ -28,22 +27,32 @@ import type { OpeningBatchInput } from '../src/modules/invest';
 const ORG_ID = 'org-holding-001';
 const AS_OF = '2026-01-01';
 
+const OPENING_PRIO3_QTY = 5_400;
+const OPENING_PRIO3_NET = 223_668.58;
+const OPENING_PRIO3_UNIT = OPENING_PRIO3_NET / OPENING_PRIO3_QTY;
+
+const OPENING_LFT_COTAS = 58;
+const OPENING_LFT_NET = 1_032_969.97;
+const OPENING_LFT_UNIT = OPENING_LFT_NET / OPENING_LFT_COTAS;
+
 const BATCH: OpeningBatchInput = {
   asOfDate: AS_OF,
   positions: [
     {
       ticker: 'PRIO3',
       assetClass: 'stock',
-      quantity: 5400,
-      unitPrice: 38.33,
+      quantity: OPENING_PRIO3_QTY,
+      unitPrice: OPENING_PRIO3_UNIT,
       name: 'Prio S.A.',
+      notes: `Abertura BTG — PM ${OPENING_PRIO3_UNIT.toFixed(4)} (RV liquida R$ ${OPENING_PRIO3_NET.toFixed(2)})`,
     },
     {
-      ticker: 'TESOURO-LFT-BTG',
+      ticker: 'LFT-20310301',
       assetClass: 'fixed_income',
-      quantity: 1,
-      unitPrice: 1_000_341.65,
-      name: 'Tesouro LFT (BTG)',
+      quantity: OPENING_LFT_COTAS,
+      unitPrice: OPENING_LFT_UNIT,
+      name: 'Tesouro Direto LFT 01/03/2031',
+      notes: `Abertura BTG — PM ${OPENING_LFT_UNIT.toFixed(4)} (RF liquida R$ ${OPENING_LFT_NET.toFixed(2)})`,
     },
     {
       ticker: 'PRIOQ43',
@@ -86,7 +95,8 @@ const BATCH: OpeningBatchInput = {
   ],
 };
 
-const EXPECTED_PATRIMONY = 1_212_435.42;
+/** PRIO3/LFT: PM de abertura = saldo BTG ÷ qty (cutover; opções inalteradas). */
+const EXPECTED_PATRIMONY = 1_261_750.32;
 
 async function purgeOrgData(conn: mysql.Connection): Promise<void> {
   console.log(`Limpando dados de INVEST da organizacao ${ORG_ID} (ambos os schemas)...`);
