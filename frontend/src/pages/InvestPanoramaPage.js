@@ -3,7 +3,7 @@ import '../styles/invest-portfolio.css';
 import '../styles/invest-panorama.css';
 import { renderShell } from '../components/Shell.js';
 import { navigate } from '../router.js';
-import { isAuthenticated } from '../auth/session.js';
+import { isAuthenticated, isGlobalSession } from '../auth/session.js';
 import { apiRequest } from '../api/client.js';
 import { formatBrl } from '../lib/portfolioDisplay.js';
 import { fetchOpenOptionsPortfolio } from '../lib/investOptionsShared.js';
@@ -217,6 +217,15 @@ function renderPanorama(root, optionRows, titulosPayload) {
 export async function InvestPanoramaPage(container) {
   if (!isAuthenticated()) {
     navigate('/login');
+    return;
+  }
+
+  if (isGlobalSession()) {
+    await renderShell(container, {
+      title: 'INVEST — Panorama geral',
+      contentHtml:
+        '<div class="card"><p class="muted">Personifique o titular da holding para ver o panorama.</p></div>',
+    });
     return;
   }
 

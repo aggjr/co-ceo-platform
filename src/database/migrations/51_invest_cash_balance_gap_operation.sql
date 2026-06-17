@@ -3,7 +3,7 @@
 -- Representa a DIFERENCA DE SALDO DESCONHECIDA: residuo entre o saldo de caixa
 -- calculado pelo sistema (livro razao) e o saldo informado pela corretora, sem
 -- correspondencia em nenhum lancamento conhecido. Diferente de 'extract_divergence'
--- (que e uma linha REAL do extrato sem classificacao); aqui o proprio extrato nao
+-- (que e uma linha REAL do extrato sem classificacao). Aqui o proprio extrato nao
 -- explica a diferenca. Lancado como evento de caixa explicito e auditavel
 -- (substitui o antigo plug silencioso, ja desativado) para que o usuario possa
 -- filtrar por este tipo e questionar a corretora.

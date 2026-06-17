@@ -430,6 +430,22 @@ export class LedgerImportService {
     return this.projection.listLedgerEvents(ctx, from, to);
   }
 
+  async enrichImportLinesForSettlement(
+    ctx: UserContext,
+    lines: LedgerImportLine[]
+  ): Promise<LedgerImportLine[]> {
+    const enriched: LedgerImportLine[] = [];
+    for (const line of lines) {
+      const ticker = canonicalTesouroTicker(line.ticker.trim().toUpperCase());
+      const assetType = line.asset_type || inferAssetType(ticker);
+      const parsedDate = parseDate(line.date);
+      enriched.push(
+        await this.enrichSettlementForLine(ctx, line, ticker, assetType, parsedDate)
+      );
+    }
+    return enriched;
+  }
+
   /**
    * Re-deriva quantidades e PM no nucleo. O InventoryLedger ja atualiza
    * patrimony_items.quantity/current_value a cada movimento, entao isto eh
@@ -440,7 +456,31 @@ export class LedgerImportService {
     ctx: UserContext,
     lines: LedgerImportLine[]
   ): Promise<{ backfilled: number }> {
-    return this.operations.backfillPendingFinancialForImportLines(ctx, lines);
+    const enriched = await this.enrichImportLinesForSettlement(ctx, lines);
+    return this.operations.backfillPendingFinancialForImportLines(ctx, enriched);
+  }
+
+  async listPendingSignedCentsBySettlement(
+    ctx: UserContext,
+    from: string,
+    to: string
+  ): Promise<Record<string, number[]>> {
+    const rows = (await this.gateway.findWhere(
+      ctx,
+      'financial_ledger_entries',
+      { status: 'pending' },
+      { limit: 2000 }
+    )) as Array<{ settlement_date?: string; amount?: number; direction?: string }>;
+    const out: Record<string, number[]> = {};
+    for (const row of rows) {
+      const d = String(row.settlement_date ?? '').slice(0, 10);
+      if (!d || d < from || d > to) continue;
+      const sign = String(row.direction) === 'out' ? -1 : 1;
+      const cents = Math.round(Math.abs(Number(row.amount ?? 0)) * 100) * sign;
+      if (!out[d]) out[d] = [];
+      out[d].push(cents);
+    }
+    return out;
   }
 
   async countPendingFinancialBySettlement(

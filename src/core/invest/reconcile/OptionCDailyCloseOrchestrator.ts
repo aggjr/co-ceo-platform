@@ -56,6 +56,7 @@ type OptionCRuntime = {
   previousClosingExtract: number | null;
   monthsApplied: string[];
   monthsSkipped: string[];
+  resetFirst: boolean;
 };
 
 const runsById = new Map<string, OptionCRuntime>();
@@ -126,6 +127,7 @@ export class OptionCDailyCloseOrchestrator {
           previousClosingExtract: null,
           monthsApplied: [],
           monthsSkipped: [],
+          resetFirst: false,
         });
       }
       return persisted;
@@ -213,6 +215,7 @@ export class OptionCDailyCloseOrchestrator {
       previousClosingExtract: null,
       monthsApplied: [],
       monthsSkipped: [],
+      resetFirst: input.resetFirst === true,
       state: {
         runId,
         organizationId: ctx.organizationId,
@@ -427,7 +430,10 @@ export class OptionCDailyCloseOrchestrator {
       month,
       planEntry.extractFile,
       rt.notesFiles,
-      { previousClosingExtract: rt.previousClosingExtract }
+      {
+        previousClosingExtract: rt.previousClosingExtract,
+        simulateFreshImport: rt.resetFirst,
+      }
     );
 
     logStep(

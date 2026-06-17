@@ -191,6 +191,9 @@ const NOTE_CASH_OPS = new Set<LedgerTransactionType>([
   'option_exercise',
 ]);
 
+/** Operacoes de nota que geram expectativa LIQ BOLSA no import mensal. */
+export const BROKERAGE_NOTE_CASH_OPS = NOTE_CASH_OPS;
+
 /** Import mensal: patrimônio na nota, caixa no extrato (LIQ BOLSA). */
 export function suppressBrokerageNoteCashLines(lines: LedgerImportLine[]): LedgerImportLine[] {
   return lines.map((line) => {

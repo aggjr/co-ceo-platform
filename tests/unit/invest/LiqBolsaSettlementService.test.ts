@@ -1,5 +1,5 @@
 import type { UserContext } from '../../../src/core/dal';
-import { LiqBolsaSettlementService } from '../../../src/core/invest/LiqBolsaSettlementService';
+import { LiqBolsaSettlementService, matchSignedCentsSubset, consumeSignedCentsSubset } from '../../../src/core/invest/LiqBolsaSettlementService';
 import {
   InMemoryGateway,
   castGateway,
@@ -174,5 +174,16 @@ describe('LiqBolsaSettlementService', () => {
     if (result.status !== 'matched') throw new Error('expected matched');
     expect(result.settledEvents).toEqual(['be-old']);
     expect(gw.dump('financial_ledger_entries')).toHaveLength(1);
+  });
+
+  it('matchSignedCentsSubset casa soma total ou subconjunto', () => {
+    expect(matchSignedCentsSubset([-100000, 30000], -70000)).toBe(true);
+    expect(matchSignedCentsSubset([-100000], -70000)).toBe(false);
+    expect(matchSignedCentsSubset([], 100)).toBe(false);
+  });
+
+  it('consumeSignedCentsSubset remove candidatos casados do pool', () => {
+    const consumed = consumeSignedCentsSubset([39948, 179760], 39948);
+    expect(consumed?.remaining).toEqual([179760]);
   });
 });

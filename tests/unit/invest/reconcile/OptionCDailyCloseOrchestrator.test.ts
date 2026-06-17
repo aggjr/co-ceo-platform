@@ -168,7 +168,8 @@ describe('OptionCDailyCloseOrchestrator', () => {
       expect.any(Object),
       '2026-01',
       extractFiles[0],
-      notesFiles
+      notesFiles,
+      { previousClosingExtract: null, simulateFreshImport: false }
     );
     expect(syncHistoricalFromBrapi).toHaveBeenCalledWith(ctx);
     expect(syncMissingOptions).toHaveBeenCalledWith(ctx);

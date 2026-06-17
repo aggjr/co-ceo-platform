@@ -28,13 +28,18 @@ function isBenignSqlError(err: unknown): boolean {
   return /already exists|Duplicate column/i.test(msg);
 }
 
+/** Remove comentarios de linha antes do split por `;` (evita `);` dentro de comentario). */
+export function stripSqlLineComments(sql: string): string {
+  return sql.replace(/--[^\n]*/g, '');
+}
+
 /** Executa um arquivo .sql statement a statement (sem multipleStatements no pool). */
 export async function runSqlFile(pool: Pool, fileName: string): Promise<void> {
   const full = path.join(migrationsDir(), fileName);
-  const sql = fs.readFileSync(full, 'utf8');
+  const sql = stripSqlLineComments(fs.readFileSync(full, 'utf8'));
   const statements = sql
     .split(';')
-    .map((s) => s.replace(/--[^\n]*/g, '').trim())
+    .map((s) => s.trim())
     .filter((s) => s.length > 0);
   for (const stmt of statements) {
     try {

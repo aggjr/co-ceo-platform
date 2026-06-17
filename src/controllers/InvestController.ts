@@ -1807,7 +1807,8 @@ export class InvestController {
           'btg-batch',
           ctx.organizationId,
           `PREVIEW months=${preview.months.length} ready=${preview.monthsReady} blocked=${preview.monthsBlocked} ` +
-            `already=${preview.monthsAlreadyImported} resultOk=${preview.resultOk} summary=${preview.summary}`
+            `already=${preview.monthsAlreadyImported} resultOk=${preview.resultOk} summary=${preview.summary} ` +
+            `liqBlocked=${preview.months.filter((m) => m.liqBolsaOk === false).length}`
         );
         return res.json({ success: true, dryRun: true, preview });
       }

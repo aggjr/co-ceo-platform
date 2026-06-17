@@ -31,20 +31,37 @@ function renderBatchPreview(preview) {
   if (!preview?.months?.length) {
     return '<p class="muted">Selecione as pastas e valide o período.</p>';
   }
-  const rows = preview.months.map((m) => `
+  const rows = preview.months.map((m) => {
+    const liqCell =
+      m.liqBolsaOk === true
+        ? 'OK'
+        : m.liqBolsaOk === false
+          ? '<span class="monthly-badge monthly-badge--err">Bloqueado</span>'
+          : '—';
+    const detailParts = [m.resultDetail, m.liqBolsaDetail, m.notesDetail, m.financialDetail].filter(
+      Boolean
+    );
+    const detail = detailParts.join(' · ');
+    const pdfNote =
+      m.notesFilesInMonth != null
+        ? ` · ${m.notesFilesInMonth} PDF(s) no mês`
+        : '';
+    return `
     <tr>
       <td>${escapeHtml(m.month)}</td>
       <td>${monthStatusBadge(m.status)}</td>
       <td>${m.notesOk ? 'OK' : '—'}</td>
       <td>${m.financialOk ? 'OK' : '—'}</td>
-      <td class="monthly-detail">${escapeHtml(m.resultDetail || m.financialDetail || '')}</td>
+      <td>${liqCell}</td>
+      <td class="monthly-detail">${escapeHtml(detail)}${escapeHtml(pdfNote)}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
   return `
     <p class="monthly-summary">${escapeHtml(preview.summary || '')}</p>
     <table class="monthly-preview-table">
       <thead>
-        <tr><th>Mês</th><th>Status</th><th>Notas</th><th>Caixa</th><th>Detalhe</th></tr>
+        <tr><th>Mês</th><th>Status</th><th>Notas</th><th>Caixa</th><th>LIQ BOLSA</th><th>Detalhe</th></tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -235,9 +252,11 @@ export async function InvestIntegracaoMensalPage(container) {
   async function pollRunStatus(runId) {
     stopPolling();
     let lastLogIndex = 0;
+    let pollErrors = 0;
     pollTimer = setInterval(async () => {
       try {
         const data = await apiRequest(`/api/invest/reconcile/option-c/status/${encodeURIComponent(runId)}`);
+        pollErrors = 0;
         const state = data?.state;
         if (!state) return;
         const log = state.activityLog || [];
@@ -257,8 +276,15 @@ export async function InvestIntegracaoMensalPage(container) {
           if (btnApply) btnApply.disabled = false;
           if (btnValidate) btnValidate.disabled = false;
         }
-      } catch {
-        /* retry */
+      } catch (err) {
+        pollErrors += 1;
+        if (pollErrors >= 5) {
+          stopPolling();
+          appendLog(logEl, err?.message || 'Falha ao consultar status da importação.', 'err');
+          setStatus('Perda de comunicação com o servidor durante a importação.', 'err');
+          if (btnApply) btnApply.disabled = false;
+          if (btnValidate) btnValidate.disabled = false;
+        }
       }
     }, 2500);
   }

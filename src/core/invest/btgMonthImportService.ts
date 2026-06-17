@@ -20,7 +20,7 @@ import {
   parseBtgBrokerageNoteBlocks,
   type BtgBrokerageNote,
 } from './btgBrokerageNoteParser';
-import { brokerageNotesToLedgerLines, suppressBrokerageNoteCashLines } from './btgBrokerageNoteLedgerTranslator';
+import { brokerageNotesToLedgerLines, suppressBrokerageNoteCashLines, BROKERAGE_NOTE_CASH_OPS } from './btgBrokerageNoteLedgerTranslator';
 import { mapBrokerOrderToLedger } from './brokerOrderMapper';
 import { cashSettlementDate } from './settlementCalendar';
 import { pdfBufferToLines } from './btgPdfTextExtract';
@@ -36,9 +36,15 @@ import {
   type BtgExtractFileResult,
   type BtgUploadFileInput,
   getExtractNormalizedLines,
+  parseExtractUploadImportLines,
   previewBtgBrokerageUpload,
   previewBtgExtractUpload,
 } from './btgUploadImportService';
+import {
+  consumeSignedCentsSubset,
+  liqBolsaBlockReason,
+} from './LiqBolsaSettlementService';
+import type { LedgerImportLine } from './ledgerTypes';
 import { logInvestStdout } from './reconcile/reconcileErrorDetail';
 
 function logMonthImportStdout(
@@ -56,6 +62,7 @@ function logMonthImportStdout(
       `pdfs=${preview.notesFilesInMonth}/${preview.notesFilesInFolder} ` +
       `openingExt=${e.openingExtract ?? '?'} closingExt=${e.closingExtract ?? '?'} ` +
       `openingLedgerOk=${e.openingLedgerOk ?? '?'} closingLedgerOk=${e.closingLedgerOk ?? '?'} ` +
+      `liqBolsaOk=${preview.liqBolsaOk ?? '?'} ` +
       `detail=${detail ?? preview.resultDetail}`
   );
 }
@@ -76,6 +83,9 @@ export type BtgMonthImportPreview = {
   notesDetail: string;
   financialDetail: string;
   resultDetail: string;
+  /** Previa estrita: casamento LIQ BOLSA x expectativas pending das notas. */
+  liqBolsaOk?: boolean;
+  liqBolsaDetail?: string;
   notesFilesInFolder: number;
   notesFilesInMonth: number;
   notes: BtgBrokerageImportPreview;
@@ -207,7 +217,7 @@ function decodeUploadBase64(file: BtgUploadFileInput): Buffer {
 }
 
 /** Nota entra no mês se o pregão OU alguma liquidação D+N cair no YYYY-MM. */
-function noteAffectsMonth(note: BtgBrokerageNote, monthNorm: string): boolean {
+export function noteAffectsMonth(note: BtgBrokerageNote, monthNorm: string): boolean {
   if (String(note.pregaoDate || '').slice(0, 7) === monthNorm) return true;
   for (const trade of note.trades) {
     if (note.category === 'LOAN') {
@@ -528,10 +538,32 @@ export async function previewBtgMonthImport(
     noteFiles.length
   );
 
+  let liqBolsaOk = true;
+  let liqBolsaDetail = '';
+  if (noteFiles.length && extract.parseOk) {
+    const liq = await assessLiqBolsaStrictForMonth(
+      ctx,
+      ledger,
+      monthNorm,
+      noteFiles,
+      extractFile,
+      { ignoreDbPending: opts?.simulateFreshImport === true }
+    );
+    liqBolsaOk = liq.ok;
+    liqBolsaDetail = liq.detail;
+  }
+
+  const resultOk = flags.resultOk && liqBolsaOk;
+  const resultDetail = liqBolsaOk ? flags.resultDetail : liqBolsaDetail;
+
   return {
     kind: 'month_import',
     month: monthNorm,
     ...flags,
+    resultOk,
+    resultDetail,
+    liqBolsaOk,
+    liqBolsaDetail,
     notesFilesInFolder: noteFilesAll.filter((f) => isPdfPath(f.name)).length,
     notesFilesInMonth: noteFiles.length,
     notes,
@@ -694,9 +726,145 @@ async function collectMonthImportLines(
   return lines;
 }
 
+function isLiqBolsaExtractLine(line: LedgerImportLine): boolean {
+  return /LIQ\s+BOLSA/i.test(String(line.notes || ''));
+}
+
+function signedCentsFromSkipFinancialLine(line: LedgerImportLine): number | null {
+  if (line.skip_financial_ledger !== true) return null;
+  if (!BROKERAGE_NOTE_CASH_OPS.has(line.operation as LedgerTransactionType)) return null;
+  const signed =
+    Math.round(
+      Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)) * 100
+    ) / 100;
+  if (Math.abs(signed) < 0.01) return null;
+  return Math.round(signed * 100);
+}
+
+export type LiqBolsaStrictAssessment = {
+  ok: boolean;
+  unresolved: Array<{ date: string; net: number; reason: string }>;
+  detail: string;
+};
+
+/** Avalia casamento LIQ BOLSA a partir de pools de expectativa (testes e diagnostico). */
+export function assessLiqBolsaFromPendingPools(
+  month: string,
+  pendingByDate: Record<string, number[]>,
+  liqLines: Array<{ date: string; signedCents: number }>
+): LiqBolsaStrictAssessment {
+  const monthNorm = month.slice(0, 7);
+  const pools: Record<string, number[]> = {};
+  for (const [date, cents] of Object.entries(pendingByDate)) {
+    pools[date] = [...cents];
+  }
+
+  const unresolved: LiqBolsaStrictAssessment['unresolved'] = [];
+  const sorted = [...liqLines].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.signedCents - b.signedCents
+  );
+
+  for (const line of sorted) {
+    const date = String(line.date).slice(0, 10);
+    if (date.slice(0, 7) !== monthNorm) continue;
+    const candidates = pools[date] ?? [];
+    const consumed = consumeSignedCentsSubset(candidates, line.signedCents);
+    if (consumed) {
+      pools[date] = consumed.remaining;
+      continue;
+    }
+    unresolved.push({
+      date,
+      net: line.signedCents / 100,
+      reason: liqBolsaBlockReason(candidates, line.signedCents),
+    });
+  }
+
+  if (!unresolved.length) return { ok: true, unresolved: [], detail: '' };
+
+  const details = unresolved
+    .slice(0, 5)
+    .map((u) => `${u.date}: ${u.net} (${u.reason})`)
+    .join('; ');
+  return {
+    ok: false,
+    unresolved,
+    detail:
+      `LIQ BOLSA sem casamento com eventos de negocio (${unresolved.length}). ` +
+      `Corrija notas/eventos pendentes antes de importar. ${details}`,
+  };
+}
+
+/** Simula casamento LIQ BOLSA estrito (mesma regra do apply). */
+export async function assessLiqBolsaStrictForMonth(
+  ctx: UserContext,
+  ledger: LedgerImportService,
+  month: string,
+  noteFiles: BtgUploadFileInput[],
+  extractFile: BtgUploadFileInput,
+  opts?: { ignoreDbPending?: boolean }
+): Promise<LiqBolsaStrictAssessment> {
+  const bounds = monthBounds(month);
+  if (!bounds) return { ok: true, unresolved: [], detail: '' };
+
+  const importLines = await collectMonthImportLines(noteFiles);
+  const enriched = await ledger.enrichImportLinesForSettlement(ctx, importLines);
+
+  const pendingByDate: Record<string, number[]> = opts?.ignoreDbPending
+    ? {}
+    : await ledger.listPendingSignedCentsBySettlement(ctx, bounds.from, bounds.to);
+
+  for (const line of enriched) {
+    const cents = signedCentsFromSkipFinancialLine(line);
+    if (cents === null) continue;
+    const settle = String(line.settlement_date ?? line.date).slice(0, 10);
+    if (settle < bounds.from || settle > bounds.to) continue;
+    if (!pendingByDate[settle]) pendingByDate[settle] = [];
+    pendingByDate[settle]!.push(cents);
+  }
+
+  let liqLines: LedgerImportLine[] = [];
+  let extractAssessError: string | null = null;
+  try {
+    const opening = await ledger.getOpeningLedgerBalance(ctx);
+    liqLines = (
+      await parseExtractUploadImportLines(
+        extractFile,
+        { includeLiqBolsa: true },
+        opening ?? undefined,
+        undefined,
+        ctx,
+        ledger
+      )
+    ).filter(isLiqBolsaExtractLine);
+  } catch (err) {
+    extractAssessError = err instanceof Error ? err.message : String(err);
+  }
+
+  if (extractAssessError) {
+    return {
+      ok: false,
+      unresolved: [],
+      detail: `Nao foi possivel simular LIQ BOLSA do extrato: ${extractAssessError}`,
+    };
+  }
+
+  const monthNorm = month.slice(0, 7);
+  const liqForPool = liqLines
+    .filter((line) => String(line.date).slice(0, 7) === monthNorm)
+    .map((line) => ({
+      date: String(line.date).slice(0, 10),
+      signedCents: Math.round(Number(line.total_net_value ?? 0) * 100),
+    }));
+
+  return assessLiqBolsaFromPendingPools(month, pendingByDate, liqForPool);
+}
+
 export type BtgMonthImportApplyOptions = {
   /** Fechamento do extrato do mês anterior (cadeia de saldos). */
   previousClosingExtract?: number | null;
+  /** Ignora pending residual no banco na prévia (após purge / simulação limpa). */
+  simulateFreshImport?: boolean;
 };
 
 export async function applyBtgMonthImport(
@@ -709,6 +877,7 @@ export async function applyBtgMonthImport(
 ): Promise<BtgMonthImportApplyResult> {
   const previewOpts: PreviewBtgMonthImportOptions = {
     previousClosingExtract: applyOpts?.previousClosingExtract ?? null,
+    simulateFreshImport: applyOpts?.simulateFreshImport === true,
   };
   const preview = await previewBtgMonthImport(
     ctx,

@@ -3,6 +3,74 @@ import type { CoCeoDataGateway, SecurePayload, UserContext } from '../dal';
 
 const MONEY_TOL_CENTS = 1;
 
+export function matchSignedCentsSubset(
+  candidateSignedCents: number[],
+  targetSignedCents: number
+): boolean {
+  return findSignedCentsSubsetIndices(candidateSignedCents, targetSignedCents) !== null;
+}
+
+function findSignedCentsSubsetIndices(
+  candidateSignedCents: number[],
+  targetSignedCents: number
+): number[] | null {
+  const n = candidateSignedCents.length;
+  if (n === 0) return null;
+  const sumAll = candidateSignedCents.reduce((sum, cents) => sum + cents, 0);
+  if (Math.abs(sumAll - targetSignedCents) <= MONEY_TOL_CENTS) {
+    return candidateSignedCents.map((_, index) => index);
+  }
+  if (n > 20) return null;
+
+  let best: number[] | null = null;
+  let bestDelta = MONEY_TOL_CENTS + 1;
+  let ambiguous = false;
+  for (let mask = 1; mask < 1 << n; mask += 1) {
+    let sum = 0;
+    const indices: number[] = [];
+    for (let i = 0; i < n; i += 1) {
+      if (mask & (1 << i)) {
+        sum += candidateSignedCents[i]!;
+        indices.push(i);
+      }
+    }
+    const delta = Math.abs(sum - targetSignedCents);
+    if (delta <= MONEY_TOL_CENTS) {
+      if (delta < bestDelta) {
+        bestDelta = delta;
+        best = indices;
+        ambiguous = false;
+      } else if (delta === bestDelta) {
+        ambiguous = true;
+      }
+    }
+  }
+  return ambiguous ? null : best;
+}
+
+/** Remove do pool os candidatos casados com um LIQ BOLSA (espelha baixa no apply). */
+export function consumeSignedCentsSubset(
+  candidateSignedCents: number[],
+  targetSignedCents: number
+): { remaining: number[] } | null {
+  const indices = findSignedCentsSubsetIndices(candidateSignedCents, targetSignedCents);
+  if (!indices) return null;
+  const remove = new Set(indices);
+  return {
+    remaining: candidateSignedCents.filter((_, index) => !remove.has(index)),
+  };
+}
+
+export function liqBolsaBlockReason(
+  candidateSignedCents: number[],
+  _targetSignedCents: number
+): string {
+  if (!candidateSignedCents.length) {
+    return 'Nenhum evento candidato encontrado para esta data de liquidacao.';
+  }
+  return 'Nenhum subconjunto de eventos casa com o valor do LIQ BOLSA.';
+}
+
 type BusinessEventCandidateRow = {
   id: string;
   source_ref?: string | null;
