@@ -114,6 +114,10 @@ import {
   previewBtgMonthImport,
 } from '../core/invest/btgMonthImportService';
 import { OptionCDailyCloseOrchestrator } from '../core/invest/reconcile/OptionCDailyCloseOrchestrator';
+import {
+  logInvestStdout,
+  logReconcileFailure,
+} from '../core/invest/reconcile/reconcileErrorDetail';
 import type { UserContext } from '../core/dal';
 import { GatewayError } from '../core/dal/errors';
 import { SYSTEM_INSTALLER_USER_ID } from '../core/dal/types';
@@ -1799,6 +1803,12 @@ export class InvestController {
           extractFiles,
           { resetFirst: req.body?.resetFirst === true }
         );
+        logInvestStdout(
+          'btg-batch',
+          ctx.organizationId,
+          `PREVIEW months=${preview.months.length} ready=${preview.monthsReady} blocked=${preview.monthsBlocked} ` +
+            `already=${preview.monthsAlreadyImported} resultOk=${preview.resultOk} summary=${preview.summary}`
+        );
         return res.json({ success: true, dryRun: true, preview });
       }
 
@@ -1817,16 +1827,37 @@ export class InvestController {
         started.runStatus = 'running';
         const runId = started.runId;
 
+        logInvestStdout(
+          'btg-batch',
+          ctx.organizationId,
+          `ASYNC_START run=${runId} mode=${mode} reset=${resetFirst} months=${started.calendar.length} ` +
+            `notas=${noteFiles.length} extratos=${extractFiles.length}`
+        );
+
         void (async () => {
           try {
             const maxIterations = started.calendar.length + 10;
             for (let i = 0; i < maxIterations; i += 1) {
               const result = await this.optionC.closeNextDay(ctx, runId);
+              logInvestStdout(
+                'btg-batch',
+                ctx.organizationId,
+                `ASYNC_STEP run=${runId} iter=${i + 1} status=${result.status} day=${result.day ?? '-'} ` +
+                  `phase=${result.state.phase} runStatus=${result.state.runStatus ?? '-'} ` +
+                  `dayIndex=${result.state.dayIndex}/${result.state.calendar.length}`
+              );
               if (result.status === 'done') break;
               if (result.status === 'blocked' && mode !== 'homologation') break;
             }
-          } catch {
-            /* estado persistido no run */
+            const final = await this.optionC.getRunWithFallback(runId);
+            logInvestStdout(
+              'btg-batch',
+              ctx.organizationId,
+              `ASYNC_END run=${runId} phase=${final?.phase ?? '?'} runStatus=${final?.runStatus ?? '?'} ` +
+                `error=${final?.runError ?? '-'}`
+            );
+          } catch (err) {
+            logReconcileFailure('btg-batch.async', ctx.organizationId ?? undefined, err, { runId });
           }
         })();
 

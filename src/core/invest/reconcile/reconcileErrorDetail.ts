@@ -42,6 +42,15 @@ export function logReconcileEvent(
   }
 }
 
+/** Linha plana para grep nos logs do EasyPanel / container (stdout). */
+export function logInvestStdout(
+  prefix: string,
+  orgId: string | null | undefined,
+  message: string
+): void {
+  console.info(`[${prefix}] org=${orgId ?? '-'} ${message}`);
+}
+
 export function formatReconcileError(
   error: unknown,
   context?: Record<string, unknown>

@@ -36,6 +36,26 @@ import {
   previewBtgBrokerageUpload,
   previewBtgExtractUpload,
 } from './btgUploadImportService';
+import { logInvestStdout } from './reconcile/reconcileErrorDetail';
+
+function logMonthImportStdout(
+  orgId: string | null | undefined,
+  tag: string,
+  month: string,
+  preview: BtgMonthImportPreview,
+  detail?: string
+): void {
+  const e = preview.extract;
+  logInvestStdout(
+    'btg-import',
+    orgId,
+    `${tag} month=${month} notesOk=${preview.notesOk} finOk=${preview.financialOk} resultOk=${preview.resultOk} ` +
+      `pdfs=${preview.notesFilesInMonth}/${preview.notesFilesInFolder} ` +
+      `openingExt=${e.openingExtract ?? '?'} closingExt=${e.closingExtract ?? '?'} ` +
+      `openingLedgerOk=${e.openingLedgerOk ?? '?'} closingLedgerOk=${e.closingLedgerOk ?? '?'} ` +
+      `detail=${detail ?? preview.resultDetail}`
+  );
+}
 
 /**
  * Notas = patrimônio (skip_financial_ledger=true); caixa vem exclusivamente do extrato.
@@ -641,7 +661,11 @@ export async function applyBtgMonthImport(
     previewOpts
   );
 
+  logMonthImportStdout(ctx.organizationId, 'PREVIEW', month, preview);
+
   if (!preview.notesOk || !preview.extract.parseOk) {
+    const detail = preview.resultDetail || 'Corrija notas e extrato antes de gravar este mês.';
+    logMonthImportStdout(ctx.organizationId, 'BLOCKED', month, preview, detail);
     return {
       ...preview,
       applied: false,
@@ -649,12 +673,14 @@ export async function applyBtgMonthImport(
       notesSkipped: 0,
       extractInserted: 0,
       extractSkipped: 0,
-      resultDetail:
-        preview.resultDetail || 'Corrija notas e extrato antes de gravar este mês.',
+      resultDetail: detail,
     };
   }
 
   if (!preview.resultOk) {
+    const detail =
+      preview.resultDetail || 'Valide notas e extrato antes de gravar este mes.';
+    logMonthImportStdout(ctx.organizationId, 'BLOCKED', month, preview, detail);
     return {
       ...preview,
       applied: false,
@@ -662,9 +688,7 @@ export async function applyBtgMonthImport(
       notesSkipped: 0,
       extractInserted: 0,
       extractSkipped: 0,
-      resultDetail:
-        preview.resultDetail ||
-        'Valide notas e extrato antes de gravar este mes.',
+      resultDetail: detail,
     };
   }
 
@@ -695,6 +719,17 @@ export async function applyBtgMonthImport(
     ? ` trânsito: +${reconcileAfter.pendingSync.created}/-${reconcileAfter.pendingSync.cleared}.`
     : '';
 
+  const resultDetail = applied
+    ? `Importado: notas +${notesInserted}/-${notesSkipped}, extrato +${extractInserted}/-${extractSkipped}.${pendingNote}`
+    : extractApply.importError || 'Falha ao gravar extrato.';
+
+  logInvestStdout(
+    'btg-import',
+    ctx.organizationId,
+    `${applied ? 'APPLIED' : 'FAILED'} month=${month} notes=+${notesInserted}/-${notesSkipped} ` +
+      `extract=+${extractInserted}/-${extractSkipped} pdfs=${noteFiles.length} detail=${resultDetail}`
+  );
+
   return {
     ...afterPreview,
     applied,
@@ -704,8 +739,6 @@ export async function applyBtgMonthImport(
     extractSkipped,
     financialOk: applied ? preview.financialOk : afterPreview.financialOk,
     resultOk: applied && preview.resultOk,
-    resultDetail: applied
-      ? `Importado: notas +${notesInserted}/-${notesSkipped}, extrato +${extractInserted}/-${extractSkipped}.${pendingNote}`
-      : extractApply.importError || 'Falha ao gravar extrato.',
+    resultDetail,
   };
 }

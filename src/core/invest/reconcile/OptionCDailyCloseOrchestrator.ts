@@ -19,7 +19,7 @@ import {
   HomeBrokerSnapshotUploadService,
   type HomeBrokerSnapshotUploadResult,
 } from './HomeBrokerSnapshotUploadService';
-import { logReconcileEvent, logReconcileFailure } from './reconcileErrorDetail';
+import { logInvestStdout, logReconcileEvent, logReconcileFailure } from './reconcileErrorDetail';
 import { OptionCRunRepository } from './OptionCRunRepository';
 import type { ReconcileDecision } from './auditTypes';
 
@@ -66,6 +66,7 @@ function newRunId(orgId: string): string {
 
 function logStep(rt: OptionCRuntime, message: string): void {
   rt.state.activityLog.push(message);
+  logInvestStdout('OptionC', rt.state.organizationId, `run=${rt.state.runId} | ${message}`);
   logReconcileEvent('info', 'option-c.step', rt.state.organizationId, {
     runId: rt.state.runId,
     phase: rt.state.phase,
