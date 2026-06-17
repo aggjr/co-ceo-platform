@@ -115,7 +115,7 @@ export const MENU_CATALOG = [
         resourceKey: 'screen.invest.results',
       },
       {
-        label: 'Integração mensal',
+        label: 'Integração BTG',
         path: '/invest/integracao-mensal',
         resourceKey: 'screen.invest.results',
       },

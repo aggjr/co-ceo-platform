@@ -397,6 +397,108 @@ export async function previewBtgMonthImport(
   };
 }
 
+export type BtgBatchMonthStatus = 'ready' | 'blocked' | 'already_imported';
+
+export type BtgBatchMonthPreview = BtgMonthImportPreview & {
+  status: BtgBatchMonthStatus;
+};
+
+export type BtgBatchImportPreview = {
+  kind: 'batch_import';
+  months: BtgBatchMonthPreview[];
+  monthsTotal: number;
+  monthsReady: number;
+  monthsBlocked: number;
+  monthsAlreadyImported: number;
+  chainOk: boolean;
+  resultOk: boolean;
+  summary: string;
+};
+
+/**
+ * Prévia de todos os meses detectados nos extratos — sem gravar.
+ * Idempotência: meses já importados e coerentes aparecem como already_imported.
+ */
+export async function previewBtgBatchImport(
+  ctx: UserContext,
+  ledger: LedgerImportService,
+  noteFilesAll: BtgUploadFileInput[],
+  extractFiles: BtgUploadFileInput[]
+): Promise<BtgBatchImportPreview> {
+  if (!extractFiles?.length) {
+    throw new GatewayError('INVALID_PAYLOAD', 'Envie ao menos um extrato BTG.', 400);
+  }
+  if (!noteFilesAll?.length) {
+    throw new GatewayError('INVALID_PAYLOAD', 'Envie ao menos um PDF de notas.', 400);
+  }
+
+  const plan = await discoverMonthExtractPlan(extractFiles);
+  if (!plan.length) {
+    throw new GatewayError(
+      'INVALID_PAYLOAD',
+      'Nenhum extrato BTG válido encontrado na pasta enviada.',
+      400
+    );
+  }
+
+  const months: BtgBatchMonthPreview[] = [];
+  let prevClosing: number | null = null;
+  let chainOk = true;
+
+  for (const entry of plan) {
+    const preview = await previewBtgMonthImport(
+      ctx,
+      ledger,
+      entry.month,
+      entry.extractFile,
+      noteFilesAll
+    );
+
+    if (
+      prevClosing != null &&
+      preview.extract.openingExtract != null &&
+      Math.abs(preview.extract.openingExtract - prevClosing) > MONTH_IMPORT_CASH_TOLERANCE
+    ) {
+      chainOk = false;
+    }
+    if (preview.extract.closingExtract != null) {
+      prevClosing = preview.extract.closingExtract;
+    }
+
+    let status: BtgBatchMonthStatus = 'blocked';
+    if (preview.resultOk) {
+      status = preview.extract.monthAlreadyImported ? 'already_imported' : 'ready';
+    }
+
+    months.push({ ...preview, status });
+  }
+
+  const monthsReady = months.filter((m) => m.status === 'ready').length;
+  const monthsBlocked = months.filter((m) => m.status === 'blocked').length;
+  const monthsAlreadyImported = months.filter((m) => m.status === 'already_imported').length;
+  const resultOk =
+    chainOk && monthsBlocked === 0 && (monthsReady > 0 || monthsAlreadyImported === months.length);
+
+  const parts: string[] = [];
+  parts.push(`${plan.length} mês(es): ${plan[0]!.month} → ${plan[plan.length - 1]!.month}`);
+  if (monthsReady) parts.push(`${monthsReady} pronto(s) para importar`);
+  if (monthsAlreadyImported) parts.push(`${monthsAlreadyImported} já importado(s)`);
+  if (monthsBlocked) parts.push(`${monthsBlocked} com bloqueio`);
+  if (!chainOk) parts.push('cadeia de saldos entre extratos quebrada');
+
+  return {
+    kind: 'batch_import',
+    months,
+    monthsTotal: months.length,
+    monthsReady,
+    monthsBlocked,
+    monthsAlreadyImported,
+    chainOk,
+    resultOk,
+    summary: parts.join(' · '),
+  };
+}
+
 export async function applyBtgMonthImport(
   ctx: UserContext,
   ledger: LedgerImportService,

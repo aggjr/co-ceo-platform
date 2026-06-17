@@ -428,6 +428,12 @@ router.post(
   invest.importBtgMonthUpload.bind(invest)
 );
 router.post(
+  '/invest/import/btg-batch',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:write'),
+  invest.importBtgBatchUpload.bind(invest)
+);
+router.post(
   '/invest/custody/reconcile',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:write'),

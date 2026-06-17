@@ -297,7 +297,7 @@ export async function InvestConciliacaoPage(container) {
         </div>
         <div class="conciliacao-btn-row">
           <label class="invest-conciliacao__check-row">
-            <input type="checkbox" id="optc-reset-first" class="invest-conciliacao__checkbox" checked />
+            <input type="checkbox" id="optc-reset-first" class="invest-conciliacao__checkbox" />
             Reset antes de iniciar (preserva abertura)
           </label>
         </div>

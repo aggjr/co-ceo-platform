@@ -110,8 +110,10 @@ import {
 } from '../core/invest/btgUploadImportService';
 import {
   applyBtgMonthImport,
+  previewBtgBatchImport,
   previewBtgMonthImport,
 } from '../core/invest/btgMonthImportService';
+import { OptionCDailyCloseOrchestrator } from '../core/invest/reconcile/OptionCDailyCloseOrchestrator';
 import type { UserContext } from '../core/dal';
 import { GatewayError } from '../core/dal/errors';
 import { SYSTEM_INSTALLER_USER_ID } from '../core/dal/types';
@@ -270,6 +272,7 @@ export class InvestController {
   private readonly fxRates: FxRateRepository;
   private readonly threePricesFactory: ThreePricesContextFactory;
   private readonly investPeriods: InvestBookPeriodService;
+  private readonly optionC: OptionCDailyCloseOrchestrator;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -286,6 +289,7 @@ export class InvestController {
     this.fxRates = new FxRateRepository(gateway);
     this.threePricesFactory = new ThreePricesContextFactory(gateway);
     this.investPeriods = new InvestBookPeriodService(gateway);
+    this.optionC = new OptionCDailyCloseOrchestrator(gateway, pool);
   }
 
   private async periodBoundsFor(ctx: UserContext) {
@@ -1748,6 +1752,112 @@ export class InvestController {
       const status = (err as { httpStatus?: number }).httpStatus ?? 500;
       const message =
         err instanceof Error ? err.message : 'Falha na importação mensal BTG.';
+      return res.status(status).json({ success: false, error: message });
+    }
+  };
+
+  /**
+   * Importação BTG em lote: todas as notas + extratos + âncoras JSON.
+   * dryRun=true → prévia mês a mês; dryRun=false → processa tudo (Opção C).
+   */
+  importBtgBatchUpload = async (req: Request, res: Response) => {
+    const ctx = req.userContext!;
+    if (!ctx.organizationId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Selecione uma organização (personifique a holding).',
+      });
+    }
+
+    const noteFiles = (req.body?.noteFiles as BtgUploadFileInput[]) ?? [];
+    const extractFiles = (req.body?.extractFiles as BtgUploadFileInput[]) ?? [];
+    const homeBrokerFiles = (req.body?.homeBrokerFiles as BtgUploadFileInput[]) ?? [];
+    const dryRun = Boolean(req.body?.dryRun);
+    const resetFirst = req.body?.resetFirst === true;
+    const mode = req.body?.mode === 'strict' ? 'strict' : 'homologation';
+    const asyncRun = req.body?.async === true;
+
+    if (!extractFiles.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Envie a pasta de extratos BTG (PDF/CSV/TXT).',
+      });
+    }
+    if (!noteFiles.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Envie a pasta de notas de corretagem (PDF).',
+      });
+    }
+
+    try {
+      if (dryRun) {
+        const preview = await previewBtgBatchImport(
+          ctx,
+          this.ledger,
+          noteFiles,
+          extractFiles
+        );
+        return res.json({ success: true, dryRun: true, preview });
+      }
+
+      req.socket.setTimeout(0);
+      res.setTimeout(0);
+
+      if (asyncRun) {
+        const started = await this.optionC.start(ctx, {
+          notesFiles: noteFiles,
+          extractFiles,
+          homeBrokerFiles,
+          resetFirst,
+          mode,
+        });
+        started.runStatus = 'running';
+        const runId = started.runId;
+
+        void (async () => {
+          try {
+            const maxIterations = started.calendar.length + 10;
+            for (let i = 0; i < maxIterations; i += 1) {
+              const result = await this.optionC.closeNextDay(ctx, runId);
+              if (result.status === 'done') break;
+              if (result.status === 'blocked' && mode !== 'homologation') break;
+            }
+          } catch {
+            /* estado persistido no run */
+          }
+        })();
+
+        return res.status(202).json({
+          success: true,
+          accepted: true,
+          runId,
+          message: 'Importação em lote iniciada em segundo plano.',
+          state: started,
+        });
+      }
+
+      const finalState = await this.optionC.runAll(ctx, {
+        notesFiles: noteFiles,
+        extractFiles,
+        homeBrokerFiles,
+        resetFirst,
+        mode,
+        delayMs: 0,
+      });
+
+      const done = finalState.phase === 'done';
+      return res.json({
+        success: mode === 'homologation' ? true : done,
+        message: done
+          ? 'Importação em lote concluída.'
+          : `Processo pausado em ${finalState.lastDay ?? '?'}. Confira o log.`,
+        state: finalState,
+      });
+    } catch (err: unknown) {
+      const status = (err as { httpStatus?: number }).httpStatus ?? 500;
+      const message =
+        err instanceof Error ? err.message : 'Falha na importação em lote BTG.';
       return res.status(status).json({ success: false, error: message });
     }
   };
