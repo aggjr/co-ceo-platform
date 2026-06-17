@@ -61,27 +61,57 @@ export async function applyUiCatalog(pool: Pool): Promise<UiCatalogApplyResult> 
     schemaCreated = true;
   }
 
+  // Garante enum atualizado (inclui kind='description') antes de inserir TEXTS.
+  // Idempotente — seguro rodar em todo boot.
+  await runSqlFile(pool, '32_ui_text_kind_description.sql');
+
   for (const t of TEXTS) {
-    await pool.query(
-      `INSERT INTO ui_text_catalog (id, text_key, locale, module_code, kind, default_text, description, metadata)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         default_text = VALUES(default_text),
-         module_code = VALUES(module_code),
-         kind = VALUES(kind),
-         description = COALESCE(VALUES(description), description),
-         metadata = COALESCE(VALUES(metadata), metadata)`,
-      [
-        t.id,
-        t.text_key,
-        LOCALE,
-        t.module_code,
-        t.kind,
-        t.default_text,
-        t.description ?? null,
-        t.metadata ? JSON.stringify(t.metadata) : null,
-      ]
-    );
+    const upsert = async (kindOverride?: string) => {
+      await pool.query(
+        `INSERT INTO ui_text_catalog (id, text_key, locale, module_code, kind, default_text, description, metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           default_text = VALUES(default_text),
+           module_code = VALUES(module_code),
+           kind = VALUES(kind),
+           description = COALESCE(VALUES(description), description),
+           metadata = COALESCE(VALUES(metadata), metadata)`,
+        [
+          t.id,
+          t.text_key,
+          LOCALE,
+          t.module_code,
+          kindOverride ?? t.kind,
+          t.default_text,
+          t.description ?? null,
+          t.metadata ? JSON.stringify(t.metadata) : null,
+        ]
+      );
+    };
+
+    try {
+      await upsert();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Produção antiga: coluna `kind` pode não suportar 'description' ainda.
+      if (/Data truncated for column 'kind'/i.test(msg)) {
+        // Reaplica migration e tenta novamente.
+        await runSqlFile(pool, '32_ui_text_kind_description.sql');
+        try {
+          await upsert();
+          continue;
+        } catch (e2) {
+          const msg2 = e2 instanceof Error ? e2.message : String(e2);
+          // Fallback: mantém apply funcionando convertendo description → field_label.
+          if (/Data truncated for column 'kind'/i.test(msg2) && t.kind === 'description') {
+            await upsert('field_label');
+            continue;
+          }
+          throw e2;
+        }
+      }
+      throw e;
+    }
   }
 
   const codeToId = new Map<string, string>();
