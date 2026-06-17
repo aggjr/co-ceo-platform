@@ -12,6 +12,7 @@ import {
   inferExtractMonth,
   isExtractMonthInLedger,
   MONTH_IMPORT_CASH_TOLERANCE,
+  sortParsedExtracts,
   type ParsedExtractForBatch,
 } from './btgExtractBatchReconcile';
 import {
@@ -65,6 +66,58 @@ export type BtgMonthImportApplyResult = BtgMonthImportPreview & {
   extractInserted: number;
   extractSkipped: number;
 };
+
+export type MonthExtractPlanEntry = {
+  month: string;
+  extractFile: BtgUploadFileInput;
+};
+
+/** Intervalo calendário [from, to] de um mês YYYY-MM. */
+export function monthBounds(month: string): { from: string; to: string } | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]);
+  if (!Number.isInteger(year) || !Number.isInteger(monthIndex) || monthIndex < 1 || monthIndex > 12) {
+    return null;
+  }
+  const lastDay = new Date(Date.UTC(year, monthIndex, 0)).getUTCDate();
+  return {
+    from: `${match[1]}-${match[2]}-01`,
+    to: `${match[1]}-${match[2]}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
+
+/** Ordena extratos por mês e retorna um par mês→arquivo (último arquivo vence duplicatas). */
+export async function discoverMonthExtractPlan(
+  extractFiles: BtgUploadFileInput[]
+): Promise<MonthExtractPlanEntry[]> {
+  const parsed: ParsedExtractForBatch[] = [];
+  for (const file of extractFiles) {
+    const preview = await previewBtgExtractUpload(file);
+    if (!preview.parseOk || !preview.preview) continue;
+    parsed.push({
+      path: preview.path,
+      fileName: preview.fileName,
+      preview: preview.preview,
+    });
+  }
+
+  const sorted = sortParsedExtracts(parsed);
+  const byMonth = new Map<string, BtgUploadFileInput>();
+  for (const item of sorted) {
+    const month =
+      inferExtractMonth(item.fileName, item.preview.firstDate, item.preview.lastDate) ??
+      item.preview.firstDate?.slice(0, 7);
+    if (!month) continue;
+    const file = extractFiles.find((f) => f.name === item.path);
+    if (file) byMonth.set(month, file);
+  }
+
+  return Array.from(byMonth.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, extractFile]) => ({ month, extractFile }));
+}
 
 /** Filtra arquivos cuja pasta/nome pertence ao mês YYYY-MM. */
 export function filterFilesForMonth(files: BtgUploadFileInput[], month: string): BtgUploadFileInput[] {

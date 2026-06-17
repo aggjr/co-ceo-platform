@@ -1,29 +1,24 @@
 import type { CoCeoDataGateway, UserContext } from '../../../../src/core/dal';
 
 const startSession = jest.fn();
-const completePhase = jest.fn();
-const getDay = jest.fn();
-const reconcileCustody = jest.fn();
-const importEntriesOnly = jest.fn();
 const importAndApplyHomeBroker = jest.fn();
-const applyBtgExtractBatchUpload = jest.fn();
+const applyBtgMonthImport = jest.fn();
+const discoverMonthExtractPlan = jest.fn();
+const monthBounds = jest.fn();
 const syncHistoricalFromBrapi = jest.fn();
 const syncMissingOptions = jest.fn();
 const rebuildPatrimony = jest.fn();
-const buildNotesFileIndex = jest.fn();
+const reconcileCustody = jest.fn();
 
 jest.mock('../../../../src/core/invest/reconcile/ReconciliationSessionService', () => ({
   ReconciliationSessionService: jest.fn().mockImplementation(() => ({
     startSession,
-    completePhase,
-    getDay,
   })),
 }));
 
 jest.mock('../../../../src/core/invest/LedgerImportService', () => ({
   LedgerImportService: jest.fn().mockImplementation(() => ({
     reconcileCustody,
-    importEntriesOnly,
   })),
 }));
 
@@ -33,8 +28,10 @@ jest.mock('../../../../src/core/invest/reconcile/HomeBrokerSnapshotUploadService
   })),
 }));
 
-jest.mock('../../../../src/core/invest/btgUploadImportService', () => ({
-  applyBtgExtractBatchUpload,
+jest.mock('../../../../src/core/invest/btgMonthImportService', () => ({
+  applyBtgMonthImport,
+  discoverMonthExtractPlan,
+  monthBounds,
 }));
 
 jest.mock('../../../../src/core/invest/InvestQuoteSyncService', () => ({
@@ -67,10 +64,6 @@ jest.mock('../../../../src/core/invest/HoldingPurgeKeepOpeningService', () => ({
   })),
 }));
 
-jest.mock('../../../../src/core/invest/reconcile/reconcileNotesIndex', () => ({
-  buildNotesFileIndex,
-}));
-
 import { OptionCDailyCloseOrchestrator } from '../../../../src/core/invest/reconcile/OptionCDailyCloseOrchestrator';
 
 const ctx: UserContext = {
@@ -101,18 +94,11 @@ describe('OptionCDailyCloseOrchestrator', () => {
 
     startSession.mockResolvedValue({
       sessionId: 'sess-1',
-      calendar: ['2026-01-02'],
+      calendar: ['2026-01'],
       activityLog: [{ message: 'sessao iniciada' }],
       schemaApplied: true,
     });
-    completePhase.mockResolvedValue({ completed: true });
-    getDay.mockResolvedValue({
-      canClose: true,
-      pendingDecisions: [],
-      blockReasons: [],
-    });
     reconcileCustody.mockResolvedValue({ ok: true });
-    importEntriesOnly.mockResolvedValue({ inserted: 1, skipped: 0, enriched: 0 });
     importAndApplyHomeBroker.mockResolvedValue({
       filesTotal: 1,
       snapshotsImported: 1,
@@ -121,37 +107,35 @@ describe('OptionCDailyCloseOrchestrator', () => {
       warnings: [],
       appliedDates: ['2026-01-02'],
     });
-    applyBtgExtractBatchUpload.mockResolvedValue({
-      fileResults: [{ importOk: true }],
-      totals: { inserted: 2, skipped: 0 },
-      chainOk: true,
+    discoverMonthExtractPlan.mockResolvedValue([
+      {
+        month: '2026-01',
+        extractFile: { name: 'extratos/jan.txt', contentBase64: 'dHh0' },
+      },
+    ]);
+    monthBounds.mockReturnValue({ from: '2026-01-01', to: '2026-01-31' });
+    applyBtgMonthImport.mockResolvedValue({
+      month: '2026-01',
+      applied: true,
+      notesOk: true,
+      financialOk: true,
+      resultOk: true,
+      resultDetail: 'Importado.',
+      notesInserted: 2,
+      notesSkipped: 0,
+      extractInserted: 5,
+      extractSkipped: 0,
+      extract: { importOk: true },
     });
     syncHistoricalFromBrapi.mockResolvedValue(4);
     syncMissingOptions.mockResolvedValue({ synced: 2, missing: 0 });
     rebuildPatrimony.mockImplementation(async (_ctx, opts) => {
-      opts?.onProgress?.(1, 0, '2026-01-02');
+      opts?.onProgress?.(1, 0, '2026-01-15');
       return { daysWritten: 1, daysSkipped: 0, threePricesUpdated: 1, warnings: [] };
-    });
-    buildNotesFileIndex.mockResolvedValue({
-      calendar: ['2026-01-02'],
-      noteLinesByDate: {},
-      linesByRowKey: new Map([
-        [
-          'note:1:2026-01-02:1',
-          {
-            date: '2026-01-02',
-            ticker: 'PRIO3',
-            quantity: 100,
-            unit_price: 40,
-            operation: 'buy',
-            broker_note_ref: 'BTG-NOTA-1',
-          },
-        ],
-      ]),
     });
   });
 
-  it('processa os 3 grupos da interface e atualiza financeiro, custodia, cotacoes, opcoes e patrimonio', async () => {
+  it('processa mes a mes com importacao mensal, cotacoes e rebuild com initialLoad', async () => {
     const notesFiles = [{ name: 'notas/jan.pdf', contentBase64: 'cGRm' }];
     const extractFiles = [{ name: 'extratos/jan.txt', contentBase64: 'dHh0' }];
     const homeBrokerFiles = [{ name: 'homebroker/snapshot.json', contentBase64: 'e30=' }];
@@ -175,18 +159,27 @@ describe('OptionCDailyCloseOrchestrator', () => {
       snapshotsApplied: 1,
       anchorsUpserted: 1,
     });
+    expect(discoverMonthExtractPlan).toHaveBeenCalledWith(extractFiles);
     expect(startSession).toHaveBeenCalledWith(ctx, expect.objectContaining({ phase: 'notes', files: notesFiles }));
     expect(importAndApplyHomeBroker).toHaveBeenCalledWith(ctx, homeBrokerFiles);
     expect(reconcileCustody).toHaveBeenCalledWith(ctx);
-    expect(importEntriesOnly).toHaveBeenCalledWith(
+    expect(applyBtgMonthImport).toHaveBeenCalledWith(
       ctx,
-      [expect.objectContaining({ ticker: 'PRIO3', date: '2026-01-02' })],
-      { sourceLabel: 'option_c_notes_day' }
+      expect.any(Object),
+      '2026-01',
+      extractFiles[0],
+      notesFiles
     );
-    expect(applyBtgExtractBatchUpload).toHaveBeenCalledWith(ctx, expect.any(Object), extractFiles);
     expect(syncHistoricalFromBrapi).toHaveBeenCalledWith(ctx);
     expect(syncMissingOptions).toHaveBeenCalledWith(ctx);
-    expect(rebuildPatrimony).toHaveBeenCalledWith(ctx, expect.objectContaining({ onProgress: expect.any(Function) }));
-    expect(finalState.activityLog.join('\n')).toContain('Rebuild: 1 dia(s) gravados');
+    expect(rebuildPatrimony).toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({
+        from: '2026-01-01',
+        to: '2026-01-31',
+        initialLoad: true,
+      })
+    );
+    expect(finalState.activityLog.join('\n')).toContain('Rebuild final');
   });
 });

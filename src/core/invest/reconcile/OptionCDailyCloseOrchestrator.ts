@@ -2,16 +2,18 @@ import type { Pool } from 'mysql2/promise';
 import type { CoCeoDataGateway, UserContext } from '../../dal';
 import { GatewayError } from '../../dal/errors';
 import type { BtgUploadFileInput } from '../btgUploadImportService';
-import { applyBtgExtractBatchUpload } from '../btgUploadImportService';
-import { ExternalOptionQuoteFetcher } from '../ExternalOptionQuoteFetcher';
+import {
+  applyBtgMonthImport,
+  discoverMonthExtractPlan,
+  monthBounds,
+  type MonthExtractPlanEntry,
+} from '../btgMonthImportService';
 import { InvestQuoteSyncService } from '../InvestQuoteSyncService';
 import { OptionHistoricalSyncService } from '../OptionHistoricalSyncService';
 import { LedgerImportService } from '../LedgerImportService';
 import { HoldingPurgeKeepOpeningService } from '../HoldingPurgeKeepOpeningService';
 import { PatrimonyDailyRebuildService } from '../PatrimonyDailyRebuildService';
 import { ReconciliationSessionService } from './ReconciliationSessionService';
-import { DailyCloseMaterializeService } from './DailyCloseMaterializeService';
-import { buildNotesFileIndex } from './reconcileNotesIndex';
 import {
   HomeBrokerSnapshotUploadService,
   type HomeBrokerSnapshotUploadResult,
@@ -19,7 +21,6 @@ import {
 import { logReconcileEvent, logReconcileFailure } from './reconcileErrorDetail';
 import { OptionCRunRepository } from './OptionCRunRepository';
 import type { ReconcileDecision } from './auditTypes';
-import type { LedgerImportLine } from '../ledgerTypes';
 
 export type OptionCPhase = 'notes' | 'extracts' | 'done';
 export type OptionCMode = 'strict' | 'homologation';
@@ -49,7 +50,8 @@ type OptionCRuntime = {
   state: OptionCRunState;
   notesFiles: BtgUploadFileInput[];
   extractFiles: BtgUploadFileInput[];
-  linesByDate: Map<string, LedgerImportLine[]>;
+  monthPlan: MonthExtractPlanEntry[];
+  quotesSynced: boolean;
 };
 
 const runsById = new Map<string, OptionCRuntime>();
@@ -71,11 +73,10 @@ function logStep(rt: OptionCRuntime, message: string): void {
 }
 
 /**
- * Opção C — reset + 2 pastas + fechamento calmo dia a dia com cotações web e materialização.
+ * Opção C — reset + pastas BTG + fechamento mês a mês (notas + extrato + patrimônio com âncoras).
  */
 export class OptionCDailyCloseOrchestrator {
   private readonly session: ReconciliationSessionService;
-  private readonly dailyClose: DailyCloseMaterializeService;
   private readonly ledger: LedgerImportService;
   private readonly patrimonyRebuild: PatrimonyDailyRebuildService;
   private readonly homeBrokerUpload: HomeBrokerSnapshotUploadService;
@@ -87,7 +88,6 @@ export class OptionCDailyCloseOrchestrator {
     pool?: Pool
   ) {
     this.session = new ReconciliationSessionService(gateway, pool);
-    this.dailyClose = new DailyCloseMaterializeService(gateway);
     this.ledger = new LedgerImportService(gateway);
     this.patrimonyRebuild = new PatrimonyDailyRebuildService(gateway);
     this.homeBrokerUpload = new HomeBrokerSnapshotUploadService(gateway);
@@ -110,12 +110,12 @@ export class OptionCDailyCloseOrchestrator {
     try {
       const persisted = await this.runRepo.findById(runId);
       if (persisted) {
-        // Restaura no cache sem os arquivos binários (não reanexamos os files aqui)
         runsById.set(runId, {
           state: persisted,
           notesFiles: [],
           extractFiles: [],
-          linesByDate: new Map(),
+          monthPlan: [],
+          quotesSynced: false,
         });
       }
       return persisted;
@@ -174,6 +174,15 @@ export class OptionCDailyCloseOrchestrator {
       input.homeBrokerFiles
     );
 
+    const monthPlan = await discoverMonthExtractPlan(input.extractFiles);
+    if (!monthPlan.length) {
+      throw new GatewayError(
+        'INVALID_PAYLOAD',
+        'Nenhum extrato BTG válido encontrado — confira os arquivos da pasta.',
+        400
+      );
+    }
+
     const sessionDataMode =
       input.resetFirst &&
       (input.dataMode === 'reset_from_opening' || input.dataMode === undefined)
@@ -186,27 +195,19 @@ export class OptionCDailyCloseOrchestrator {
       dataMode: sessionDataMode,
     });
 
-    const index = await buildNotesFileIndex(input.notesFiles);
-    const linesByDate = new Map<string, LedgerImportLine[]>();
-    for (const [, line] of index.linesByRowKey) {
-      const d = String(line.date || '').slice(0, 10);
-      if (!d) continue;
-      const list = linesByDate.get(d) ?? [];
-      list.push(line);
-      linesByDate.set(d, list);
-    }
-
     const runId = newRunId(ctx.organizationId);
+    const monthCalendar = monthPlan.map((m) => m.month);
     const rt: OptionCRuntime = {
       notesFiles: input.notesFiles,
       extractFiles: input.extractFiles,
-      linesByDate,
+      monthPlan,
+      quotesSynced: false,
       state: {
         runId,
         organizationId: ctx.organizationId,
         sessionId: started.sessionId,
         phase: 'notes',
-        calendar: started.calendar ?? [],
+        calendar: monthCalendar,
         dayIndex: 0,
         horizonTrustedThrough: null,
         notesFilesCount: input.notesFiles.length,
@@ -235,18 +236,16 @@ export class OptionCDailyCloseOrchestrator {
 
     logStep(
       rt,
-      `Opção C iniciada (${mode}) — ${rt.state.calendar.length} pregão(ões) de notas, ${input.extractFiles.length} extrato(s) na fase 2.`
+      `Opção C iniciada (${mode}) — ${monthCalendar.length} mês(es) de ${monthCalendar[0]} a ${monthCalendar[monthCalendar.length - 1]}, ${input.notesFiles.length} nota(s), ${input.extractFiles.length} extrato(s).`
     );
     runsById.set(runId, rt);
 
-    // Persiste o estado inicial no DB e remove runs antigos
     if (this.runRepo) {
       try {
         await this.runRepo.upsert(rt.state);
         await this.runRepo.pruneOld();
       } catch (err) {
         logReconcileFailure('option-c.run-repo.upsert', ctx.organizationId, err, { runId });
-        // Não interrompe: persistência é best-effort, a execução continua
       }
     }
 
@@ -256,9 +255,10 @@ export class OptionCDailyCloseOrchestrator {
   async closeNextDay(ctx: UserContext, runId: string): Promise<{
     status: 'closed' | 'blocked' | 'phase_complete' | 'done';
     day?: string;
-    materialize?: Awaited<ReturnType<DailyCloseMaterializeService['materializeDay']>>;
+    materialize?: unknown;
     pendingDecisions?: ReconcileDecision[];
     blockReasons?: string[];
+    message?: string;
     state: OptionCRunState;
   }> {
     const rt = runsById.get(runId);
@@ -271,11 +271,11 @@ export class OptionCDailyCloseOrchestrator {
     }
 
     if (rt.state.phase === 'notes') {
-      return this.closeNextNotesDay(ctx, rt);
+      return this.closeNextMonth(ctx, rt);
     }
 
     if (rt.state.phase === 'extracts') {
-      return this.finishExtractsPhase(ctx, rt);
+      return this.finalizeRun(ctx, rt);
     }
 
     return { status: 'done', state: rt.state };
@@ -283,7 +283,7 @@ export class OptionCDailyCloseOrchestrator {
 
   /**
    * Executa o loop completo da Opção C no servidor:
-   * inicia sessão → fecha cada pregão com delay → importa extratos → rebuild.
+   * inicia sessão → importa e fecha cada mês → rebuild com âncoras.
    */
   async runAll(
     ctx: UserContext,
@@ -310,7 +310,7 @@ export class OptionCDailyCloseOrchestrator {
     });
 
     const runId = state.runId;
-    logStep(runsById.get(runId)!, `run-all iniciado — ${state.calendar.length} pregão(ões), delay=${delay}ms`);
+    logStep(runsById.get(runId)!, `run-all iniciado — ${state.calendar.length} mês(es), delay=${delay}ms`);
 
     let iterations = 0;
     const maxIterations = state.calendar.length + 10;
@@ -351,164 +351,201 @@ export class OptionCDailyCloseOrchestrator {
     return finalRt?.state ?? state;
   }
 
-  private async closeNextNotesDay(ctx: UserContext, rt: OptionCRuntime) {
-    const { calendar, dayIndex, sessionId } = rt.state;
+  private async ensureHistoricalQuotes(ctx: UserContext, rt: OptionCRuntime): Promise<void> {
+    if (rt.quotesSynced) return;
+    logStep(rt, 'Baixando cotações históricas em lote (Brapi)...');
+    if (this.runRepo) {
+      try {
+        await this.runRepo.upsert(rt.state);
+      } catch {
+        /* best-effort */
+      }
+    }
+    try {
+      const quoteSync = new InvestQuoteSyncService(this.gateway);
+      const quotesFetched = await quoteSync.syncHistoricalFromBrapi(ctx);
+      logStep(rt, `Cotações atualizadas: ${quotesFetched} registro(s) global(is).`);
+
+      logStep(rt, 'Baixando cotações de opções pendentes...');
+      const optionQuoteSync = new OptionHistoricalSyncService(this.gateway);
+      await optionQuoteSync.syncMissingOptions(ctx);
+      logStep(rt, 'Verificação de opções pendentes concluída.');
+      rt.quotesSynced = true;
+    } catch (err) {
+      logStep(
+        rt,
+        `⚠️ Falha ao baixar cotações históricas: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+
+  private async closeNextMonth(ctx: UserContext, rt: OptionCRuntime) {
+    const { calendar, dayIndex } = rt.state;
     if (dayIndex >= calendar.length) {
-      logStep(rt, 'Fase notas concluída — iniciando extratos.');
-      await this.session.completePhase(ctx, sessionId);
+      logStep(rt, 'Todos os meses processados — finalizando.');
       rt.state.phase = 'extracts';
-      return this.finishExtractsPhase(ctx, rt);
+      return this.finalizeRun(ctx, rt);
     }
 
-    const day = calendar[dayIndex]!;
-    logStep(rt, `─── Pregão ${day} (${dayIndex + 1}/${calendar.length}) ───`);
+    const month = calendar[dayIndex]!;
+    const planEntry = rt.monthPlan[dayIndex];
+    if (!planEntry || planEntry.month !== month) {
+      throw new GatewayError(
+        'INVALID_CONTEXT',
+        `Plano mensal inconsistente para ${month}. Reinicie a Opção C.`,
+        409
+      );
+    }
 
+    logStep(rt, `─── Mês ${month} (${dayIndex + 1}/${calendar.length}) ───`);
+
+    await this.ensureHistoricalQuotes(ctx, rt);
     await this.ledger.reconcileCustody(ctx);
 
-    const dayLines = rt.linesByDate.get(day) ?? [];
-    if (dayLines.length) {
-      const imported = await this.ledger.importEntriesOnly(ctx, dayLines, {
-        sourceLabel: 'option_c_notes_day',
-      });
+    const importResult = await applyBtgMonthImport(
+      ctx,
+      this.ledger,
+      month,
+      planEntry.extractFile,
+      rt.notesFiles
+    );
+
+    logStep(
+      rt,
+      `Importação ${month}: notas ${importResult.notesOk ? 'OK' : 'pendente'}, caixa ${importResult.financialOk ? 'OK' : 'pendente'} — ${importResult.resultDetail}`
+    );
+
+    if (!importResult.applied) {
+      const blockMsg =
+        importResult.resultDetail ||
+        importResult.extract.importError ||
+        importResult.extract.parseError ||
+        `Falha ao importar mês ${month}.`;
+      logStep(rt, `⚠️ Mês ${month} não gravado: ${blockMsg}`);
+      if (rt.state.mode !== 'homologation') {
+        return {
+          status: 'blocked' as const,
+          day: month,
+          blockReasons: ['invest.reconcile.block.month_import'],
+          message: blockMsg,
+          state: rt.state,
+        };
+      }
+      logStep(rt, `Homologação: avançando para o próximo mês sem gravar ${month}.`);
+    } else {
       logStep(
         rt,
-        `Notas ${day}: ${imported.inserted} gravada(s), ${imported.skipped} pulada(s).`
+        `Gravado ${month}: notas +${importResult.notesInserted}/-${importResult.notesSkipped}, extrato +${importResult.extractInserted}/-${importResult.extractSkipped}.`
       );
-    }
 
-    const dayState = await this.session.getDay(ctx, sessionId, day);
-    if (!dayState.canClose && rt.state.mode !== 'homologation') {
-      logStep(
-        rt,
-        `Bloqueado em ${day}: ${dayState.pendingDecisions.length} pendência(s) — resolva na UI.`
-      );
-      return {
-        status: 'blocked' as const,
-        day,
-        pendingDecisions: dayState.pendingDecisions,
-        blockReasons: dayState.blockReasons,
-        state: rt.state,
-      };
-    }
-
-    if (!dayState.canClose && rt.state.mode === 'homologation') {
-      logStep(
-        rt,
-        `Homologação ${day}: ${dayState.pendingDecisions.length} pendência(s) registrada(s); avanço mantido.`
-      );
-    }
-
-    logStep(rt, `Importando notas para o dia ${day}... Materialização movida para o final da etapa de extratos.`);
-    const materialize = undefined;
-    // rt.state.mode === 'homologation'
-    //   ? await this.dailyClose.materializeDay(ctx, day)
-    //   : undefined;
-    if (rt.state.mode !== 'homologation') {
-      await this.session.closeDay(ctx, sessionId, day);
+      const bounds = monthBounds(month);
+      if (!bounds) {
+        logStep(rt, `⚠️ Mês inválido para rebuild: ${month}.`);
+      } else {
+        logStep(rt, `Rebuild patrimônio diário ${bounds.from} → ${bounds.to} (carga inicial + âncoras)…`);
+        if (this.runRepo) {
+          try {
+            await this.runRepo.upsert(rt.state);
+          } catch {
+            /* best-effort */
+          }
+        }
+        const rebuild = await this.patrimonyRebuild.rebuild(ctx, {
+          from: bounds.from,
+          to: bounds.to,
+          initialLoad: true,
+          onProgress: (daysWritten, daysSkipped, currentDay) => {
+            logStep(
+              rt,
+              `Rebuild ${month}: dia ${currentDay} (${daysWritten + daysSkipped} processados).`
+            );
+            if (this.runRepo) {
+              try {
+                this.runRepo.upsert(rt.state);
+              } catch {
+                /* best-effort */
+              }
+            }
+          },
+        });
+        logStep(
+          rt,
+          `Rebuild ${month}: ${rebuild.daysWritten} dia(s) gravados, ${rebuild.daysSkipped} pulados.`
+        );
+        rt.state.horizonTrustedThrough = bounds.to;
+      }
     }
 
     rt.state.dayIndex += 1;
-    rt.state.horizonTrustedThrough = day;
-    rt.state.lastDay = day;
-    logStep(rt, `✅ Dia ${day} fechado.`);
+    rt.state.lastDay = month;
+    logStep(rt, `✅ Mês ${month} fechado.`);
 
     if (rt.state.dayIndex >= calendar.length) {
-      logStep(rt, 'Calendário de notas esgotado — fase extratos.');
-      await this.session.completePhase(ctx, sessionId);
+      logStep(rt, 'Calendário mensal esgotado — finalizando.');
       rt.state.phase = 'extracts';
       return {
         status: 'phase_complete' as const,
-        day,
+        day: month,
         state: rt.state,
       };
     }
 
     return {
       status: 'closed' as const,
-      day,
-      materialize,
-      pendingDecisions: dayState.pendingDecisions,
+      day: month,
       state: rt.state,
     };
   }
 
-  private async finishExtractsPhase(ctx: UserContext, rt: OptionCRuntime) {
-    logStep(rt, `Importando ${rt.extractFiles.length} extrato(s) BTG…`);
+  private async finalizeRun(ctx: UserContext, rt: OptionCRuntime) {
+    await this.ensureHistoricalQuotes(ctx, rt);
 
-    const applied = await applyBtgExtractBatchUpload(ctx, this.ledger, rt.extractFiles);
-    const fileResults = applied.fileResults ?? [];
-    const importErrors = fileResults.filter((f: { importOk?: boolean }) => f.importOk === false).length;
-    logReconcileEvent(importErrors ? 'warn' : 'info', 'option-c.extracts.done', rt.state.organizationId, {
-      runId: rt.state.runId,
-      files: fileResults.length,
-      importErrors,
-      inserted: applied.totals?.inserted ?? 0,
-      skipped: applied.totals?.skipped ?? 0,
-      chainOk: applied.chainOk,
-      blockedMessage: applied.blockedMessage ?? null,
-    });
+    const firstMonth = rt.state.calendar[0];
+    const lastMonth = rt.state.calendar[rt.state.calendar.length - 1];
+    const fromBounds = firstMonth ? monthBounds(firstMonth) : null;
+    const toBounds = lastMonth ? monthBounds(lastMonth) : null;
 
-    if (importErrors > 0) {
-      logStep(rt, `⚠️ ${importErrors} extrato(s) com erro — divergência registrada.`);
-      if (rt.state.mode !== 'homologation') {
-        return {
-          status: 'blocked' as const,
-          blockReasons: ['invest.reconcile.block.extract_import'],
-          state: rt.state,
-        };
-      }
-      logStep(rt, 'Homologação: seguindo para rebuild mesmo com erro em extrato.');
-    }
-
-    logStep(rt, 'Baixando cotações históricas em lote (Brapi)...');
-    if (this.runRepo) {
-      try { await this.runRepo.upsert(rt.state); } catch { /* best-effort */ }
-    }
-    try {
-      const quoteSync = new InvestQuoteSyncService(this.gateway);
-      const quotesFetched = await quoteSync.syncHistoricalFromBrapi(ctx);
-      logStep(rt, `Cotações atualizadas com sucesso: ${quotesFetched} registros globais.`);
-
-      logStep(rt, 'Baixando cotações de opções pendentes...');
-      const optionQuoteSync = new OptionHistoricalSyncService(this.gateway);
-      await optionQuoteSync.syncMissingOptions(ctx);
-      logStep(rt, 'Verificação de opções pendentes concluída.');
-    } catch (err) {
-      logStep(rt, `⚠️ Falha ao baixar cotações históricas: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
-    logStep(rt, 'Rebuild patrimônio diário (intervalo completo)…');
-    if (this.runRepo) {
-      try { await this.runRepo.upsert(rt.state); } catch { /* best-effort */ }
-    }
-    const rebuild = await this.patrimonyRebuild.rebuild(ctx, {
-      onProgress: (daysWritten, daysSkipped, currentDay) => {
-        logStep(
-          rt,
-          `Rebuild em andamento... Dia ${currentDay} (${daysWritten + daysSkipped} dias processados).`
-        );
-        if (this.runRepo) {
-          try {
-            this.runRepo.upsert(rt.state);
-          } catch {
-            /* best-effort */
-          }
+    if (fromBounds && toBounds) {
+      logStep(
+        rt,
+        `Rebuild consolidado ${fromBounds.from} → ${toBounds.to} (validação final com âncoras)…`
+      );
+      if (this.runRepo) {
+        try {
+          await this.runRepo.upsert(rt.state);
+        } catch {
+          /* best-effort */
         }
-      },
-    });
-    logStep(
-      rt,
-      `Rebuild: ${rebuild.daysWritten} dia(s) gravados, ${rebuild.daysSkipped} pulados.`
-    );
+      }
+      const rebuild = await this.patrimonyRebuild.rebuild(ctx, {
+        from: fromBounds.from,
+        to: toBounds.to,
+        initialLoad: true,
+        onProgress: (daysWritten, daysSkipped, currentDay) => {
+          logStep(
+            rt,
+            `Rebuild final: dia ${currentDay} (${daysWritten + daysSkipped} processados).`
+          );
+        },
+      });
+      logStep(
+        rt,
+        `Rebuild final: ${rebuild.daysWritten} dia(s) gravados, ${rebuild.daysSkipped} pulados.`
+      );
+      rt.state.horizonTrustedThrough = toBounds.to;
+    }
 
     rt.state.phase = 'done';
     rt.state.extractPending = false;
     rt.state.runStatus = 'done';
     logStep(rt, '🎉 Opção C concluída. Confira Resultado histórico e Ações/FIIs.');
 
-    // Persiste estado final
     if (this.runRepo) {
-      try { await this.runRepo.upsert(rt.state); } catch { /* best-effort */ }
+      try {
+        await this.runRepo.upsert(rt.state);
+      } catch {
+        /* best-effort */
+      }
     }
 
     return {

@@ -243,8 +243,19 @@ export class HoldingPurgeKeepOpeningService {
         [orgId, openingRefs]
       );
 
+      const patrimonyLegsToRemove = Number(wouldPle[0]?.n ?? 0);
+      const financialLegsToRemove = Number(wouldFle[0]?.n ?? 0);
+      const businessEventsToRemove = Number(beCount[0]?.n ?? 0);
+      const totalAuxToRemove = Object.values(auxRowsToRemove).reduce((acc, val) => acc + val, 0);
+      
+      const isEmpty = 
+        patrimonyLegsToRemove === 0 &&
+        financialLegsToRemove === 0 &&
+        businessEventsToRemove === 0 &&
+        totalAuxToRemove === 0;
+
       const openingLegCount = Number(openingLegCountRow[0]?.n ?? 0);
-      let canPurge = openingLegCount > 0 || openingEventIds.length > 0;
+      let canPurge = openingLegCount > 0 || openingEventIds.length > 0 || isEmpty;
       let abortReason: string | undefined;
       if (!canPurge) {
         abortReason = `Sem abertura em ${openingDate} (${openingRef}). Purge cancelado.`;
@@ -255,9 +266,9 @@ export class HoldingPurgeKeepOpeningService {
         openingRef,
         openingEventIds,
         openingLegCount,
-        patrimonyLegsToRemove: Number(wouldPle[0]?.n ?? 0),
-        financialLegsToRemove: Number(wouldFle[0]?.n ?? 0),
-        businessEventsToRemove: Number(beCount[0]?.n ?? 0),
+        patrimonyLegsToRemove,
+        financialLegsToRemove,
+        businessEventsToRemove,
         auxRowsToRemove,
         canPurge,
         abortReason,

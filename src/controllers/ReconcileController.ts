@@ -499,14 +499,22 @@ export class ReconcileController {
               }
               // Persiste progresso a cada pregão
               await this.optionC.getRunWithFallback(runId); // atualiza cache
-              if (result.status === 'blocked' && state.mode !== 'homologation') break;
+              if (result.status === 'blocked' && state.mode !== 'homologation') {
+                if (result.message && state) {
+                  state.runStatus = 'error';
+                  state.runError = result.message;
+                }
+                break;
+              }
               if (result.status === 'done') break;
               if (delayMs > 0 && result.status !== 'phase_complete') {
                 await new Promise((resolve) => setTimeout(resolve, delayMs));
               }
             }
             const finalState = this.optionC.getRun(runId);
-            if (finalState) finalState.runStatus = finalState.phase === 'done' ? 'done' : 'running';
+            if (finalState && finalState.runStatus !== 'error') {
+              finalState.runStatus = finalState.phase === 'done' ? 'done' : 'running';
+            }
           } catch (error) {
             const current = this.optionC.getRun(runId);
             const message = error instanceof Error ? error.message : String(error);
