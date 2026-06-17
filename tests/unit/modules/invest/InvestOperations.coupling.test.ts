@@ -152,6 +152,34 @@ describe('Trade: link bidirecional entre pernas (ambas existem)', () => {
     expect(finRows.some((r) => r.status === 'cleared')).toBe(false);
   });
 
+  it('duplicata com skip_financial_ledger cria expectativa pending para LIQ BOLSA', async () => {
+    const gw = new InMemoryGateway();
+    await seedCatalog(gw);
+    const { ops } = buildStack(gw);
+
+    const line = {
+      date: '2026-01-16',
+      ticker: 'PRIO3',
+      operation: 'sell' as const,
+      quantity: 4000,
+      unit_price: 55,
+      total_net_value: 219983.99,
+      broker_note_ref: 'B3-NOTA-111#2026-01-16#1',
+      event_source_ref: 'B3-NOTA-111',
+      settlement_date: '2026-01-20',
+      skip_financial_ledger: true,
+    };
+
+    await ops.recordOperation(ctx, line);
+    await ops.recordOperation(ctx, line);
+
+    const pending = gw
+      .dump('financial_ledger_entries')
+      .filter((r) => !r.deleted_at && r.status === 'pending');
+    expect(pending).toHaveLength(1);
+    expect(String(pending[0]!.settlement_date).slice(0, 10)).toBe('2026-01-20');
+  });
+
   it('cost_adjustment cria ambas as pernas linkadas', async () => {
     const gw = new InMemoryGateway();
     await seedCatalog(gw);

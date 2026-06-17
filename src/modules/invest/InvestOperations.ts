@@ -647,7 +647,9 @@ export class InvestOperations {
     const row = patRows[0];
     if (!row) return false;
     const meta = InvestOperations.parseRowMetadata(row.metadata);
-    if (meta.skip_financial_ledger === true || meta.skip_financial_ledger === 1) return false;
+    if (meta.skip_financial_ledger === true || meta.skip_financial_ledger === 1) {
+      return this.ensurePendingFinancialLegForImportLine(ctx, line);
+    }
     await this.gateway.update(ic, 'patrimony_ledger_entries', String(row.id), {
       metadata: {
         ...meta,
@@ -656,7 +658,101 @@ export class InvestOperations {
         skip_financial_repaired_at: new Date().toISOString(),
       },
     });
+    return this.ensurePendingFinancialLegForImportLine(ctx, line);
+  }
+
+  /**
+   * Import mensal BTG: garante perna financeira pending para casamento LIQ BOLSA.
+   * Idempotente — nao duplica se BROKER_REF:{ref}:PENDING ja existe.
+   */
+  async ensurePendingFinancialLegForImportLine(
+    ctx: UserContext,
+    line: LedgerImportLine
+  ): Promise<boolean> {
+    if (line.skip_financial_ledger !== true) return false;
+    const ref = line.broker_note_ref?.trim();
+    if (!ref) return false;
+
+    const pendingRef = `BROKER_REF:${ref}:PENDING`;
+    const existingPending = await this.gateway.findWhere(
+      ctx,
+      'financial_ledger_entries',
+      { external_ref: pendingRef },
+      { limit: 1 }
+    );
+    if (existingPending.length) return false;
+
+    const op = String(line.operation);
+    const ticker = String(line.ticker || '').toUpperCase().trim();
+    if (!ticker) return false;
+    const assetType = String(line.asset_type || inferAssetType(ticker));
+    if (assetType === 'cash' || ticker.startsWith('CAIXA-')) return false;
+
+    const policy = await this.operationPolicies.resolve(ctx, {
+      operationCode: op,
+      assetType,
+      eventDate: line.date,
+    });
+    if (!policy.isTrade && !policy.isOptionTrade) return false;
+
+    const signedNet = Math.round(
+      Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)) * 100
+    ) / 100;
+    const totalCash = Math.abs(signedNet);
+    if (totalCash <= 0) return false;
+
+    const eventKind = inferBusinessEventKind(line, policy.businessEventKind) as BusinessEventKind;
+    const businessEventId = await this.resolveOrCreateEvent(ctx, line, eventKind);
+    const cashResolution = await this.resolveCashAccount(ctx, {
+      brokerCode: await this.brokerCodeFromLine(ctx, line),
+      sourceSystem: line.source_system,
+      currencyCode: line.currency ?? 'BRL',
+      eventDate: line.date,
+    });
+    const settleOn = String(line.settlement_date ?? line.date).slice(0, 10);
+    const fees = Math.abs(
+      (line.brokerage_fee ?? 0) + (line.b3_fees ?? 0) + (line.irrf_tax ?? 0)
+    );
+
+    await this.financialLedger.record(ctx, {
+      accountId: cashResolution.accountId,
+      transactionDate: line.date,
+      direction: signedNet >= 0 ? 'in' : 'out',
+      amount: totalCash,
+      description: line.notes ?? `Expectativa liquidacao ${settleOn} — ${op} ${ticker}`,
+      status: 'pending',
+      settlementDate: settleOn,
+      businessEventId,
+      externalRef: pendingRef,
+      metadata: {
+        legacy_op: 'pending_settlement',
+        broker_note_ref: ref,
+        skip_financial_ledger: true,
+        fees,
+        brokerage_fee: line.brokerage_fee ?? 0,
+        b3_fees: line.b3_fees ?? 0,
+        irrf_tax: line.irrf_tax ?? 0,
+        broker_code: cashResolution.brokerCode,
+        cash_ticker: cashResolution.cashTicker,
+        currency_code: cashResolution.currencyCode,
+        cash_policy_id: cashResolution.policyId,
+        backfilled_from_import: true,
+      },
+    });
     return true;
+  }
+
+  /** Reprocessa linhas de nota e cria expectativas pending faltantes. */
+  async backfillPendingFinancialForImportLines(
+    ctx: UserContext,
+    lines: LedgerImportLine[]
+  ): Promise<{ backfilled: number }> {
+    let backfilled = 0;
+    for (const line of lines) {
+      if (line.skip_financial_ledger !== true) continue;
+      if (await this.ensurePendingFinancialLegForImportLine(ctx, line)) backfilled += 1;
+    }
+    return { backfilled };
   }
 
   private async repairExistingTradeFromImportLine(
@@ -861,10 +957,14 @@ export class InvestOperations {
         line,
         ref
       );
+      let backfilledPending = false;
+      if (line.skip_financial_ledger === true) {
+        backfilledPending = await this.ensurePendingFinancialLegForImportLine(ctx, line);
+      }
       return {
         skipped: true,
         reason: `broker_note_ref ${ref} ja registrado`,
-        enriched: enriched || repaired || repairedSkipFinancial,
+        enriched: enriched || repaired || repairedSkipFinancial || backfilledPending,
         match: 'broker_note_ref',
       };
     }
@@ -880,10 +980,14 @@ export class InvestOperations {
         );
         const doubleCash = wouldDoubleCash(dup.existing, line);
         const sib = dup.fingerprintSiblings.length > 1 ? '; multiplas pernas no livro' : '';
+        let backfilledPending = false;
+        if (line.skip_financial_ledger === true) {
+          backfilledPending = await this.ensurePendingFinancialLegForImportLine(ctx, line);
+        }
         return {
           skipped: true,
           reason: `duplicata (${dup.match})${doubleCash ? '; caixa ja registrado' : ''}${sib}`,
-          enriched,
+          enriched: enriched || backfilledPending,
           match: dup.match,
         };
       }

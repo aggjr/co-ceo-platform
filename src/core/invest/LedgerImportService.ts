@@ -436,6 +436,34 @@ export class LedgerImportService {
    * apenas um "tocar" idempotente. Mantido por compatibilidade com chamadas
    * antigas; pode ser removido quando os callers forem auditados.
    */
+  async backfillPendingFinancialForImportLines(
+    ctx: UserContext,
+    lines: LedgerImportLine[]
+  ): Promise<{ backfilled: number }> {
+    return this.operations.backfillPendingFinancialForImportLines(ctx, lines);
+  }
+
+  async countPendingFinancialBySettlement(
+    ctx: UserContext,
+    from: string,
+    to: string
+  ): Promise<Record<string, number>> {
+    const rows = (await this.gateway.findWhere(
+      ctx,
+      'financial_ledger_entries',
+      { status: 'pending' },
+      { limit: 2000 }
+    )) as Array<{ settlement_date?: string; amount?: number; direction?: string }>;
+    const out: Record<string, number> = {};
+    for (const row of rows) {
+      const d = String(row.settlement_date ?? '').slice(0, 10);
+      if (!d || d < from || d > to) continue;
+      const sign = String(row.direction) === 'out' ? -1 : 1;
+      out[d] = (out[d] ?? 0) + sign * Math.abs(Number(row.amount ?? 0));
+    }
+    return out;
+  }
+
   async reconcileCustody(ctx: UserContext) {
     const from = '2000-01-01';
     const to = new Date().toISOString().slice(0, 10);

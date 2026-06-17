@@ -20,7 +20,7 @@ import {
   parseBtgBrokerageNoteBlocks,
   type BtgBrokerageNote,
 } from './btgBrokerageNoteParser';
-import { brokerageNotesToLedgerLines } from './btgBrokerageNoteLedgerTranslator';
+import { brokerageNotesToLedgerLines, suppressBrokerageNoteCashLines } from './btgBrokerageNoteLedgerTranslator';
 import { mapBrokerOrderToLedger } from './brokerOrderMapper';
 import { cashSettlementDate } from './settlementCalendar';
 import { pdfBufferToLines } from './btgPdfTextExtract';
@@ -675,6 +675,25 @@ export async function previewBtgBatchImport(
   };
 }
 
+/** Linhas de import (com skip_financial_ledger) para backfill de expectativas pending. */
+async function collectMonthImportLines(
+  noteFiles: BtgUploadFileInput[]
+): Promise<import('./ledgerTypes').LedgerImportLine[]> {
+  const lines: import('./ledgerTypes').LedgerImportLine[] = [];
+  for (const file of noteFiles) {
+    if (!isPdfPath(file.name)) continue;
+    try {
+      const rawLines = await pdfBufferToLines(decodeUploadBase64(file));
+      const notes = parseBtgBrokerageNoteBlocks(rawLines, file.name);
+      const { kept } = dedupeBrokerageNotes(notes);
+      lines.push(...suppressBrokerageNoteCashLines(brokerageNotesToLedgerLines(kept)));
+    } catch {
+      /* ilegível */
+    }
+  }
+  return lines;
+}
+
 export type BtgMonthImportApplyOptions = {
   /** Fechamento do extrato do mês anterior (cadeia de saldos). */
   previousClosingExtract?: number | null;
@@ -737,6 +756,24 @@ export async function applyBtgMonthImport(
   );
 
   const notesApply = await applyBtgBrokerageUpload(ctx, ledger, noteFiles);
+
+  const importLines = await collectMonthImportLines(noteFiles);
+  const backfill = await ledger.backfillPendingFinancialForImportLines(ctx, importLines);
+  const monthBoundsDates = monthBounds(preview.month);
+  const pendingByDay = monthBoundsDates
+    ? await ledger.countPendingFinancialBySettlement(
+        ctx,
+        monthBoundsDates.from,
+        monthBoundsDates.to
+      )
+    : {};
+  logInvestStdout(
+    'btg-import',
+    ctx.organizationId,
+    `PENDING_AFTER_NOTES month=${preview.month} backfilled=${backfill.backfilled} ` +
+      `lines=${importLines.length} byDay=${JSON.stringify(pendingByDay)}`
+  );
+
   await ledger.reconcileCustody(ctx);
   await ensureExtractDivergenceOperation(pool);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
