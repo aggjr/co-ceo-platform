@@ -14,6 +14,7 @@ import { LedgerImportService } from '../LedgerImportService';
 import { HoldingPurgeKeepOpeningService } from '../HoldingPurgeKeepOpeningService';
 import { PatrimonyDailyRebuildService } from '../PatrimonyDailyRebuildService';
 import { ReconciliationSessionService } from './ReconciliationSessionService';
+import { ReconciliationDiagnosticsService } from './ReconciliationDiagnosticsService';
 import {
   HomeBrokerSnapshotUploadService,
   type HomeBrokerSnapshotUploadResult,
@@ -82,6 +83,7 @@ export class OptionCDailyCloseOrchestrator {
   private readonly homeBrokerUpload: HomeBrokerSnapshotUploadService;
   private readonly holdingPurge: HoldingPurgeKeepOpeningService | null;
   private readonly runRepo: OptionCRunRepository | null;
+  private readonly diagnostics: ReconciliationDiagnosticsService;
 
   constructor(
     private readonly gateway: CoCeoDataGateway,
@@ -93,6 +95,7 @@ export class OptionCDailyCloseOrchestrator {
     this.homeBrokerUpload = new HomeBrokerSnapshotUploadService(gateway);
     this.holdingPurge = pool ? new HoldingPurgeKeepOpeningService(gateway, pool) : null;
     this.runRepo = pool ? new OptionCRunRepository(pool) : null;
+    this.diagnostics = new ReconciliationDiagnosticsService(gateway);
   }
 
   getRun(runId: string): OptionCRunState | null {
@@ -539,6 +542,27 @@ export class OptionCDailyCloseOrchestrator {
         `Rebuild final: ${rebuild.daysWritten} dia(s) gravados, ${rebuild.daysSkipped} pulados.`
       );
       rt.state.horizonTrustedThrough = toBounds.to;
+    }
+
+    if (toBounds) {
+      try {
+        const report = await this.diagnostics.build(ctx, toBounds.to);
+        const s = report.summary;
+        logStep(
+          rt,
+          `Diagnóstico: ${s.eventErrors} evento(s) com erro, ${s.cashErrors} caixa, ${s.criticalFindings} achado(s) crítico(s).`
+        );
+        const eventSample = report.businessEvents
+          .filter((r) => r.status === 'error')
+          .slice(0, 3)
+          .map((r) => `${r.date} ${r.tickers}: ${r.finding}`)
+          .join('; ');
+        if (eventSample) {
+          logStep(rt, `Eventos com erro (amostra): ${eventSample}`);
+        }
+      } catch (e) {
+        logReconcileFailure('option-c.diagnostics', ctx.organizationId ?? undefined, e);
+      }
     }
 
     rt.state.phase = 'done';

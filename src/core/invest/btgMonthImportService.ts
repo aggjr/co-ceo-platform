@@ -605,10 +605,11 @@ export async function applyBtgMonthImport(
   );
 
   const notesApply = await applyBtgBrokerageUpload(ctx, ledger, noteFiles);
+  await ledger.reconcileCustody(ctx);
   await ensureExtractDivergenceOperation(pool);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
     parseOptions: MONTH_IMPORT_EXTRACT_OPTS_APPLY,
-    keepUnmatchedLiqBolsaAsCash: true,
+    keepUnmatchedLiqBolsaAsCash: false,
   });
 
   const notesInserted = notesApply.totals.inserted;
@@ -616,8 +617,14 @@ export async function applyBtgMonthImport(
   const extractInserted = extractApply.inserted ?? 0;
   const extractSkipped = extractApply.skipped ?? 0;
 
+  const reconcileAfter = await ledger.reconcileCustody(ctx);
+
   const afterPreview = await previewBtgMonthImport(ctx, ledger, month, extractFile, noteFilesAll);
   const applied = Boolean(extractApply.importOk);
+
+  const pendingNote = reconcileAfter.pendingSync
+    ? ` trânsito: +${reconcileAfter.pendingSync.created}/-${reconcileAfter.pendingSync.cleared}.`
+    : '';
 
   return {
     ...afterPreview,
@@ -629,7 +636,7 @@ export async function applyBtgMonthImport(
     financialOk: applied ? preview.financialOk : afterPreview.financialOk,
     resultOk: applied && preview.resultOk,
     resultDetail: applied
-      ? `Importado: notas +${notesInserted}/-${notesSkipped}, extrato +${extractInserted}/-${extractSkipped}.`
+      ? `Importado: notas +${notesInserted}/-${notesSkipped}, extrato +${extractInserted}/-${extractSkipped}.${pendingNote}`
       : extractApply.importError || 'Falha ao gravar extrato.',
   };
 }

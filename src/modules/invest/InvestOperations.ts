@@ -1278,9 +1278,10 @@ export class InvestOperations {
     }
 
     // Trades e opcoes: geram fluxo de caixa real → perna patrimonial + perna financeira linkadas.
+    // skip_financial_ledger (import mensal BTG): patrimonio na nota, caixa liquidado no extrato
+    // via LIQ BOLSA — grava expectativa pending (nao cleared) para casamento com o extrato.
     // Corporate actions (split/bonus/revaluation): sem fluxo de caixa → apenas perna patrimonial.
-    // Pernas sem link sao legitimas quando genuinamente nao ha relacao com o outro mundo.
-    if (cashDirection && !line.skip_financial_ledger) {
+    if (cashDirection) {
       const cashResolution = await this.resolveCashAccount(ctx, {
         brokerCode: await this.brokerCodeFromLine(ctx, line),
         sourceSystem: line.source_system,
@@ -1288,33 +1289,52 @@ export class InvestOperations {
         eventDate: line.date,
       });
       const accountId = cashResolution.accountId;
-      const totalCash = Math.abs(Number(line.total_net_value ?? line.quantity * line.unit_price));
+      const signedNet = Math.round(
+        Number(line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)) * 100
+      ) / 100;
+      const totalCash = Math.abs(signedNet);
       const fees = Math.abs(
         (line.brokerage_fee ?? 0) + (line.b3_fees ?? 0) + (line.irrf_tax ?? 0)
       );
       if (totalCash > 0) {
-        const cashDefers = await this.settlementRules.defersCashSettlement({
-          tradeDate: line.date,
-          assetType: assetClass,
-          transactionType: op,
-          ticker,
-        });
-        const cashTxnDate = cashDefers
-          ? String(line.settlement_date ?? line.date).slice(0, 10)
-          : line.date;
+        const settleOn = String(line.settlement_date ?? line.date).slice(0, 10);
+        const finDirection = line.skip_financial_ledger
+          ? signedNet >= 0
+            ? 'in'
+            : 'out'
+          : cashDirection;
+        const finStatus = line.skip_financial_ledger ? 'pending' : 'cleared';
+        const cashDefers = line.skip_financial_ledger
+          ? true
+          : await this.settlementRules.defersCashSettlement({
+              tradeDate: line.date,
+              assetType: assetClass,
+              transactionType: op,
+              ticker,
+            });
+        const cashTxnDate =
+          finStatus === 'pending'
+            ? line.date
+            : cashDefers
+            ? settleOn
+            : line.date;
+        const externalSuffix = line.skip_financial_ledger ? ':PENDING' : ':CASH';
         const tradeFinEntry = await this.financialLedger.record(ctx, {
           accountId,
           transactionDate: cashTxnDate,
-          direction: cashDirection,
+          direction: finDirection,
           amount: totalCash,
-          description: line.notes ?? op,
-          status: 'cleared',
-          settlementDate: line.settlement_date ?? line.date,
+          description: line.skip_financial_ledger
+            ? line.notes ?? `Expectativa liquidacao ${settleOn} — ${op} ${ticker}`
+            : line.notes ?? op,
+          status: finStatus,
+          settlementDate: settleOn,
           businessEventId,
-          externalRef: ref ? `BROKER_REF:${ref}:CASH` : null,
+          externalRef: ref ? `BROKER_REF:${ref}${externalSuffix}` : null,
           metadata: {
-            legacy_op: op,
+            legacy_op: line.skip_financial_ledger ? 'pending_settlement' : op,
             broker_note_ref: ref ?? null,
+            skip_financial_ledger: Boolean(line.skip_financial_ledger),
             fees,
             brokerage_fee: line.brokerage_fee ?? 0,
             b3_fees: line.b3_fees ?? 0,
@@ -1327,12 +1347,9 @@ export class InvestOperations {
             cash_policy_id: cashResolution.policyId,
           },
         });
-        // Link bidirecional: trade tem AMBAS as pernas → relaciona-las explicitamente.
         await this.inventoryLedger.linkToFinancialLedger(ctx, tradePatEntry.id, tradeFinEntry.id);
         await this.financialLedger.linkToPatrimonyLedger(ctx, tradeFinEntry.id, tradePatEntry.id);
       }
-      // Se totalCash=0 (ex: exercicio de opcao sem valor residual), a perna
-      // patrimonial fica sem link financeiro — comportamento correto.
     }
     // split/bonus/revaluation: cashDirection=null → sem perna financeira.
     // Estas operacoes corporativas nao geram fluxo de caixa e legitimamente

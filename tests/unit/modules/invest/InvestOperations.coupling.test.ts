@@ -114,7 +114,7 @@ describe('Trade: link bidirecional entre pernas (ambas existem)', () => {
     expect(finLeg!.related_patrimony_ledger_id).toBe(patLeg!.id);
   });
 
-  it('buy com skip_financial_ledger grava patrimonio sem duplicar caixa', async () => {
+  it('buy com skip_financial_ledger grava patrimonio e expectativa pending (sem caixa liquidado)', async () => {
     const gw = new InMemoryGateway();
     await seedCatalog(gw);
     const { ops } = buildStack(gw);
@@ -129,12 +129,14 @@ describe('Trade: link bidirecional entre pernas (ambas existem)', () => {
       brokerage_fee: 10,
       b3_fees: 2.34,
       broker_note_ref: 'BUY-NOTE-NO-CASH',
+      settlement_date: '2026-04-21',
       skip_financial_ledger: true,
     });
 
     const patRows = gw.dump('patrimony_ledger_entries').filter((r) => !r.deleted_at);
     const finRows = gw.dump('financial_ledger_entries').filter((r) => !r.deleted_at);
     const patLeg = patRows.find((r) => r.movement_type === 'acquisition');
+    const pendingLeg = finRows.find((r) => r.status === 'pending');
     const meta = JSON.parse(String(patLeg?.metadata ?? '{}'));
 
     expect(patLeg).toBeTruthy();
@@ -142,7 +144,12 @@ describe('Trade: link bidirecional entre pernas (ambas existem)', () => {
     expect(Number(patLeg!.unit_value)).toBe(52);
     expect(meta.total_net_value).toBe(-5212.34);
     expect(meta.skip_financial_ledger).toBe(true);
-    expect(finRows).toHaveLength(0);
+    expect(finRows).toHaveLength(1);
+    expect(pendingLeg).toBeTruthy();
+    expect(pendingLeg!.direction).toBe('out');
+    expect(Number(pendingLeg!.amount)).toBeCloseTo(5212.34, 2);
+    expect(String(pendingLeg!.settlement_date).slice(0, 10)).toBe('2026-04-21');
+    expect(finRows.some((r) => r.status === 'cleared')).toBe(false);
   });
 
   it('cost_adjustment cria ambas as pernas linkadas', async () => {
