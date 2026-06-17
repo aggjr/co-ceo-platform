@@ -147,6 +147,7 @@ export class OptionCDailyCloseOrchestrator {
 
     const mode = input.mode ?? 'homologation';
 
+    let purgeLog: string[] = [];
     if (input.resetFirst && this.holdingPurge) {
       logReconcileEvent('info', 'option-c.reset.start', ctx.organizationId, {
         mode,
@@ -156,7 +157,8 @@ export class OptionCDailyCloseOrchestrator {
       });
       console.log(`[OptionC] org=${ctx.organizationId} reset (purge) antes da sessão de notas…`);
       try {
-        await this.holdingPurge.purgeKeepOpening(ctx);
+        const purgeResult = await this.holdingPurge.purgeKeepOpening(ctx);
+        purgeLog = purgeResult.activityLog?.map((s) => s.message) ?? [];
         logReconcileEvent('info', 'option-c.reset.done', ctx.organizationId, { mode });
         console.log(`[OptionC] org=${ctx.organizationId} reset concluído — abertura preservada.`);
       } catch (err) {
@@ -213,7 +215,7 @@ export class OptionCDailyCloseOrchestrator {
         mode,
         extractPending: true,
         lastDay: null,
-        activityLog: [...(started.activityLog?.map((s) => s.message) ?? [])],
+        activityLog: [...purgeLog, ...(started.activityLog?.map((s) => s.message) ?? [])],
         runStatus: 'idle',
         runError: null,
         schemaApplied: started.schemaApplied,

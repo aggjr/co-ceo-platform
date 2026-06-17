@@ -287,7 +287,11 @@ export class ReconciliationSessionService {
         const purgeResult = await this.holdingPurge.purgeKeepOpening(ctx);
         activityLog.push(...(purgeResult.activityLog ?? []));
       } else {
-        log('Modo recover — livro atual preservado', 'session.recover', 'info');
+        if (pf.needsDataModeChoice) {
+          log('Modo recover — livro atual preservado', 'session.recover', 'info');
+        } else {
+          log('Base vazia (ou recém-resetada) — pronta para receber notas', 'session.start', 'info');
+        }
       }
     }
 
