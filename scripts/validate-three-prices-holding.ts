@@ -21,6 +21,7 @@ import {
 } from '../src/core/invest/portfolioThreePrices';
 import { computeThreePricesByUnderlying } from '../src/core/invest/threePricesEngine';
 import { validateEquityThreePrices } from '../src/core/invest/threePricesValidation';
+import { ThreePricesContextFactory } from '../src/core/invest/ThreePricesContextFactory';
 import { InvestAssetProjection } from '../src/modules/invest/sync/InvestAssetProjection';
 import { LedgerEventProjection } from '../src/modules/invest/sync/LedgerEventProjection';
 
@@ -44,10 +45,13 @@ async function main() {
 
   const projection = new InvestAssetProjection(gateway);
   const ledger = new LedgerEventProjection(gateway);
+  const threeFactory = new ThreePricesContextFactory(gateway);
+  const threeCtx = await threeFactory.build(ctx);
+  const threeOpts = { ctx: threeCtx };
   const today = new Date().toISOString().slice(0, 10);
   const events = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
-  const engineSnapshots = computeThreePricesByUnderlying(events);
-  const threeByUnderlying = buildThreeAvgPricesByUnderlying(events);
+  const engineSnapshots = computeThreePricesByUnderlying(events, threeOpts, today);
+  const threeByUnderlying = buildThreeAvgPricesByUnderlying(events, threeOpts);
 
   const rows = await projection.listActiveAssets(ctx);
   const { assets: ledgerCustody } = rebuildCustodyFromLedger(events);

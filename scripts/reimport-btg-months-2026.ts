@@ -4,8 +4,14 @@
  *
  *   npx ts-node scripts/reimport-btg-months-2026.ts --analyze
  *   npx ts-node scripts/reimport-btg-months-2026.ts --apply
+ *
+ * Fonte padrão: co_ceo_platform (dados) — BTG_DADOS_DIR para override.
  *   npx ts-node scripts/reimport-btg-months-2026.ts --apply --from 2026-02
  *   npx ts-node scripts/reimport-btg-months-2026.ts --apply --force   (pula check de reconciliação)
+ *
+ * Carga inicial completa (reset + abertura + import + backfill):
+ *   npm run invest:initial-load-2026
+ *   npm run invest:initial-load-2026 -- --reset
  *
  * Ao final exibe comparativo de rentabilidade mensal CO-CEO vs homebroker BTG.
  * Nota: a rentabilidade CO-CEO é calculada a partir de invest_portfolio_daily.
@@ -22,17 +28,24 @@ import { LedgerImportService } from '../src/core/invest/LedgerImportService';
 import { MONTH_IMPORT_CASH_TOLERANCE } from '../src/core/invest/btgExtractBatchReconcile';
 import {
   applyBtgMonthImport,
+  buildMonthReconcileLedger,
+  filterLedgerOpeningOnly,
+  previewBtgBatchImport,
   previewBtgMonthImport,
 } from '../src/core/invest/btgMonthImportService';
+import type { LedgerEvent } from '../src/core/invest/CustodyEngine';
 import type { BtgUploadFileInput } from '../src/core/invest/btgUploadImportService';
 import { settledCashBalanceFromLedger } from '../src/core/invest/cashInvestLedger';
 import {
   BTG_MONTHS_2026,
   btgSourcesBase,
-  listNotePdfs,
+  extractsDir,
+  listAllNoteUploads,
   resolveExtractPath,
   resolveNotesDir,
 } from './lib/btg-2026-months';
+import { createInvestPool } from './lib/invest-db-pool';
+import { runBackfillPatrimonyDaily } from './backfill-daily-patrimony';
 
 dotenv.config();
 
@@ -41,7 +54,13 @@ const ROOT = path.join(__dirname, '..');
 const APPLY = process.argv.includes('--apply');
 const ANALYZE = process.argv.includes('--analyze') || !APPLY;
 const FORCE = process.argv.includes('--force');
-const FROM = process.argv.find((a) => a.startsWith('--from='))?.slice(7) || '2026-01';
+const SKIP_BACKFILL = process.argv.includes('--skip-backfill');
+const FROM =
+  process.argv.find((a) => a.startsWith('--from='))?.slice(7) ||
+  (process.argv.includes('--from')
+    ? process.argv[process.argv.indexOf('--from') + 1]
+    : undefined) ||
+  '2026-01';
 
 /**
  * Rentabilidade mensal reportada pelo homebroker BTG (tela de Performance).
@@ -71,13 +90,22 @@ function brl(n: number | null | undefined): string {
 
 type Row = Record<string, string | number | boolean>;
 
+function buildUploadBundles(fromMonth: string) {
+  const base = btgSourcesBase();
+  const extDir = extractsDir(base);
+  const allNotes = listAllNoteUploads(base);
+  const extractFiles = BTG_MONTHS_2026.filter((s) => s.month >= fromMonth).map((spec) =>
+    toUpload(resolveExtractPath(base, spec), extDir)
+  );
+  return { base, extDir, allNotes, extractFiles };
+}
+
 async function analyzeAll(
   ctx: ReturnType<typeof installerContext> & { organizationId: string },
   ledger: LedgerImportService
 ) {
-  const base = btgSourcesBase();
+  const { base, allNotes, extractFiles } = buildUploadBundles(FROM);
   const rows: Row[] = [];
-  let prevClosing: number | null = null;
 
   for (const spec of BTG_MONTHS_2026) {
     if (spec.month < FROM) continue;
@@ -89,22 +117,34 @@ async function analyzeAll(
         ok: false,
         detalhe: !fs.existsSync(extractPath) ? 'extrato ausente' : 'pasta notas ausente',
       });
-      continue;
     }
+  }
+  if (rows.some((r) => !r.ok)) return rows;
 
-    const notePdfs = listNotePdfs(notesDir);
-    const extractFile = toUpload(extractPath, base);
-    const noteFiles = notePdfs.map((p) => toUpload(p, notesDir));
-    const preview = await previewBtgMonthImport(ctx, ledger, spec.month, extractFile, noteFiles);
+  if (!allNotes.length) {
+    return BTG_MONTHS_2026.filter((s) => s.month >= FROM).map((spec) => ({
+      mês: spec.label,
+      ok: false,
+      detalhe: 'nenhuma nota PDF na pasta (dados)',
+    }));
+  }
 
+  const batch = await previewBtgBatchImport(ctx, ledger, allNotes, extractFiles, {
+    resetFirst: true,
+  });
+
+  let prevClosing: number | null = null;
+  for (const preview of batch.months) {
+    const spec = BTG_MONTHS_2026.find((s) => s.month === preview.month);
+    const label = spec?.label ?? preview.month;
     const opening = preview.extract.openingExtract ?? null;
     const closing = preview.extract.closingExtract ?? null;
     const chainOk =
       prevClosing == null ||
-      (opening != null &&
-        Math.abs(opening - prevClosing) <= MONTH_IMPORT_CASH_TOLERANCE);
+      (opening != null && Math.abs(opening - prevClosing) <= MONTH_IMPORT_CASH_TOLERANCE);
 
     const ok =
+      preview.status !== 'blocked' &&
       preview.notesOk &&
       preview.extract.parseOk &&
       preview.extract.openingLedgerOk === true &&
@@ -112,16 +152,15 @@ async function analyzeAll(
       chainOk;
 
     rows.push({
-      mês: spec.label,
+      mês: label,
       ok,
       notas: preview.notesOk,
       financeiro: preview.extract.closingLedgerOk === true,
       resultado: preview.resultOk,
-      já_importado: preview.extract.monthAlreadyImported ? 'sim' : 'não',
+      status: preview.status,
       cadeia: chainOk ? 'OK' : 'Não',
       'ini extrato': brl(opening),
       'fim extrato': brl(closing),
-      'livro fim': brl(preview.extract.closingLedgerBalance ?? null),
       'Δ fim': brl(preview.extract.closingLedgerDelta ?? null),
       detalhe: preview.resultDetail,
     });
@@ -211,7 +250,7 @@ async function printReturnComparison(pool: mysql.Pool): Promise<void> {
     }
     console.warn('\nPossíveis causas: operação patrimonial com sinal errado, abertura incorreta,');
     console.warn('ou invest_portfolio_daily não recalculado após reimport.');
-    console.warn('Execute: npx ts-node scripts/backfill-daily-patrimony.ts --from 2026-01-01');
+    console.warn('Execute: npx ts-node scripts/backfill-daily-patrimony.ts --from=2026-01-01');
   } else {
     const hasData = rows.some((r) => r['CO-CEO %'] !== '(sem dados)');
     if (hasData) {
@@ -222,13 +261,27 @@ async function printReturnComparison(pool: mysql.Pool): Promise<void> {
   }
 }
 
-async function applyMonth(spec: (typeof BTG_MONTHS_2026)[0], ctx: Parameters<typeof analyzeAll>[0], ledger: LedgerImportService) {
+async function applyMonth(
+  spec: (typeof BTG_MONTHS_2026)[0],
+  ctx: Parameters<typeof analyzeAll>[0],
+  ledger: LedgerImportService,
+  previousClosingExtract: number | null,
+  workingLedger: LedgerEvent[]
+): Promise<{
+  spec: (typeof BTG_MONTHS_2026)[0];
+  cashEnd: number;
+  delta: number;
+  closingExtract: number | null;
+  workingLedger: LedgerEvent[];
+}> {
   const base = btgSourcesBase();
   const extractPath = resolveExtractPath(base, spec);
   const notesDir = resolveNotesDir(base, spec)!;
-  const notePdfs = listNotePdfs(notesDir);
-  const extractFile = toUpload(extractPath, base);
-  const noteFiles = notePdfs.map((p) => toUpload(p, notesDir));
+  if (!notesDir) {
+    throw new Error(`${spec.label}: pasta de notas ausente`);
+  }
+  const extractFile = toUpload(extractPath, extractsDir(base));
+  const allNoteUploads = listAllNoteUploads(base);
 
   console.log(`\n========== ${spec.label} ==========`);
   execSync(`npx ts-node scripts/purge-invest-month.ts ${spec.month} --confirm`, {
@@ -236,7 +289,11 @@ async function applyMonth(spec: (typeof BTG_MONTHS_2026)[0], ctx: Parameters<typ
     cwd: ROOT,
   });
 
-  const before = await previewBtgMonthImport(ctx, ledger, spec.month, extractFile, noteFiles);
+  const before = await previewBtgMonthImport(ctx, ledger, spec.month, extractFile, allNoteUploads, {
+    baseLedger: workingLedger,
+    previousClosingExtract,
+    simulateFreshImport: true,
+  });
   if (!before.notesOk) {
     throw new Error(`${spec.label}: notas não OK — ${before.notesDetail}`);
   }
@@ -262,21 +319,32 @@ async function applyMonth(spec: (typeof BTG_MONTHS_2026)[0], ctx: Parameters<typ
     }
   }
 
-  const applied = await applyBtgMonthImport(ctx, ledger, spec.month, extractFile, noteFiles);
+  const applied = await applyBtgMonthImport(ctx, ledger, spec.month, extractFile, allNoteUploads, {
+    previousClosingExtract,
+    simulateFreshImport: true,
+    baseLedger: workingLedger,
+  });
   if (!applied.applied) {
     throw new Error(`${spec.label}: apply falhou — ${applied.resultDetail}`);
   }
 
   const closingDate = applied.extract.closingDate || `${spec.month}-28`;
-  const today = new Date().toISOString().slice(0, 10);
-  const events = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
-  const cashEnd = settledCashBalanceFromLedger(events, closingDate);
-  const delta = (applied.extract.closingExtract ?? 0) - cashEnd;
+  const reconcileLedger = await buildMonthReconcileLedger(spec.month, extractFile, workingLedger);
+  const cashEnd = settledCashBalanceFromLedger(reconcileLedger, closingDate);
+  const closingExtract = applied.extract.closingExtract ?? null;
+  const delta = closingExtract != null ? closingExtract - cashEnd : 0;
 
   console.log('Notas +', applied.notesInserted, 'Extrato +', applied.extractInserted);
-  console.log('Saldo caixa livro:', brl(cashEnd), '| extrato:', brl(applied.extract.closingExtract), '| Δ:', brl(delta));
+  console.log(
+    'Saldo caixa (série extrato):',
+    brl(cashEnd),
+    '| extrato:',
+    brl(closingExtract),
+    '| Δ:',
+    brl(delta)
+  );
 
-  if (Math.abs(delta) > MONTH_IMPORT_CASH_TOLERANCE) {
+  if (closingExtract != null && Math.abs(delta) > MONTH_IMPORT_CASH_TOLERANCE) {
     const msg = `${spec.label}: Δ fim ${delta.toFixed(2)} acima da tolerância R$ ${MONTH_IMPORT_CASH_TOLERANCE}`;
     if (FORCE) {
       console.warn(`AVISO (--force): ${msg}`);
@@ -284,30 +352,22 @@ async function applyMonth(spec: (typeof BTG_MONTHS_2026)[0], ctx: Parameters<typ
       throw new Error(msg);
     }
   }
-  return { spec, cashEnd, delta };
+  const nextWorkingLedger = reconcileLedger;
+  return { spec, cashEnd, delta, closingExtract, workingLedger: nextWorkingLedger };
 }
 
 async function main() {
-  const password = process.env.REMOTE_DB_PASSWORD ?? process.env.DB_PASSWORD;
-  if (!password) {
-    console.error('Defina DB_PASSWORD ou REMOTE_DB_PASSWORD.');
-    process.exit(1);
-  }
-
-  const pool = mysql.createPool({
-    host: process.env.REMOTE_DB_HOST || process.env.DB_HOST || '127.0.0.1',
-    user: process.env.REMOTE_DB_USER || process.env.DB_USER || 'root',
-    password,
-    database: process.env.REMOTE_DB_NAME || process.env.DB_NAME || 'co_ceo_platform',
-    connectTimeout: 30000,
-  });
+  const pool = createInvestPool();
 
   const ctx = { ...installerContext(), organizationId: ORG, scope: 'node' as const };
   const ledger = new LedgerImportService(new CoCeoDataGateway(pool));
 
   try {
     if (ANALYZE) {
-      console.log('\n=== Análise jan–jun/2026 (livro remoto) ===\n');
+      console.log('\n=== Análise jan–jun/2026 (livro remoto) ===');
+      console.log(`Fonte: ${btgSourcesBase()}`);
+      console.log(`Extratos: ${extractsDir()}`);
+      console.log(`Notas: ${path.join(btgSourcesBase(), 'Notas de Corretagem')}\n`);
       const rows = await analyzeAll(ctx, ledger);
       console.table(rows);
       const bad = rows.filter((r) => !r.ok);
@@ -322,13 +382,20 @@ async function main() {
 
     if (APPLY) {
       console.log('\n=== Reimportação (--apply) ===');
+      const today = new Date().toISOString().slice(0, 10);
+      const dbLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+      let workingLedger = filterLedgerOpeningOnly(dbLedger);
       const results = [];
+      let prevClosing: number | null = null;
       for (const spec of BTG_MONTHS_2026) {
         if (spec.month < FROM) {
           console.log(`Pulando ${spec.label} (--from ${FROM})`);
           continue;
         }
-        results.push(await applyMonth(spec, ctx, ledger));
+        const r = await applyMonth(spec, ctx, ledger, prevClosing, workingLedger);
+        results.push(r);
+        workingLedger = r.workingLedger;
+        if (r.closingExtract != null) prevClosing = r.closingExtract;
       }
       console.log('\n=== Resumo de caixa por mês ===');
       console.table(
@@ -339,16 +406,18 @@ async function main() {
           ok: Math.abs(r.delta) <= MONTH_IMPORT_CASH_TOLERANCE ? 'OK' : 'ATENÇÃO',
         }))
       );
+
+      if (!SKIP_BACKFILL) {
+        console.log('\n=== Backfill patrimônio diário ===');
+        await runBackfillPatrimonyDaily(pool, '2026-01-01', ORG);
+      }
     }
 
     // Mostra comparativo de rentabilidade em qualquer modo
     await printReturnComparison(pool);
 
-    if (APPLY) {
-      console.log('\nPróximos passos:');
-      console.log('  1. Se invest_portfolio_daily estava vazio, execute:');
-      console.log('     npx ts-node scripts/backfill-daily-patrimony.ts --from 2026-01-01');
-      console.log('  2. Rode novamente com --analyze para ver os dados finais.');
+    if (APPLY && SKIP_BACKFILL) {
+      console.log('\nBackfill pulado (--skip-backfill).');
     }
   } finally {
     await pool.end();

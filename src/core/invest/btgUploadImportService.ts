@@ -19,6 +19,7 @@ import { pdfBufferToLines, pdfBufferToText } from './btgPdfTextExtract';
 import { LedgerImportService } from './LedgerImportService';
 import { buildBtgExtractResolvers } from './buildBtgExtractResolvers';
 import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
+import { MAIN_CASH_TICKER } from './ledgerTypes';
 import {
   extractMovementBlock,
   lastExtractCashPoint,
@@ -259,6 +260,54 @@ function signedCashValue(line: LedgerImportLine): number {
   return Math.round(Number(line.total_net_value ?? 0) * 100) / 100;
 }
 
+/** PDF pode duplicar LIQ BOLSA — mesma chave do parser de extrato. */
+export function dedupeLiqBolsaImportLines(lines: LedgerImportLine[]): LedgerImportLine[] {
+  const seen = new Set<string>();
+  const out: LedgerImportLine[] = [];
+  for (const line of lines) {
+    if (!isLiqBolsaLine(line)) {
+      out.push(line);
+      continue;
+    }
+    const key = `${String(line.date).slice(0, 10)}|${Math.round(Number(line.total_net_value ?? 0) * 100)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(line);
+  }
+  return out;
+}
+
+/**
+ * Divergencia patrimonial quando o pool das notas nao fecha com o LIQ do extrato.
+ * Caixa vem integralmente do LIQ; esta linha documenta o delta no PM gerencial.
+ */
+function liqNoteCashDivergenceLine(
+  liqLine: LedgerImportLine,
+  liqNet: number,
+  poolSumCents: number
+): LedgerImportLine | null {
+  const delta = Math.round((liqNet - poolSumCents / 100) * 100) / 100;
+  if (Math.abs(delta) < 0.01) return null;
+  const ref = liqLine.broker_note_ref || `BTG-EXT-${liqLine.date}`;
+  const poolNet = Math.round((poolSumCents / 100) * 100) / 100;
+  return {
+    date: liqLine.date,
+    ticker: MAIN_CASH_TICKER,
+    operation: 'extract_divergence',
+    quantity: 0,
+    unit_price: Math.abs(delta),
+    total_net_value: Math.abs(delta),
+    asset_type: 'cash',
+    broker_note_ref: `${ref}#LIQ-NOTE-DIV`,
+    event_source_ref: `BTG-LIQ-NOTE-DIV:${String(liqLine.date).slice(0, 10)}:${Math.round(Math.abs(delta) * 100)}`,
+    notes:
+      `Divergencia LIQ vs pool notas: liquido extrato ${liqNet.toFixed(2)} ` +
+      `pool notas ${poolNet.toFixed(2)} delta ${delta.toFixed(2)}`,
+    skip_financial_ledger: true,
+    impacts_managerial_price: true,
+  };
+}
+
 async function settleLiqBolsaEntries(
   ctx: UserContext,
   ledger: Pick<LedgerImportService, 'settleLiqBolsa'>,
@@ -294,6 +343,10 @@ async function settleLiqBolsaEntries(
     if (options?.keepUnmatchedAsCash) {
       keptAsCash += 1;
       out.push(line);
+      if (result.status === 'blocked' && result.sumCents > 0) {
+        const divLine = liqNoteCashDivergenceLine(line, net, result.sumCents);
+        if (divLine) out.push(divLine);
+      }
       continue;
     }
     unresolved.push({
@@ -659,10 +712,12 @@ export async function parseExtractUploadImportLines(
     mergedOptions
   );
   return assignExtractRefs(
-    rawEntries.map((e) => ({
-      ...e,
-      operation: e.operation as LedgerTransactionType,
-    }))
+    dedupeLiqBolsaImportLines(
+      rawEntries.map((e) => ({
+        ...e,
+        operation: e.operation as LedgerTransactionType,
+      }))
+    )
   );
 }
 

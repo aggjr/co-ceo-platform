@@ -36,7 +36,7 @@ function renderBatchPreview(preview) {
       m.liqBolsaOk === true
         ? 'OK'
         : m.liqBolsaOk === false
-          ? '<span class="monthly-badge monthly-badge--err">Bloqueado</span>'
+          ? '<span class="monthly-badge monthly-badge--idle">Pendente</span>'
           : '—';
     const detailParts = [m.resultDetail, m.liqBolsaDetail, m.notesDetail, m.financialDetail].filter(
       Boolean

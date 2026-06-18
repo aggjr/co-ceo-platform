@@ -45,12 +45,17 @@ const DELETE_PLAN = [
 ];
 
 async function main() {
-  const host = process.env.REMOTE_DB_HOST || '69.62.99.34';
+  const password = process.env.REMOTE_DB_PASSWORD ?? process.env.DB_PASSWORD;
+  if (!password) {
+    console.error('Defina DB_PASSWORD ou REMOTE_DB_PASSWORD.');
+    process.exit(1);
+  }
+  const host = process.env.REMOTE_DB_HOST || process.env.DB_HOST || '127.0.0.1';
   const conn = await mysql.createConnection({
     host,
-    user: process.env.REMOTE_DB_USER || 'root',
-    password: process.env.REMOTE_DB_PASSWORD,
-    database: process.env.REMOTE_DB_NAME || 'co_ceo_platform',
+    user: process.env.REMOTE_DB_USER || process.env.DB_USER || 'root',
+    password,
+    database: process.env.REMOTE_DB_NAME || process.env.DB_NAME || 'co_ceo_platform',
     charset: 'utf8mb4',
   });
 

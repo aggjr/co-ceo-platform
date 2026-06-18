@@ -4,6 +4,9 @@ import { SYSTEM_INSTALLER_USER_ID } from '../../../core/dal/types';
 import type { LedgerEvent } from '../../../core/invest/CustodyEngine';
 import type { LedgerTransactionType } from '../../../core/invest/ledgerTypes';
 
+/** Livro completo da org — default do gateway (500) truncava projeção e os 3 preços. */
+const FULL_LEDGER_READ_LIMIT = 250_000;
+
 /**
  * Reconstrói LedgerEvent[] (shape consumido por CustodyEngine,
  * threePricesEngine, PnLPivotEngine, PatrimonyMtmDailyEngine) lendo do
@@ -142,10 +145,12 @@ export class LedgerEventProjection {
       scope: 'global',
     };
 
-    const items = await this.gateway.findWhere(installer, 'patrimony_items', {
-      organization_id: orgId,
-      source_module: 'INVEST',
-    });
+    const items = await this.gateway.findWhere(
+      installer,
+      'patrimony_items',
+      { organization_id: orgId, source_module: 'INVEST' },
+      { limit: FULL_LEDGER_READ_LIMIT }
+    );
     const itemById = new Map<string, Record<string, unknown>>();
     for (const it of items) itemById.set(String(it.id), it);
 
@@ -162,12 +167,18 @@ export class LedgerEventProjection {
     const accountById = new Map<string, Record<string, unknown>>();
     for (const acc of accounts) accountById.set(String(acc.id), acc);
 
-    const pl = await this.gateway.findWhere(installer, 'patrimony_ledger_entries', {
-      organization_id: orgId,
-    });
-    const fl = await this.gateway.findWhere(installer, 'financial_ledger_entries', {
-      organization_id: orgId,
-    });
+    const pl = await this.gateway.findWhere(
+      installer,
+      'patrimony_ledger_entries',
+      { organization_id: orgId },
+      { limit: FULL_LEDGER_READ_LIMIT }
+    );
+    const fl = await this.gateway.findWhere(
+      installer,
+      'financial_ledger_entries',
+      { organization_id: orgId },
+      { limit: FULL_LEDGER_READ_LIMIT }
+    );
 
     const events: Array<LedgerEvent & { _sortKey: string }> = [];
 

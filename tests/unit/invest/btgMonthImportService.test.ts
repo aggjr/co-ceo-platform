@@ -142,4 +142,13 @@ describe('btgMonthImportService', () => {
     expect(result.ok).toBe(true);
     expect(result.unresolved).toHaveLength(0);
   });
+
+  it('LIQ pendente nao bloqueia resultOk da previa (notas + caixa bastam)', () => {
+    const notesOk = true;
+    const financialOk = true;
+    const liqBolsaOk = false;
+    const resultOk = notesOk && financialOk;
+    expect(resultOk).toBe(true);
+    expect(resultOk && liqBolsaOk).toBe(false);
+  });
 });

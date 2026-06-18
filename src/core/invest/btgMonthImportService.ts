@@ -39,6 +39,7 @@ import {
   parseExtractUploadImportLines,
   previewBtgBrokerageUpload,
   previewBtgExtractUpload,
+  dedupeLiqBolsaImportLines,
 } from './btgUploadImportService';
 import {
   consumeSignedCentsSubset,
@@ -79,11 +80,12 @@ export type BtgMonthImportPreview = {
   month: string;
   notesOk: boolean;
   financialOk: boolean;
+  /** Notas + caixa (extrato) — LIQ BOLSA nao bloqueia importacao. */
   resultOk: boolean;
   notesDetail: string;
   financialDetail: string;
   resultDetail: string;
-  /** Previa estrita: casamento LIQ BOLSA x expectativas pending das notas. */
+  /** Relatorio: casamento LIQ BOLSA x expectativas pending das notas (informativo). */
   liqBolsaOk?: boolean;
   liqBolsaDetail?: string;
   notesFilesInFolder: number;
@@ -554,8 +556,11 @@ export async function previewBtgMonthImport(
     liqBolsaDetail = liq.detail;
   }
 
-  const resultOk = flags.resultOk && liqBolsaOk;
-  const resultDetail = liqBolsaOk ? flags.resultDetail : liqBolsaDetail;
+  const resultOk = flags.resultOk;
+  const resultDetail =
+    flags.resultOk && !liqBolsaOk && liqBolsaDetail
+      ? `${flags.resultDetail} LIQ BOLSA (relatorio): ${liqBolsaDetail}`
+      : flags.resultDetail;
 
   return {
     kind: 'month_import',
@@ -709,7 +714,7 @@ export async function previewBtgBatchImport(
 }
 
 /** Linhas de import (com skip_financial_ledger) para backfill de expectativas pending. */
-async function collectMonthImportLines(
+export async function collectMonthImportLines(
   noteFiles: BtgUploadFileInput[]
 ): Promise<import('./ledgerTypes').LedgerImportLine[]> {
   const lines: import('./ledgerTypes').LedgerImportLine[] = [];
@@ -740,6 +745,24 @@ function signedCentsFromSkipFinancialLine(line: LedgerImportLine): number | null
     ) / 100;
   if (Math.abs(signed) < 0.01) return null;
   return Math.round(signed * 100);
+}
+
+/** Pool de expectativa LIQ (centavos) por data de liquidacao — usado em auditoria offline. */
+export function buildPendingPoolBySettlement(
+  lines: LedgerImportLine[],
+  from: string,
+  to: string
+): Record<string, number[]> {
+  const pendingByDate: Record<string, number[]> = {};
+  for (const line of lines) {
+    const cents = signedCentsFromSkipFinancialLine(line);
+    if (cents === null) continue;
+    const settle = String(line.settlement_date ?? line.date).slice(0, 10);
+    if (settle < from || settle > to) continue;
+    if (!pendingByDate[settle]) pendingByDate[settle] = [];
+    pendingByDate[settle]!.push(cents);
+  }
+  return pendingByDate;
 }
 
 export type LiqBolsaStrictAssessment = {
@@ -799,8 +822,7 @@ export function assessLiqBolsaFromPendingPools(
     ok: false,
     unresolved,
     detail:
-      `LIQ BOLSA sem casamento com eventos de negocio (${unresolved.length}). ` +
-      `Corrija notas/eventos pendentes antes de importar. ${details}.${priorHint}`,
+      `LIQ BOLSA sem casamento com eventos de negocio (${unresolved.length}). ${details}.${priorHint}`,
   };
 }
 
@@ -817,13 +839,13 @@ export async function assessLiqBolsaStrictForMonth(
   if (!bounds) return { ok: true, unresolved: [], detail: '' };
 
   const importLines = await collectMonthImportLines(noteFiles);
-  const enriched = await ledger.enrichImportLinesForSettlement(ctx, importLines);
 
   const pendingByDate: Record<string, number[]> = opts?.ignoreDbPending
     ? {}
     : await ledger.listPendingSignedCentsBySettlement(ctx, bounds.from, bounds.to);
 
-  for (const line of enriched) {
+  // Datas de liquidacao ja vêm do tradutor B3 (D+1/D+2); enrich do catalogo pode desalinhar do extrato.
+  for (const line of importLines) {
     const cents = signedCentsFromSkipFinancialLine(line);
     if (cents === null) continue;
     const settle = String(line.settlement_date ?? line.date).slice(0, 10);
@@ -846,6 +868,7 @@ export async function assessLiqBolsaStrictForMonth(
         ledger
       )
     ).filter(isLiqBolsaExtractLine);
+    liqLines = dedupeLiqBolsaImportLines(liqLines);
   } catch (err) {
     extractAssessError = err instanceof Error ? err.message : String(err);
   }
@@ -874,6 +897,8 @@ export type BtgMonthImportApplyOptions = {
   previousClosingExtract?: number | null;
   /** Ignora pending residual no banco na prévia (após purge / simulação limpa). */
   simulateFreshImport?: boolean;
+  /** Livro simulado acumulado (cadeia mensal batch). */
+  baseLedger?: LedgerEvent[];
 };
 
 export async function applyBtgMonthImport(
@@ -887,6 +912,7 @@ export async function applyBtgMonthImport(
   const previewOpts: PreviewBtgMonthImportOptions = {
     previousClosingExtract: applyOpts?.previousClosingExtract ?? null,
     simulateFreshImport: applyOpts?.simulateFreshImport === true,
+    baseLedger: applyOpts?.baseLedger,
   };
   const preview = await previewBtgMonthImport(
     ctx,
@@ -913,7 +939,7 @@ export async function applyBtgMonthImport(
     };
   }
 
-  if (!preview.resultOk) {
+  if (!preview.notesOk || !preview.financialOk) {
     const detail =
       preview.resultDetail || 'Valide notas e extrato antes de gravar este mes.';
     logMonthImportStdout(ctx.organizationId, 'BLOCKED', month, preview, detail);
@@ -956,7 +982,7 @@ export async function applyBtgMonthImport(
   await ensureExtractDivergenceOperation(pool);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
     parseOptions: MONTH_IMPORT_EXTRACT_OPTS_APPLY,
-    keepUnmatchedLiqBolsaAsCash: false,
+    keepUnmatchedLiqBolsaAsCash: true,
   });
 
   const notesInserted = notesApply.totals.inserted;

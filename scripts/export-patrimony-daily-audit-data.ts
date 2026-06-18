@@ -91,6 +91,13 @@ async function loadMonthlyJsonAnchors(repoRoot: string) {
     'carteira atualizada.json',
   ];
 
+  const extra = await fs.readdir(monthlyDir);
+  for (const name of extra) {
+    if (/^carteira_atualizada.*\.json$/i.test(name) && !filenames.includes(name)) {
+      filenames.push(name);
+    }
+  }
+
   const records: Array<{
     file: string;
     date: string;
@@ -103,8 +110,13 @@ async function loadMonthlyJsonAnchors(repoRoot: string) {
 
   for (const file of filenames) {
     const full = path.join(monthlyDir, file);
+    try {
+      await fs.access(full);
+    } catch {
+      continue;
+    }
     const raw = JSON.parse(await fs.readFile(full, 'utf8')) as Record<string, any>;
-    if (file === 'carteira atualizada.json') {
+    if (file === 'carteira atualizada.json' || /^carteira_atualizada/i.test(file)) {
       records.push({
         file,
         date: String(raw.data_referencia).slice(0, 10),

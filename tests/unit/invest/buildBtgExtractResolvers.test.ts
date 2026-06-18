@@ -4,9 +4,8 @@ import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 describe('buildBtgExtractResolvers', () => {
   const events: LedgerEvent[] = [
     {
-      id: 'opt-sell-1',
+      asset_id: 'opt-sell-1',
       transaction_date: '2026-03-17',
-      asset_id: 'a1',
       asset_ticker: 'PRIOR407',
       asset_type: 'option_put',
       transaction_type: 'put_sell',
@@ -15,9 +14,8 @@ describe('buildBtgExtractResolvers', () => {
       total_net_value: 15474.53,
     },
     {
-      id: 'stock-1',
+      asset_id: 'stock-1',
       transaction_date: '2026-01-01',
-      asset_id: 'a2',
       asset_ticker: 'PRIO3',
       asset_type: 'stock',
       transaction_type: 'opening_balance',
@@ -40,5 +38,12 @@ describe('buildBtgExtractResolvers', () => {
     expect(alloc?.length).toBeGreaterThan(0);
     const sum = (alloc ?? []).reduce((s, row) => s + row.weight, 0);
     expect(sum).toBeCloseTo(1, 4);
+  });
+
+  it('resolveCustodyFeeAllocation usa mesma base de valor em custodia', () => {
+    const resolvers = buildBtgExtractResolvers(events);
+    const alloc = resolvers.resolveCustodyFeeAllocation?.('2026-03-20');
+    expect(alloc?.length).toBeGreaterThan(0);
+    expect(alloc?.some((r) => r.ticker === 'PRIO3')).toBe(true);
   });
 });

@@ -15,7 +15,7 @@ type OptionSeriesState = {
   qtyAtual: number;
   /** Líquido (vendas − compras), ainda não consumido por exercício. */
   premioLiquido: number;
-  /** Parcela do `premioLiquido` que já foi computada em `premioOpcoesPeriodo`
+  /** Parcela do `premioLiquido` que já foi computada em `gerencialFluxoPeriodo`
    *  (operações ocorridas com a ação em carteira). O complemento é "pré-lote",
    *  só entra no gerencial se a opção for exercida e gerar entrada de ações. */
   premioContadoGerencial: number;
@@ -26,7 +26,8 @@ type UnderlyingState = {
   qty: number;
   estritoTotal: number;
   b3AjusteTotal: number;
-  premioOpcoesPeriodo: number;
+  /** Entradas (+) e custos (−) acumulados no lote: opções, dividendos, JCP, locação… */
+  gerencialFluxoPeriodo: number;
   lotStart: string | null;
   optionSeries: Map<string, OptionSeriesState>;
 };
@@ -39,6 +40,13 @@ import type { ThreePricesContext } from './ledgerTypes';
 const OPTION_SELL_TX = new Set(['put_sell', 'call_sell']);
 const OPTION_BUY_TX = new Set(['put_buy', 'call_buy']);
 
+/** Entradas/custos que alteram só o Meu PM (não Estrito/B3). */
+export const GERENCIAL_CASHFLOW_TX = new Set([
+  'dividend',
+  'jcp',
+  'securities_lending',
+]);
+
 
 function emptyState(underlying: string): UnderlyingState {
   return {
@@ -46,7 +54,7 @@ function emptyState(underlying: string): UnderlyingState {
     qty: 0,
     estritoTotal: 0,
     b3AjusteTotal: 0,
-    premioOpcoesPeriodo: 0,
+    gerencialFluxoPeriodo: 0,
     lotStart: null,
     optionSeries: new Map(),
   };
@@ -56,7 +64,7 @@ function resetState(s: UnderlyingState): void {
   s.qty = 0;
   s.estritoTotal = 0;
   s.b3AjusteTotal = 0;
-  s.premioOpcoesPeriodo = 0;
+  s.gerencialFluxoPeriodo = 0;
   s.lotStart = null;
   s.optionSeries.clear();
 }
@@ -131,7 +139,7 @@ function applyProportionalReduction(s: UnderlyingState, qtyOut: number): void {
   const frac = q / s.qty;
   s.estritoTotal -= s.estritoTotal * frac;
   s.b3AjusteTotal -= s.b3AjusteTotal * frac;
-  s.premioOpcoesPeriodo -= s.premioOpcoesPeriodo * frac;
+  s.gerencialFluxoPeriodo -= s.gerencialFluxoPeriodo * frac;
   s.qty -= q;
   if (s.qty <= 1e-9) resetState(s);
 }
@@ -191,12 +199,12 @@ function applyPutShortExercisePremium(
   if (useExplicitNet) {
     const premioRecebido = Math.abs(explicitNet!);
     s.b3AjusteTotal += premioRecebido;
-    s.premioOpcoesPeriodo += premioRecebido - series.premioContadoGerencial;
+    s.gerencialFluxoPeriodo += premioRecebido - series.premioContadoGerencial;
     series.premioLiquido = 0;
     series.premioContadoGerencial = 0;
   } else if (Math.abs(series.premioLiquido) > 0.005) {
     s.b3AjusteTotal += allocatedFromHistory;
-    s.premioOpcoesPeriodo += naoContadoSerieHistory;
+    s.gerencialFluxoPeriodo += naoContadoSerieHistory;
     series.premioLiquido -= allocatedFromHistory;
     series.premioContadoGerencial = series.premioLiquido;
   }
@@ -337,13 +345,13 @@ function applyOptionTrade(s: UnderlyingState, e: LedgerEvent): void {
 
   // Gerencial só conta opção quando a ação está em carteira. Antes do lote
   // abrir (ou após zerar), a série acumula em `premioLiquido` mas não toca em
-  // `premioOpcoesPeriodo` — esse prêmio "pré-lote" só ressuscita se a opção
+  // `gerencialFluxoPeriodo` — esse prêmio "pré-lote" só ressuscita se a opção
   // for exercida e gerar entrada de ações (tratado em applyOptionExercise).
   if (OPTION_SELL_TX.has(type)) {
     series.qtyAtual -= q;
     series.premioLiquido += signedPremio;
     if (s.qty > 0) {
-      s.premioOpcoesPeriodo += signedPremio;
+      s.gerencialFluxoPeriodo += signedPremio;
       series.premioContadoGerencial += signedPremio;
     }
     return;
@@ -352,7 +360,7 @@ function applyOptionTrade(s: UnderlyingState, e: LedgerEvent): void {
     series.qtyAtual += q;
     series.premioLiquido += signedPremio;
     if (s.qty > 0) {
-      s.premioOpcoesPeriodo += signedPremio;
+      s.gerencialFluxoPeriodo += signedPremio;
       series.premioContadoGerencial += signedPremio;
     }
     return;
@@ -422,6 +430,14 @@ export type ThreePricesOptions = {
   ctx: ThreePricesContext;
 };
 
+/** Proventos/locação: abatem (+) ou aumentam (−) só o Meu PM com ação em carteira. */
+function applyGerencialCashflow(s: UnderlyingState, e: LedgerEvent): void {
+  if (s.qty <= 0) return;
+  const net = Number(e.total_net_value ?? 0);
+  if (Math.abs(net) <= 0.005) return;
+  s.gerencialFluxoPeriodo += net;
+}
+
 function applyEvent(
   s: UnderlyingState,
   e: LedgerEvent,
@@ -429,6 +445,14 @@ function applyEvent(
 ): void {
   const type = String(e.transaction_type);
   const ctx = options.ctx;
+
+  if (GERENCIAL_CASHFLOW_TX.has(type)) {
+    const assetType = effectiveAssetType(e);
+    if (ctx.isStockLike(assetType) && !ctx.isIgnoredAssetType(assetType)) {
+      applyGerencialCashflow(s, e);
+    }
+    return;
+  }
 
   if (ctx.isIgnoredTransaction(type)) return;
 
@@ -516,7 +540,7 @@ function snapshot(s: UnderlyingState): ThreePrices {
   }
   const estrito = s.estritoTotal / s.qty;
   const b3 = (s.estritoTotal - s.b3AjusteTotal) / s.qty;
-  const gerencial = (s.estritoTotal - s.premioOpcoesPeriodo) / s.qty;
+  const gerencial = (s.estritoTotal - s.gerencialFluxoPeriodo) / s.qty;
   return {
     qty: round4(s.qty),
     estrito: round4(estrito),
@@ -529,7 +553,8 @@ function snapshot(s: UnderlyingState): ThreePrices {
 /**
  * Calcula os três preços (Estrito / B3 / Gerencial) por ação mãe, processando
  * o livro razão em ordem cronológica. Sem FIFO/LIFO: a cada nova entrada o
- * lote inteiro é recalculado. Reset total quando qty zera.
+ * lote inteiro é recalculado. Reset total quando qty zera — opções/proventos
+ * fora de custódia ficam só na pivot (StockUnderlyingPivotEngine).
  *
  * Modelo formal documentado em [tasks/wave-2/01-engine-tres-precos.md].
  */

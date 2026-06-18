@@ -397,6 +397,19 @@ describe('threePricesEngine', () => {
     expect(p.gerencial).toBeCloseTo((499 * 20 - 50) / 499, 2);
   });
 
+  it('opções sem ação em carteira não entram nos 3 preços (só pivot); novo lote começa limpo', () => {
+    const out = runEngine([
+      putSell('PRIOM40', 'PRIO3', 10, 100, '2026-01-05'),
+      callSell('PRIOA45', 'PRIO3', 5, 50, '2026-01-10'),
+      buy('PRIO3', 100, 30, '2026-02-01'),
+    ]);
+    const p = out.get('PRIO3')!;
+    expect(p.qty).toBe(100);
+    expect(p.estrito).toBe(30);
+    expect(p.b3).toBe(30);
+    expect(p.gerencial).toBe(30);
+  });
+
   it('lote zera por venda total → próxima compra começa do zero', () => {
     const out = runEngine([
       buy('PRIO3', 100, 40, '2026-01-10'),
@@ -433,7 +446,7 @@ describe('threePricesEngine', () => {
     expect(p.gerencial).toBe(30);
   });
 
-  it('dividendo, JCP, locação são ignorados — não afetam PM', () => {
+  it('dividendo, JCP e locação abatem só o Meu PM (Estrito e B3 inalterados)', () => {
     const out = runEngine([
       buy('PRIO3', 100, 40, '2026-01-10'),
       {
@@ -458,11 +471,22 @@ describe('threePricesEngine', () => {
         unit_price: 0,
         total_net_value: 50,
       },
+      {
+        id: 'sl1',
+        asset_id: 'PRIO3',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'securities_lending',
+        transaction_date: '2026-02-25',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 30,
+      },
     ]);
     const p = out.get('PRIO3')!;
     expect(p.estrito).toBe(40);
     expect(p.b3).toBe(40);
-    expect(p.gerencial).toBe(40);
+    expect(p.gerencial).toBeCloseTo((100 * 40 - 280) / 100, 4);
   });
 
   it('cenário do arquiteto (mês 2 + mês 3): PUT série A não exercida = não conta; PUT série B com parte exercida = toda conta', () => {

@@ -5,6 +5,11 @@
 import { MAIN_CASH_TICKER } from './ledgerTypes';
 import type { InvestImportRule } from './ledgerTypes';
 import { inferAssetType } from './assetClassifier';
+import {
+  netZeroCustodyFeePairs,
+  splitNetZeroCustodyMoves,
+  type PendingGenericCustodyMove,
+} from './custodyFeeNetting';
 
 const B3_TICKER_RE = /\b([A-Z]{4}\d{1,2})\b/;
 
@@ -220,6 +225,11 @@ function parseProventoTickerFromDescription(description: string): string | null 
   return m ? m[1]! : null;
 }
 
+export const IS_GENERIC_CUSTODY_RE =
+  /(?:^|\s)(TAXA\s+DE\s+CUST|CUST[ÓO]DIA|REEMBOLSO\s+DE\s+CUST|TAXA\s+SOBRE\s+VALOR\s+EM\s+CUST)/i;
+
+const IS_LIQ_CUSTODY_RE = /LIQ\s+BOLSA.+(?:TAXA\s+SOBRE\s+VALOR\s+EM\s+CUST|CUST[ÓO]DIA)/i;
+
 /** Classifica linha do extrato → operação do livro-razão INVEST. */
 export function classifyBtgDescription(
   description: string,
@@ -256,6 +266,15 @@ export function classifyBtgDescription(
   }
 
   if (d.includes('LIQ BOLSA')) {
+    // Taxa de custodia vem como LIQ BOLSA no extrato — nao entra no pool de notas.
+    if (IS_GENERIC_CUSTODY_RE.test(d) || /TAXA\s+SOBRE\s+VALOR\s+EM\s+CUST/i.test(d)) {
+      return {
+        operation: 'fee',
+        ticker: CASH_TICKER,
+        asset_type: 'cash',
+        notes: description,
+      };
+    }
     return { operation: 'skip', ticker: CASH_TICKER, skip: true };
   }
   if (d.includes('CONTA REMUNERADA - RESGATE')) {
@@ -489,7 +508,6 @@ const IRRF_TD_DESC_RE = /IRRF\s+COBRADO\s+SOBRE\s+OPERACAO\s+DE\s+TESOURO/i;
 /** IRRF Lei 11.033/04 sobre opcoes (VENDAS/DAY TRADE) — sem ticker na descricao. */
 const IRRF_OPCAO_DESC_RE = /IRRF\s*-\s*LEI\s+11\.033.+OP[CÇ][AÃ]O/i;
 const TAXA_TD_DESC_RE = /TAXA.+TESOURO|EMOLUMENTOS.+TESOURO|CUSTODIA.+TESOURO|CUST[ÓO]DIA.+TESOURO/i;
-const IS_GENERIC_CUSTODY_RE = /(?:^|\s)(TAXA\s+DE\s+CUST|CUST[ÓO]DIA|REEMBOLSO\s+DE\s+CUST|TAXA\s+SOBRE\s+VALOR\s+EM\s+CUST)/i;
 const BTC_PRIO3_DESC_RE = /BTC\s*PRIO3|CORRETAGEM\s*BTC|IR\s*-\s*BTC|TAXA.+BTC\s*PRIO3|REMUNERA[ÇC][ÃA]O.+BTC\s*PRIO3/i;
 const NEG_PENALTY_RE = /JUROS\s+SOBRE\s+SALDO\s+NEGATIVO|IOF\s+SOBRE\s+SALDO\s+NEGATIVO/i;
 
@@ -510,7 +528,56 @@ export interface BtgExtractResolvers {
    * Retorna lista de ativos comprados no dia util anterior e seus pesos (soma=1.0),
    * para distribuir a multa/juros de saldo negativo como cost_adjustment.
    */
-  resolveNegativeBalanceAllocation?: (extractDate: string) => Array<{ ticker: string; weight: number; asset_type?: string; underlying_ticker?: string }> | undefined;
+  resolveNegativeBalanceAllocation?: (
+    extractDate: string
+  ) => Array<{ ticker: string; weight: number; asset_type?: string; underlying_ticker?: string }> | undefined;
+
+  /**
+   * Rateio de taxa de custodia mensal por valor em custodia (posicao aberta na data).
+   */
+  resolveCustodyFeeAllocation?: (
+    extractDate: string
+  ) => Array<{ ticker: string; weight: number; asset_type?: string; underlying_ticker?: string }> | undefined;
+}
+
+type ExtractAllocationRow = {
+  ticker: string;
+  weight: number;
+  asset_type?: string;
+  underlying_ticker?: string;
+};
+
+function pushWeightedCostAdjustments(
+  out: BtgExtractEntry[],
+  parsed: { date: string; description: string },
+  allocation: ExtractAllocationRow[],
+  totalAmount: number,
+  opts: { event_source_ref?: string; notesPrefix: string }
+): void {
+  let allocated = 0;
+  for (let i = 0; i < allocation.length; i += 1) {
+    const alloc = allocation[i]!;
+    const allocAmount =
+      i === allocation.length - 1
+        ? Math.round((totalAmount - allocated) * 100) / 100
+        : Math.round(totalAmount * alloc.weight * 100) / 100;
+    if (i < allocation.length - 1) allocated += allocAmount;
+    if (Math.abs(allocAmount) < 0.005) continue;
+    out.push({
+      date: parsed.date,
+      ticker: alloc.ticker,
+      operation: 'cost_adjustment',
+      quantity: 0,
+      unit_price: allocAmount,
+      total_net_value: allocAmount,
+      asset_type: alloc.asset_type || 'stock',
+      underlying_ticker: alloc.underlying_ticker,
+      notes: `${opts.notesPrefix} ${parsed.description}`,
+      event_source_ref: opts.event_source_ref,
+      extract_category: 1,
+      applies_to_b3: false,
+    });
+  }
 }
 
 export function btgLinesToImportEntries(
@@ -530,6 +597,7 @@ export function btgLinesToImportEntries(
     string,
     { date: string; ticker: string; event_source_ref: string }
   >();
+  const pendingCustody: PendingGenericCustodyMove[] = [];
 
   for (const raw of lines) {
     const line = raw.trim();
@@ -550,7 +618,8 @@ export function btgLinesToImportEntries(
     if (
       (map.skip || map.operation === 'skip') &&
       options?.includeLiqBolsa &&
-      upperDesc.includes('LIQ BOLSA')
+      upperDesc.includes('LIQ BOLSA') &&
+      !IS_LIQ_CUSTODY_RE.test(upperDesc)
     ) {
       const liqNet = Math.round(parsed.signedCash * 100) / 100;
       out.push({
@@ -726,23 +795,18 @@ export function btgLinesToImportEntries(
       continue;
     }
 
-    // Caso 2 — custodia/taxa generica sem ticker patrimonial: header mensal isolado.
+    // Caso 2 — custodia/taxa generica: pareia cobranca+estorno antes de ratear.
     if (
       map.operation === 'fee' &&
       IS_GENERIC_CUSTODY_RE.test(parsed.description) &&
       !TAXA_TD_DESC_RE.test(upperDesc)
     ) {
-      out.push({
+      pendingCustody.push({
         date: parsed.date,
-        ticker: map.ticker,
-        operation: map.operation,
-        quantity: 0,
-        unit_price: 0,
-        total_net_value: Math.round(net * 100) / 100,
-        asset_type: map.asset_type,
-        notes: map.notes ?? parsed.description,
-        event_source_ref: eventSourceRefForCustodiaMensal(ym),
-        extract_category: 2,
+        description: parsed.description,
+        movementAmount: parsed.movementAmount,
+        signedNet: Math.round(net * 100) / 100,
+        ym,
       });
       continue;
     }
@@ -751,23 +815,13 @@ export function btgLinesToImportEntries(
     if (NEG_PENALTY_RE.test(upperDesc)) {
       const allocation = resolvers?.resolveNegativeBalanceAllocation?.(parsed.date);
       if (allocation && allocation.length > 0) {
-        const totalAmount = Math.abs(parsed.movementAmount);
-        for (const alloc of allocation) {
-          const allocAmount = Math.round(totalAmount * alloc.weight * 100) / 100;
-          out.push({
-            date: parsed.date,
-            ticker: alloc.ticker,
-            operation: 'cost_adjustment',
-            quantity: 0,
-            unit_price: allocAmount,
-            total_net_value: allocAmount,
-            asset_type: alloc.asset_type || 'stock',
-            underlying_ticker: alloc.underlying_ticker,
-            notes: `Rateio juros/multa: ${parsed.description}`,
-            extract_category: 1,
-            applies_to_b3: false,
-          });
-        }
+        pushWeightedCostAdjustments(
+          out,
+          parsed,
+          allocation,
+          Math.abs(parsed.movementAmount),
+          { notesPrefix: 'Rateio juros/multa:' }
+        );
         continue;
       }
 
@@ -806,5 +860,60 @@ export function btgLinesToImportEntries(
     });
   }
 
+  const { netZero: custodyNetZero, unmatched: custodyUnmatched } =
+    splitNetZeroCustodyMoves(pendingCustody);
+  out.push(...custodyNetZero);
+  for (const move of custodyUnmatched) {
+    const ref = eventSourceRefForCustodiaMensal(move.ym);
+    if (move.signedNet < 0) {
+      const allocation = resolvers?.resolveCustodyFeeAllocation?.(move.date);
+      if (allocation?.length) {
+        pushWeightedCostAdjustments(
+          out,
+          { date: move.date, description: move.description },
+          allocation,
+          Math.abs(move.movementAmount),
+          {
+            event_source_ref: ref,
+            notesPrefix: 'Rateio custodia:',
+          }
+        );
+        continue;
+      }
+    }
+
+    out.push({
+      date: move.date,
+      ticker: CASH_TICKER,
+      operation: 'fee',
+      quantity: 0,
+      unit_price: 0,
+      total_net_value: move.signedNet,
+      asset_type: 'cash',
+      notes: move.description,
+      event_source_ref: ref,
+      extract_category: 2,
+    });
+  }
+
+  return dedupeLiqBolsaExtractEntries(netZeroCustodyFeePairs(out));
+}
+
+/** PDF BTG pode repetir a mesma linha LIQ BOLSA — dedup por data+valor. */
+export function dedupeLiqBolsaExtractEntries(entries: BtgExtractEntry[]): BtgExtractEntry[] {
+  const seen = new Set<string>();
+  const out: BtgExtractEntry[] = [];
+  for (const entry of entries) {
+    const isLiq =
+      entry.operation === 'pending_settlement' && /LIQ\s+BOLSA/i.test(String(entry.notes || ''));
+    if (!isLiq) {
+      out.push(entry);
+      continue;
+    }
+    const key = `${entry.date}|${Math.round(Number(entry.total_net_value ?? 0) * 100)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry);
+  }
   return out;
 }

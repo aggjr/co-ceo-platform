@@ -1,10 +1,13 @@
 import {
   btgLinesToImportEntries,
   classifyBtgDescription,
+  dedupeLiqBolsaExtractEntries,
   parseBtgMovementLine,
   parseBrNumber,
   getBtgOperationSign,
 } from '../../../src/core/invest/BtgExtractLineParser';
+import { buildBtgExtractResolvers } from '../../../src/core/invest/buildBtgExtractResolvers';
+import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 
 describe('BtgExtractLineParser', () => {
   it('parseBrNumber', () => {
@@ -31,13 +34,13 @@ describe('BtgExtractLineParser', () => {
     expect(row?.signedCash).toBeCloseTo(-54160.08);
   });
 
-  it('skips aggregated bolsa liquidation', () => {
+  it('skips aggregated bolsa liquidation mas classifica custodia LIQ como fee', () => {
     expect(
       classifyBtgDescription('LIQ BOLSA (Operacoes)- Pregão:05/01/2026').skip
     ).toBe(true);
-    expect(
-      classifyBtgDescription('LIQ BOLSA (TAXA SOBRE VALOR EM CUSTÓDIA TAXA').skip
-    ).toBe(true);
+    const custody = classifyBtgDescription('LIQ BOLSA (TAXA SOBRE VALOR EM CUSTÓDIA TAXA');
+    expect(custody.skip).toBeFalsy();
+    expect(custody.operation).toBe('fee');
   });
 
   it('maps conta remunerada resgate como cash_yield', () => {
@@ -82,6 +85,21 @@ describe('BtgExtractLineParser', () => {
     expect(entries[0]!.operation).toBe('pending_settlement');
     expect(entries[0]!.total_net_value).toBeCloseTo(399.48, 2);
     expect(['capital_deposit', 'capital_withdrawal']).not.toContain(entries[0]!.operation);
+  });
+
+  it('dedupeLiqBolsaExtractEntries remove LIQ duplicado no mesmo dia/valor', () => {
+    const entries = btgLinesToImportEntries(
+      [
+        'Saldo Inicial 58.758,79',
+        '06/01/2026 LIQ BOLSA (Operacoes)- Pregão:05/01/2026 59.158,27\t399,48',
+        '06/01/2026 LIQ BOLSA (Operacoes)- Pregão:05/01/2026 59.158,27\t399,48',
+      ],
+      58758.79,
+      undefined,
+      { includeLiqBolsa: true }
+    );
+    expect(entries).toHaveLength(1);
+    expect(dedupeLiqBolsaExtractEntries(entries)).toHaveLength(1);
   });
 
   it('getBtgOperationSign maps correctly', () => {
@@ -225,6 +243,48 @@ describe('BtgExtractLineParser', () => {
       expect(fee?.extract_category).toBe(2);
     });
 
+    it('Custodia generica com posicoes abertas rateia cost_adjustment por valor em custodia', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'o1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'PRIO3',
+          asset_type: 'stock',
+          transaction_type: 'opening_balance',
+          quantity: 5400,
+          unit_price: 40,
+          total_net_value: 216_000,
+        } as LedgerEvent,
+        {
+          asset_id: 'o2',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 58,
+          unit_price: 17_809.83,
+          total_net_value: 1_032_969.97,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 100.000,00',
+          '31/03/2026 Taxa de Custódia 99.990,00\t10,00',
+        ],
+        100000,
+        resolvers
+      );
+      const adjustments = entries.filter((e) => e.operation === 'cost_adjustment');
+      expect(adjustments.length).toBe(2);
+      expect(adjustments.every((e) => e.event_source_ref === 'BTG-CUSTODIA-MENSAL:2026-03')).toBe(
+        true
+      );
+      const sum = adjustments.reduce((s, e) => s + Number(e.total_net_value), 0);
+      expect(sum).toBeCloseTo(10, 2);
+      expect(entries.some((e) => e.operation === 'fee')).toBe(false);
+    });
+
     it('Multa por saldo negativo vai como penalty_b3 avulso (sem event_source_ref por enquanto)', () => {
       const entries = btgLinesToImportEntries(
         [
@@ -268,15 +328,101 @@ describe('BtgExtractLineParser', () => {
       expect(entries.length).toBe(0);
     });
 
-    it('ignora LIQ BOLSA (taxa custódia agregada) — não duplicar no livro', () => {
-      const entries = btgLinesToImportEntries(
+    it('LIQ BOLSA taxa custodia com posicoes rateia cost_adjustment (credito fica fee em caixa)', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'o1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'PRIO3',
+          asset_type: 'stock',
+          transaction_type: 'opening_balance',
+          quantity: 5400,
+          unit_price: 40,
+          total_net_value: 216_000,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const charge = btgLinesToImportEntries(
         [
           'Saldo Inicial 100.000,00',
           '19/01/2026 LIQ BOLSA (TAXA SOBRE VALOR EM CUSTODIA) 99.998,00\t2,00',
         ],
-        100000
+        100000,
+        resolvers
       );
-      expect(entries.length).toBe(0);
+      expect(charge.filter((e) => e.operation === 'cost_adjustment')).toHaveLength(1);
+      expect(charge.some((e) => e.operation === 'fee')).toBe(false);
+
+      const credit = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 100.000,00',
+          '19/01/2026 LIQ BOLSA (TAXA SOBRE VALOR EM CUSTODIA) 100.002,00\t2,00',
+        ],
+        100000,
+        resolvers
+      );
+      expect(credit.some((e) => e.operation === 'fee')).toBe(true);
+    });
+
+    it('pareia cobranca e estorno custodia POS 1026 sem rateio (liquido zero)', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'o1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'PRIO3',
+          asset_type: 'stock',
+          transaction_type: 'opening_balance',
+          quantity: 5400,
+          unit_price: 40,
+          total_net_value: 216_000,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 100.000,00',
+          '19/01/2026 LIQ BOLSA (TAXA SOBRE VALOR EM CUSTODIA TAXA SOBRE POSICAO 1026) 99.998,28\t1,72',
+          '19/01/2026 LIQ BOLSA (TAXA SOBRE VALOR EM CUSTODIA ESTORNO DE TAXA SOBRE POSICAO 1026) 100.000,00\t1,72',
+        ],
+        100000,
+        resolvers
+      );
+      expect(entries.filter((e) => e.operation === 'cost_adjustment')).toHaveLength(0);
+      const net = entries.find((e) => e.event_source_ref?.startsWith('BTG-CUSTODIA-NET:'));
+      expect(net).toBeDefined();
+      expect(net?.total_net_value).toBe(0);
+      expect(net?.extract_category).toBe(2);
+    });
+
+    it('reembolso custodia remunerada aluguel nao pareia com taxa POS 1026', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'o1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'PRIO3',
+          asset_type: 'stock',
+          transaction_type: 'opening_balance',
+          quantity: 5400,
+          unit_price: 40,
+          total_net_value: 216_000,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 100.000,00',
+          '19/01/2026 LIQ BOLSA (TAXA SOBRE VALOR EM CUSTODIA TAXA SOBRE POSICAO 1026) 99.998,28\t1,72',
+          '21/01/2026 REEMBOLSO DE CUSTODIA REMUNERADA - ALUGUEL 99.999,46\t1,18',
+        ],
+        100000,
+        resolvers
+      );
+      expect(entries.filter((e) => e.event_source_ref?.startsWith('BTG-CUSTODIA-NET:'))).toHaveLength(
+        0
+      );
+      expect(entries.filter((e) => e.operation === 'cost_adjustment')).toHaveLength(1);
+      const reemb = entries.find((e) => e.operation === 'cash_yield');
+      expect(reemb?.total_net_value).toBeCloseTo(1.18, 2);
     });
 
     it('TED enviada/recebida sao cat 3 sem event_source_ref', () => {

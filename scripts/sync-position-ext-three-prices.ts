@@ -11,7 +11,9 @@ import { CoCeoDataGateway } from '../src/core/dal';
 import { installerContext } from '../src/database/seeds/lib/installerContext';
 import { LedgerImportService } from '../src/core/invest/LedgerImportService';
 import { computeThreePricesByUnderlying } from '../src/core/invest/threePricesEngine';
+import { ThreePricesContextFactory } from '../src/core/invest/ThreePricesContextFactory';
 import { inferAssetType, inferUnderlyingTicker } from '../src/core/invest/assetClassifier';
+import { createInvestPool } from './lib/invest-db-pool';
 
 dotenv.config();
 
@@ -20,19 +22,15 @@ const STOCK_LIKE = new Set(['stock', 'fii']);
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
-  const pool = mysql.createPool({
-    host: process.env.REMOTE_DB_HOST || process.env.DB_HOST || '127.0.0.1',
-    user: process.env.REMOTE_DB_USER || process.env.DB_USER || 'root',
-    password: process.env.REMOTE_DB_PASSWORD ?? process.env.DB_PASSWORD,
-    database: process.env.REMOTE_DB_NAME || process.env.DB_NAME || 'co_ceo_platform',
-    charset: 'utf8mb4',
-  });
+  const pool = createInvestPool();
   const gateway = new CoCeoDataGateway(pool);
   const ledger = new LedgerImportService(gateway);
   const ctx = { ...installerContext(), organizationId: ORG, scope: 'node' as const };
   const today = new Date().toISOString().slice(0, 10);
   const events = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
-  const prices = computeThreePricesByUnderlying(events);
+  const threeFactory = new ThreePricesContextFactory(gateway);
+  const threeCtx = await threeFactory.build(ctx);
+  const prices = computeThreePricesByUnderlying(events, { ctx: threeCtx }, today);
 
   const [items] = await pool.query<mysql.RowDataPacket[]>(
     `SELECT pi.id AS patrimony_item_id, pi.identifier AS ticker, pi.subcategory,

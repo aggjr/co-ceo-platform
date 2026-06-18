@@ -23,6 +23,43 @@ function isOptionSellEvent(e: LedgerEvent): boolean {
   return (type === 'option_call' || type === 'option_put') && Number(e.quantity) < 0;
 }
 
+export type PortfolioWeightAllocation = {
+  ticker: string;
+  weight: number;
+  asset_type?: string;
+  underlying_ticker?: string;
+};
+
+/** Pondera posicoes abertas (nao-caixa) por valor de mercado na data do extrato. */
+export function resolvePortfolioWeightAllocation(
+  events: LedgerEvent[],
+  extractDate: string
+): PortfolioWeightAllocation[] | undefined {
+  const prior = events.filter(
+    (e) => String(e.transaction_date || '').slice(0, 10) < extractDate.slice(0, 10)
+  );
+  const { assets } = rebuildCustodyFromLedger(prior);
+  const open = assets.filter(
+    (a) => !isCashInvestTicker(a.ticker) && Math.abs(Number(a.quantity)) > 1e-6
+  );
+  if (!open.length) return undefined;
+
+  const weights = open.map((a) => {
+    const qty = Math.abs(Number(a.quantity));
+    const mv = qty * Math.abs(Number(a.avgPrice) || 0);
+    return { a, mv: mv > 0 ? mv : qty };
+  });
+  const total = weights.reduce((s, row) => s + row.mv, 0);
+  if (total <= 0) return undefined;
+
+  return weights.map(({ a, mv }) => ({
+    ticker: a.ticker,
+    weight: mv / total,
+    asset_type: a.assetType,
+    underlying_ticker: a.underlying || a.ticker,
+  }));
+}
+
 /**
  * Resolvers contextuais do extrato BTG: alocam IRRF de opcao e multas de saldo
  * negativo com base no livro razao ja importado (notas B3 + meses anteriores).
@@ -48,31 +85,11 @@ export function buildBtgExtractResolvers(events: LedgerEvent[]): BtgExtractResol
     },
 
     resolveNegativeBalanceAllocation(extractDate: string) {
-      const prior = events.filter(
-        (e) => String(e.transaction_date || '').slice(0, 10) < extractDate.slice(0, 10)
-      );
-      const { assets } = rebuildCustodyFromLedger(prior);
-      const open = assets.filter(
-        (a) =>
-          !isCashInvestTicker(a.ticker) &&
-          Math.abs(Number(a.quantity)) > 1e-6
-      );
-      if (!open.length) return undefined;
+      return resolvePortfolioWeightAllocation(events, extractDate);
+    },
 
-      const weights = open.map((a) => {
-        const qty = Math.abs(Number(a.quantity));
-        const mv = qty * Math.abs(Number(a.avgPrice) || 0);
-        return { a, mv: mv > 0 ? mv : qty };
-      });
-      const total = weights.reduce((s, row) => s + row.mv, 0);
-      if (total <= 0) return undefined;
-
-      return weights.map(({ a, mv }) => ({
-        ticker: a.ticker,
-        weight: mv / total,
-        asset_type: a.assetType,
-        underlying_ticker: a.underlying || a.ticker,
-      }));
+    resolveCustodyFeeAllocation(extractDate: string) {
+      return resolvePortfolioWeightAllocation(events, extractDate);
     },
   };
 }

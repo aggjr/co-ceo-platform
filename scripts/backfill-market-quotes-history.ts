@@ -92,7 +92,7 @@ async function fetchHistoryBatch(
   const token = process.env.BRAPI_TOKEN || '';
   const out = new Map<string, BrapiBar[]>();
 
-  for (const batch of chunk(tickers, 18)) {
+  for (const batch of chunk(tickers, 1)) {
     const params = new URLSearchParams();
     if (token) params.set('token', token);
     params.set('range', range);
@@ -150,8 +150,15 @@ async function main() {
   const token = process.env.BRAPI_TOKEN || '';
   if (token) {
     console.log(`brapi range=${args.range}  ${fromIso} → ${toIso}`);
-    const brapi = await fetchHistoryBatch(tickers, args.range);
-    for (const [t, bars] of brapi.entries()) series.set(t, bars);
+    try {
+      const brapi = await fetchHistoryBatch(tickers, args.range);
+      for (const [t, bars] of brapi.entries()) series.set(t, bars);
+    } catch (e) {
+      console.warn(
+        'brapi indisponível para este lote — complementando via Yahoo:',
+        e instanceof Error ? e.message : e
+      );
+    }
   } else {
     console.log('BRAPI_TOKEN ausente — histórico via Yahoo Finance (.SA)');
   }
