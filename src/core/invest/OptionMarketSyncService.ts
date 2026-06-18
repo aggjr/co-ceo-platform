@@ -3,7 +3,7 @@ import { SYSTEM_INSTALLER_USER_ID } from '../dal/types';
 import { inferUnderlyingTicker, isOptionTicker } from './assetClassifier';
 import { fetchOpcoesNetOptionsChainAll } from './opcoesNetClient';
 import { parseOpcoesNetExpirations, type ParsedOptionMarketRow } from './opcoesNetChainParser';
-import { fetchOpcoesNetOptionQuotes } from './opcoesNetQuotes';
+import { fetchOptionQuotesWithFallback } from './opcoesNetQuotes';
 import { OptionMarketRepository } from './OptionMarketRepository';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 
@@ -12,6 +12,8 @@ export type OptionQuoteSyncReport = {
   tickersInUse: string[];
   quotesSaved: number;
   missing: string[];
+  /** Tickers resolvidos por fonte alternativa (apos opcoes.net). */
+  fallbackResolved: string[];
   contractsInserted: number;
   contractsUpdated: number;
 };
@@ -207,15 +209,17 @@ export class OptionMarketSyncService {
         tickersInUse: [],
         quotesSaved: 0,
         missing: [],
+        fallbackResolved: [],
         contractsInserted: 0,
         contractsUpdated: 0,
       };
     }
 
-    const quotes = await fetchOpcoesNetOptionQuotes(tickers, { asOfDate: day });
+    const quotes = await fetchOptionQuotesWithFallback(tickers, { asOfDate: day });
     const quoteByTicker = new Map(quotes.map((q) => [q.ticker, q]));
     let quotesSaved = 0;
     const missing: string[] = [];
+    const fallbackResolved: string[] = [];
     const contractRows: ParsedOptionMarketRow[] = [];
 
     for (const ticker of tickers) {
@@ -228,10 +232,16 @@ export class OptionMarketSyncService {
         ticker: q.ticker,
         quoteDate: q.asOf,
         closingPrice: q.price,
-        source: 'opcoes_net',
-        metadata: { kind: 'option_last', scope: 'open_custody' },
+        source: q.source,
+        metadata: {
+          kind: 'option_last',
+          scope: 'open_custody',
+          ...(q.provider ? { provider: q.provider } : {}),
+          ...(q.source !== 'opcoes_net' ? { fallback_for: 'opcoes_net' } : {}),
+        },
       });
       quotesSaved += 1;
+      if (q.source !== 'opcoes_net') fallbackResolved.push(q.ticker);
       const hasContract = await this.marketRepo.hasContract(optionMarketGlobalCtx, q.ticker);
       if (
         !hasContract &&
@@ -262,6 +272,7 @@ export class OptionMarketSyncService {
       tickersInUse: tickers,
       quotesSaved,
       missing,
+      fallbackResolved,
       contractsInserted: contractResult.inserted,
       contractsUpdated: contractResult.updated,
     };

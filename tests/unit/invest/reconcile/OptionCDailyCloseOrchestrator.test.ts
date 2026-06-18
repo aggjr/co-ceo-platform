@@ -9,6 +9,9 @@ const syncHistoricalFromBrapi = jest.fn();
 const syncMissingOptions = jest.fn();
 const rebuildPatrimony = jest.fn();
 const reconcileCustody = jest.fn();
+const listLedgerEvents = jest.fn();
+const filterLedgerOpeningOnly = jest.fn();
+const buildMonthReconcileLedger = jest.fn();
 
 jest.mock('../../../../src/core/invest/reconcile/ReconciliationSessionService', () => ({
   ReconciliationSessionService: jest.fn().mockImplementation(() => ({
@@ -19,6 +22,7 @@ jest.mock('../../../../src/core/invest/reconcile/ReconciliationSessionService', 
 jest.mock('../../../../src/core/invest/LedgerImportService', () => ({
   LedgerImportService: jest.fn().mockImplementation(() => ({
     reconcileCustody,
+    listLedgerEvents,
   })),
 }));
 
@@ -30,7 +34,9 @@ jest.mock('../../../../src/core/invest/reconcile/HomeBrokerSnapshotUploadService
 
 jest.mock('../../../../src/core/invest/btgMonthImportService', () => ({
   applyBtgMonthImport,
+  buildMonthReconcileLedger,
   discoverMonthExtractPlan,
+  filterLedgerOpeningOnly,
   monthBounds,
 }));
 
@@ -99,6 +105,9 @@ describe('OptionCDailyCloseOrchestrator', () => {
       schemaApplied: true,
     });
     reconcileCustody.mockResolvedValue({ ok: true });
+    listLedgerEvents.mockResolvedValue([]);
+    filterLedgerOpeningOnly.mockImplementation((events: unknown[]) => events);
+    buildMonthReconcileLedger.mockImplementation(async (_m: string, _f: unknown, base: unknown[]) => base);
     importAndApplyHomeBroker.mockResolvedValue({
       filesTotal: 1,
       snapshotsImported: 1,
@@ -169,8 +178,9 @@ describe('OptionCDailyCloseOrchestrator', () => {
       '2026-01',
       extractFiles[0],
       notesFiles,
-      { previousClosingExtract: null, simulateFreshImport: false }
+      { previousClosingExtract: null, simulateFreshImport: false, baseLedger: [] }
     );
+    expect(buildMonthReconcileLedger).toHaveBeenCalled();
     expect(syncHistoricalFromBrapi).toHaveBeenCalledWith(ctx);
     expect(syncMissingOptions).toHaveBeenCalledWith(ctx);
     expect(rebuildPatrimony).toHaveBeenCalledWith(

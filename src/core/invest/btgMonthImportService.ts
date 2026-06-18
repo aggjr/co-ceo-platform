@@ -85,7 +85,7 @@ export type BtgMonthImportPreview = {
   notesDetail: string;
   financialDetail: string;
   resultDetail: string;
-  /** Relatorio: casamento LIQ BOLSA x expectativas pending das notas (informativo). */
+  /** Coluna LIQ BOLSA na previa: true quando casou ou quando caixa ja fecha (linhas ignoradas). */
   liqBolsaOk?: boolean;
   liqBolsaDetail?: string;
   notesFilesInFolder: number;
@@ -442,9 +442,9 @@ function evaluateMonthPreview(
     resultDetail = extract.monthAlreadyImported
       ? 'Mês pronto para atualizar: notas e extrato batem; duplicados serão descartados e apenas novidades serão inseridas.'
       : 'Mês pronto para importar: notas e extrato coerentes com o livro (simulação pós-notas).';
-  } else if (notesOk && extract.parseOk && extract.closingLedgerOk === false) {
+  } else if (notesOk && extract.parseOk && !financialOk) {
     resultDetail =
-      'Notas OK, mas caixa do extrato não fecha com o livro após simular as notas. Pode haver LIQ BOLSA duplicada ao importar o extrato — revise antes de gravar.';
+      'Notas OK, mas o saldo do extrato não fecha com o livro após simular o caixa do mês. Revise extrato e a cadeia de saldos dos meses anteriores.';
   } else if (!notesOk && financialOk) {
     resultDetail = 'Corrija as notas antes de fechar o mês.';
   } else {
@@ -552,15 +552,13 @@ export async function previewBtgMonthImport(
       extractFile,
       { ignoreDbPending: opts?.simulateFreshImport === true }
     );
-    liqBolsaOk = liq.ok;
-    liqBolsaDetail = liq.detail;
+    const resolved = resolveLiqBolsaMonthPreview(flags.resultOk, liq);
+    liqBolsaOk = resolved.liqBolsaOk;
+    liqBolsaDetail = resolved.liqBolsaDetail;
   }
 
   const resultOk = flags.resultOk;
-  const resultDetail =
-    flags.resultOk && !liqBolsaOk && liqBolsaDetail
-      ? `${flags.resultDetail} LIQ BOLSA (relatorio): ${liqBolsaDetail}`
-      : flags.resultDetail;
+  const resultDetail = flags.resultDetail;
 
   return {
     kind: 'month_import',
@@ -824,6 +822,29 @@ export function assessLiqBolsaFromPendingPools(
     detail:
       `LIQ BOLSA sem casamento com eventos de negocio (${unresolved.length}). ${details}.${priorHint}`,
   };
+}
+
+/**
+ * LIQ BOLSA formaliza caixa em transito → conta investimento.
+ * Se notas+caixa ja fecham, linhas sem casamento estrito sao ignoradas na importacao (nao pendencia).
+ */
+export function resolveLiqBolsaMonthPreview(
+  resultOk: boolean,
+  assessment: LiqBolsaStrictAssessment
+): { liqBolsaOk: boolean; liqBolsaDetail: string } {
+  if (assessment.ok) {
+    return { liqBolsaOk: true, liqBolsaDetail: '' };
+  }
+  if (resultOk) {
+    const n = assessment.unresolved.length;
+    const detail =
+      n > 0
+        ? `${n} linha(s) LIQ BOLSA ignorada(s) na importacao ` +
+          `(formalizacao de caixa em transito; extrato ja fecha — evita duplicidade).`
+        : assessment.detail;
+    return { liqBolsaOk: true, liqBolsaDetail: detail };
+  }
+  return { liqBolsaOk: false, liqBolsaDetail: assessment.detail };
 }
 
 /** Simula casamento LIQ BOLSA estrito (mesma regra do apply). */

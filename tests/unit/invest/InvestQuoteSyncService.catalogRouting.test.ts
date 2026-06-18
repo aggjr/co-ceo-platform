@@ -1,7 +1,7 @@
 import type { UserContext } from '../../../src/core/dal';
 import { InvestQuoteSyncService } from '../../../src/core/invest/InvestQuoteSyncService';
 import { fetchB3Quotes } from '../../../src/core/invest/B3QuoteProvider';
-import { fetchOpcoesNetOptionQuotes } from '../../../src/core/invest/opcoesNetQuotes';
+import { fetchOptionQuotesWithFallback } from '../../../src/core/invest/opcoesNetQuotes';
 import { fetchTesouroDiretoQuotes } from '../../../src/core/invest/TesouroDiretoQuoteProvider';
 import {
   InMemoryGateway,
@@ -14,6 +14,7 @@ jest.mock('../../../src/core/invest/B3QuoteProvider', () => ({
 
 jest.mock('../../../src/core/invest/opcoesNetQuotes', () => ({
   fetchOpcoesNetOptionQuotes: jest.fn(),
+  fetchOptionQuotesWithFallback: jest.fn(),
 }));
 
 jest.mock('../../../src/core/invest/TesouroDiretoQuoteProvider', () => ({
@@ -75,7 +76,7 @@ async function seedAsset(gw: InMemoryGateway, ticker: string, subcategory: strin
 describe('InvestQuoteSyncService catalog routing', () => {
   beforeEach(() => {
     jest.mocked(fetchB3Quotes).mockReset();
-    jest.mocked(fetchOpcoesNetOptionQuotes).mockReset();
+    jest.mocked(fetchOptionQuotesWithFallback).mockReset();
     jest.mocked(fetchTesouroDiretoQuotes).mockReset();
   });
 
@@ -93,7 +94,7 @@ describe('InvestQuoteSyncService catalog routing', () => {
       { ticker: 'BOVA11', price: 120, asOf: '2026-06-05', source: 'brapi', kind: 'close' },
       { ticker: 'ITUB4', price: 39.5, asOf: '2026-06-05', source: 'brapi', kind: 'close' },
     ]);
-    jest.mocked(fetchOpcoesNetOptionQuotes).mockResolvedValue([
+    jest.mocked(fetchOptionQuotesWithFallback).mockResolvedValue([
       {
         ticker: 'ITUBF420',
         price: 0.42,
@@ -102,6 +103,7 @@ describe('InvestQuoteSyncService catalog routing', () => {
         expirationDate: '2026-06-19',
         optionType: 'CALL',
         underlyingTicker: 'ITUB4',
+        source: 'opcoes_net',
       },
     ]);
     jest.mocked(fetchTesouroDiretoQuotes).mockResolvedValue([
@@ -124,7 +126,7 @@ describe('InvestQuoteSyncService catalog routing', () => {
       expect.arrayContaining(['BOVA11', 'ITUB4']),
       expect.objectContaining({ asOfDate: '2026-06-05' })
     );
-    expect(fetchOpcoesNetOptionQuotes).toHaveBeenCalledWith(
+    expect(fetchOptionQuotesWithFallback).toHaveBeenCalledWith(
       ['ITUBF420'],
       { asOfDate: '2026-06-05' }
     );
@@ -152,7 +154,7 @@ describe('InvestQuoteSyncService catalog routing', () => {
     jest.mocked(fetchB3Quotes).mockResolvedValue([
       { ticker: 'PRIO3', price: 64.87, asOf: '2026-06-05', source: 'brapi', kind: 'close' },
     ]);
-    jest.mocked(fetchOpcoesNetOptionQuotes).mockResolvedValue([]);
+    jest.mocked(fetchOptionQuotesWithFallback).mockResolvedValue([]);
     jest.mocked(fetchTesouroDiretoQuotes).mockResolvedValue([]);
 
     const report = await new InvestQuoteSyncService(castGateway(gw)).syncFromBrapi(
@@ -168,5 +170,48 @@ describe('InvestQuoteSyncService catalog routing', () => {
     expect(report.missing).toEqual([]);
     expect(gw.dump('market_quotes_daily').find((r) => r.ticker === 'PRIO3')?.closing_price)
       .toBe(64.87);
+  });
+
+  it('persiste cotacao de opcao resolvida por fallback quando opcoes.net nao retorna', async () => {
+    const gw = new InMemoryGateway();
+    await seedCategory(gw, 'option_call', 'opcoes_net');
+    await seedAsset(gw, 'PRIOM385', 'option_call');
+
+    jest.mocked(fetchB3Quotes).mockResolvedValue([]);
+    jest.mocked(fetchOptionQuotesWithFallback).mockResolvedValue([
+      {
+        ticker: 'PRIOM385',
+        price: 0.07,
+        asOf: '2026-06-05',
+        strikePrice: null,
+        expirationDate: '2026-01-16',
+        optionType: 'CALL',
+        underlyingTicker: 'PRIO3',
+        source: 'yahoo_finance',
+        provider: 'statusinvest',
+      },
+    ]);
+    jest.mocked(fetchTesouroDiretoQuotes).mockResolvedValue([]);
+
+    const report = await new InvestQuoteSyncService(castGateway(gw)).syncFromBrapi(
+      ctx,
+      '2026-06-05'
+    );
+
+    expect(fetchOptionQuotesWithFallback).toHaveBeenCalledWith(
+      ['PRIOM385'],
+      { asOfDate: '2026-06-05' }
+    );
+    expect(report.missing).toEqual([]);
+    const row = gw.dump('market_quotes_daily').find((r) => r.ticker === 'PRIOM385');
+    expect(row?.closing_price).toBe(0.07);
+    expect(row?.source).toBe('yahoo_finance');
+    const meta =
+      typeof row?.metadata === 'string' ? JSON.parse(row.metadata) : row?.metadata;
+    expect(meta).toMatchObject({
+      kind: 'option_last',
+      provider: 'statusinvest',
+      requested_source: 'opcoes_net',
+    });
   });
 });

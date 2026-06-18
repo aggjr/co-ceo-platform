@@ -9,7 +9,7 @@ import {
 import { inferOptionExpiryDate, inferOptionMonthFromTicker } from './optionExpiry';
 import { authBootstrapContext } from '../auth/authBootstrapContext';
 import { fetchB3Quotes, type B3QuoteResult } from './B3QuoteProvider';
-import { fetchOpcoesNetOptionQuotes } from './opcoesNetQuotes';
+import { fetchOptionQuotesWithFallback } from './opcoesNetQuotes';
 import { MarketQuoteRepository, type QuoteSource } from '../market/MarketQuoteRepository';
 import {
   fetchExternalStockHistory,
@@ -164,13 +164,14 @@ export class InvestQuoteSyncService {
       return out;
     }
     if (source === 'opcoes_net') {
-      const optionQuotes = await fetchOpcoesNetOptionQuotes(tickers, { asOfDate });
+      const optionQuotes = await fetchOptionQuotesWithFallback(tickers, { asOfDate });
       return optionQuotes.map((q) => ({
         ticker: q.ticker,
         price: q.price,
         asOf: q.asOf,
-        source: 'opcoes_net' as QuoteSource,
+        source: q.source,
         kind: 'option_last',
+        provider: q.provider,
         strikePrice: q.strikePrice,
         expirationDate: q.expirationDate,
         optionType: q.optionType,

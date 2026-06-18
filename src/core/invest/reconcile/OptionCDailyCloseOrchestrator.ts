@@ -4,10 +4,13 @@ import { GatewayError } from '../../dal/errors';
 import type { BtgUploadFileInput } from '../btgUploadImportService';
 import {
   applyBtgMonthImport,
+  buildMonthReconcileLedger,
   discoverMonthExtractPlan,
+  filterLedgerOpeningOnly,
   monthBounds,
   type MonthExtractPlanEntry,
 } from '../btgMonthImportService';
+import type { LedgerEvent } from '../CustodyEngine';
 import { InvestQuoteSyncService } from '../InvestQuoteSyncService';
 import { OptionHistoricalSyncService } from '../OptionHistoricalSyncService';
 import { LedgerImportService } from '../LedgerImportService';
@@ -54,6 +57,8 @@ type OptionCRuntime = {
   monthPlan: MonthExtractPlanEntry[];
   quotesSynced: boolean;
   previousClosingExtract: number | null;
+  /** Livro simulado mês a mês (série de saldo do extrato) — mesma regra da prévia em lote. */
+  workingLedger: LedgerEvent[];
   monthsApplied: string[];
   monthsSkipped: string[];
   resetFirst: boolean;
@@ -125,6 +130,7 @@ export class OptionCDailyCloseOrchestrator {
           monthPlan: [],
           quotesSynced: false,
           previousClosingExtract: null,
+          workingLedger: [],
           monthsApplied: [],
           monthsSkipped: [],
           resetFirst: false,
@@ -207,12 +213,18 @@ export class OptionCDailyCloseOrchestrator {
 
     const runId = newRunId(ctx.organizationId);
     const monthCalendar = monthPlan.map((m) => m.month);
+    const today = new Date().toISOString().slice(0, 10);
+    const dbLedger = await this.ledger.listLedgerEvents(ctx, '2000-01-01', today);
+    const workingLedger = input.resetFirst
+      ? filterLedgerOpeningOnly(dbLedger)
+      : dbLedger;
     const rt: OptionCRuntime = {
       notesFiles: input.notesFiles,
       extractFiles: input.extractFiles,
       monthPlan,
       quotesSynced: false,
       previousClosingExtract: null,
+      workingLedger,
       monthsApplied: [],
       monthsSkipped: [],
       resetFirst: input.resetFirst === true,
@@ -433,6 +445,7 @@ export class OptionCDailyCloseOrchestrator {
       {
         previousClosingExtract: rt.previousClosingExtract,
         simulateFreshImport: rt.resetFirst,
+        baseLedger: rt.workingLedger,
       }
     );
 
@@ -466,6 +479,11 @@ export class OptionCDailyCloseOrchestrator {
       if (importResult.extract.closingExtract != null) {
         rt.previousClosingExtract = importResult.extract.closingExtract;
       }
+      rt.workingLedger = await buildMonthReconcileLedger(
+        month,
+        planEntry.extractFile,
+        rt.workingLedger
+      );
       logStep(
         rt,
         `Gravado ${month}: notas +${importResult.notesInserted}/-${importResult.notesSkipped}, extrato +${importResult.extractInserted}/-${importResult.extractSkipped}.`

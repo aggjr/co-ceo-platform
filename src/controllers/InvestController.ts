@@ -31,7 +31,7 @@ import { ReconciliationSessionService } from '../core/invest/reconcile/Reconcili
 import { ReconciliationAuditService } from '../core/invest/reconcile/ReconciliationAuditService';
 import type { ReconcileAction } from '../core/invest/reconcile/auditTypes';
 import { fetchB3Quotes } from '../core/invest/B3QuoteProvider';
-import { fetchOpcoesNetOptionQuotes } from '../core/invest/opcoesNetQuotes';
+import { fetchOptionQuotesWithFallback } from '../core/invest/opcoesNetQuotes';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import {
@@ -444,15 +444,18 @@ export class InvestController {
     // Tela de opções: só cotações já no banco (sync manual/cron). Evita grade opcoes.net no request.
     if (missingOptions.length && !optionsOnly) {
       try {
-        const optQuotes = await fetchOpcoesNetOptionQuotes(missingOptions);
+        const optQuotes = await fetchOptionQuotesWithFallback(missingOptions);
         const marketCtx = authBootstrapContext();
         for (const q of optQuotes) {
           await this.marketQuoteRepo.upsertQuote(marketCtx, {
             ticker: q.ticker,
             quoteDate: q.asOf,
             closingPrice: q.price,
-            source: 'opcoes_net',
-            metadata: { kind: 'option_last' },
+            source: q.source,
+            metadata: {
+              kind: 'option_last',
+              ...(q.provider ? { provider: q.provider } : {}),
+            },
           });
           marketQuoteMap.set(q.ticker.toUpperCase(), {
             price: q.price,

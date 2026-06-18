@@ -33,13 +33,18 @@ export function evaluateOptionsMarketSyncReport(
     };
   }
   const quoteMissing = report.quoteSync?.flatMap((q) => q.missing) ?? [];
+  const fallbackHits = report.quoteSync?.flatMap((q) => q.fallbackResolved ?? []) ?? [];
   if (quoteMissing.length > 0) {
+    const fallbackNote =
+      fallbackHits.length > 0
+        ? ` ${fallbackHits.length} via fontes alternativas (${fallbackHits.slice(0, 4).join(', ')}${fallbackHits.length > 4 ? '...' : ''}).`
+        : '';
     return {
       status: 'warning',
-      title: 'Sync opcoes.net com cotacoes faltantes',
+      title: 'Sync opções com cotações faltantes',
       body:
-        `${quoteMissing.length} opcao(oes) abertas sem cotacao opcoes.net: ` +
-        `${quoteMissing.slice(0, 8).join(', ')}${quoteMissing.length > 8 ? '...' : ''}.`,
+        `${quoteMissing.length} opcao(oes) abertas sem cotação (opcoes.net + fallbacks): ` +
+        `${quoteMissing.slice(0, 8).join(', ')}${quoteMissing.length > 8 ? '...' : ''}.${fallbackNote}`,
       summary: report as unknown as Record<string, unknown>,
     };
   }

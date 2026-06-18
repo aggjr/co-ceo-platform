@@ -3,6 +3,7 @@ import {
   buildMonthReconcileLedger,
   filterFilesForMonth,
   isMonthBtgImportCashEvent,
+  resolveLiqBolsaMonthPreview,
   stripBtgImportCashFromMonthForward,
   stripMonthImportCashFromLedger,
 } from '../../../src/core/invest/btgMonthImportService';
@@ -143,12 +144,26 @@ describe('btgMonthImportService', () => {
     expect(result.unresolved).toHaveLength(0);
   });
 
-  it('LIQ pendente nao bloqueia resultOk da previa (notas + caixa bastam)', () => {
-    const notesOk = true;
-    const financialOk = true;
-    const liqBolsaOk = false;
-    const resultOk = notesOk && financialOk;
-    expect(resultOk).toBe(true);
-    expect(resultOk && liqBolsaOk).toBe(false);
+  it('LIQ sem casamento estrito nao bloqueia previa quando caixa fecha', () => {
+    const assessment = assessLiqBolsaFromPendingPools(
+      '2026-01',
+      {},
+      [{ date: '2026-01-20', signedCents: 21_998_399 }]
+    );
+    expect(assessment.ok).toBe(false);
+    const preview = resolveLiqBolsaMonthPreview(true, assessment);
+    expect(preview.liqBolsaOk).toBe(true);
+    expect(preview.liqBolsaDetail).toContain('ignorada(s)');
+  });
+
+  it('LIQ sem casamento permanece diagnostico quando caixa nao fecha', () => {
+    const assessment = assessLiqBolsaFromPendingPools(
+      '2026-01',
+      {},
+      [{ date: '2026-01-20', signedCents: 21_998_399 }]
+    );
+    const preview = resolveLiqBolsaMonthPreview(false, assessment);
+    expect(preview.liqBolsaOk).toBe(false);
+    expect(preview.liqBolsaDetail).toContain('sem casamento');
   });
 });

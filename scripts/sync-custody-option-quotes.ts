@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 import mysql from 'mysql2/promise';
 import { CoCeoDataGateway } from '../src/core/dal';
 import { authBootstrapContext } from '../src/core/auth/authBootstrapContext';
-import { fetchOpcoesNetOptionQuotes } from '../src/core/invest/opcoesNetQuotes';
+import { fetchOptionQuotesWithFallback } from '../src/core/invest/opcoesNetQuotes';
 import { MarketQuoteRepository } from '../src/core/market/MarketQuoteRepository';
 
 dotenv.config();
@@ -50,10 +50,11 @@ async function main() {
   console.log(`Opções em carteira: ${tickers.length}`);
   console.log(tickers.join(', '));
 
-  const quotes = await fetchOpcoesNetOptionQuotes(tickers);
+  const quotes = await fetchOptionQuotesWithFallback(tickers);
   const marketQuotes = new MarketQuoteRepository(gateway);
   let saved = 0;
   const missing: string[] = [];
+  const fallback: string[] = [];
 
   for (const ticker of tickers) {
     const q = quotes.find((x) => x.ticker === ticker);
@@ -61,20 +62,29 @@ async function main() {
       missing.push(ticker);
       continue;
     }
+    if (q.source !== 'opcoes_net') fallback.push(ticker);
     await marketQuotes.upsertQuote(ctx, {
       ticker: q.ticker,
       quoteDate: q.asOf,
       closingPrice: q.price,
-      source: 'opcoes_net',
-      metadata: { kind: 'option_last', scope: 'custody' },
+      source: q.source,
+      metadata: {
+        kind: 'option_last',
+        scope: 'custody',
+        ...(q.provider ? { provider: q.provider } : {}),
+      },
     });
     saved += 1;
-    console.log(`  ${q.ticker}: R$ ${q.price} (${q.asOf})`);
+    const src = q.source === 'opcoes_net' ? 'opcoes.net' : `${q.provider ?? q.source}`;
+    console.log(`  ${q.ticker}: R$ ${q.price} (${q.asOf}) [${src}]`);
   }
 
   console.log(`Gravadas: ${saved}/${tickers.length}`);
+  if (fallback.length) {
+    console.log(`Via fontes alternativas: ${fallback.join(', ')}`);
+  }
   if (missing.length) {
-    console.log(`Sem cotação na grade: ${missing.join(', ')}`);
+    console.log(`Sem cotação em nenhuma fonte: ${missing.join(', ')}`);
   }
 
   await pool.end();
