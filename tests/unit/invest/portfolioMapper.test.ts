@@ -2,12 +2,14 @@ import {
   applyAllocationPercents,
   attachUnderlyingMarketData,
   buildLongEquityPmMapFromAssetRows,
+  collectOptionUnderlyingTickersFromAssetRows,
   enrichPortfolioRow,
   equityResultFromB3Quote,
   optionPriceReturnPct,
   isClosedOptionPosition,
   partitionPortfolioPositions,
   summarizePortfolio,
+  tickersWithoutValidQuote,
 } from '../../../src/core/invest/portfolioMapper';
 
 describe('portfolioMapper', () => {
@@ -428,6 +430,35 @@ describe('portfolioMapper', () => {
     expect(enriched.underlyingLastPrice).toBe(65.4);
     expect(enriched.strikeDistanceBrl).toBeCloseTo(7.4, 1);
     expect(enriched.strikeDistancePct).toBeCloseTo(12.76, 1);
+  });
+
+  it('tickersWithoutValidQuote ignora preço zero ou ausente', () => {
+    const quotes = new Map([
+      ['PRIO3', { price: 65.4 }],
+      ['ITUB4', { price: 0 }],
+      ['PETR4', { price: -1 }],
+    ]);
+    expect(tickersWithoutValidQuote(['PRIO3', 'ITUB4', 'PETR4', 'VALE3'], quotes)).toEqual([
+      'ITUB4',
+      'PETR4',
+      'VALE3',
+    ]);
+  });
+
+  it('collectOptionUnderlyingTickersFromAssetRows inclui metadata e inferência', () => {
+    const rows = [
+      {
+        asset_ticker: 'PRIOR580',
+        asset_type: 'option_put',
+        metadata: { underlying_ticker: 'PRIO3' },
+      },
+      {
+        asset_ticker: 'PETRC350',
+        asset_type: 'option_call',
+        metadata: JSON.stringify({ underlying_ticker: 'PETR4' }),
+      },
+    ];
+    expect(collectOptionUnderlyingTickersFromAssetRows(rows).sort()).toEqual(['PETR4', 'PRIO3']);
   });
 
   it('ação: cotação de mercado não replica PM B3 (metadata com PM errado)', () => {

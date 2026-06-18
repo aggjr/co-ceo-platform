@@ -415,6 +415,51 @@ export function enrichPortfolioRow(
 
 export type UnderlyingSpotMap = Map<string, number>;
 
+/** Tickers sem cotação válida (> 0) em market_quotes_daily / mapa de fallback. */
+export function tickersWithoutValidQuote(
+  tickers: string[],
+  quotes: Map<string, { price: number }>
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of tickers) {
+    const t = String(raw || '').trim().toUpperCase();
+    if (!t || seen.has(t) || isOptionTicker(t)) continue;
+    seen.add(t);
+    const price = Number(quotes.get(t)?.price);
+    if (!(price > 0)) out.push(t);
+  }
+  return out;
+}
+
+/** Subjacentes das opções abertas (metadata ou inferência do ticker). */
+export function collectOptionUnderlyingTickersFromAssetRows(
+  rows: Record<string, unknown>[]
+): string[] {
+  const set = new Set<string>();
+  for (const raw of rows) {
+    const ticker = String(raw.asset_ticker ?? '').trim().toUpperCase();
+    const type = String(raw.asset_type ?? '').toLowerCase();
+    if (!ticker) continue;
+    if (type !== 'option_call' && type !== 'option_put' && !isOptionTicker(ticker)) continue;
+    const meta =
+      typeof raw.metadata === 'string'
+        ? (() => {
+            try {
+              return JSON.parse(raw.metadata) as { underlying_ticker?: string };
+            } catch {
+              return {};
+            }
+          })()
+        : ((raw.metadata as { underlying_ticker?: string }) ?? {});
+    const und = String(meta.underlying_ticker || inferUnderlyingTicker(ticker) || '')
+      .trim()
+      .toUpperCase();
+    if (und) set.add(und);
+  }
+  return [...set];
+}
+
 /** Cotações de subjacentes vindas de market_quotes_daily / brapi (quando a resposta não traz a ação). */
 export function buildUnderlyingSpotMap(
   items: PortfolioItemDto[],

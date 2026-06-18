@@ -32,6 +32,7 @@ import { ReconciliationAuditService } from '../core/invest/reconcile/Reconciliat
 import type { ReconcileAction } from '../core/invest/reconcile/auditTypes';
 import { fetchB3Quotes } from '../core/invest/B3QuoteProvider';
 import { fetchOptionQuotesWithFallback } from '../core/invest/opcoesNetQuotes';
+import { fetchExternalStockQuoteForDate } from '../core/market/ExternalStockQuoteProvider';
 import { authBootstrapContext } from '../core/auth/authBootstrapContext';
 import { MarketQuoteRepository } from '../core/market/MarketQuoteRepository';
 import {
@@ -78,10 +79,12 @@ import {
   enrichPortfolioRow,
   attachUnderlyingMarketData,
   buildLongEquityPmMapFromAssetRows,
+  collectOptionUnderlyingTickersFromAssetRows,
   mergeLedgerCustodyIntoAssetRows,
   mergeOptionStrikeIntoAssetRow,
   partitionPortfolioPositions,
   summarizePortfolio,
+  tickersWithoutValidQuote,
 } from '../core/invest/portfolioMapper';
 import {
   buildThreeAvgPricesByUnderlying,
@@ -408,14 +411,20 @@ export class InvestController {
         if (und) quoteTickers.add(und);
       }
     }
+    if (optionsOnly) {
+      for (const und of collectOptionUnderlyingTickersFromAssetRows(rowsMerged)) {
+        quoteTickers.add(und);
+      }
+    }
     const allQuoteTickers = [...quoteTickers];
     const marketQuoteMap = await this.marketQuoteRepo.loadLatestQuoteMap(
       ctx,
       allQuoteTickers
     );
-    const missingQuotes = allQuoteTickers.filter((t) => !marketQuoteMap.has(t));
-    const missingEquity = missingQuotes.filter((t) => !isOptionTicker(t));
-    const missingOptions = missingQuotes.filter((t) => isOptionTicker(t));
+    let missingEquity = tickersWithoutValidQuote(allQuoteTickers, marketQuoteMap);
+    const missingOptions = allQuoteTickers.filter(
+      (t) => isOptionTicker(t) && !marketQuoteMap.has(t.toUpperCase())
+    );
 
     if (missingEquity.length) {
       try {
@@ -438,6 +447,30 @@ export class InvestController {
         }
       } catch (err) {
         console.warn('[listPortfolio] preenchimento brapi de cotações:', err);
+      }
+    }
+
+    missingEquity = tickersWithoutValidQuote(allQuoteTickers, marketQuoteMap);
+    if (missingEquity.length) {
+      const marketCtx = authBootstrapContext();
+      for (const ticker of missingEquity) {
+        try {
+          const q = await fetchExternalStockQuoteForDate(ticker, today);
+          if (!q || !(q.price > 0)) continue;
+          await this.marketQuoteRepo.upsertQuote(marketCtx, {
+            ticker: q.ticker,
+            quoteDate: q.asOf,
+            closingPrice: q.price,
+            source: 'yahoo_finance',
+            metadata: { kind: q.kind, provider: q.source },
+          });
+          marketQuoteMap.set(q.ticker.toUpperCase(), {
+            price: q.price,
+            date: q.asOf,
+          });
+        } catch (err) {
+          console.warn(`[listPortfolio] fallback cotação ${ticker}:`, err);
+        }
       }
     }
 
