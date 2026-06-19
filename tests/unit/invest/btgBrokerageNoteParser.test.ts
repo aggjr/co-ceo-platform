@@ -244,5 +244,34 @@ Resumo dos Negócios
     expect(kept).toHaveLength(1);
     expect(skipped).toHaveLength(1);
     expect(skipped[0].duplicateSkipped).toBe(true);
+    expect(kept[0].trades).toHaveLength(1);
+  });
+
+  it('dedupe agrega negocios de folhas distintas da mesma nota', () => {
+    const lines = `
+NOTA DE CORRETAGEM
+31963578 Nr. nota
+1 Folha
+15/05/2026 Data pregão
+004176105
+Negócios realizados
+1-BOVESPA C EXERC OPC VENDA WEGEQ435E ON 300 43,46 13038,00 D
+Resumo dos Negócios
+NOTA DE CORRETAGEM
+31963578 Nr. nota
+2 Folha
+15/05/2026 Data pregão
+004176105
+Negócios realizados
+1-BOVESPA C EXERC OPC VENDA WEGEQ455E ON 900 45,46 40914,00 D
+Resumo dos Negócios
+`.trim().split('\n');
+    const { kept, skipped } = dedupeBrokerageNotes(
+      parseBtgBrokerageNoteBlocks(lines, 'spot.pdf', 'SPOT')
+    );
+    expect(kept).toHaveLength(1);
+    expect(skipped).toHaveLength(1);
+    expect(kept[0].trades).toHaveLength(2);
+    expect(kept[0].trades.map((t) => t.ticker).sort()).toEqual(['WEGEQ435E', 'WEGEQ455E']);
   });
 });

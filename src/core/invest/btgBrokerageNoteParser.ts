@@ -593,6 +593,32 @@ export function parseBtgBrokerageNoteBlocks(
   return notes;
 }
 
+function tradeFingerprint(t: BtgBrokerageNoteTrade): string {
+  return [
+    t.side,
+    t.ticker,
+    t.quantity,
+    t.unitPrice,
+    t.marketType,
+    t.grossValue,
+    t.specification,
+  ].join('|');
+}
+
+/** Mesma nota BTG em varias folhas: agrega negocios distintos (nao descarta folha 2+). */
+function mergeNoteTrades(into: BtgBrokerageNote, from: BtgBrokerageNote): number {
+  const seen = new Set(into.trades.map(tradeFingerprint));
+  let added = 0;
+  for (const t of from.trades) {
+    const fp = tradeFingerprint(t);
+    if (seen.has(fp)) continue;
+    seen.add(fp);
+    into.trades.push(t);
+    added += 1;
+  }
+  return added;
+}
+
 export function dedupeBrokerageNotes(notes: BtgBrokerageNote[]): {
   kept: BtgBrokerageNote[];
   skipped: BtgBrokerageNote[];
@@ -606,6 +632,7 @@ export function dedupeBrokerageNotes(notes: BtgBrokerageNote[]): {
     if (prev) {
       note.duplicateSkipped = true;
       note.duplicateOf = prev.dedupeKey;
+      mergeNoteTrades(prev, note);
       skipped.push(note);
       continue;
     }

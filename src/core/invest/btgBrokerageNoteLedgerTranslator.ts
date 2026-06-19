@@ -19,23 +19,21 @@ import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
 
 /** Prefixo canonico de perna individual (idempotencia). */
 export const B3_NOTE_LEDGER_REF_PREFIX = 'B3-NOTA';
-/** Prefixo canonico do header business_events (1 header por nota B3). */
+/** Prefixo canonico do header business_events (1 header por linha operacional B3). */
 export const B3_NOTE_EVENT_REF_PREFIX = 'B3-NOTA';
 /** @deprecated use B3_NOTE_* — alias legado */
 export const BTG_NOTE_LEDGER_REF_PREFIX = B3_NOTE_LEDGER_REF_PREFIX;
 /** @deprecated use B3_NOTE_* — alias legado */
 export const BTG_NOTE_EVENT_REF_PREFIX = B3_NOTE_EVENT_REF_PREFIX;
 
-/**
- * Chave canonica do header business_events para uma nota BTG. Todas as
- * pernas da mesma nota carregam o MESMO event_source_ref e caem no mesmo
- * business_events.id via BusinessEventRegistry.ensureByRef.
- *
- * `broker_note_ref` (line-level) continua diferenciado por trade para
- * idempotencia da perna individual.
- */
-function eventSourceRefForNote(note: BtgBrokerageNote): string {
-  return `${B3_NOTE_EVENT_REF_PREFIX}-${note.noteNumber}`;
+import {
+  eventSourceRefForTrade,
+  noteGroupRef,
+} from './noteEventSettlement';
+
+/** Agrupador da nota (metadado / conciliação Σ eventos). */
+function noteGroupSourceRef(note: BtgBrokerageNote): string {
+  return noteGroupRef(note.noteNumber);
 }
 
 type NoteFees = {
@@ -181,7 +179,7 @@ function tradeFeeLedgerLines(
   const settleDate =
     anchorLine.settlement_date ||
     cashSettlementDate(note.pregaoDate, assetType, anchorLine.operation, ticker);
-  const eventRef = eventSourceRefForNote(note);
+  const eventRef = eventSourceRefForTrade(note.noteNumber, lineNo);
   const tradeRef = `${B3_NOTE_LEDGER_REF_PREFIX}-${note.noteNumber}#${note.pregaoDate}#${lineNo}`;
 
   return tradeFeeSpecs(note, tradeIndex).map((spec) => ({
@@ -196,6 +194,7 @@ function tradeFeeLedgerLines(
     total_net_value: -Math.abs(spec.amount),
     broker_note_ref: `${tradeRef}#FEE-${spec.suffix}`,
     event_source_ref: eventRef,
+    note_group_ref: noteGroupSourceRef(note),
     counterparty: 'BTG Pactual',
     source_system: 'b3_brokerage_note',
     settlement_date: settleDate,
@@ -221,7 +220,8 @@ function loanToLedger(
     unit_price: Number(trade.unitPrice) || 0,
     total_net_value: Math.abs(Number(trade.grossValue) || 0),
     broker_note_ref: ref,
-    event_source_ref: eventSourceRefForNote(note),
+    event_source_ref: eventSourceRefForTrade(note.noteNumber, 1),
+    note_group_ref: noteGroupSourceRef(note),
     counterparty: 'BTG Pactual',
     source_system: 'b3_brokerage_note',
     notes: `Locação BTC — ${trade.specification || trade.ticker}`,
@@ -259,7 +259,7 @@ function tradeToLedger(
 
   if (!mapped.length) return [];
 
-  const eventRef = eventSourceRefForNote(note);
+  const eventRef = eventSourceRefForTrade(note.noteNumber, lineNo);
   for (const line of mapped) {
     if (trade.isExercise && line.operation === 'buy') {
       line.option_strike = Number(trade.unitPrice) || undefined;
@@ -269,6 +269,7 @@ function tradeToLedger(
     line.settlement_date = cashSettlementDate(note.pregaoDate, line.asset_type || 'stock', line.operation, line.ticker);
     line.settlement_status = 'pending';
     line.event_source_ref = eventRef;
+    line.note_group_ref = noteGroupSourceRef(note);
     line.counterparty = 'BTG Pactual';
     line.source_system = 'b3_brokerage_note';
   }

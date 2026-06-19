@@ -47,6 +47,11 @@ import {
 } from './LiqBolsaSettlementService';
 import type { LedgerImportLine } from './ledgerTypes';
 import { logInvestStdout } from './reconcile/reconcileErrorDetail';
+import {
+  assessNotesFromImportLines,
+  summarizeNoteSettlements,
+  type NoteSettlementAssessment,
+} from './noteEventSettlement';
 
 function logMonthImportStdout(
   orgId: string | null | undefined,
@@ -85,9 +90,16 @@ export type BtgMonthImportPreview = {
   notesDetail: string;
   financialDetail: string;
   resultDetail: string;
-  /** Coluna LIQ BOLSA na previa: true quando casou ou quando caixa ja fecha (linhas ignoradas). */
+  /** Coluna LIQ BOLSA na previa: casamento estrito com pool pending. */
   liqBolsaOk?: boolean;
   liqBolsaDetail?: string;
+  /** Conciliacao contabil por nota (pool vs liquido; materializacao). */
+  noteSettlements?: NoteSettlementAssessment[];
+  notesSettlementSummary?: {
+    closed: number;
+    open: number;
+    waiting: number;
+  };
   notesFilesInFolder: number;
   notesFilesInMonth: number;
   notes: BtgBrokerageImportPreview;
@@ -542,8 +554,15 @@ export async function previewBtgMonthImport(
 
   let liqBolsaOk = true;
   let liqBolsaDetail = '';
+  let noteSettlements: NoteSettlementAssessment[] = [];
+  let notesSettlementSummary = { closed: 0, open: 0, waiting: 0 };
   const pdfsForLiq = noteFilesAll.filter((f) => isPdfPath(f.name));
   if (pdfsForLiq.length && extract.parseOk) {
+    const importLines = await collectMonthImportLines(pdfsForLiq);
+    const parsedNotes = await collectMonthImportNotes(pdfsForLiq, monthNorm);
+    noteSettlements = assessNotesFromImportLines(parsedNotes, importLines);
+    notesSettlementSummary = summarizeNoteSettlements(noteSettlements);
+
     const liq = await assessLiqBolsaStrictForMonth(
       ctx,
       ledger,
@@ -552,13 +571,15 @@ export async function previewBtgMonthImport(
       extractFile,
       { ignoreDbPending: opts?.simulateFreshImport === true }
     );
-    const resolved = resolveLiqBolsaMonthPreview(flags.resultOk, liq);
+    const resolved = resolveLiqBolsaMonthPreview(liq);
     liqBolsaOk = resolved.liqBolsaOk;
     liqBolsaDetail = resolved.liqBolsaDetail;
   }
 
-  const resultOk = flags.resultOk;
-  const resultDetail = flags.resultDetail;
+  const resultOk = flags.resultOk && liqBolsaOk;
+  const resultDetail = flags.resultOk && !liqBolsaOk
+    ? liqBolsaDetail || 'LIQ BOLSA sem casamento com eventos pendentes.'
+    : flags.resultDetail;
 
   return {
     kind: 'month_import',
@@ -568,6 +589,8 @@ export async function previewBtgMonthImport(
     resultDetail,
     liqBolsaOk,
     liqBolsaDetail,
+    noteSettlements,
+    notesSettlementSummary,
     notesFilesInFolder: noteFilesAll.filter((f) => isPdfPath(f.name)).length,
     notesFilesInMonth: noteFiles.length,
     notes,
@@ -711,6 +734,29 @@ export async function previewBtgBatchImport(
   };
 }
 
+/** Notas parseadas do mes (dedupe + merge folhas). */
+export async function collectMonthImportNotes(
+  noteFiles: BtgUploadFileInput[],
+  month: string
+): Promise<BtgBrokerageNote[]> {
+  const monthNorm = month.slice(0, 7);
+  const notes: BtgBrokerageNote[] = [];
+  for (const file of noteFiles) {
+    if (!isPdfPath(file.name)) continue;
+    try {
+      const rawLines = await pdfBufferToLines(decodeUploadBase64(file));
+      const parsed = parseBtgBrokerageNoteBlocks(rawLines, file.name);
+      const { kept } = dedupeBrokerageNotes(parsed);
+      for (const note of kept) {
+        if (String(note.pregaoDate).slice(0, 7) === monthNorm) notes.push(note);
+      }
+    } catch {
+      /* ilegivel */
+    }
+  }
+  return notes;
+}
+
 /** Linhas de import (com skip_financial_ledger) para backfill de expectativas pending. */
 export async function collectMonthImportLines(
   noteFiles: BtgUploadFileInput[]
@@ -826,23 +872,13 @@ export function assessLiqBolsaFromPendingPools(
 
 /**
  * LIQ BOLSA formaliza caixa em transito → conta investimento.
- * Se notas+caixa ja fecham, linhas sem casamento estrito sao ignoradas na importacao (nao pendencia).
+ * Casamento estrito: LIQ sem evento pending correspondente fica pendente (nao vira caixa orfao).
  */
 export function resolveLiqBolsaMonthPreview(
-  resultOk: boolean,
   assessment: LiqBolsaStrictAssessment
 ): { liqBolsaOk: boolean; liqBolsaDetail: string } {
   if (assessment.ok) {
     return { liqBolsaOk: true, liqBolsaDetail: '' };
-  }
-  if (resultOk) {
-    const n = assessment.unresolved.length;
-    const detail =
-      n > 0
-        ? `${n} linha(s) LIQ BOLSA ignorada(s) na importacao ` +
-          `(formalizacao de caixa em transito; extrato ja fecha — evita duplicidade).`
-        : assessment.detail;
-    return { liqBolsaOk: true, liqBolsaDetail: detail };
   }
   return { liqBolsaOk: false, liqBolsaDetail: assessment.detail };
 }
@@ -1003,7 +1039,7 @@ export async function applyBtgMonthImport(
   await ensureExtractDivergenceOperation(pool);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
     parseOptions: MONTH_IMPORT_EXTRACT_OPTS_APPLY,
-    keepUnmatchedLiqBolsaAsCash: true,
+    keepUnmatchedLiqBolsaAsCash: false,
   });
 
   const notesInserted = notesApply.totals.inserted;
@@ -1043,3 +1079,6 @@ export async function applyBtgMonthImport(
     resultDetail,
   };
 }
+
+
+

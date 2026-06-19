@@ -27,15 +27,7 @@ export const BTG_MONTHS_2026: BtgMonthSpec[] = [
   { month: '2026-06', extractFile: 'Jun_2026.pdf', notesDirName: '004176105_20260601_20260616', label: 'Jun/2026' },
 ];
 
-const DEFAULT_DADOS_DIR = path.join(
-  'G:',
-  'Meu Drive',
-  '01 - Nova Estrutura',
-  'Trabalhos',
-  'FOCCUS',
-  'Softwares',
-  'co_ceo_platform (dados)'
-);
+const DEFAULT_DADOS_DIR = path.join(process.cwd(), 'Dados do Homebroker');
 
 /** Pasta raiz `(dados)` com extratos, notas e JSON patrimônio. */
 export function btgDadosDir(): string {
@@ -129,3 +121,4 @@ export function verifyBtgDadosLayout(base = btgSourcesBase()): {
   if (noteCount === 0) missing.push('nenhum PDF de nota encontrado');
   return { ok: missing.length === 0, base, missing, noteCount };
 }
+

@@ -312,15 +312,17 @@ async function settleLiqBolsaEntries(
   ctx: UserContext,
   ledger: Pick<LedgerImportService, 'settleLiqBolsa'>,
   entries: LedgerImportLine[],
-  options?: { keepUnmatchedAsCash?: boolean }
+  options?: { keepUnmatchedAsCash?: boolean; skipUnmatched?: boolean }
 ): Promise<{
   entries: LedgerImportLine[];
   matched: number;
   keptAsCash: number;
+  skipped: number;
   unresolved: Array<{ date: string; net: number; notes: string | undefined; reason: string }>;
 }> {
   let matched = 0;
   let keptAsCash = 0;
+  let skipped = 0;
   const unresolved: Array<{ date: string; net: number; notes: string | undefined; reason: string }> = [];
   const out: LedgerImportLine[] = [];
 
@@ -349,6 +351,16 @@ async function settleLiqBolsaEntries(
       }
       continue;
     }
+    if (options?.skipUnmatched) {
+      skipped += 1;
+      unresolved.push({
+        date: line.date,
+        net,
+        notes: line.notes,
+        reason: result.reason,
+      });
+      continue;
+    }
     unresolved.push({
       date: line.date,
       net,
@@ -357,7 +369,7 @@ async function settleLiqBolsaEntries(
     });
   }
 
-  return { entries: out, matched, keptAsCash, unresolved };
+  return { entries: out, matched, keptAsCash, skipped, unresolved };
 }
 
 function buildExtractPreview(
@@ -728,6 +740,8 @@ export async function applyBtgExtractUpload(
   options?: { 
     parseOptions?: import('./BtgExtractLineParser').BtgExtractParseOptions;
     keepUnmatchedLiqBolsaAsCash?: boolean;
+    /** LIQ sem casamento: nao grava caixa orfao; importa demais linhas. */
+    skipUnmatchedLiqBolsa?: boolean;
     /** Deprecated: nao usar em fluxos novos; cadeia quebrada deve bloquear. */
     injectCashAdjustment?: number;
   }
@@ -774,9 +788,10 @@ export async function applyBtgExtractUpload(
     );
     const liqBolsaSettlement = await settleLiqBolsaEntries(ctx, ledger, entries, {
       keepUnmatchedAsCash: options?.keepUnmatchedLiqBolsaAsCash === true,
+      skipUnmatched: options?.skipUnmatchedLiqBolsa === true,
     });
     entries = liqBolsaSettlement.entries;
-    if (liqBolsaSettlement.matched || liqBolsaSettlement.keptAsCash || liqBolsaSettlement.unresolved.length) {
+    if (liqBolsaSettlement.matched || liqBolsaSettlement.keptAsCash || liqBolsaSettlement.skipped || liqBolsaSettlement.unresolved.length) {
       logReconcileEvent(
         liqBolsaSettlement.unresolved.length ? 'warn' : 'info',
         'btg-extract.liq-bolsa.business-events',
@@ -785,12 +800,13 @@ export async function applyBtgExtractUpload(
           fileName: previewResult.fileName,
           matched: liqBolsaSettlement.matched,
           keptAsCash: liqBolsaSettlement.keptAsCash,
+          skipped: liqBolsaSettlement.skipped,
           unresolved: liqBolsaSettlement.unresolved.length,
         }
       );
     }
 
-    if (liqBolsaSettlement.unresolved.length) {
+    if (liqBolsaSettlement.unresolved.length && options?.skipUnmatchedLiqBolsa !== true) {
       const details = liqBolsaSettlement.unresolved
         .slice(0, 5)
         .map((u) => `${u.date}: ${u.net} (${u.reason})`)

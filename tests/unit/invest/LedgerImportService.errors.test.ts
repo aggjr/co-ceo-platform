@@ -79,7 +79,7 @@ describe('LedgerImportService — erros de validação', () => {
     });
   });
 
-  it('importEntriesOnly overwrites settlement_date from configured rules', async () => {
+  it('importEntriesOnly preserves explicit settlement_date from import lines', async () => {
     const gw = new InMemoryGateway();
     await gw.insert(ctxWithOrg, 'contracts', {
       id: 'contract-invest',
@@ -140,7 +140,8 @@ describe('LedgerImportService — erros de validação', () => {
     expect(result.inserted).toBe(1);
     const financialLegs = gw.dump('financial_ledger_entries');
     expect(financialLegs).toHaveLength(1);
-    expect(financialLegs[0]!.transaction_date).toBe('2026-05-14');
-    expect(financialLegs[0]!.settlement_date).toBe('2026-05-14');
+    expect(financialLegs[0]!.transaction_date).toBe('2026-05-12');
+    expect(financialLegs[0]!.settlement_date).toBe('2026-05-12');
   });
 });
+

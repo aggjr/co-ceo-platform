@@ -60,6 +60,12 @@ export class LedgerImportService {
   ): Promise<LedgerImportLine> {
     const transactionType = String(line.operation || '').trim().toLowerCase();
     if (!transactionType || transactionType === 'opening_balance') return line;
+    if (line.settlement_date) {
+      return {
+        ...line,
+        settlement_date: String(line.settlement_date).slice(0, 10),
+      };
+    }
     const rule = await this.settlementRules
       .resolveRule(
         {
@@ -513,3 +519,4 @@ export class LedgerImportService {
     return { processedEntries, positions: assets.length, pendingSync };
   }
 }
+

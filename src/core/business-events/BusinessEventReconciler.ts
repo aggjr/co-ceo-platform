@@ -63,10 +63,10 @@ export class BusinessEventReconciler {
     if (patrimonyLegs.length === 0 && financialLegs.length === 0) {
       issues.push(`Header sem pernas (nem custodia nem caixa).`);
     }
-    if (!hasCompleteLegComposition(patrimonyLegs.length, financialLegs.length)) {
+    if (!hasCompleteLegComposition(event.event_kind, patrimonyLegs.length, financialLegs.length, financialLegs)) {
       issues.push(
         `Composicao incompleta de pernas: patrimony=${patrimonyLegs.length}, financial=${financialLegs.length}. ` +
-          `Esperado custodia+caixa, 2+ custodia, ou 2+ financeiras.`
+          `Esperado custodia+caixa, unilateral catalogado, ou pending de materializacao.`
       );
     }
     if (event.voided_at) {
@@ -138,9 +138,37 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-function hasCompleteLegComposition(patrimonyCount: number, financialCount: number): boolean {
+function hasCompleteLegComposition(
+  eventKind: string,
+  patrimonyCount: number,
+  financialCount: number,
+  financialLegs: Record<string, unknown>[]
+): boolean {
   if (patrimonyCount >= 1 && financialCount >= 1) return true;
   if (patrimonyCount >= 2) return true;
   if (financialCount >= 2) return true;
+
+  const kind = String(eventKind ?? '');
+  if (patrimonyCount >= 1 && financialCount === 0) {
+    if (kind === 'corporate_action') return true;
+  }
+  if (financialCount >= 1 && patrimonyCount === 0) {
+    if (
+      kind === 'cash_movement' ||
+      kind === 'cash_yield_event' ||
+      kind === 'broker_note_loan'
+    ) {
+      return true;
+    }
+  }
+  if (patrimonyCount >= 1 && financialCount >= 1) return true;
+  if (patrimonyCount >= 1 && financialCount === 1) {
+    const hasPending = financialLegs.some(
+      (leg) => String((leg as { status?: string }).status ?? '') === 'pending'
+    );
+    if (hasPending && /broker_note|brokerage_note|treasury_direct|buy|sell/i.test(kind)) {
+      return true;
+    }
+  }
   return false;
 }

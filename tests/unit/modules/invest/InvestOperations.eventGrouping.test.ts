@@ -101,30 +101,28 @@ function cashYieldLine(overrides: Partial<LedgerImportLine>): LedgerImportLine {
 }
 
 describe('InvestOperations — agrupamento de pernas por event_source_ref (Saida B)', () => {
-  it('2 linhas com MESMO event_source_ref e broker_note_ref distintos => 1 header, 2 pernas', async () => {
+  it('2 linhas com event_source_ref distintos (1 por trade) => 2 headers', async () => {
     const gw = new InMemoryGateway();
     await seedCatalog(gw);
     const { ops } = buildOps(gw);
 
-    const ref = 'BTG-NOTA-12345';
     await ops.recordOperation(ctx, cashYieldLine({
-      event_source_ref: ref,
+      event_source_ref: 'BTG-NOTA-12345#1',
       broker_note_ref: 'BTG-NOTA-12345#2026-04-17#1',
       total_net_value: 500,
     }));
     await ops.recordOperation(ctx, cashYieldLine({
-      event_source_ref: ref,
+      event_source_ref: 'BTG-NOTA-12345#2',
       broker_note_ref: 'BTG-NOTA-12345#2026-04-17#2',
       total_net_value: 300,
     }));
 
     const headers = gw.dump('business_events');
-    expect(headers).toHaveLength(1);
-    expect(headers[0]?.source_ref).toBe(ref);
+    expect(headers).toHaveLength(2);
 
     const legs = gw.dump('financial_ledger_entries').filter((r) => !r.deleted_at);
     expect(legs).toHaveLength(2);
-    expect(new Set(legs.map((l) => l.business_event_id))).toEqual(new Set([headers[0]!.id]));
+    expect(new Set(legs.map((l) => l.business_event_id)).size).toBe(2);
     // broker_note_ref vira external_ref na perna — idempotencia individual
     const externalRefs = legs.map((l) => l.external_ref).sort();
     expect(externalRefs).toEqual([

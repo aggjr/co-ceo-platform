@@ -145,18 +145,11 @@ export type LedgerImportLine = {
    * automatico por linha (caso de cash_movement do extrato).
    */
   business_event_id?: string;
+  /** Agrupador da nota B3 (B3-NOTA-{numero}) para conciliacao Σ eventos. */
+  note_group_ref?: string;
   /**
-   * Chave do header agregador (business_events.source_ref). Multiplas linhas
-   * com o MESMO event_source_ref caem no MESMO business_events.id via
-   * BusinessEventRegistry.ensureByRef.
-   *
-   * Padroes adotados:
-   *   - 'B3-NOTA-{noteNumber}' → 1 header por nota de corretagem (padrao B3)
-   *   - 'OPENING:{date}'        → 1 header para o opening
-   *   - vazio                   → cada linha vira 1 header avulso (cash_movement)
-   *
-   * Difere de `broker_note_ref` (que continua sendo idempotencia da perna
-   * via external_ref). Ver docs/architecture/business_events_integration_plan.md.
+   * Chave do header business_events.source_ref.
+   * Notas B3: B3-NOTA-{noteNumber}#{lineNo} (1 evento por ativo/linha).
    */
   event_source_ref?: string;
   /** Sistema/parser que gerou (rastreabilidade). Ex: 'btg_extract_import'. */
