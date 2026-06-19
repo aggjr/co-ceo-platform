@@ -21,6 +21,8 @@ export function inferBusinessEventKind(
 
   if (B3_NOTE_REF.test(ref)) return defaultKind;
 
+  if (line.operation === 'extract_divergence') return 'unknown_invest_event';
+
   if (line.source_system === 'btg_extract') {
     if (line.operation === 'cash_yield') return 'cash_yield_event';
     if (line.extract_category === 3) return 'cash_movement';

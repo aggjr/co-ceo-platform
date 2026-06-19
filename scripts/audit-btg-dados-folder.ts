@@ -55,6 +55,48 @@ function brl(n: number | null | undefined): string {
   return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+
+type PendingAuditRow = {
+  categoria: string;
+  mes: string;
+  data: string;
+  valor: number | null;
+  origem: string;
+  status: string;
+  motivo: string;
+  acao_sugerida: string;
+  detalhe: string;
+};
+
+const AUDIT_OUT_DIR = path.join(process.cwd(), 'local-import', 'btg-sources', 'auditoria');
+
+function csvCell(value: unknown): string {
+  const s = value == null ? '' : String(value);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function writePendingCsv(rows: PendingAuditRow[]): string {
+  fs.mkdirSync(AUDIT_OUT_DIR, { recursive: true });
+  const stamp = new Date().toISOString().slice(0, 10);
+  const outPath = path.join(AUDIT_OUT_DIR, `pendencias-btg-dados-folder-${stamp}.csv`);
+  const headers: Array<keyof PendingAuditRow> = [
+    'categoria',
+    'mes',
+    'data',
+    'valor',
+    'origem',
+    'status',
+    'motivo',
+    'acao_sugerida',
+    'detalhe',
+  ];
+  const lines = [
+    headers.join(';'),
+    ...rows.map((row) => headers.map((h) => csvCell(row[h])).join(';')),
+  ];
+  fs.writeFileSync(outPath, lines.join('\n'), 'utf8');
+  return outPath;
+}
 function toUpload(filePath: string, relBase: string): BtgUploadFileInput {
   const rel = path.relative(relBase, filePath).replace(/\\/g, '/');
   return {
@@ -303,6 +345,8 @@ async function main() {
 
   await auditPatrimonioJson();
 
+  const pendingRows: PendingAuditRow[] = [];
+
   const plan = discoverPlan();
   console.log('\n========== INVENTÁRIO ==========');
   console.table(
@@ -337,7 +381,20 @@ async function main() {
 
     await auditExtractLines(entry.extractPath, entry.month);
     await auditNotesPending(entry.month, entry.notesDir, allNoteUploads);
-    await auditLiqMatch(entry.month, entry.extractPath, allNoteUploads);
+    const liq = await auditLiqMatch(entry.month, entry.extractPath, allNoteUploads);
+    for (const item of liq.unresolved) {
+      pendingRows.push({
+        categoria: 'LIQ_BOLSA_DESCONHECIDO',
+        mes: entry.month,
+        data: item.date,
+        valor: item.net,
+        origem: path.basename(entry.extractPath),
+        status: 'pendente_analise',
+        motivo: item.reason,
+        acao_sugerida: 'Investigar com a corretora ou criar regra/tipo de evento para classificar este LIQ.',
+        detalhe: liq.detail,
+      });
+    }
   }
 
   console.log('\n========== PRÉVIA BATCH (previewBtgBatchImport — simulação limpa) ==========');
@@ -366,6 +423,53 @@ async function main() {
       detalhe: (m.resultDetail || '').slice(0, 80),
     }))
   );
+
+
+  for (const m of batch.months) {
+    if (!m.notesOk) {
+      pendingRows.push({
+        categoria: 'NOTA_NAO_PROCESSADA',
+        mes: m.month,
+        data: m.month,
+        valor: null,
+        origem: 'Notas de Corretagem',
+        status: 'pendente_analise',
+        motivo: m.notesDetail,
+        acao_sugerida: 'Revisar PDFs da pasta do mes e parser de nota.',
+        detalhe: m.resultDetail,
+      });
+    }
+    if (!m.financialOk) {
+      pendingRows.push({
+        categoria: 'CAIXA_NAO_CONCILIADO',
+        mes: m.month,
+        data: m.month,
+        valor: m.extract.closingLedgerDelta ?? m.extract.openingLedgerDelta ?? null,
+        origem: m.extract.fileName,
+        status: 'pendente_analise',
+        motivo: m.financialDetail,
+        acao_sugerida: 'Revisar cadeia de saldos, extrato e eventos desconhecidos importados.',
+        detalhe: m.resultDetail,
+      });
+    }
+    for (const note of m.noteSettlements ?? []) {
+      if (note.status === 'closed') continue;
+      pendingRows.push({
+        categoria: `NOTA_${note.status.toUpperCase()}`,
+        mes: m.month,
+        data: note.pregaoDate,
+        valor: note.deltaPoolCents / 100,
+        origem: `Nota ${note.noteNumber}`,
+        status: 'pendente_analise',
+        motivo: note.detail,
+        acao_sugerida: 'Revisar linhas da nota, taxas e materializacao financeira no extrato.',
+        detalhe: `expected=${(note.expectedCents / 100).toFixed(2)} pool=${(note.poolCents / 100).toFixed(2)} materialized=${(note.materializedCents / 100).toFixed(2)}`,
+      });
+    }
+  }
+
+  const pendingCsv = writePendingCsv(pendingRows);
+  console.log(`\nPlanilha CSV de pendencias: ${pendingCsv} (${pendingRows.length} item(ns))`);
 
   console.log('\n========== FIM — use esta saída para decidir correções ==========\n');
 }

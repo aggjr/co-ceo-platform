@@ -1,7 +1,9 @@
 import {
   applyBtgExtractUpload,
+  liqBolsaUnknownEventLine,
   previewBtgExtractUpload,
 } from '../../../src/core/invest/btgUploadImportService';
+import { inferBusinessEventKind } from '../../../src/core/invest/inferBusinessEventKind';
 
 function uploadText(name: string, text: string) {
   return {
@@ -66,5 +68,28 @@ Cont corrente - Movimentacao
     expect(ledger.settleLiqBolsa).toHaveBeenCalled();
     expect(imported).toHaveLength(1);
     expect((imported[0] as { operation?: string }).operation).toBe('pending_settlement');
+  });
+
+  it('converte LIQ BOLSA sem casamento em evento desconhecido investigavel', () => {
+    const line = liqBolsaUnknownEventLine(
+      {
+        date: '2026-04-01',
+        ticker: 'CAIXA-BTG',
+        operation: 'pending_settlement',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 3603.68,
+        asset_type: 'cash',
+        broker_note_ref: 'BTG-EXT-2026-04-01#01',
+        notes: 'LIQ BOLSA (Operacoes)- Pregao:31/03/2026',
+      },
+      'Nenhum evento candidato encontrado para esta data de liquidacao.'
+    );
+
+    expect(line.operation).toBe('extract_divergence');
+    expect(line.broker_note_ref).toBe('BTG-EXT-2026-04-01#01#LIQ-UNKNOWN');
+    expect(line.event_source_ref).toBe('BTG-LIQ-UNKNOWN:2026-04-01:360368');
+    expect(line.notes).toContain('PENDENCIA_ANALISE');
+    expect(inferBusinessEventKind(line, 'cash_movement')).toBe('unknown_invest_event');
   });
 });

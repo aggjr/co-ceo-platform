@@ -576,9 +576,9 @@ export async function previewBtgMonthImport(
     liqBolsaDetail = resolved.liqBolsaDetail;
   }
 
-  const resultOk = flags.resultOk && liqBolsaOk;
+  const resultOk = flags.resultOk;
   const resultDetail = flags.resultOk && !liqBolsaOk
-    ? liqBolsaDetail || 'LIQ BOLSA sem casamento com eventos pendentes.'
+    ? `${flags.resultDetail} Pendencias LIQ BOLSA serao importadas como eventos desconhecidos para analise posterior. ${liqBolsaDetail}`
     : flags.resultDetail;
 
   return {
@@ -1039,7 +1039,7 @@ export async function applyBtgMonthImport(
   await ensureExtractDivergenceOperation(pool);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
     parseOptions: MONTH_IMPORT_EXTRACT_OPTS_APPLY,
-    keepUnmatchedLiqBolsaAsCash: false,
+    keepUnmatchedLiqBolsaAsUnknown: true,
   });
 
   const notesInserted = notesApply.totals.inserted;

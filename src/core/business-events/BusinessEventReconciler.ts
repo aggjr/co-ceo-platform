@@ -156,7 +156,8 @@ function hasCompleteLegComposition(
     if (
       kind === 'cash_movement' ||
       kind === 'cash_yield_event' ||
-      kind === 'broker_note_loan'
+      kind === 'broker_note_loan' ||
+      kind === 'unknown_invest_event'
     ) {
       return true;
     }
