@@ -29,6 +29,7 @@ export const BTG_NOTE_EVENT_REF_PREFIX = B3_NOTE_EVENT_REF_PREFIX;
 import {
   eventSourceRefForTrade,
   noteGroupRef,
+  rebalanceNoteImportLinesPool,
 } from './noteEventSettlement';
 
 /** Agrupador da nota (metadado / conciliação Σ eventos). */
@@ -290,6 +291,7 @@ export function brokerageNotesToLedgerLines(notes: BtgBrokerageNote[]): LedgerIm
         lines.push(...tradeFeeLedgerLines(note, trade, idx, lineNo, anchor));
       }
     });
+    rebalanceNoteImportLinesPool(lines, note);
   }
   return lines;
 }

@@ -42,14 +42,19 @@ import {
   dedupeLiqBolsaImportLines,
 } from './btgUploadImportService';
 import {
-  consumeSignedCentsSubset,
+  consumePoolEntrySubset,
   liqBolsaBlockReason,
+  LIQ_PREGAO_TOLERANCE_CENTS,
 } from './LiqBolsaSettlementService';
 import type { LedgerImportLine } from './ledgerTypes';
 import { logInvestStdout } from './reconcile/reconcileErrorDetail';
 import {
+  aggregatePendingPoolEntries,
   assessNotesFromImportLines,
+  liqPoolCandidatesForLine,
+  parsePregaoDateFromLiqNotes,
   summarizeNoteSettlements,
+  type LiqBolsaPoolEntry,
   type NoteSettlementAssessment,
 } from './noteEventSettlement';
 
@@ -578,7 +583,7 @@ export async function previewBtgMonthImport(
 
   const resultOk = flags.resultOk;
   const resultDetail = flags.resultOk && !liqBolsaOk
-    ? `${flags.resultDetail} Pendencias LIQ BOLSA serao importadas como eventos desconhecidos para analise posterior. ${liqBolsaDetail}`
+    ? `${flags.resultDetail} Importacao bloqueada enquanto LIQ BOLSA nao casar com eventos pending. ${liqBolsaDetail}`
     : flags.resultDetail;
 
   return {
@@ -687,7 +692,8 @@ export async function previewBtgBatchImport(
     }
 
     let status: BtgBatchMonthStatus = 'blocked';
-    if (preview.resultOk) {
+    const monthOk = preview.resultOk && preview.liqBolsaOk !== false;
+    if (monthOk) {
       if (!resetFirst && alreadyInDb) {
         status = 'already_imported';
         workingLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
@@ -708,7 +714,10 @@ export async function previewBtgBatchImport(
   const monthsBlocked = months.filter((m) => m.status === 'blocked').length;
   const monthsAlreadyImported = months.filter((m) => m.status === 'already_imported').length;
   const resultOk =
-    chainOk && monthsBlocked === 0 && (monthsReady > 0 || monthsAlreadyImported === months.length);
+    chainOk &&
+    monthsBlocked === 0 &&
+    months.every((m) => m.liqBolsaOk !== false) &&
+    (monthsReady > 0 || monthsAlreadyImported === months.length);
 
   const parts: string[] = [];
   parts.push(`${plan.length} mês(es): ${plan[0]!.month} → ${plan[plan.length - 1]!.month}`);
@@ -796,17 +805,8 @@ export function buildPendingPoolBySettlement(
   lines: LedgerImportLine[],
   from: string,
   to: string
-): Record<string, number[]> {
-  const pendingByDate: Record<string, number[]> = {};
-  for (const line of lines) {
-    const cents = signedCentsFromSkipFinancialLine(line);
-    if (cents === null) continue;
-    const settle = String(line.settlement_date ?? line.date).slice(0, 10);
-    if (settle < from || settle > to) continue;
-    if (!pendingByDate[settle]) pendingByDate[settle] = [];
-    pendingByDate[settle]!.push(cents);
-  }
-  return pendingByDate;
+): Record<string, LiqBolsaPoolEntry[]> {
+  return aggregatePendingPoolEntries(lines, from, to);
 }
 
 export type LiqBolsaStrictAssessment = {
@@ -818,33 +818,45 @@ export type LiqBolsaStrictAssessment = {
 /** Avalia casamento LIQ BOLSA a partir de pools de expectativa (testes e diagnostico). */
 export function assessLiqBolsaFromPendingPools(
   month: string,
-  pendingByDate: Record<string, number[]>,
-  liqLines: Array<{ date: string; signedCents: number }>
+  pendingByDate: Record<string, LiqBolsaPoolEntry[]>,
+  liqLines: Array<{ date: string; signedCents: number; tradeDate?: string | null }>
 ): LiqBolsaStrictAssessment {
   const monthNorm = month.slice(0, 7);
-  const pools: Record<string, number[]> = {};
-  for (const [date, cents] of Object.entries(pendingByDate)) {
-    pools[date] = [...cents];
+  const pools: Record<string, LiqBolsaPoolEntry[]> = {};
+  for (const [date, entries] of Object.entries(pendingByDate)) {
+    pools[date] = entries.map((e) => ({ ...e }));
   }
 
   const unresolved: LiqBolsaStrictAssessment['unresolved'] = [];
   const sorted = [...liqLines].sort(
-    (a, b) => a.date.localeCompare(b.date) || a.signedCents - b.signedCents
+    (a, b) =>
+      a.date.localeCompare(b.date) ||
+      a.signedCents - b.signedCents ||
+      String(a.tradeDate ?? '').localeCompare(String(b.tradeDate ?? ''))
   );
 
   for (const line of sorted) {
     const date = String(line.date).slice(0, 10);
     if (date.slice(0, 7) !== monthNorm) continue;
-    const candidates = pools[date] ?? [];
-    const consumed = consumeSignedCentsSubset(candidates, line.signedCents);
+    const allOnDate = pools[date] ?? [];
+    const candidates = liqPoolCandidatesForLine(pools, date, line.tradeDate);
+    const consumed = consumePoolEntrySubset(
+      candidates,
+      line.signedCents,
+      line.tradeDate ? LIQ_PREGAO_TOLERANCE_CENTS : 1
+    );
     if (consumed) {
-      pools[date] = consumed.remaining;
+      const candSet = new Set(candidates);
+      pools[date] = [...allOnDate.filter((e) => !candSet.has(e)), ...consumed.remaining];
       continue;
     }
     unresolved.push({
       date,
       net: line.signedCents / 100,
-      reason: liqBolsaBlockReason(candidates, line.signedCents),
+      reason: liqBolsaBlockReason(
+        candidates.map((e) => e.cents),
+        line.signedCents
+      ),
     });
   }
 
@@ -897,18 +909,14 @@ export async function assessLiqBolsaStrictForMonth(
 
   const importLines = await collectMonthImportLines(noteFiles);
 
-  const pendingByDate: Record<string, number[]> = opts?.ignoreDbPending
+  const pendingByDate: Record<string, LiqBolsaPoolEntry[]> = opts?.ignoreDbPending
     ? {}
-    : await ledger.listPendingSignedCentsBySettlement(ctx, bounds.from, bounds.to);
+    : await ledger.listPendingEventNetsBySettlement(ctx, bounds.from, bounds.to);
 
-  // Datas de liquidacao ja vêm do tradutor B3 (D+1/D+2); enrich do catalogo pode desalinhar do extrato.
-  for (const line of importLines) {
-    const cents = signedCentsFromSkipFinancialLine(line);
-    if (cents === null) continue;
-    const settle = String(line.settlement_date ?? line.date).slice(0, 10);
-    if (settle < bounds.from || settle > bounds.to) continue;
+  const simulated = aggregatePendingPoolEntries(importLines, bounds.from, bounds.to);
+  for (const [settle, entries] of Object.entries(simulated)) {
     if (!pendingByDate[settle]) pendingByDate[settle] = [];
-    pendingByDate[settle]!.push(cents);
+    pendingByDate[settle]!.push(...entries);
   }
 
   let liqLines: LedgerImportLine[] = [];
@@ -944,6 +952,7 @@ export async function assessLiqBolsaStrictForMonth(
     .map((line) => ({
       date: String(line.date).slice(0, 10),
       signedCents: Math.round(Number(line.total_net_value ?? 0) * 100),
+      tradeDate: parsePregaoDateFromLiqNotes(line.notes),
     }));
 
   return assessLiqBolsaFromPendingPools(month, pendingByDate, liqForPool);
@@ -1039,7 +1048,8 @@ export async function applyBtgMonthImport(
   await ensureExtractDivergenceOperation(pool);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
     parseOptions: MONTH_IMPORT_EXTRACT_OPTS_APPLY,
-    keepUnmatchedLiqBolsaAsUnknown: true,
+    keepUnmatchedLiqBolsaAsUnknown: false,
+    skipUnmatchedLiqBolsa: false,
   });
 
   const notesInserted = notesApply.totals.inserted;

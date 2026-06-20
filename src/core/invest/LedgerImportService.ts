@@ -25,6 +25,8 @@ import {
   type LiqBolsaSettlementInput,
 } from './LiqBolsaSettlementService';
 import { SettlementRulesService } from './SettlementRulesService';
+import type { LiqBolsaPoolEntry } from './noteEventSettlement';
+import { isoDateFromRow } from './isoDateFromRow';
 
 /** Abertura de custódia — referência única usada para idempotência. */
 
@@ -471,20 +473,59 @@ export class LedgerImportService {
     from: string,
     to: string
   ): Promise<Record<string, number[]>> {
+    const nets = await this.listPendingEventNetsBySettlement(ctx, from, to);
+    const out: Record<string, number[]> = {};
+    for (const [date, entries] of Object.entries(nets)) {
+      out[date] = entries.map((e) => e.cents);
+    }
+    return out;
+  }
+
+  /** Pending agrupado por evento de negocio (pregao + net por evento). */
+  async listPendingEventNetsBySettlement(
+    ctx: UserContext,
+    from: string,
+    to: string
+  ): Promise<Record<string, LiqBolsaPoolEntry[]>> {
     const rows = (await this.gateway.findWhere(
       ctx,
       'financial_ledger_entries',
       { status: 'pending' },
-      { limit: 2000 }
-    )) as Array<{ settlement_date?: string; amount?: number; direction?: string }>;
-    const out: Record<string, number[]> = {};
+      { limit: 5000 }
+    )) as Array<{
+      settlement_date?: string;
+      transaction_date?: string;
+      amount?: number;
+      direction?: string;
+      business_event_id?: string;
+    }>;
+
+    const byEvent = new Map<
+      string,
+      { settle: string; eventId: string; cents: number }
+    >();
     for (const row of rows) {
-      const d = String(row.settlement_date ?? '').slice(0, 10);
-      if (!d || d < from || d > to) continue;
+      const settle = isoDateFromRow(row.settlement_date ?? row.transaction_date);
+      if (!settle || settle < from || settle > to) continue;
+      const eventId = String(row.business_event_id ?? '');
+      if (!eventId) continue;
       const sign = String(row.direction) === 'out' ? -1 : 1;
-      const cents = Math.round(Math.abs(Number(row.amount ?? 0)) * 100) * sign;
-      if (!out[d]) out[d] = [];
-      out[d].push(cents);
+      const legCents = Math.round(Math.abs(Number(row.amount ?? 0)) * 100) * sign;
+      const bucket = byEvent.get(eventId);
+      if (bucket) bucket.cents += legCents;
+      else byEvent.set(eventId, { settle, eventId, cents: legCents });
+    }
+
+    const out: Record<string, LiqBolsaPoolEntry[]> = {};
+    for (const { settle, eventId, cents } of byEvent.values()) {
+      if (cents === 0) continue;
+      const event = (await this.gateway.findById(ctx, 'business_events', eventId)) as {
+        occurred_on?: string | Date | null;
+      } | null;
+      const tradeDate = isoDateFromRow(event?.occurred_on);
+      if (!tradeDate) continue;
+      if (!out[settle]) out[settle] = [];
+      out[settle]!.push({ tradeDate, cents });
     }
     return out;
   }
@@ -499,10 +540,10 @@ export class LedgerImportService {
       'financial_ledger_entries',
       { status: 'pending' },
       { limit: 2000 }
-    )) as Array<{ settlement_date?: string; amount?: number; direction?: string }>;
+    )) as Array<{ settlement_date?: string; transaction_date?: string; amount?: number; direction?: string }>;
     const out: Record<string, number> = {};
     for (const row of rows) {
-      const d = String(row.settlement_date ?? '').slice(0, 10);
+      const d = isoDateFromRow(row.settlement_date ?? row.transaction_date);
       if (!d || d < from || d > to) continue;
       const sign = String(row.direction) === 'out' ? -1 : 1;
       out[d] = (out[d] ?? 0) + sign * Math.abs(Number(row.amount ?? 0));

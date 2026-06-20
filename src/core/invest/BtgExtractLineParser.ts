@@ -91,6 +91,17 @@ export function parseBtgMovementLine(
     }
   }
 
+  const upperDesc = description.toUpperCase();
+  if (upperDesc.includes('LIQ BOLSA') && upperDesc.includes('OPERAC')) {
+    // PDF BTG: ultima coluna = credito da liquidacao (nao delta de saldo quando ha debitos ocultos).
+    signedCash = Math.abs(parseBrNumber(numbers[numbers.length - 1]!));
+  } else if (
+    upperDesc.includes('LIQ BOLSA') &&
+    /BTC|ALUGUEL|CORRETAGEM/i.test(upperDesc)
+  ) {
+    signedCash = -Math.abs(parseBrNumber(numbers[numbers.length - 1]!));
+  }
+
   return {
     date: `${yyyy}-${mm}-${dd}`,
     description,
@@ -214,8 +225,20 @@ function takeTesouroDiretoMovement(
       bestDelta = delta;
     }
   }
-  if (best) best.used = true;
-  return best;
+  if (best) {
+    best.used = true;
+    return best;
+  }
+
+  let fallback: TesouroDiretoMovement | null = null;
+  for (const row of rows) {
+    if (row.used) continue;
+    if (row.date !== date || row.ticker !== ticker || row.operation !== operation) continue;
+    fallback = row;
+    break;
+  }
+  if (fallback) fallback.used = true;
+  return fallback;
 }
 
 /** Ticker B3 em descricoes de provento (ex.: "DIVIDENDO PRIO3"). */

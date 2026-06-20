@@ -136,12 +136,29 @@ describe('btgMonthImportService', () => {
     const result = assessLiqBolsaFromPendingPools(
       '2026-01',
       {
-        '2026-01-06': [40_000, -11, -27, -14],
+        '2026-01-06': [{ tradeDate: '2026-01-05', cents: 39_948 }],
       },
-      [{ date: '2026-01-06', signedCents: 39_948 }]
+      [{ date: '2026-01-06', signedCents: 39_948, tradeDate: '2026-01-05' }]
     );
     expect(result.ok).toBe(true);
     expect(result.unresolved).toHaveLength(0);
+  });
+
+  it('LIQ filtra pool pelo pregão quando informado', () => {
+    const result = assessLiqBolsaFromPendingPools(
+      '2026-01',
+      {
+        '2026-01-20': [
+          { tradeDate: '2026-01-16', cents: 21_998_399 },
+          { tradeDate: '2026-01-19', cents: 3_495_320 },
+        ],
+      },
+      [
+        { date: '2026-01-20', signedCents: 21_998_399, tradeDate: '2026-01-16' },
+        { date: '2026-01-20', signedCents: 3_495_320, tradeDate: '2026-01-19' },
+      ]
+    );
+    expect(result.ok).toBe(true);
   });
 
   it('LIQ sem casamento permanece aberto na previa (nao mascara)', () => {
@@ -159,8 +176,8 @@ describe('btgMonthImportService', () => {
   it('LIQ casada marca previa ok', () => {
     const assessment = assessLiqBolsaFromPendingPools(
       '2026-01',
-      { '2026-01-06': [39_948] },
-      [{ date: '2026-01-06', signedCents: 39_948 }]
+      { '2026-01-06': [{ tradeDate: '2026-01-05', cents: 39_948 }] },
+      [{ date: '2026-01-06', signedCents: 39_948, tradeDate: '2026-01-05' }]
     );
     const preview = resolveLiqBolsaMonthPreview(assessment);
     expect(preview.liqBolsaOk).toBe(true);

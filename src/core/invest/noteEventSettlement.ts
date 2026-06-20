@@ -157,3 +157,78 @@ export function summarizeNoteSettlements(assessments: NoteSettlementAssessment[]
     openNotes,
   };
 }
+
+/** Data do pregão B3 em descrição LIQ BOLSA do extrato (ex.: Pregão:16/01/2026). */
+export function parsePregaoDateFromLiqNotes(notes: string | null | undefined): string | null {
+  const m = /Preg[aã]o:\s*(\d{2})\/(\d{2})\/(\d{4})/i.exec(String(notes ?? ''));
+  if (!m) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+export type LiqBolsaPoolEntry = {
+  tradeDate: string;
+  cents: number;
+};
+
+/** Ajusta ultima taxa da nota para pool pending = liquido do rodape B3. */
+export function rebalanceNoteImportLinesPool(
+  lines: LedgerImportLine[],
+  note: BtgBrokerageNote
+): void {
+  const expected = expectedNetCents(note);
+  if (expected === null) return;
+  const pool = poolCentsForNoteLines(lines, note.noteNumber);
+  const delta = expected - pool;
+  if (Math.abs(delta) <= NOTE_SETTLEMENT_TOLERANCE_CENTS) return;
+
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i]!;
+    if (parseNoteNumberFromBrokerRef(line.broker_note_ref) !== note.noteNumber) continue;
+    if (line.operation !== 'fee') continue;
+    const cur = signedCentsFromPendingImportLine(line);
+    if (cur === null) continue;
+    const adjusted = (cur + delta) / 100;
+    line.total_net_value = Math.round(adjusted * 100) / 100;
+    line.unit_price = Math.abs(line.total_net_value);
+    return;
+  }
+}
+
+/** Pool por data de liquidacao com nets agregados por evento (pregao + event_source_ref). */
+export function aggregatePendingPoolEntries(
+  lines: LedgerImportLine[],
+  from: string,
+  to: string
+): Record<string, LiqBolsaPoolEntry[]> {
+  const byKey = new Map<string, LiqBolsaPoolEntry>();
+  for (const line of lines) {
+    const cents = signedCentsFromPendingImportLine(line);
+    if (cents === null) continue;
+    const settle = String(line.settlement_date ?? line.date).slice(0, 10);
+    const tradeDate = String(line.date).slice(0, 10);
+    if (settle < from || settle > to) continue;
+    const eventRef = String(line.event_source_ref ?? `${tradeDate}#${line.broker_note_ref ?? ''}`);
+    const key = `${settle}|${tradeDate}|${eventRef}`;
+    const prev = byKey.get(key);
+    if (prev) prev.cents += cents;
+    else byKey.set(key, { tradeDate, cents });
+  }
+
+  const out: Record<string, LiqBolsaPoolEntry[]> = {};
+  for (const [key, entry] of byKey) {
+    const settle = key.slice(0, key.indexOf('|'));
+    if (!out[settle]) out[settle] = [];
+    out[settle]!.push(entry);
+  }
+  return out;
+}
+
+export function liqPoolCandidatesForLine(
+  pool: Record<string, LiqBolsaPoolEntry[]>,
+  settlementDate: string,
+  tradeDate: string | null | undefined
+): LiqBolsaPoolEntry[] {
+  const entries = pool[settlementDate] ?? [];
+  if (!tradeDate) return [...entries];
+  return entries.filter((e) => e.tradeDate === tradeDate);
+}

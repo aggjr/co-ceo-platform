@@ -143,6 +143,61 @@ describe('LiqBolsaSettlementService', () => {
     expect(result.status).toBe('matched');
   });
 
+  it('filtra candidatos pelo pregão quando tradeDate informado', async () => {
+    const gw = new InMemoryGateway();
+    const gateway = castGateway(gw);
+    await gateway.insert(ctx, 'business_events', {
+      id: 'be-a',
+      source_ref: 'B3-NOTA-A#1',
+      event_kind: 'broker_note_spot',
+      occurred_on: '2026-01-16',
+      settles_on: '2026-01-20',
+      total_net: 219983.99,
+    });
+    await gateway.insert(ctx, 'business_events', {
+      id: 'be-b',
+      source_ref: 'B3-NOTA-B#1',
+      event_kind: 'broker_note_option',
+      occurred_on: '2026-01-19',
+      settles_on: '2026-01-20',
+      total_net: 3495.32,
+    });
+    await gateway.insert(ctx, 'financial_ledger_entries', {
+      id: 'pending-a',
+      account_id: 'acc-1',
+      business_event_id: 'be-a',
+      transaction_date: '2026-01-16',
+      settlement_date: '2026-01-20',
+      direction: 'in',
+      amount: 219983.99,
+      status: 'pending',
+      external_ref: 'PENDING-A',
+    });
+    await gateway.insert(ctx, 'financial_ledger_entries', {
+      id: 'pending-b',
+      account_id: 'acc-1',
+      business_event_id: 'be-b',
+      transaction_date: '2026-01-19',
+      settlement_date: '2026-01-20',
+      direction: 'in',
+      amount: 3495.32,
+      status: 'pending',
+      external_ref: 'PENDING-B',
+    });
+
+    const result = await new LiqBolsaSettlementService(gateway).settle(ctx, {
+      extractLineRef: 'BTG-EXT-2026-01-20#01',
+      settlementDate: '2026-01-20',
+      valueSignedCents: 21998399,
+      tradeDate: '2026-01-16',
+    });
+
+    expect(result.status).toBe('matched');
+    if (result.status === 'matched') {
+      expect(result.settledEvents).toEqual(['be-a']);
+    }
+  });
+
   it('reaplicar mesma LIQ BOLSA ja liquidada retorna matched idempotente', async () => {
     const gw = new InMemoryGateway();
     const gateway = castGateway(gw);
@@ -185,5 +240,38 @@ describe('LiqBolsaSettlementService', () => {
   it('consumeSignedCentsSubset remove candidatos casados do pool', () => {
     const consumed = consumeSignedCentsSubset([39948, 179760], 39948);
     expect(consumed?.remaining).toEqual([179760]);
+  });
+
+  it('encontra pending quando settlement_date vem como Date do MySQL', async () => {
+    const gw = new InMemoryGateway();
+    const gateway = castGateway(gw);
+    await gateway.insert(ctx, 'business_events', {
+      id: 'be-date',
+      source_ref: 'BTG-NOTA-DATE',
+      event_kind: 'broker_note_option',
+      occurred_on: '2026-01-05',
+      settles_on: '2026-01-06',
+      total_net: 399.48,
+    });
+    await gateway.insert(ctx, 'financial_ledger_entries', {
+      id: 'pending-date',
+      account_id: 'acc-1',
+      business_event_id: 'be-date',
+      transaction_date: new Date('2026-01-05T03:00:00.000Z'),
+      settlement_date: new Date('2026-01-06T03:00:00.000Z'),
+      direction: 'in',
+      amount: 399.48,
+      status: 'pending',
+      external_ref: 'BROKER_REF:TEST:PENDING',
+    });
+
+    const result = await new LiqBolsaSettlementService(gateway).settle(ctx, {
+      extractLineRef: 'BTG-EXT-DATE',
+      settlementDate: '2026-01-06',
+      valueSignedCents: 39948,
+      tradeDate: '2026-01-05',
+    });
+
+    expect(result.status).toBe('matched');
   });
 });

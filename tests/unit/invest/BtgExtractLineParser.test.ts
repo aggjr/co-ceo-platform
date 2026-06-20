@@ -34,6 +34,15 @@ describe('BtgExtractLineParser', () => {
     expect(row?.signedCash).toBeCloseTo(-54160.08);
   });
 
+  it('parseBtgMovementLine LIQ operacoes usa coluna credito quando saldo acumulado diverge', () => {
+    const row = parseBtgMovementLine(
+      '28/01/2026 LIQ BOLSA (Operacoes)- Pregão:27/01/2026 2.016,50 1.997,32',
+      52557.07
+    );
+    expect(row?.signedCash).toBeCloseTo(1997.32);
+    expect(row?.balance).toBeCloseTo(2016.5);
+  });
+
   it('skips aggregated bolsa liquidation mas classifica custodia LIQ como fee', () => {
     expect(
       classifyBtgDescription('LIQ BOLSA (Operacoes)- Pregão:05/01/2026').skip

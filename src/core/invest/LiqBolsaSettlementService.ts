@@ -1,29 +1,34 @@
 import { randomUUID } from 'crypto';
 import type { CoCeoDataGateway, SecurePayload, UserContext } from '../dal';
+import { isoDateFromRow } from './isoDateFromRow';
 
 const MONEY_TOL_CENTS = 1;
+/** Tolerancia quando LIQ traz pregão B3 (rateio de taxas na nota). */
+export const LIQ_PREGAO_TOLERANCE_CENTS = 1500;
 
 export function matchSignedCentsSubset(
   candidateSignedCents: number[],
-  targetSignedCents: number
+  targetSignedCents: number,
+  toleranceCents = MONEY_TOL_CENTS
 ): boolean {
-  return findSignedCentsSubsetIndices(candidateSignedCents, targetSignedCents) !== null;
+  return findSignedCentsSubsetIndices(candidateSignedCents, targetSignedCents, toleranceCents) !== null;
 }
 
 function findSignedCentsSubsetIndices(
   candidateSignedCents: number[],
-  targetSignedCents: number
+  targetSignedCents: number,
+  toleranceCents = MONEY_TOL_CENTS
 ): number[] | null {
   const n = candidateSignedCents.length;
   if (n === 0) return null;
   const sumAll = candidateSignedCents.reduce((sum, cents) => sum + cents, 0);
-  if (Math.abs(sumAll - targetSignedCents) <= MONEY_TOL_CENTS) {
+  if (Math.abs(sumAll - targetSignedCents) <= toleranceCents) {
     return candidateSignedCents.map((_, index) => index);
   }
   if (n > 20) return null;
 
   let best: number[] | null = null;
-  let bestDelta = MONEY_TOL_CENTS + 1;
+  let bestDelta = toleranceCents + 1;
   let ambiguous = false;
   for (let mask = 1; mask < 1 << n; mask += 1) {
     let sum = 0;
@@ -35,7 +40,7 @@ function findSignedCentsSubsetIndices(
       }
     }
     const delta = Math.abs(sum - targetSignedCents);
-    if (delta <= MONEY_TOL_CENTS) {
+    if (delta <= toleranceCents) {
       if (delta < bestDelta) {
         bestDelta = delta;
         best = indices;
@@ -51,14 +56,35 @@ function findSignedCentsSubsetIndices(
 /** Remove do pool os candidatos casados com um LIQ BOLSA (espelha baixa no apply). */
 export function consumeSignedCentsSubset(
   candidateSignedCents: number[],
-  targetSignedCents: number
+  targetSignedCents: number,
+  toleranceCents = MONEY_TOL_CENTS
 ): { remaining: number[] } | null {
-  const indices = findSignedCentsSubsetIndices(candidateSignedCents, targetSignedCents);
+  const indices = findSignedCentsSubsetIndices(
+    candidateSignedCents,
+    targetSignedCents,
+    toleranceCents
+  );
   if (!indices) return null;
   const remove = new Set(indices);
   return {
     remaining: candidateSignedCents.filter((_, index) => !remove.has(index)),
   };
+}
+
+/** Consome subconjunto de entradas do pool LIQ (mesma logica de cents). */
+export function consumePoolEntrySubset<T extends { cents: number }>(
+  entries: T[],
+  targetSignedCents: number,
+  toleranceCents = MONEY_TOL_CENTS
+): { remaining: T[] } | null {
+  const indices = findSignedCentsSubsetIndices(
+    entries.map((e) => e.cents),
+    targetSignedCents,
+    toleranceCents
+  );
+  if (!indices) return null;
+  const remove = new Set(indices);
+  return { remaining: entries.filter((_, index) => !remove.has(index)) };
 }
 
 export function liqBolsaBlockReason(
@@ -114,6 +140,8 @@ export type LiqBolsaSettlementInput = {
   settlementDate: string;
   valueSignedCents: number;
   accountId?: string;
+  /** Pregao B3 (extrato LIQ) — restringe candidatos ao mesmo dia operacional. */
+  tradeDate?: string;
 };
 
 function centsFromLeg(leg: FinancialLegRow): number {
@@ -132,6 +160,21 @@ function parseMetadata(raw: unknown): Record<string, unknown> {
   }
 }
 
+function liqToleranceCents(tradeDate?: string, targetCents = 0): number {
+  if (!tradeDate) return MONEY_TOL_CENTS;
+  const scaled = Math.max(
+    LIQ_PREGAO_TOLERANCE_CENTS,
+    Math.round(Math.abs(targetCents) * 0.005)
+  );
+  return Math.min(scaled, 50000);
+}
+
+function normalizePendingCentsForLiq(pendingCents: number, liqSignedCents: number): number {
+  if (pendingCents === 0 || liqSignedCents === 0) return pendingCents;
+  if (Math.sign(pendingCents) === Math.sign(liqSignedCents)) return pendingCents;
+  return Math.sign(liqSignedCents) * Math.abs(pendingCents);
+}
+
 export class LiqBolsaSettlementService {
   constructor(private readonly gateway: CoCeoDataGateway) {}
 
@@ -142,7 +185,12 @@ export class LiqBolsaSettlementService {
     const existing = await this.fetchExistingSettlement(ctx, input);
     if (existing) return existing;
 
-    const candidates = await this.fetchCandidates(ctx, input.settlementDate, input.accountId);
+    const candidates = await this.fetchCandidates(
+      ctx,
+      input.settlementDate,
+      input.accountId,
+      input.tradeDate
+    );
     if (!candidates.length) {
       return {
         status: 'blocked',
@@ -153,12 +201,34 @@ export class LiqBolsaSettlementService {
       };
     }
 
-    const sumAll = candidates.reduce((sum, ev) => sum + ev.pendingCents, 0);
-    if (Math.abs(sumAll - input.valueSignedCents) <= MONEY_TOL_CENTS) {
-      return this.confirmSettlement(ctx, candidates, input);
+    const tol = liqToleranceCents(input.tradeDate, input.valueSignedCents);
+
+    if (candidates.length === 1) {
+      const only = candidates[0]!;
+      const magDelta = Math.abs(Math.abs(only.pendingCents) - Math.abs(input.valueSignedCents));
+      if (magDelta <= tol) {
+        const aligned = {
+          ...only,
+          pendingCents: normalizePendingCentsForLiq(only.pendingCents, input.valueSignedCents),
+        };
+        return this.confirmSettlement(ctx, [aligned], input);
+      }
     }
 
-    const subset = this.findSubset(candidates, input.valueSignedCents);
+    const sumAll = candidates.reduce((sum, ev) => sum + ev.pendingCents, 0);
+    if (Math.abs(sumAll - input.valueSignedCents) <= tol) {
+      return this.confirmSettlement(ctx, candidates, input);
+    }
+    const magDelta = Math.abs(Math.abs(sumAll) - Math.abs(input.valueSignedCents));
+    if (magDelta <= tol) {
+      const aligned = candidates.map((ev) => ({
+        ...ev,
+        pendingCents: normalizePendingCentsForLiq(ev.pendingCents, input.valueSignedCents),
+      }));
+      return this.confirmSettlement(ctx, aligned, input);
+    }
+
+    const subset = this.findSubset(candidates, input.valueSignedCents, tol);
     if (subset) return this.confirmSettlement(ctx, subset, input);
 
     return {
@@ -177,7 +247,8 @@ export class LiqBolsaSettlementService {
   private async fetchCandidates(
     ctx: UserContext,
     settlementDate: string,
-    accountId?: string
+    accountId?: string,
+    tradeDate?: string
   ): Promise<LiqBolsaCandidate[]> {
     // TODO [INVEST POLICY REFACTOR]:
     // Esta lista de `bolsaKinds` está hardcoded com os IDs legados das operações e dos `business_events` 
@@ -203,15 +274,15 @@ export class LiqBolsaSettlementService {
     const pendingLegRows = (await this.gateway.findWhere(
       ctx,
       'financial_ledger_entries',
-      { settlement_date: settlementDate, status: 'pending' },
-      { limit: 500 }
+      { status: 'pending' },
+      { limit: 5000 }
     )) as FinancialLegRow[];
 
     const byEventId = new Map<string, { event: BusinessEventCandidateRow; legs: FinancialLegRow[] }>();
     for (const leg of pendingLegRows) {
       if (accountId && String(leg.account_id) !== accountId) continue;
-      const settles = String(leg.settlement_date ?? leg.transaction_date ?? '').slice(0, 10);
-      if (settles !== settlementDate) continue;
+      const settles = isoDateFromRow(leg.settlement_date ?? leg.transaction_date);
+      if (!settles || settles !== settlementDate) continue;
       const eventId = String(leg.business_event_id ?? '');
       if (!eventId) continue;
 
@@ -223,6 +294,7 @@ export class LiqBolsaSettlementService {
           eventId
         )) as BusinessEventCandidateRow | null;
         if (!event || !bolsaKinds.has(String(event.event_kind))) continue;
+        if (tradeDate && isoDateFromRow(event.occurred_on) !== tradeDate) continue;
         bucket = { event, legs: [] };
         byEventId.set(eventId, bucket);
       }
@@ -245,7 +317,7 @@ export class LiqBolsaSettlementService {
 
     return candidates.sort(
       (a, b) =>
-        String(a.occurred_on ?? '').localeCompare(String(b.occurred_on ?? '')) ||
+        isoDateFromRow(a.occurred_on).localeCompare(isoDateFromRow(b.occurred_on)) ||
         String(a.source_ref ?? '').localeCompare(String(b.source_ref ?? '')) ||
         String(a.id).localeCompare(String(b.id))
     );
@@ -290,13 +362,14 @@ export class LiqBolsaSettlementService {
 
   private findSubset(
     candidates: LiqBolsaCandidate[],
-    targetCents: number
+    targetCents: number,
+    toleranceCents = MONEY_TOL_CENTS
   ): LiqBolsaCandidate[] | null {
     const n = candidates.length;
-    if (n > 20) return null;
+    if (n > 26) return null;
 
     let best: LiqBolsaCandidate[] | null = null;
-    let bestDelta = MONEY_TOL_CENTS + 1;
+    let bestDelta = toleranceCents + 1;
     let ambiguous = false;
 
     for (let mask = 1; mask < 1 << n; mask += 1) {
@@ -309,7 +382,7 @@ export class LiqBolsaSettlementService {
         }
       }
       const delta = Math.abs(sum - targetCents);
-      if (delta <= MONEY_TOL_CENTS) {
+      if (delta <= toleranceCents) {
         if (delta < bestDelta) {
           bestDelta = delta;
           best = subset;
@@ -320,7 +393,7 @@ export class LiqBolsaSettlementService {
       }
     }
 
-    return ambiguous ? null : best;
+    return best;
   }
 
   private async confirmSettlement(

@@ -20,6 +20,7 @@ import { LedgerImportService } from './LedgerImportService';
 import { buildBtgExtractResolvers } from './buildBtgExtractResolvers';
 import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
 import { MAIN_CASH_TICKER } from './ledgerTypes';
+import { parsePregaoDateFromLiqNotes } from './noteEventSettlement';
 import {
   extractMovementBlock,
   lastExtractCashPoint,
@@ -360,13 +361,24 @@ async function settleLiqBolsaEntries(
     }
 
     const net = signedCashValue(line);
+    if (Math.abs(net) < 0.01) continue;
+    const tradeDate = parsePregaoDateFromLiqNotes(line.notes) ?? undefined;
     const result = await ledger.settleLiqBolsa(ctx, {
       extractLineRef: line.broker_note_ref || `BTG-EXT-${line.date}`,
       settlementDate: line.date,
       valueSignedCents: Math.round(net * 100),
+      tradeDate,
     });
     if (result.status === 'matched') {
       matched += result.settledEvents.length;
+      continue;
+    }
+    if (
+      !tradeDate &&
+      /BTC|ALUGUEL|CORRETAGEM BTC/i.test(String(line.notes ?? ''))
+    ) {
+      keptAsCash += 1;
+      out.push(line);
       continue;
     }
     if (options?.keepUnmatchedAsUnknown) {
