@@ -182,4 +182,20 @@ describe('btgMonthImportService', () => {
     const preview = resolveLiqBolsaMonthPreview(assessment);
     expect(preview.liqBolsaOk).toBe(true);
   });
+
+  it('LIQ zerado e BTC sem pregão não bloqueiam previa', () => {
+    const assessment = assessLiqBolsaFromPendingPools(
+      '2026-01',
+      {},
+      [
+        { date: '2026-01-19', signedCents: 0 },
+        {
+          date: '2026-01-20',
+          signedCents: -204,
+          notes: 'LIQ BOLSA CORRETAGEM BTC',
+        },
+      ]
+    );
+    expect(assessment.ok).toBe(true);
+  });
 });

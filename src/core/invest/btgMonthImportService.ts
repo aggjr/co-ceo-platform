@@ -42,9 +42,8 @@ import {
   dedupeLiqBolsaImportLines,
 } from './btgUploadImportService';
 import {
-  consumePoolEntrySubset,
+  consumePoolEntriesForLiqLine,
   liqBolsaBlockReason,
-  LIQ_PREGAO_TOLERANCE_CENTS,
 } from './LiqBolsaSettlementService';
 import type { LedgerImportLine } from './ledgerTypes';
 import { logInvestStdout } from './reconcile/reconcileErrorDetail';
@@ -583,7 +582,7 @@ export async function previewBtgMonthImport(
 
   const resultOk = flags.resultOk;
   const resultDetail = flags.resultOk && !liqBolsaOk
-    ? `${flags.resultDetail} Importacao bloqueada enquanto LIQ BOLSA nao casar com eventos pending. ${liqBolsaDetail}`
+    ? `${flags.resultDetail} LIQ BOLSA pendente na simulacao (sera reavaliado ao importar). ${liqBolsaDetail}`
     : flags.resultDetail;
 
   return {
@@ -691,19 +690,22 @@ export async function previewBtgBatchImport(
       prevClosing = preview.extract.closingExtract;
     }
 
+    if (preview.resultOk) {
+      workingLedger = await buildMonthReconcileLedger(
+        entry.month,
+        entry.extractFile,
+        workingLedger
+      );
+    }
+
     let status: BtgBatchMonthStatus = 'blocked';
-    const monthOk = preview.resultOk && preview.liqBolsaOk !== false;
+    const monthOk = preview.resultOk;
     if (monthOk) {
       if (!resetFirst && alreadyInDb) {
         status = 'already_imported';
         workingLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
       } else {
         status = 'ready';
-        workingLedger = await buildMonthReconcileLedger(
-          entry.month,
-          entry.extractFile,
-          workingLedger
-        );
       }
     }
 
@@ -716,7 +718,6 @@ export async function previewBtgBatchImport(
   const resultOk =
     chainOk &&
     monthsBlocked === 0 &&
-    months.every((m) => m.liqBolsaOk !== false) &&
     (monthsReady > 0 || monthsAlreadyImported === months.length);
 
   const parts: string[] = [];
@@ -819,7 +820,7 @@ export type LiqBolsaStrictAssessment = {
 export function assessLiqBolsaFromPendingPools(
   month: string,
   pendingByDate: Record<string, LiqBolsaPoolEntry[]>,
-  liqLines: Array<{ date: string; signedCents: number; tradeDate?: string | null }>
+  liqLines: Array<{ date: string; signedCents: number; tradeDate?: string | null; notes?: string | null }>
 ): LiqBolsaStrictAssessment {
   const monthNorm = month.slice(0, 7);
   const pools: Record<string, LiqBolsaPoolEntry[]> = {};
@@ -838,18 +839,24 @@ export function assessLiqBolsaFromPendingPools(
   for (const line of sorted) {
     const date = String(line.date).slice(0, 10);
     if (date.slice(0, 7) !== monthNorm) continue;
-    const allOnDate = pools[date] ?? [];
-    const candidates = liqPoolCandidatesForLine(pools, date, line.tradeDate);
-    const consumed = consumePoolEntrySubset(
-      candidates,
-      line.signedCents,
-      line.tradeDate ? LIQ_PREGAO_TOLERANCE_CENTS : 1
-    );
-    if (consumed) {
-      const candSet = new Set(candidates);
-      pools[date] = [...allOnDate.filter((e) => !candSet.has(e)), ...consumed.remaining];
+    if (Math.abs(line.signedCents) < 1) continue;
+    if (
+      !line.tradeDate &&
+      /BTC|ALUGUEL|CORRETAGEM BTC/i.test(String(line.notes ?? ''))
+    ) {
       continue;
     }
+    const allOnDate = pools[date] ?? [];
+    const consumed = consumePoolEntriesForLiqLine(
+      allOnDate,
+      line.signedCents,
+      line.tradeDate
+    );
+    if (consumed) {
+      pools[date] = consumed.remaining;
+      continue;
+    }
+    const candidates = liqPoolCandidatesForLine(pools, date, line.tradeDate);
     unresolved.push({
       date,
       net: line.signedCents / 100,
@@ -953,6 +960,7 @@ export async function assessLiqBolsaStrictForMonth(
       date: String(line.date).slice(0, 10),
       signedCents: Math.round(Number(line.total_net_value ?? 0) * 100),
       tradeDate: parsePregaoDateFromLiqNotes(line.notes),
+      notes: line.notes,
     }));
 
   return assessLiqBolsaFromPendingPools(month, pendingByDate, liqForPool);

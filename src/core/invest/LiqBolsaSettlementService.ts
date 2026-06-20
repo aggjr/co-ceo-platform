@@ -72,6 +72,44 @@ export function consumeSignedCentsSubset(
 }
 
 /** Consome subconjunto de entradas do pool LIQ (mesma logica de cents). */
+/** Casamento offline pool↔LIQ (previa mensal) — mesma tolerancia do apply. */
+export function consumePoolEntriesForLiqLine(
+  allOnDate: Array<{ tradeDate: string; cents: number }>,
+  targetSignedCents: number,
+  tradeDate?: string | null
+): { remaining: Array<{ tradeDate: string; cents: number }> } | null {
+  const candidates = tradeDate
+    ? allOnDate.filter((e) => e.tradeDate === tradeDate)
+    : [...allOnDate];
+  const tol = liqToleranceCents(tradeDate ?? undefined, targetSignedCents);
+
+  if (candidates.length === 1) {
+    const only = candidates[0]!;
+    const aligned = normalizePendingCentsForLiq(only.cents, targetSignedCents);
+    if (Math.abs(Math.abs(aligned) - Math.abs(targetSignedCents)) <= tol) {
+      return { remaining: allOnDate.filter((e) => e !== only) };
+    }
+  }
+
+  const sumAll = candidates.reduce((sum, ev) => sum + ev.cents, 0);
+  if (Math.abs(sumAll - targetSignedCents) <= tol) {
+    const remove = new Set(candidates);
+    return { remaining: allOnDate.filter((e) => !remove.has(e)) };
+  }
+  const magDelta = Math.abs(Math.abs(sumAll) - Math.abs(targetSignedCents));
+  if (magDelta <= tol) {
+    const remove = new Set(candidates);
+    return { remaining: allOnDate.filter((e) => !remove.has(e)) };
+  }
+
+  const subset = consumePoolEntrySubset(candidates, targetSignedCents, tol);
+  if (!subset) return null;
+  const candSet = new Set(candidates);
+  return {
+    remaining: [...allOnDate.filter((e) => !candSet.has(e)), ...subset.remaining],
+  };
+}
+
 export function consumePoolEntrySubset<T extends { cents: number }>(
   entries: T[],
   targetSignedCents: number,
@@ -160,7 +198,7 @@ function parseMetadata(raw: unknown): Record<string, unknown> {
   }
 }
 
-function liqToleranceCents(tradeDate?: string, targetCents = 0): number {
+export function liqToleranceCents(tradeDate?: string, targetCents = 0): number {
   if (!tradeDate) return MONEY_TOL_CENTS;
   const scaled = Math.max(
     LIQ_PREGAO_TOLERANCE_CENTS,
@@ -169,7 +207,7 @@ function liqToleranceCents(tradeDate?: string, targetCents = 0): number {
   return Math.min(scaled, 50000);
 }
 
-function normalizePendingCentsForLiq(pendingCents: number, liqSignedCents: number): number {
+export function normalizePendingCentsForLiq(pendingCents: number, liqSignedCents: number): number {
   if (pendingCents === 0 || liqSignedCents === 0) return pendingCents;
   if (Math.sign(pendingCents) === Math.sign(liqSignedCents)) return pendingCents;
   return Math.sign(liqSignedCents) * Math.abs(pendingCents);
