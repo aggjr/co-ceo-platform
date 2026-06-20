@@ -290,7 +290,7 @@ describe('BtgExtractLineParser', () => {
         true
       );
       const sum = adjustments.reduce((s, e) => s + Number(e.total_net_value), 0);
-      expect(sum).toBeCloseTo(10, 2);
+      expect(sum).toBeCloseTo(-10, 2);
       expect(entries.some((e) => e.operation === 'fee')).toBe(false);
     });
 

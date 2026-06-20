@@ -4,7 +4,7 @@
  */
 import { MAIN_CASH_TICKER } from './ledgerTypes';
 import type { InvestImportRule } from './ledgerTypes';
-import { inferAssetType } from './assetClassifier';
+import { inferAssetType, isFixedIncomeTicker } from './assetClassifier';
 import {
   netZeroCustodyFeePairs,
   splitNetZeroCustodyMoves,
@@ -159,6 +159,20 @@ function lftTickerFromShortMaturity(dd: string, mm: string, yy: string): string 
   return `LFT-20${yy}${mm}${dd}`;
 }
 
+const TD_SHORT_DATE_LINE_RE = /^(\d{2}\/\d{2}\/\d{2})(?:\b|$)/;
+const TD_FULL_DATE_LINE_RE = /^(\d{2}\/\d{2}\/\d{4})(?:\b|$)/;
+const TD_DEFINITIVA_RE =
+  /^(COMPRA|VENDA)\s+DEFINITIVA\s+(-?[\d.,]+)\s+(-?[\d.]+,\d{4,6})\s+(-?[\d.]+,\d{2})/i;
+
+function tdTickerMatches(rowTicker: string, wanted: string): boolean {
+  const row = rowTicker.trim().toUpperCase();
+  const want = wanted.trim().toUpperCase();
+  if (row === want) return true;
+  if (row === UNKNOWN_TESOURO_DIRETO_TICKER || want === UNKNOWN_TESOURO_DIRETO_TICKER) return true;
+  if (isFixedIncomeTicker(row) && isFixedIncomeTicker(want)) return true;
+  return false;
+}
+
 function inferLftTickerFromDocument(lines: string[]): string {
   for (const raw of lines) {
     const line = raw.replace(/\s+/g, ' ').trim();
@@ -176,31 +190,46 @@ function extractTesouroDiretoMovements(lines: string[]): TesouroDiretoMovement[]
 
   for (const raw of lines) {
     const line = raw.replace(/\s+/g, ' ').trim();
-    const dateMatch = line.match(/^(\d{2}\/\d{2}\/\d{2})(?:\b|$)/);
-    if (dateMatch) {
-      currentDate = shortBrDateToIso(dateMatch[1]!);
+    const shortDate = line.match(TD_SHORT_DATE_LINE_RE);
+    const fullDate = line.match(TD_FULL_DATE_LINE_RE);
+    if (shortDate || fullDate) {
+      const br = shortDate?.[1] ?? fullDate?.[1]!;
+      currentDate = shortDate
+        ? shortBrDateToIso(br)
+        : br.replace(/^(\d{2})\/(\d{2})\/(\d{4})$/, '$3-$2-$1');
       currentTicker = null;
-      if (/\bLFT\b/i.test(line)) currentTicker = documentLftTicker;
+      if (/\bLFT\b/i.test(line)) {
+        const fromLine = line.match(LFT_TICKER_RE);
+        currentTicker = fromLine
+          ? `LFT-${fromLine[3]}${fromLine[2]}${fromLine[1]}`
+          : documentLftTicker;
+      }
     }
     if (/^LFT$/i.test(line)) {
       currentTicker = documentLftTicker;
       continue;
     }
-    if (!currentDate || !currentTicker) continue;
 
-    const movement = line.match(
-      /^(COMPRA|VENDA)\s+DEFINITIVA\s+(-?[\d.,]+)\s+(-?[\d.]+,\d{4,6})\s+(-?[\d.]+,\d{2})\s+(?:-|(-?[\d.]+,\d{2}))\s+(?:-|(-?[\d.]+,\d{2}))\s+(-?[\d.]+,\d{2})/i
-    );
+    const movement = line.match(TD_DEFINITIVA_RE);
     if (!movement) continue;
 
-    out.push({
-      date: currentDate,
-      ticker: currentTicker,
-      operation: movement[1]!.toUpperCase() === 'COMPRA' ? 'buy' : 'sell',
+    const op = movement[1]!.toUpperCase() === 'COMPRA' ? 'buy' : 'sell';
+    const row: TesouroDiretoMovement = {
+      date: currentDate ?? '',
+      ticker: currentTicker ?? documentLftTicker,
+      operation: op,
       quantity: Math.abs(parseBrFlexible(movement[2]!)),
       unitPrice: Math.abs(parseBrFlexible(movement[3]!)),
       gross: Math.abs(parseBrFlexible(movement[4]!)),
-    });
+    };
+
+    if (!row.date) {
+      const descDate = line.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (descDate) row.date = `${descDate[3]}-${descDate[2]}-${descDate[1]}`;
+    }
+    if (!row.date) continue;
+
+    out.push(row);
   }
 
   return out;
@@ -218,7 +247,7 @@ function takeTesouroDiretoMovement(
   let bestDelta = Number.POSITIVE_INFINITY;
   for (const row of rows) {
     if (row.used) continue;
-    if (row.date !== date || row.ticker !== ticker || row.operation !== operation) continue;
+    if (row.date !== date || row.operation !== operation || !tdTickerMatches(row.ticker, ticker)) continue;
     const delta = Math.abs(row.gross - Math.abs(gross));
     if (delta <= tolerance && delta < bestDelta) {
       best = row;
@@ -233,12 +262,25 @@ function takeTesouroDiretoMovement(
   let fallback: TesouroDiretoMovement | null = null;
   for (const row of rows) {
     if (row.used) continue;
-    if (row.date !== date || row.ticker !== ticker || row.operation !== operation) continue;
+    if (row.date !== date || row.operation !== operation || !tdTickerMatches(row.ticker, ticker)) continue;
     fallback = row;
     break;
   }
-  if (fallback) fallback.used = true;
-  return fallback;
+  if (fallback) {
+    fallback.used = true;
+    return fallback;
+  }
+
+  // Último recurso: uma única linha TD no dia (tabela Operações sem ticker explícito).
+  const sameDay = rows.filter(
+    (row) => !row.used && row.date === date && row.operation === operation
+  );
+  if (sameDay.length === 1) {
+    const only = sameDay[0]!;
+    only.used = true;
+    return only;
+  }
+  return null;
 }
 
 /** Ticker B3 em descricoes de provento (ex.: "DIVIDENDO PRIO3"). */
@@ -586,13 +628,14 @@ function pushWeightedCostAdjustments(
         : Math.round(totalAmount * alloc.weight * 100) / 100;
     if (i < allocation.length - 1) allocated += allocAmount;
     if (Math.abs(allocAmount) < 0.005) continue;
+    const expense = Math.round(Math.abs(allocAmount) * 100) / 100;
     out.push({
       date: parsed.date,
       ticker: alloc.ticker,
       operation: 'cost_adjustment',
       quantity: 0,
-      unit_price: allocAmount,
-      total_net_value: allocAmount,
+      unit_price: expense,
+      total_net_value: -expense,
       asset_type: alloc.asset_type || 'stock',
       underlying_ticker: alloc.underlying_ticker,
       notes: `${opts.notesPrefix} ${parsed.description}`,

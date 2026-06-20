@@ -227,6 +227,23 @@ function normalizeExtractLines(raw: string, format: BtgExtractFileFormat): strin
   return normalized.split(/\r?\n/).filter((l) => l.trim());
 }
 
+function extractTesouroOperacoesContextLines(raw: string): string[] {
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter((l) => l);
+  const start = lines.findIndex((l) =>
+    /opera[cç][õo]es.*tesouro|tesouro\s+direto.*opera|renda\s+fixa.*opera/i.test(l) ||
+    (/opera[cç][õo]es/i.test(l) && /LFT|COMPRA\s+DEFINITIVA|VENDA\s+DEFINITIVA/i.test(l))
+  );
+  if (start < 0) return [];
+  const end = lines.findIndex(
+    (l, i) =>
+      i > start &&
+      (/movimenta[cç][aã]o\s*-\s*conta\s*corrente/i.test(l) ||
+        /^extrato de conta corrente$/i.test(l))
+  );
+  const slice = end > start ? lines.slice(start, end) : lines.slice(start, Math.min(start + 250, lines.length));
+  return slice;
+}
+
 function extractParserContextLines(
   raw: string,
   format: BtgExtractFileFormat,
@@ -234,7 +251,8 @@ function extractParserContextLines(
 ): string[] {
   if (format !== 'pdf') return normalizedLines;
   const rawLines = raw.split(/\r?\n/).filter((l) => l.trim());
-  return [...rawLines, ...normalizedLines];
+  const tesouroOps = extractTesouroOperacoesContextLines(raw);
+  return [...tesouroOps, ...rawLines, ...normalizedLines];
 }
 
 function assignExtractRefs(entries: LedgerImportLine[]): LedgerImportLine[] {

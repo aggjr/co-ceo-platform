@@ -32,7 +32,12 @@ function renderBatchPreview(preview) {
     return '<p class="muted">Selecione as pastas e valide o período.</p>';
   }
   const rows = preview.months.map((m) => {
-    const liqCell = m.liqBolsaOk === true ? 'OK' : m.liqBolsaOk === false ? '—' : '—';
+    const liqCell =
+      m.liqBolsaOk === true
+        ? 'OK'
+        : m.liqBolsaOk === false
+          ? '<span class="monthly-badge monthly-badge--idle">Pendente</span>'
+          : '—';
     const detailParts = [m.resultDetail, m.liqBolsaDetail, m.notesDetail, m.financialDetail].filter(
       Boolean
     );

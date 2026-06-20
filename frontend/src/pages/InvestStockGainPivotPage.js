@@ -92,7 +92,7 @@ function buildColumns(columnLabels, columnOrder, uiTexts = {}) {
   const cols = [
     {
       key: 'underlying',
-      label: uiTexts['column.invest.stock_gain.underlying'] || columnLabels.underlying || 'Ação',
+      label: uiTexts['column.invest.stock_gain.underlying'] || columnLabels.underlying || 'Ativo',
       align: 'left',
       sticky: true,
       width: '108px',

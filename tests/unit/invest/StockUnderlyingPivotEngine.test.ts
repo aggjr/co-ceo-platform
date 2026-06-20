@@ -121,6 +121,75 @@ describe('buildStockUnderlyingPivot', () => {
     expect(row?.resultado_custodia).toBeCloseTo(150, 0);
   });
 
+  it('cost_adjustment e rateio de juros entram em taxas, nao em outros ganhos', () => {
+    const entries: LedgerEvent[] = [
+      ev({
+        asset_id: 's1',
+        transaction_type: 'cost_adjustment',
+        transaction_date: '2026-03-10',
+        quantity: 0,
+        unit_price: 50,
+        total_net_value: 50,
+        notes: 'Rateio juros/multa: JUROS SOBRE SALDO NEGATIVO',
+      }),
+      ev({
+        asset_id: 's1-fee',
+        transaction_type: 'fee',
+        transaction_date: '2026-03-11',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: -5,
+      }),
+    ];
+
+    const r = buildStockUnderlyingPivot(entries, '2026-01-01', '2026-12-31');
+    const row = r.rows.find((x) => x.underlying === 'PRIO3');
+    expect(row).toBeDefined();
+    expect(row!.outros_ganhos).toBe(0);
+    expect(row!.taxas).toBeCloseTo(-55, 2);
+    expect(row!.ganho_aproximado).toBeCloseTo(-55, 2);
+  });
+
+  it('inclui renda fixa (LFT) com trade de compra/venda', () => {
+    const entries: LedgerEvent[] = [
+      ev({
+        asset_id: 'lft1',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-01',
+        quantity: 58,
+        unit_price: 17809.83,
+        total_net_value: 0,
+      }),
+      ev({
+        asset_id: 'lft1',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'buy',
+        transaction_date: '2026-02-05',
+        quantity: 2,
+        unit_price: 18000,
+        total_net_value: -36000,
+      }),
+      ev({
+        asset_id: 'lft1',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'sell',
+        transaction_date: '2026-03-10',
+        quantity: 1,
+        unit_price: 18100,
+        total_net_value: 18100,
+      }),
+    ];
+    const r = buildStockUnderlyingPivot(entries, '2026-01-01', '2026-12-31');
+    const row = r.rows.find((x) => x.underlying === 'LFT-20310301');
+    expect(row).toBeDefined();
+    expect(row!.trade).toBeGreaterThan(0);
+    expect(row!.preco_estrito).toBeGreaterThan(0);
+  });
+
   it('preenche PM e cotacao atual no pivot por acao', () => {
     const pivot = buildStockUnderlyingPivot(
       [

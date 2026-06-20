@@ -1,6 +1,6 @@
 import type { LedgerEvent } from './CustodyEngine';
 import { rebuildCustodyFromLedger } from './CustodyEngine';
-import { inferAssetType, inferUnderlyingTicker } from './assetClassifier';
+import { inferAssetType, inferUnderlyingTicker, isFixedIncomeTicker } from './assetClassifier';
 
 /** Colunas do pivot por ação (underlying). */
 export const STOCK_PIVOT_COLUMNS = [
@@ -79,19 +79,24 @@ function tradeCashBeforeExpenses(e: LedgerEvent, type: string): number {
 }
 
 function underlyingOf(e: LedgerEvent): string {
+  const ticker = String(e.asset_ticker || '').toUpperCase();
+  const assetType = String(e.asset_type || inferAssetType(ticker));
+  if (assetType === 'fixed_income' || isFixedIncomeTicker(ticker)) {
+    return ticker;
+  }
   const explicit = e.underlying_ticker?.trim();
   if (explicit) return explicit.toUpperCase();
-  const ticker = String(e.asset_ticker || '').toUpperCase();
-  const type = String(e.asset_type || inferAssetType(ticker));
-  if (type === 'option_call' || type === 'option_put') {
+  if (assetType === 'option_call' || assetType === 'option_put') {
     return inferUnderlyingTicker(ticker, explicit);
   }
   return ticker;
 }
 
-function isStockUnderlying(ticker: string): boolean {
+/** Linha do pivot: ações B3 (PN/ON/FII) e renda fixa (LFT, CDB, Tesouro). */
+function isPivotAssetKey(ticker: string): boolean {
   const t = ticker.toUpperCase();
-  if (!t || t.startsWith('CAIXA') || t.startsWith('TESOURO') || t.startsWith('LFT-')) return false;
+  if (!t || t.startsWith('CAIXA')) return false;
+  if (isFixedIncomeTicker(t)) return true;
   return /^[A-Z]{4}(3|4|8|11)$/.test(t);
 }
 
@@ -223,7 +228,7 @@ export function buildStockUnderlyingPivot(
   for (const e of entries) {
     const day = String(e.transaction_date || '').slice(0, 10);
     const und = underlyingOf(e);
-    if (!isStockUnderlying(und)) continue;
+    if (!isPivotAssetKey(und)) continue;
 
     const row = getRow(und);
     const type = String(e.transaction_type);
@@ -259,6 +264,12 @@ export function buildStockUnderlyingPivot(
       case 'revaluation':
         addToRow(row, 'outros_ganhos', net);
         break;
+      case 'cost_adjustment':
+        addToRow(row, 'taxas', signedExpense(net !== 0 ? net : Number(e.unit_price ?? 0)));
+        break;
+      case 'extract_divergence':
+        addToRow(row, 'outros_ganhos', net);
+        break;
       case 'put_sell':
       case 'put_buy':
       case 'call_sell':
@@ -266,7 +277,7 @@ export function buildStockUnderlyingPivot(
       case 'sell':
       case 'buy':
       case 'option_exercise': {
-        if (assetType === 'stock' || assetType === 'fii') {
+        if (assetType === 'stock' || assetType === 'fii' || assetType === 'fixed_income') {
           if (type === 'buy') {
             if (closedQty > 0 && !wasLong) {
                const cashOfClosed = qty > 0 ? tradeCash * (closedQty / qty) : tradeCash;
@@ -340,7 +351,7 @@ export function buildStockUnderlyingPivot(
     }
 
     const exp = expenseAmount(e);
-    if (exp > 0 && type !== 'fee') {
+    if (exp > 0 && type !== 'fee' && type !== 'cost_adjustment') {
       addToRow(row, 'taxas', -exp);
     }
   }
@@ -348,10 +359,15 @@ export function buildStockUnderlyingPivot(
   const custody = rebuildCustodyFromLedger(entries);
   for (const pos of custody.assets) {
     const ticker = String(pos.underlying || pos.ticker || '').toUpperCase();
-    if (!isStockUnderlying(ticker)) continue;
+    if (!isPivotAssetKey(ticker)) continue;
     const row = getRow(ticker);
     if (
-      (pos.assetType === 'stock' || pos.assetType === 'fii' || pos.assetType === 'etf' || pos.assetType === 'bdr') &&
+      (pos.assetType === 'stock' ||
+        pos.assetType === 'fii' ||
+        pos.assetType === 'etf' ||
+        pos.assetType === 'bdr' ||
+        pos.assetType === 'fixed_income' ||
+        isFixedIncomeTicker(ticker)) &&
       pos.quantity > 0 &&
       pos.avgPrice > 0
     ) {
@@ -388,7 +404,7 @@ export function buildStockUnderlyingPivot(
   ];
 
   const rows = Array.from(rowsMap.values())
-    .filter((r) => isStockUnderlying(r.underlying))
+    .filter((r) => isPivotAssetKey(r.underlying))
     .map((row) => {
       let gain = 0;
       for (const col of gainCols) gain += row[col];
