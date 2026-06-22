@@ -1,0 +1,135 @@
+.audit-geral-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.audit-geral-legend {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted, #64748b);
+}
+
+.audit-geral-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.audit-geral-filter input[type='date'] {
+  font: inherit;
+}
+
+.audit-geral-meta {
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+}
+
+.audit-geral-wrap {
+  max-height: calc(100vh - 220px);
+  overflow: auto;
+}
+
+.audit-geral-table {
+  min-width: max-content;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.audit-geral-th,
+.audit-geral-td {
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.audit-geral-th--sticky,
+.audit-geral-td--sticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface, #0f172a);
+}
+
+.audit-geral-th:nth-child(2),
+.audit-geral-td:nth-child(2) {
+  left: 88px;
+  z-index: 3;
+}
+
+.audit-geral-th:nth-child(3),
+.audit-geral-td:nth-child(3) {
+  left: 200px;
+  z-index: 4;
+}
+
+.audit-geral-th:nth-child(4),
+.audit-geral-td:nth-child(4) {
+  left: 312px;
+  z-index: 5;
+}
+
+.audit-geral-td--date {
+  font-weight: 600;
+}
+
+.audit-geral-td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-geral-td--changed {
+  background: #d4af37 !important;
+  color: #1a1200 !important;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.audit-geral-row:hover .audit-geral-td:not(.audit-geral-td--changed) {
+  background: rgba(237, 216, 187, 0.12);
+}
+
+.audit-geral-th--patrimony,
+.audit-geral-th--cash,
+.audit-geral-th--transit {
+  font-weight: 700;
+}
+
+.audit-geral-th--qty {
+  color: #94a3b8;
+}
+
+.audit-geral-th--value {
+  color: #cbd5e1;
+}
+
+.audit-geral-th--text,
+.audit-geral-th--status,
+.audit-geral-th--count {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.audit-geral-td--text {
+  white-space: normal;
+  max-width: 220px;
+  min-width: 120px;
+  text-align: left;
+  line-height: 1.35;
+  vertical-align: top;
+}
+
+.audit-geral-td--status-ok {
+  color: #86efac;
+  font-weight: 600;
+}
+
+.audit-geral-td--status-warn {
+  color: #fcd34d;
+  font-weight: 600;
+}
+
+.audit-geral-td--status-error {
+  color: #fca5a5;
+  font-weight: 600;
+}

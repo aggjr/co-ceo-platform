@@ -450,6 +450,15 @@ export function buildDailyPatrimonyMtmSeries(
       pos.expiry = pos.expiry ?? contract.expiration;
     }
 
+    if (type === 'cost_adjustment') {
+      const amount = Math.abs(Number(e.total_net_value ?? e.unit_price ?? 0));
+      const absQty = Math.abs(pos.qty);
+      if (absQty > 0 && amount > 0) {
+        pos.unitCost = (pos.unitCost * absQty + amount) / absQty;
+      }
+      return;
+    }
+
     const price = Number(e.unit_price);
     if (price > 0) pos.unitCost = price;
 

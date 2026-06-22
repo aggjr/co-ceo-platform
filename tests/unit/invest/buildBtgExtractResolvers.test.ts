@@ -46,4 +46,53 @@ describe('buildBtgExtractResolvers', () => {
     expect(alloc?.length).toBeGreaterThan(0);
     expect(alloc?.some((r) => r.ticker === 'PRIO3')).toBe(true);
   });
+
+  it('resolveLftSpotFromGross limita venda a quantidade em custodia', () => {
+    const lftEvents: LedgerEvent[] = [
+      {
+        asset_id: 'lft1',
+        transaction_date: '2026-01-01',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'opening_balance',
+        quantity: 10,
+        unit_price: 18_000,
+        total_net_value: 180_000,
+      },
+    ];
+    const resolvers = buildBtgExtractResolvers(lftEvents);
+    const hit = resolvers.resolveLftSpotFromGross?.(
+      '2026-04-22',
+      'LFT-20310301',
+      468_986.25,
+      'sell'
+    );
+    expect(hit?.quantity).toBeLessThanOrEqual(10);
+    expect(hit?.quantity).toBeGreaterThan(0);
+    expect(Number(hit?.quantity) * Number(hit?.unitPrice)).toBeCloseTo(468_986.25, 2);
+  });
+
+  it('resolveLftSpotFromGross compra fracionada coerente com valor', () => {
+    const lftEvents: LedgerEvent[] = [
+      {
+        asset_id: 'lft1',
+        transaction_date: '2026-01-01',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'opening_balance',
+        quantity: 58,
+        unit_price: 17_809.83,
+        total_net_value: 1_032_969.97,
+      },
+    ];
+    const resolvers = buildBtgExtractResolvers(lftEvents);
+    const hit = resolvers.resolveLftSpotFromGross?.(
+      '2026-02-04',
+      'LFT-20310301',
+      3464.79,
+      'buy'
+    );
+    expect(hit!.quantity).toBeLessThan(1);
+    expect(hit!.quantity * hit!.unitPrice).toBeCloseTo(3464.79, 2);
+  });
 });

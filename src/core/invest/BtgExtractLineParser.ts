@@ -10,6 +10,11 @@ import {
   splitNetZeroCustodyMoves,
   type PendingGenericCustodyMove,
 } from './custodyFeeNetting';
+import { harmonizeQuantityWithFinancialAmount } from './financialQuantityCoherence';
+import {
+  allocateLftLotForBuy,
+  type LftInvestmentLot,
+} from './lftInvestmentStatementLots';
 
 const B3_TICKER_RE = /\b([A-Z]{4}\d{1,2})\b/;
 
@@ -109,6 +114,89 @@ export function parseBtgMovementLine(
     movementAmount,
     signedCash,
   };
+}
+
+/** Valor financeiro de compra/venda TD a partir da linha do extrato. */
+export function extractTdSpotFinancialAmount(parsed: BtgParsedLine, line?: string): number {
+  const desc = parsed.description.toUpperCase();
+  const mov = parsed.movementAmount > 0.005 ? parsed.movementAmount : 0;
+  const cash = Math.abs(Number.isFinite(parsed.signedCash) ? parsed.signedCash : 0);
+
+  if (/VENDA DE TESOURO DIRETO/.test(desc)) {
+    if (line) {
+      const fromLast = extractLastMovementAmountFromLine(line);
+      if (fromLast != null) return fromLast;
+    }
+    if (cash > 0.005) return cash;
+    return mov;
+  }
+
+  if (/COMPRA DE TESOURO DIRETO/.test(desc)) {
+    if (line) {
+      const numbers = [...line.matchAll(BR_NUMBER)].map((x) => parseBrNumber(x[1]!));
+      if (numbers.length >= 2) {
+        const last = Math.abs(numbers[numbers.length - 1]!);
+        const prevNum = Math.abs(numbers[numbers.length - 2]!);
+        const hi = Math.max(last, prevNum);
+        const lo = Math.min(last, prevNum);
+        // Valor da compra = maior montante (saldo residual na linha é muito menor).
+        if (hi > 500 && (lo < hi * 0.05 || hi > lo * 1.5)) return hi;
+      }
+    }
+    if (mov > 0.005) return mov;
+    if (cash > 0.005) return cash;
+    if (line) {
+      const numbers = [...line.matchAll(BR_NUMBER)].map((x) => parseBrNumber(x[1]!));
+      if (numbers.length >= 2) {
+        return Math.max(
+          Math.abs(numbers[numbers.length - 1]!),
+          Math.abs(numbers[numbers.length - 2]!)
+        );
+      }
+    }
+    return 0;
+  }
+
+  if (mov > 0.005) return mov;
+  return cash;
+}
+
+/** PDF BTG: penultimo numero = saldo; ultimo = valor do lancamento (taxa/IRRF/provento da linha). */
+export function extractLastMovementAmountFromLine(line: string): number | null {
+  const numbers = [...line.matchAll(BR_NUMBER)].map((x) => parseBrNumber(x[1]!));
+  if (numbers.length < 2) return null;
+  const last = numbers[numbers.length - 1]!;
+  if (!Number.isFinite(last)) return null;
+  return Math.round(Math.abs(last) * 100) / 100;
+}
+
+/** Despesa/taxa de linha BTG: ultima coluna do PDF; fallback delta de caixa ou movement. */
+export function resolveExtractLineExpenseAmount(parsed: BtgParsedLine, line?: string): number {
+  const fromLine = line ? extractLastMovementAmountFromLine(line) : null;
+  if (fromLine != null && fromLine > 0.005) return fromLine;
+
+  const delta = Math.abs(parsed.signedCash);
+  const movement = Math.abs(parsed.movementAmount);
+  if (delta > 0.005 && movement > 0.005) {
+    return Math.round(Math.min(delta, movement) * 100) / 100;
+  }
+  const pick = delta > 0.005 ? delta : movement;
+  return pick > 0.005 ? Math.round(pick * 100) / 100 : 0;
+}
+
+/** IRRF/taxa TD: usa a ultima coluna do extrato; fallback para delta de caixa plausivel. */
+export function resolveTdExtractFeeAmount(parsed: BtgParsedLine, line?: string): number {
+  const fromLine = line ? extractLastMovementAmountFromLine(line) : null;
+  if (fromLine != null && fromLine > 0.005) return fromLine;
+
+  const delta = Math.abs(parsed.signedCash);
+  const movement = Math.abs(parsed.movementAmount);
+  const TD_FEE_MAX = 10_000;
+  const candidates = [delta, movement].filter((n) => n > 0.005);
+  if (candidates.length === 0) return 0;
+  const plausible = candidates.filter((n) => n <= TD_FEE_MAX);
+  const pick = plausible.length > 0 ? Math.min(...plausible) : Math.min(...candidates);
+  return Math.round(pick * 100) / 100;
 }
 
 export type BtgLedgerMapping = {
@@ -257,6 +345,18 @@ function takeTesouroDiretoMovement(
   if (best) {
     best.used = true;
     return best;
+  }
+
+  if (operation === 'sell') {
+    const sameDay = rows.filter(
+      (row) => !row.used && row.date === date && row.operation === operation
+    );
+    if (sameDay.length === 1) {
+      const only = sameDay[0]!;
+      only.used = true;
+      return only;
+    }
+    return null;
   }
 
   let fallback: TesouroDiretoMovement | null = null;
@@ -580,6 +680,8 @@ export type BtgExtractParseOptions = {
   /** Inclui LIQ BOLSA como marcador de liquidacao para roteamento pelo LiqBolsaSettlementService. */
   includeLiqBolsa?: boolean;
   importRules?: InvestImportRule[];
+  /** Lotes LFT do extrato de investimento — cruzamento qty/PU em compras TD na CC. */
+  lftInvestmentLots?: LftInvestmentLot[];
 };
 
 export interface BtgExtractResolvers {
@@ -603,6 +705,38 @@ export interface BtgExtractResolvers {
   resolveCustodyFeeAllocation?: (
     extractDate: string
   ) => Array<{ ticker: string; weight: number; asset_type?: string; underlying_ticker?: string }> | undefined;
+
+  /**
+   * Sem bloco "Operacoes Tesouro" no PDF: infere qty/PU da venda/compra TD pelo valor liquido
+   * e PM medio em custodia na data.
+   */
+  resolveLftSpotFromGross?: (
+    extractDate: string,
+    ticker: string,
+    gross: number,
+    operation: 'buy' | 'sell',
+    maxQuantity?: number
+  ) => { quantity: number; unitPrice: number } | undefined;
+
+  /** Quantidade LFT em custodia imediatamente antes da linha (livro importado). */
+  resolveLftQuantityBeforeDate?: (ticker: string, extractDate: string) => number;
+}
+
+function lftQtyFromParsedEntries(
+  out: BtgExtractEntry[],
+  ticker: string,
+  extractDate: string
+): number {
+  let qty = 0;
+  const d = extractDate.slice(0, 10);
+  const want = ticker.toUpperCase();
+  for (const e of out) {
+    if (String(e.ticker).toUpperCase() !== want) continue;
+    if (String(e.date).slice(0, 10) > d) continue;
+    if (e.operation === 'buy') qty += Number(e.quantity) || 0;
+    else if (e.operation === 'sell') qty -= Number(e.quantity) || 0;
+  }
+  return qty;
 }
 
 type ExtractAllocationRow = {
@@ -659,10 +793,7 @@ export function btgLinesToImportEntries(
   // Buffer: ultima operacao TD spot por mes (para amarrar IRRF/taxa relacionada).
   // Em D ha a operacao TD; em D+1/D+2 caem IRRF/taxa. Como o extrato vem
   // ordenado cronologicamente, ao processar IRRF ja temos a TD no buffer.
-  const lastTdByYM = new Map<
-    string,
-    { date: string; ticker: string; event_source_ref: string }
-  >();
+  let lastTdSpot: { date: string; ticker: string; event_source_ref: string } | null = null;
   const pendingCustody: PendingGenericCustodyMove[] = [];
 
   for (const raw of lines) {
@@ -716,70 +847,169 @@ export function btgLinesToImportEntries(
       map.ticker.startsWith('LFT-')
     ) {
       const ref = eventSourceRefForTd(parsed.date, map.ticker);
+      const ccGross = extractTdSpotFinancialAmount(parsed, line);
+      let spotGross = ccGross;
+      let lotMatched: LftInvestmentLot | undefined;
+      if (map.operation === 'buy' && options?.lftInvestmentLots?.length && ccGross > 0.005) {
+        lotMatched = allocateLftLotForBuy(
+          options.lftInvestmentLots,
+          parsed.date,
+          map.ticker,
+          ccGross
+        );
+      }
       const tdMovement = takeTesouroDiretoMovement(
         tesouroMovements,
         parsed.date,
         map.ticker,
         map.operation,
-        parsed.movementAmount
+        spotGross
       );
-      lastTdByYM.set(ym, {
+
+      let sellMaxQty: number | undefined;
+      if (map.operation === 'sell' && resolvers?.resolveLftQuantityBeforeDate) {
+        const fromLedger =
+          resolvers.resolveLftQuantityBeforeDate(map.ticker, parsed.date) ?? 0;
+        const fromOut = lftQtyFromParsedEntries(out, map.ticker, parsed.date);
+        const available = Math.max(0, fromLedger + fromOut);
+        if (available <= 0) {
+          out.push({
+            date: parsed.date,
+            ticker: map.ticker,
+            operation: map.operation,
+            quantity: 0,
+            unit_price: 0,
+            total_net_value: Math.round(net * 100) / 100,
+            asset_type: map.asset_type,
+            underlying_ticker: map.underlying_ticker,
+            notes: map.notes ?? parsed.description,
+            event_source_ref: ref,
+            extract_category: 1,
+            impacts_managerial_price: false,
+          });
+          continue;
+        }
+        sellMaxQty = available;
+      }
+
+      let quantity = 0;
+      let unitPrice = 0;
+      if (lotMatched) {
+        quantity = lotMatched.quantity;
+        unitPrice = lotMatched.buyPrice;
+      } else if (spotGross > 0.005) {
+        const tdQty =
+          tdMovement && Math.abs(tdMovement.gross - Math.abs(spotGross)) <= 0.05
+            ? tdMovement.quantity
+            : undefined;
+        const tdPu =
+          tdMovement && Math.abs(tdMovement.gross - Math.abs(spotGross)) <= 0.05
+            ? tdMovement.unitPrice
+            : undefined;
+
+        let harmonized: { quantity: number; unit_price: number } | undefined;
+        if (map.operation === 'sell' && resolvers?.resolveLftSpotFromGross) {
+          const inferred = resolvers.resolveLftSpotFromGross(
+            parsed.date,
+            map.ticker,
+            spotGross,
+            'sell',
+            sellMaxQty
+          );
+          if (inferred) {
+            harmonized = { quantity: inferred.quantity, unit_price: inferred.unitPrice };
+          }
+        }
+        if (!harmonized) {
+          harmonized = harmonizeQuantityWithFinancialAmount({
+            financialAmount: spotGross,
+            quantity: tdQty,
+            referenceUnitPrice: tdPu,
+            maxQuantity: sellMaxQty,
+          });
+        }
+        if (!harmonized && resolvers?.resolveLftSpotFromGross && map.operation === 'buy') {
+          const inferred = resolvers.resolveLftSpotFromGross(
+            parsed.date,
+            map.ticker,
+            spotGross,
+            'buy'
+          );
+          if (inferred) {
+            harmonized = { quantity: inferred.quantity, unit_price: inferred.unitPrice };
+          }
+        }
+        if (harmonized) {
+          quantity = harmonized.quantity;
+          unitPrice = harmonized.unit_price;
+        }
+      }
+
+      const tdSign = getBtgOperationSign(map.operation, parsed.description);
+      const tdNet = Math.round(tdSign * spotGross * 100) / 100;
+      lastTdSpot = {
         date: parsed.date,
         ticker: map.ticker,
         event_source_ref: ref,
-      });
+      };
       out.push({
         date: parsed.date,
         ticker: map.ticker,
         operation: map.operation,
-        quantity: tdMovement ? tdMovement.quantity : 0,
-        unit_price: tdMovement ? tdMovement.unitPrice : 0,
-        total_net_value: Math.round(net * 100) / 100,
+        quantity,
+        unit_price: unitPrice,
+        total_net_value: Math.round(tdNet * 100) / 100,
         asset_type: map.asset_type,
         underlying_ticker: map.underlying_ticker,
         notes: map.notes ?? parsed.description,
         event_source_ref: ref,
         extract_category: 1,
-        impacts_managerial_price: tdMovement ? undefined : false,
+        impacts_managerial_price: quantity > 0 ? undefined : false,
       });
       continue;
     }
 
     // Caso 1B — IRRF retido sobre TD: vira cost_adjustment no LFT da TD geradora.
-    if (IRRF_TD_DESC_RE.test(upperDesc) && lastTdByYM.has(ym)) {
-      const td = lastTdByYM.get(ym)!;
-      out.push({
-        date: parsed.date,
-        ticker: td.ticker,
-        operation: 'cost_adjustment',
-        quantity: 0,
-        unit_price: Math.abs(parsed.movementAmount),
-        total_net_value: Math.abs(parsed.movementAmount),
-        asset_type: 'fixed_income',
-        notes: parsed.description,
-        event_source_ref: td.event_source_ref,
-        extract_category: 1,
-        applies_to_b3: false,
-      });
+    if (IRRF_TD_DESC_RE.test(upperDesc) && lastTdSpot) {
+      const td = lastTdSpot;
+      const expense = resolveTdExtractFeeAmount(parsed, line);
+      if (expense >= 0.005) {
+        out.push({
+          date: parsed.date,
+          ticker: td.ticker,
+          operation: 'cost_adjustment',
+          quantity: 0,
+          unit_price: expense,
+          total_net_value: -expense,
+          asset_type: 'fixed_income',
+          notes: parsed.description,
+          event_source_ref: td.event_source_ref,
+          extract_category: 1,
+          applies_to_b3: false,
+        });
+      }
       continue;
     }
 
     // Caso 1C — taxa/emolumentos/custodia explicitamente TD: cost_adjustment no LFT.
-    if (TAXA_TD_DESC_RE.test(upperDesc) && lastTdByYM.has(ym)) {
-      const td = lastTdByYM.get(ym)!;
-      out.push({
-        date: parsed.date,
-        ticker: td.ticker,
-        operation: 'cost_adjustment',
-        quantity: 0,
-        unit_price: Math.abs(parsed.movementAmount),
-        total_net_value: Math.abs(parsed.movementAmount),
-        asset_type: 'fixed_income',
-        notes: parsed.description,
-        event_source_ref: td.event_source_ref,
-        extract_category: 1,
-        applies_to_b3: false,
-      });
+    if (TAXA_TD_DESC_RE.test(upperDesc) && lastTdSpot) {
+      const td = lastTdSpot;
+      const expense = resolveTdExtractFeeAmount(parsed, line);
+      if (expense >= 0.005) {
+        out.push({
+          date: parsed.date,
+          ticker: td.ticker,
+          operation: 'cost_adjustment',
+          quantity: 0,
+          unit_price: expense,
+          total_net_value: -expense,
+          asset_type: 'fixed_income',
+          notes: parsed.description,
+          event_source_ref: td.event_source_ref,
+          extract_category: 1,
+          applies_to_b3: false,
+        });
+      }
       continue;
     }
 
@@ -871,6 +1101,7 @@ export function btgLinesToImportEntries(
         date: parsed.date,
         description: parsed.description,
         movementAmount: parsed.movementAmount,
+        expenseAmount: resolveExtractLineExpenseAmount(parsed, line),
         signedNet: Math.round(net * 100) / 100,
         ym,
       });
@@ -885,7 +1116,7 @@ export function btgLinesToImportEntries(
           out,
           parsed,
           allocation,
-          Math.abs(parsed.movementAmount),
+          resolveExtractLineExpenseAmount(parsed, line),
           { notesPrefix: 'Rateio juros/multa:' }
         );
         continue;
@@ -938,7 +1169,7 @@ export function btgLinesToImportEntries(
           out,
           { date: move.date, description: move.description },
           allocation,
-          Math.abs(move.movementAmount),
+          move.expenseAmount ?? Math.abs(move.movementAmount),
           {
             event_source_ref: ref,
             notesPrefix: 'Rateio custodia:',

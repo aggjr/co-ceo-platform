@@ -3,8 +3,11 @@
  * Cruza perna patrimonial (qty × preço = valor nominal) com perna de caixa
  * (metadata.fees / b3_fees) pelo mesmo broker_note_ref.
  */
-import { inferUnderlyingTicker } from './assetClassifier';
+import { inferUnderlyingTicker, isOptionTicker } from './assetClassifier';
 import type { LedgerEvent } from './CustodyEngine';
+import { inferOptionExpiryDate } from './optionExpiry';
+import type { OptionMarketRow } from './optionMarketCatalog';
+import { resolveOptionStrike } from './optionStrike';
 
 export type BrokerageNoteReviewRow = {
   dedupeKey: string;
@@ -124,7 +127,8 @@ function isTradeEvent(e: LedgerEvent): boolean {
 
 export function buildBrokerageNoteReviewRows(
   events: LedgerEvent[],
-  todayIso: string
+  todayIso: string,
+  opts?: { optionMarket?: Map<string, OptionMarketRow> }
 ): BrokerageNoteReviewRow[] {
   const feesByRef = new Map<
     string,
@@ -183,6 +187,28 @@ export function buildBrokerageNoteReviewRows(
     const grossValue = nominalGross(e);
     const isExercise = e.transaction_type === 'option_exercise';
     const pregaoDate = e.transaction_date || todayIso;
+
+    const metaStrike = Number(e.metadata?.option_strike);
+    const metaExpiration = String(e.metadata?.option_expiration ?? '').slice(0, 10);
+    let strikePrice: number | null =
+      Number.isFinite(metaStrike) && metaStrike > 0 ? metaStrike : null;
+    let maturityIso = /^\d{4}-\d{2}-\d{2}$/.test(metaExpiration) ? metaExpiration : '';
+
+    if (isOptionTicker(e.asset_ticker)) {
+      const catalog = opts?.optionMarket?.get(String(e.asset_ticker).toUpperCase());
+      const resolved = resolveOptionStrike({
+        meta: e.metadata as { option_strike?: number | null },
+        ticker: e.asset_ticker,
+        marketStrike: catalog?.strikePrice ?? null,
+        ledgerExerciseStrike: strikePrice,
+      });
+      if (resolved.strike != null) strikePrice = resolved.strike;
+      if (!maturityIso && catalog?.expirationDate) maturityIso = catalog.expirationDate.slice(0, 10);
+      if (!maturityIso) {
+        const inferred = inferOptionExpiryDate(e.asset_ticker);
+        if (inferred) maturityIso = inferred;
+      }
+    }
 
     const cashFees = noteNum !== '—' ? feesByRef.get(noteNum) : undefined;
     let feesSource: BrokerageNoteReviewRow['feesSource'] = 'none';
@@ -247,8 +273,8 @@ export function buildBrokerageNoteReviewRows(
       sideLabel: side === 'C' ? 'Compra' : side === 'V' ? 'Venda' : '—',
       marketType: isExercise ? 'EXERCÍCIO' : category === 'OPTIONS' ? 'OPÇÕES' : 'VISTA',
       operationLabel: isExercise ? 'Exercício' : side === 'C' ? 'Compra' : 'Venda',
-      maturity: isoDateToBr((e.metadata?.option_expiration as string | undefined) || ''),
-      strikePrice: (e.metadata?.option_strike as number | undefined) || null,
+      maturity: maturityIso ? isoDateToBr(maturityIso) : null,
+      strikePrice,
       ticker: e.asset_ticker,
       underlyingStock: inferUnderlyingTicker(e.asset_ticker, e.underlying_ticker ?? undefined),
       isExercise,

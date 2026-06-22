@@ -338,6 +338,12 @@ router.get(
   invest.getStockGainPivot.bind(invest)
 );
 router.get(
+  '/invest/general-audit',
+  AuthMiddleware.protect,
+  requirePermission('invest:ledger:read'),
+  invest.getGeneralAudit.bind(invest)
+);
+router.get(
   '/invest/patrimony-daily',
   AuthMiddleware.protect,
   requirePermission('invest:ledger:read'),

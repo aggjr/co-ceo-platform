@@ -18,6 +18,11 @@ import { normalizeBtgExtractPdfText } from './btgExtractPdfText';
 import { pdfBufferToLines, pdfBufferToText } from './btgPdfTextExtract';
 import { LedgerImportService } from './LedgerImportService';
 import { buildBtgExtractResolvers } from './buildBtgExtractResolvers';
+import {
+  cloneLftInvestmentLots,
+  loadLftInvestmentLotsFromDados,
+  type LftInvestmentLot,
+} from './lftInvestmentStatementLots';
 import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
 import { MAIN_CASH_TICKER } from './ledgerTypes';
 import { parsePregaoDateFromLiqNotes } from './noteEventSettlement';
@@ -35,6 +40,7 @@ import {
 import type { LedgerEvent } from './CustodyEngine';
 import { logReconcileEvent, logReconcileFailure } from './reconcile/reconcileErrorDetail';
 import { InvestImportRulesRepository } from './InvestImportRulesRepository';
+import { fingerprintFromImportLine } from './ledgerOperationDedup';
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
@@ -216,6 +222,17 @@ async function rawTextFromExtractUpload(file: BtgUploadFileInput): Promise<{
   return { raw: buf.toString('utf8'), format };
 }
 
+let cachedLftInvestmentLotsTemplate: LftInvestmentLot[] | null = null;
+
+async function resolveLftInvestmentLotsForParse(): Promise<LftInvestmentLot[] | undefined> {
+  if (!cachedLftInvestmentLotsTemplate) {
+    const loaded = await loadLftInvestmentLotsFromDados();
+    if (!loaded.length) return undefined;
+    cachedLftInvestmentLotsTemplate = loaded;
+  }
+  return cloneLftInvestmentLots(cachedLftInvestmentLotsTemplate);
+}
+
 function normalizeExtractLines(raw: string, format: BtgExtractFileFormat): string[] {
   if (format === 'csv') {
     return btgExtractCsvToNormalizedLines(raw);
@@ -250,9 +267,10 @@ function extractParserContextLines(
   normalizedLines: string[]
 ): string[] {
   if (format !== 'pdf') return normalizedLines;
-  const rawLines = raw.split(/\r?\n/).filter((l) => l.trim());
   const tesouroOps = extractTesouroOperacoesContextLines(raw);
-  return [...tesouroOps, ...rawLines, ...normalizedLines];
+  // Movimentos CC ja estao em normalizedLines; rawLines duplicaria cada lancamento.
+  if (tesouroOps.length) return [...tesouroOps, ...normalizedLines];
+  return normalizedLines;
 }
 
 function assignExtractRefs(entries: LedgerImportLine[]): LedgerImportLine[] {
@@ -277,6 +295,23 @@ function isLiqBolsaLine(line: LedgerImportLine): boolean {
 
 function signedCashValue(line: LedgerImportLine): number {
   return Math.round(Number(line.total_net_value ?? 0) * 100) / 100;
+}
+
+/** PDF/extrato pode repetir a mesma operacao patrimonial — dedup antes de refs sequenciais. */
+export function dedupeExtractPatrimonyLines(lines: LedgerImportLine[]): LedgerImportLine[] {
+  const seen = new Set<string>();
+  const out: LedgerImportLine[] = [];
+  for (const line of lines) {
+    if (line.operation === 'pending_settlement') {
+      out.push(line);
+      continue;
+    }
+    const key = fingerprintFromImportLine(line);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(line);
+  }
+  return out;
 }
 
 /** PDF pode duplicar LIQ BOLSA — mesma chave do parser de extrato. */
@@ -778,7 +813,12 @@ export async function parseExtractUploadImportLines(
   }
   const importRules =
     importRulesRepo && ctx ? await importRulesRepo.loadForBroker(ctx, 'BTG') : [];
-  const mergedOptions = { ...options, importRules };
+  const lftInvestmentLots = await resolveLftInvestmentLotsForParse();
+  const mergedOptions = {
+    ...options,
+    importRules,
+    ...(lftInvestmentLots?.length ? { lftInvestmentLots } : {}),
+  };
   let resolvers: import('./BtgExtractLineParser').BtgExtractResolvers | undefined;
   if (ledger && ctx?.organizationId && typeof ledger.listLedgerEvents === 'function') {
     const today = new Date().toISOString().slice(0, 10);
@@ -793,10 +833,12 @@ export async function parseExtractUploadImportLines(
   );
   return assignExtractRefs(
     dedupeLiqBolsaImportLines(
-      rawEntries.map((e) => ({
-        ...e,
-        operation: e.operation as LedgerTransactionType,
-      }))
+      dedupeExtractPatrimonyLines(
+        rawEntries.map((e) => ({
+          ...e,
+          operation: e.operation as LedgerTransactionType,
+        }))
+      )
     )
   );
 }

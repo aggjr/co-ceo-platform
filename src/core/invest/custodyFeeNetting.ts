@@ -7,6 +7,8 @@ export type PendingGenericCustodyMove = {
   date: string;
   description: string;
   movementAmount: number;
+  /** Valor da despesa (ultima coluna do extrato BTG), quando disponivel. */
+  expenseAmount?: number;
   signedNet: number;
   ym: string;
 };

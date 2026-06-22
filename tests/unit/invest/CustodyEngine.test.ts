@@ -48,6 +48,44 @@ describe('CustodyEngine', () => {
     expect(assets.find((a) => a.ticker === 'LFT-20310301')).toBeUndefined();
   });
 
+  it('aplica venda LFT com quantity negativa no extrato BTG', () => {
+    const entries: LedgerEvent[] = [
+      {
+        asset_id: 'lft-1',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'opening_balance',
+        quantity: 58,
+        unit_price: 17800,
+        total_net_value: 1032969.97,
+        impacts_managerial_price: true,
+      },
+      {
+        asset_id: 'lft-1',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'buy',
+        quantity: 3.04,
+        unit_price: 17800,
+        total_net_value: -54160.08,
+        impacts_managerial_price: true,
+      },
+      {
+        asset_id: 'lft-1',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'sell',
+        quantity: -26.33,
+        unit_price: 17800,
+        total_net_value: 468986.25,
+        impacts_managerial_price: true,
+      },
+    ];
+    const { assets } = rebuildCustodyFromLedger(entries);
+    const lft = assets.find((a) => a.ticker === 'LFT-20310301');
+    expect(lft?.quantity).toBeCloseTo(34.71, 2);
+  });
+
   it('permite ação vendida a descoberto quando venda excede compras', () => {
     const entries: LedgerEvent[] = [
       {

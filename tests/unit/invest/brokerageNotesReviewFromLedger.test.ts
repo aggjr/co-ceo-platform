@@ -61,4 +61,38 @@ describe('brokerageNotesReviewFromLedger', () => {
     const e = trade({ quantity: 100, unit_price: 10, total_net_value: 1005 });
     expect(impliedFeesFromGap(e, 'C')).toBe(5);
   });
+
+  it('preenche strike e vencimento via invest_options_market quando metadata vazio', () => {
+    const catalog = new Map([
+      [
+        'PRIOM385',
+        {
+          ticker: 'PRIOM385',
+          underlyingTicker: 'PRIO3',
+          optionType: 'PUT' as const,
+          strikePrice: 38.5,
+          expirationDate: '2026-06-19',
+        },
+      ],
+    ]);
+    const rows = buildBrokerageNoteReviewRows(
+      [
+        trade({
+          id: 'o1',
+          asset_ticker: 'PRIOM385',
+          asset_type: 'option_put',
+          transaction_type: 'put_sell',
+          transaction_date: '2026-03-10',
+          quantity: 100,
+          unit_price: 0.45,
+          total_net_value: 45,
+        }),
+      ],
+      '2026-06-19',
+      { optionMarket: catalog }
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].strikePrice).toBe(38.5);
+    expect(rows[0].maturity).toBe('19/06/2026');
+  });
 });

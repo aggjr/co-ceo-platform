@@ -14,7 +14,7 @@ import {
   type LedgerImportPayload,
   type OpeningImportPayload,
 } from './ledgerTypes';
-import { buildLedgerDedupIndex } from './ledgerOperationDedup';
+import { buildLedgerDedupIndex, registerLineInDedupIndex } from './ledgerOperationDedup';
 import { LedgerEventProjection } from '../../modules/invest/sync/LedgerEventProjection';
 import { buildInvestOperations, type InvestOperations } from '../../modules/invest';
 import { syncAutoPendingSettlements } from './AutoPendingSettlementSync';
@@ -391,7 +391,18 @@ export class LedgerImportService {
         { dedupIndex }
       );
       if (result.skipped) skipped += 1;
-      else inserted += 1;
+      else {
+        inserted += 1;
+        registerLineInDedupIndex(dedupIndex, {
+          ...enrichedLine,
+          ticker,
+          asset_type: assetType,
+          quantity: norm.quantity,
+          unit_price: norm.unit_price,
+          date: parsedDate,
+          broker_note_ref: line.broker_note_ref,
+        });
+      }
       if (result.enriched) enriched += 1;
     }
 

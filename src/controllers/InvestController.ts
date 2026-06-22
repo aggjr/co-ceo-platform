@@ -16,6 +16,7 @@ import {
 import { buildDailyPatrimonySeries } from '../core/invest/PatrimonyDailyEngine';
 import { buildBtgAnchorPatrimonyDailyResult } from '../core/invest/btgPatrimonySeries';
 import { buildDailyPatrimonyMtmSeries } from '../core/invest/PatrimonyMtmDailyEngine';
+import { buildGeneralAuditMatrix } from '../core/invest/GeneralAuditMatrixService';
 import { buildBrokerageNoteReviewRows } from '../core/invest/brokerageNotesReviewFromLedger';
 import { buildExtractReconciliationSummary } from '../core/invest/btgExtractCashSeries';
 import { compareToBtgPublished } from '../core/invest/btgPerformanceReference';
@@ -1410,7 +1411,8 @@ export class InvestController {
       await this.ledgerStartDateFor(ctx),
       today
     );
-    const rows = buildBrokerageNoteReviewRows(events, today);
+    const optionMarket = await loadOptionMarketCatalog(this.gateway, ctx.organizationId);
+    const rows = buildBrokerageNoteReviewRows(events, today, { optionMarket });
 
     const notesCount = new Set<string>();
     let withFees = 0;
@@ -2477,6 +2479,49 @@ export class InvestController {
       return res.json({ success: true, data: { from, to, rows, totals } });
     } catch (err) {
       return res.status(500).json({ success: false, error: String(err) });
+    }
+  };
+
+  getGeneralAudit = async (req: Request, res: Response) => {
+    try {
+      const ctx = req.userContext!;
+      if (!ctx.organizationId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Selecione uma organização (personifique a holding).',
+        });
+      }
+
+      const bounds = await this.periodBoundsFor(ctx);
+      const fromQ = String(req.query.from || bounds.defaultFrom).slice(0, 10);
+      const from = fromQ < bounds.periodMin ? bounds.periodMin : fromQ;
+      const toRaw = String(req.query.to || bounds.today).slice(0, 10);
+      const to = toRaw > bounds.today ? bounds.today : toRaw;
+
+      const matrix = await buildGeneralAuditMatrix({
+        ctx,
+        from,
+        to,
+        periodMin: bounds.periodMin,
+        gateway: this.gateway,
+        ledger: this.ledger,
+        marketQuoteRepo: this.marketQuoteRepo,
+        valuationContext: this.valuationContext,
+        fxRates: this.fxRates,
+        pool,
+      });
+
+      return res.json({
+        success: true,
+        periodBounds: bounds,
+        ...matrix,
+      });
+    } catch (err) {
+      console.error('[getGeneralAudit]', err);
+      return res.status(500).json({
+        success: false,
+        error: err instanceof Error ? err.message : 'Falha ao montar auditoria geral.',
+      });
     }
   };
 

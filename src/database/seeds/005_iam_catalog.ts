@@ -289,6 +289,14 @@ const ACCESS_RESOURCES = [
     label: 'Conciliação',
     description: 'Wizard notas e extrato dia a dia',
   },
+  {
+    id: '00000000-0000-4002-8000-000000000013',
+    resource_key: 'screen.invest.auditoria_geral',
+    resource_type: 'screen',
+    module_code: 'invest',
+    label: 'Auditoria Geral',
+    description: 'Matriz diária patrimônio, caixa e posições',
+  },
 ] as const;
 
 function perm(map: Map<string, string>, code: string): string {
@@ -503,6 +511,7 @@ async function run() {
     'screen.invest.portfolio',
     'screen.invest.results',
     'screen.invest.conciliacao',
+    'screen.invest.auditoria_geral',
   ] as const;
   for (const key of viewerScreenKeys) {
     await ensureLink(
@@ -540,6 +549,7 @@ async function run() {
     'screen.invest.portfolio',
     'screen.invest.results',
     'screen.invest.conciliacao',
+    'screen.invest.auditoria_geral',
   ] as const;
   for (const key of managerScreenKeys) {
     await ensureLink(

@@ -124,6 +124,11 @@ export const MENU_CATALOG = [
         path: '/invest/conciliacao',
         resourceKey: 'screen.invest.results',
       },
+      {
+        label: 'Auditoria Geral',
+        path: '/invest/auditoria-geral',
+        resourceKey: 'screen.invest.auditoria_geral',
+      },
     ],
   },
 ];

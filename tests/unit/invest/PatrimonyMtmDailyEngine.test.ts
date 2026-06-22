@@ -373,4 +373,39 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(day2?.patrimony).toBeCloseTo(2000, 0);
     expect(snapshot?.priceSource).toBe('previous_market');
   });
+
+  it('cost_adjustment em LFT soma ao PM medio, nao substitui por valor inflado', () => {
+    const openPm = 17_809.83;
+    const entries: LedgerEvent[] = [
+      {
+        asset_id: 'lft1',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-01',
+        quantity: 58,
+        unit_price: openPm,
+        total_net_value: 58 * openPm,
+        impacts_managerial_price: true,
+      },
+      {
+        asset_id: 'lft1',
+        asset_ticker: 'LFT-20310301',
+        asset_type: 'fixed_income',
+        transaction_type: 'cost_adjustment',
+        transaction_date: '2026-04-22',
+        quantity: 0,
+        unit_price: 694_100.15,
+        total_net_value: -24,
+        impacts_managerial_price: true,
+      },
+    ];
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-04-22', '2026-04-22', {
+      fixedIncomeTotal: 0,
+      valuationContext: emptyAssetValuationSnapshot(),
+    });
+    const day = r.series[0]!;
+    expect(day.patrimony).toBeCloseTo(58 * openPm + 24, 0);
+    expect(day.patrimony).toBeLessThan(2_000_000);
+  });
 });

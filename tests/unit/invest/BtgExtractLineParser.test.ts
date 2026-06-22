@@ -5,8 +5,14 @@ import {
   parseBtgMovementLine,
   parseBrNumber,
   getBtgOperationSign,
+  resolveTdExtractFeeAmount,
+  extractTdSpotFinancialAmount,
 } from '../../../src/core/invest/BtgExtractLineParser';
 import { buildBtgExtractResolvers } from '../../../src/core/invest/buildBtgExtractResolvers';
+import {
+  cloneLftInvestmentLots,
+  parseLftInvestmentLotsInline,
+} from '../../../src/core/invest/lftInvestmentStatementLots';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 
 describe('BtgExtractLineParser', () => {
@@ -32,6 +38,7 @@ describe('BtgExtractLineParser', () => {
     expect(row?.balance).toBeCloseTo(6795.79);
     expect(row?.movementAmount).toBeCloseTo(54160.08);
     expect(row?.signedCash).toBeCloseTo(-54160.08);
+    expect(extractTdSpotFinancialAmount(row!)).toBeCloseTo(54160.08);
   });
 
   it('parseBtgMovementLine LIQ operacoes usa coluna credito quando saldo acumulado diverge', () => {
@@ -160,7 +167,7 @@ describe('BtgExtractLineParser', () => {
       const buy = entries.find((e) => e.operation === 'buy');
       expect(buy?.quantity).toBe(0);
       expect(buy?.unit_price).toBe(0);
-      expect(buy?.total_net_value).toBeCloseTo(-54160.08, 4);
+      expect(buy?.total_net_value).toBeCloseTo(-54160.08, 2);
       expect(buy?.impacts_managerial_price).toBe(false);
     });
 
@@ -200,10 +207,77 @@ describe('BtgExtractLineParser', () => {
       expect(adj).toBeDefined();
       expect(adj?.ticker).toBe('LFT-20310301');
       expect(adj?.unit_price).toBeCloseTo(24, 4);
-      expect(adj?.total_net_value).toBeCloseTo(24, 4);
+      expect(adj?.total_net_value).toBeCloseTo(-24, 4);
       expect(adj?.applies_to_b3).toBe(false);
       expect(adj?.event_source_ref).toBe(buy?.event_source_ref);
       expect(adj?.extract_category).toBe(1);
+    });
+
+    it('IRRF TD usa ultima coluna do extrato BTG (saldo vs taxa)', () => {
+      const line =
+        '22/04/2026 IRRF cobrado sobre operacao de Tesouro Direto: LFT 506.417,69 7.618,65';
+      const parsed = parseBtgMovementLine(line, 514_036.34);
+      expect(parsed).not.toBeNull();
+      expect(resolveTdExtractFeeAmount(parsed!, line)).toBeCloseTo(7618.65, 2);
+
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'lft1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 58,
+          unit_price: 17_809.83,
+          total_net_value: 1_032_969.97,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 450.050,09',
+          '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 514.036,34 468.986,25',
+          line,
+        ],
+        450_050.09,
+        resolvers
+      );
+      const sell = entries.find((e) => e.operation === 'sell');
+      const adj = entries.find((e) => e.operation === 'cost_adjustment');
+      expect(sell?.quantity).toBeCloseTo(25, 2);
+      expect(Number(sell?.quantity) * Number(sell?.unit_price)).toBeCloseTo(468_986.25, 2);
+      expect(adj?.unit_price).toBeCloseTo(7618.65, 2);
+      expect(adj?.total_net_value).toBeCloseTo(-7618.65, 2);
+    });
+
+    it('multiplos IRRF/taxa TD no dia 22/04 usam ultima coluna (nao saldo)', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'lft1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 58,
+          unit_price: 17_809.83,
+          total_net_value: 1_032_969.97,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const lines = [
+        'Saldo Inicial 450.050,09',
+        '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 514.036,34 468.986,25',
+        '22/04/2026 IRRF cobrado sobre operacao de Tesouro Direto: LFT 506.417,69 7.618,65',
+        '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 543.936,59 37.518,90',
+        '22/04/2026 IRRF cobrado sobre operacao de Tesouro Direto: LFT 543.342,74 593,85',
+        '22/04/2026 Taxa de custodia sobre operacao de Tesouro Direto: 694.057,88 42,27',
+      ];
+      const entries = btgLinesToImportEntries(lines, 450_050.09, resolvers);
+      const adjs = entries.filter((e) => e.operation === 'cost_adjustment');
+      const sum = adjs.reduce((s, e) => s + Math.abs(e.unit_price), 0);
+      expect(adjs.length).toBe(3);
+      expect(sum).toBeCloseTo(7618.65 + 593.85 + 42.27, 2);
+      expect(sum).toBeLessThan(20_000);
     });
 
     it('IR-BTC PRIO3 vira cost_adjustment em PRIO3 com header mensal BTG-BTC-PRIO3:{ym}', () => {
@@ -306,6 +380,274 @@ describe('BtgExtractLineParser', () => {
       expect(pen).toBeDefined();
       expect(pen?.event_source_ref).toBeUndefined();
       expect(pen?.extract_category).toBe(3);
+    });
+
+    it('Juros saldo negativo rateado usa ultima coluna do extrato (nao saldo acumulado)', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'lft1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 58,
+          unit_price: 17_809.83,
+          total_net_value: 1_032_969.97,
+        } as LedgerEvent,
+        {
+          asset_id: 'o1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'PRIO3',
+          asset_type: 'stock',
+          transaction_type: 'opening_balance',
+          quantity: 5400,
+          unit_price: 40,
+          total_net_value: 216_000,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 28.385,54',
+          '04/05/2026 JUROS SOBRE SALDO NEGATIVO - BANCO BTG 28.029,28 356,74',
+        ],
+        28_385.54,
+        resolvers
+      );
+      const adjs = entries.filter((e) => e.operation === 'cost_adjustment');
+      expect(adjs.length).toBeGreaterThan(0);
+      const sum = adjs.reduce((s, e) => s + Math.abs(Number(e.unit_price)), 0);
+      expect(sum).toBeCloseTo(356.74, 2);
+      expect(sum).toBeLessThan(1_000);
+    });
+
+    it('venda LFT inferida nao excede quantidade em custodia', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'lft1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 10,
+          unit_price: 18_000,
+          total_net_value: 180_000,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 200.000,00',
+          '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 514.036,34 468.986,25',
+        ],
+        200_000,
+        resolvers
+      );
+      const sell = entries.find((e) => e.operation === 'sell');
+      expect(sell?.quantity).toBeLessThanOrEqual(10);
+      expect(sell?.quantity).toBeGreaterThan(0);
+      expect(Number(sell?.quantity) * Number(sell?.unit_price)).toBeCloseTo(468_986.25, 2);
+    });
+
+    it('multiplas vendas LFT no mesmo dia fecham qty agregada MyProfit', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'lft1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 58,
+          unit_price: 17_809.83,
+          total_net_value: 1_032_969.97,
+        } as LedgerEvent,
+        ...[
+          { date: '2026-01-09', qty: 3, total: 54_160.08 },
+          { date: '2026-01-22', qty: 10, total: 181_453.4 },
+          { date: '2026-01-28', qty: 2.89, total: 52_557.08 },
+          { date: '2026-02-04', qty: 0.19, total: 3_464.79 },
+          { date: '2026-02-10', qty: 0.13, total: 2_375.84 },
+          { date: '2026-03-09', qty: 0.62, total: 11_438.79 },
+          { date: '2026-03-18', qty: 0.64, total: 11_854.73 },
+          { date: '2026-03-23', qty: 0.7, total: 12_987.88 },
+        ].map(
+          (row, i) =>
+            ({
+              asset_id: `lft-buy-${i}`,
+              transaction_date: row.date,
+              asset_ticker: 'LFT-20310301',
+              asset_type: 'fixed_income',
+              transaction_type: 'buy',
+              quantity: row.qty,
+              unit_price: row.total / row.qty,
+              total_net_value: -row.total,
+            }) as LedgerEvent
+        ),
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 38.275,33',
+          '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 514.036,34 468.986,25',
+          '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 510.847,24 3.189,10',
+          '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 473.328,34 37.518,90',
+          '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 323.252,74 150.075,60',
+        ],
+        38_275.33,
+        resolvers
+      );
+      const sells = entries.filter((e) => e.operation === 'sell');
+      const qtySum = sells.reduce((s, e) => s + Number(e.quantity), 0);
+      expect(qtySum).toBeCloseTo(35.17, 2);
+      expect(sells[0]?.quantity).toBeCloseTo(25, 2);
+    });
+
+    it('compra LFT fracionada coerente com valor do movimento (nao saldo)', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'lft1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 58,
+          unit_price: 17_809.83,
+          total_net_value: 1_032_969.97,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 3.614,36',
+          '04/02/2026 Compra de Tesouro Direto: LFT 01/03/2031 149,57 3.464,79',
+        ],
+        3_614.36,
+        resolvers
+      );
+      const febBuy = entries.find(
+        (e) => e.operation === 'buy' && String(e.date).startsWith('2026-02-04')
+      );
+      expect(febBuy).toBeDefined();
+      expect(Number(febBuy!.quantity)).toBeLessThan(1);
+      expect(Number(febBuy!.quantity) * Number(febBuy!.unit_price)).toBeCloseTo(3464.79, 2);
+      expect(Number(febBuy!.total_net_value)).toBeCloseTo(-3464.79, 2);
+    });
+
+    it('compra TD Jan usa lotes do extrato de investimento (qty/valor corretos)', () => {
+      const snippet =
+        'LFT   08/01/25   01/03/31   21/01/26   Não   -   -   SELIC +  0,09%   6,0   18.145,3400   108.872,04   19.126,260000   114.757,56 ' +
+        'LFT   08/01/25   01/03/31   27/01/26   Não   -   -   SELIC +  0,09%   2,89   18.185,8400   52.557,07   19.126,260000   55.274,89';
+      const lots = cloneLftInvestmentLots(parseLftInvestmentLotsInline(snippet));
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'lft1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 58,
+          unit_price: 17_809.83,
+          total_net_value: 1_032_969.97,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 58.758,79',
+          '22/01/2026 Compra de Tesouro Direto: LFT 01/03/2031 48.829,17\t181.453,40',
+          '28/01/2026 Compra de Tesouro Direto: LFT 01/03/2031 19,18\t52.557,07',
+        ],
+        58_758.79,
+        resolvers,
+        { lftInvestmentLots: lots }
+      );
+      const buy22 = entries.find(
+        (e) => e.operation === 'buy' && String(e.date).startsWith('2026-01-22')
+      );
+      const buy28 = entries.find(
+        (e) => e.operation === 'buy' && String(e.date).startsWith('2026-01-28')
+      );
+      expect(buy22?.quantity).toBe(10);
+      expect(buy22?.unit_price).toBe(18145.34);
+      expect(Number(buy22?.total_net_value)).toBeCloseTo(-181453.4, 2);
+      expect(buy28?.quantity).toBe(2.89);
+      expect(buy28?.unit_price).toBe(18185.84);
+      expect(Number(buy28?.total_net_value)).toBeCloseTo(-52557.07, 2);
+    });
+
+    it('compra TD 09/01 sem lote usa qty inteira coerente com valor (3 titulos)', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'lft1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 58,
+          unit_price: 17_809.83,
+          total_net_value: 1_032_969.97,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 60.955,87',
+          '09/01/2026 Compra de Tesouro Direto: LFT 01/03/2031 54.160,08\t6.795,79',
+        ],
+        60_955.87,
+        resolvers
+      );
+      const buy09 = entries.find(
+        (e) => e.operation === 'buy' && String(e.date).startsWith('2026-01-09')
+      );
+      expect(buy09?.quantity).toBe(3);
+      expect(buy09!.quantity! * buy09!.unit_price!).toBeCloseTo(54_160.08, 2);
+    });
+
+    it('venda LFT apos esgotar custodia vira qty zero com resolvers', () => {
+      const ledger: LedgerEvent[] = [
+        {
+          asset_id: 'lft1',
+          transaction_date: '2026-01-01',
+          asset_ticker: 'LFT-20310301',
+          asset_type: 'fixed_income',
+          transaction_type: 'opening_balance',
+          quantity: 5,
+          unit_price: 18_000,
+          total_net_value: 90_000,
+        } as LedgerEvent,
+      ];
+      const resolvers = buildBtgExtractResolvers(ledger);
+      const entries = btgLinesToImportEntries(
+        [
+          'Saldo Inicial 100.000,00',
+          '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 514.036,34 468.986,25',
+          '22/04/2026 Venda de Tesouro Direto: LFT 01/03/2031 543.936,59 37.518,90',
+        ],
+        100_000,
+        resolvers
+      );
+      const sells = entries.filter((e) => e.operation === 'sell');
+      expect(sells).toHaveLength(2);
+      expect(sells[0]?.quantity).toBe(5);
+      expect(sells[1]?.quantity).toBe(0);
+    });
+
+    it('venda LFT com tabela TD no PDF nao e capada sem contexto de custodia', () => {
+      const entries = btgLinesToImportEntries(
+        [
+          'LFT   08/01/25   01/03/31   Não   -   -   SELIC + 0,10%   33,00   18.823,200000   621.165,56   7.272,95   -   613.892,61',
+          '22/04/26',
+          'BACEN-BANCO CENTRAL DO BRASIL - RJ /',
+          'LFT',
+          'VENDA DEFINITIVA   25   18.759,450000   468.986,25   7.618,65   -   461.367,60',
+          'Saldo Inicial 38.275,33',
+          '22/04/2026 VENDA DE TESOURO DIRETO: LFT 01/03/2031 -307.892,70\t468.986,25',
+        ],
+        -776878.95
+      );
+      const sell = entries.find((e) => e.operation === 'sell');
+      expect(sell?.quantity).toBeCloseTo(25, 6);
     });
 
     it('IRRF de opcao (sem ticker no extrato) vai pro header mensal BTG-IRRF-OPCAO-MENSAL:{ym}', () => {

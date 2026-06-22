@@ -300,6 +300,33 @@ export function importLineFeesTotal(line: LedgerImportLine): number {
   );
 }
 
+/** Registra linha recém-importada no índice para dedup dentro do mesmo lote. */
+export function registerLineInDedupIndex(
+  index: LedgerDedupIndex,
+  line: LedgerImportLine
+): void {
+  const ref = line.broker_note_ref?.trim();
+  const fp = fingerprintFromImportLine(line);
+  const ticker = String(line.ticker || '').toUpperCase().trim();
+  const indexed: IndexedLedgerOperation = {
+    brokerNoteRef: ref || null,
+    bareNoteNumber: extractBareNoteNumber(ref),
+    fingerprint: fp,
+    date: String(line.date || '').slice(0, 10),
+    ticker,
+    assetType: String(line.asset_type || inferAssetType(ticker)),
+    operation: String(line.operation || ''),
+    quantity: roundMoney(Math.abs(Number(line.quantity) || 0)),
+    unitPrice: roundMoney(Math.abs(Number(line.unit_price) || 0)),
+    cashAmount: importLineExpectedCashNet(line),
+    feesTotal: importLineFeesTotal(line),
+  };
+  if (ref) index.byRef.set(ref, indexed);
+  const fpList = index.byFingerprint.get(fp) || [];
+  fpList.push(indexed);
+  index.byFingerprint.set(fp, fpList);
+}
+
 /** Detecta se reimportar geraria segunda perna de caixa com valor equivalente. */
 export function wouldDoubleCash(
   existing: IndexedLedgerOperation,

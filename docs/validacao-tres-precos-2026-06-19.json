@@ -1,0 +1,95 @@
+{
+  "ok": 0,
+  "warn": 3,
+  "err": 1,
+  "report": [
+    {
+      "ticker": "ITUB4",
+      "qty": 5100,
+      "status": "warn",
+      "codes": [
+        "EXT_AUSENTE"
+      ],
+      "observation": "[EXT_AUSENTE] invest_position_ext sem PM — tela usa só recálculo do livro",
+      "engine": {
+        "strict": 41.5443,
+        "b3": 41.1867,
+        "managerial": 40.863
+      },
+      "storedExt": null,
+      "displayed": {
+        "strict": 41.5443,
+        "b3": 41.1867,
+        "managerial": 40.863
+      }
+    },
+    {
+      "ticker": "PRIO3",
+      "qty": 12700,
+      "status": "warn",
+      "codes": [
+        "EXT_VS_ENGINE_E",
+        "EXT_VS_ENGINE_B",
+        "EXT_VS_ENGINE_G"
+      ],
+      "observation": "[EXT_VS_ENGINE_E, EXT_VS_ENGINE_B] Ext Estrito 41,4201 ≠ livro 66,6851 · Ext B3 41,4201 ≠ livro 62,9228",
+      "engine": {
+        "strict": 66.6851,
+        "b3": 62.9228,
+        "managerial": 62.2529
+      },
+      "storedExt": {
+        "strict": 41.420107,
+        "b3": 41.420107,
+        "managerial": 41.420107
+      },
+      "displayed": {
+        "strict": 66.6851,
+        "b3": 62.9228,
+        "managerial": 62.2529
+      }
+    },
+    {
+      "ticker": "WEGE3",
+      "qty": 800,
+      "status": "error",
+      "codes": [
+        "EXT_AUSENTE",
+        "ORDEM_G_B",
+        "ORDEM_G_E"
+      ],
+      "observation": "[EXT_AUSENTE, ORDEM_G_B] invest_position_ext sem PM — tela usa só recálculo do livro · Gerencial (45,44) > B3 (43,9288) — revisar CALLs/PUTs no lote",
+      "engine": {
+        "strict": 44.2413,
+        "b3": 43.9288,
+        "managerial": 45.44
+      },
+      "storedExt": null,
+      "displayed": {
+        "strict": 44.2413,
+        "b3": 43.9288,
+        "managerial": 45.44
+      }
+    },
+    {
+      "ticker": "BBAS3",
+      "qty": 6000,
+      "status": "warn",
+      "codes": [
+        "EXT_AUSENTE"
+      ],
+      "observation": "[EXT_AUSENTE] invest_position_ext sem PM — tela usa só recálculo do livro",
+      "engine": {
+        "strict": 21.2542,
+        "b3": 21.016,
+        "managerial": 20.6938
+      },
+      "storedExt": null,
+      "displayed": {
+        "strict": 21.2542,
+        "b3": 21.016,
+        "managerial": 20.6938
+      }
+    }
+  ]
+}

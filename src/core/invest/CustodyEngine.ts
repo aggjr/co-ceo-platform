@@ -112,13 +112,14 @@ function tesouroQtyAndPrice(
     quantity: Number(e.quantity),
     unit_price: Number(e.unit_price),
   });
+  const qty = Math.abs(normalized.quantity);
   if (state.qty > 0 && state.totalCost > 0) {
     const avgPu = state.totalCost / state.qty;
     if (avgPu > 50) {
-      return { qty: normalized.quantity, price: avgPu };
+      return { qty, price: avgPu };
     }
   }
-  return { qty: normalized.quantity, price: normalized.unit_price };
+  return { qty, price: normalized.unit_price };
 }
 
 /**
