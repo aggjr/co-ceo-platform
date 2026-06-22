@@ -1650,4 +1650,495 @@ sem cotacao). Option C e demais recalculos seguem economicos por padrao. Fluxo d
 carga inicial por API: upload dos JSON (Option C) seeda ancoras + aplica snapshot;
 depois `rebuild { initialLoad: true, from, to }` para o grafico bater com a corretora.
 
+## 19. Invariantes financeiro <-> carteira (auditoria arquitetural 2026-06)
+
+Esta secao registra invariantes inegociaveis e debitos confirmados por auditoria
+de codigo. Toda alteracao em livro, conciliacao, fechamento diario ou pivot deve
+preservar estes invariantes. Os itens com `Status: aberto` sao gaps reais a
+fechar; nao podem ser tratados como "ja funciona".
+
+### 19.1 Partida dobrada por evento (conservacao economica)
+
+Regra: o sistema NAO pode se contentar em validar apenas
+`SUM(pernas financeiras) == business_events.total_net`. Todo evento de negocio
+precisa fechar como partida dobrada economica:
+
+```text
+delta_patrimonial_economico(evento)
+  + movimento_financeiro_liquidado(evento)
+  + variacao_caixa_em_transito(evento)
+  = 0   (ou = variacao de patrimonio liquido rastreada, p/ provento/MTM)
+```
+
+- `delta_patrimonial_economico` = soma de `total_value` das pernas patrimoniais
+  com sinal por `movement_type` (acquisition negativo de caixa, disposition
+  positivo, etc.).
+- Eventos puramente patrimoniais (`split`, `bonus`, `revaluation`) e puramente
+  financeiros (`dividend`, `jcp`, `cash_yield`, `fee`, `cost_adjustment`) sao
+  excecoes declaradas — mas a excecao tem que ser explicita no catalogo de
+  composicao, nunca silenciosa.
+
+Estado atual (confirmado): `BusinessEventReconciler` so checa soma financeira vs
+header e composicao de pernas; nao existe checagem de zero-sum cruzado
+patrimonio<->caixa. `assertConsistent()` existe mas NAO e chamado na importacao
+(so no batch de auditoria). Arquivos:
+`src/core/business-events/BusinessEventReconciler.ts`,
+`src/core/invest/reconcile/ReconciliationAuditService.ts`.
+
+Status: aberto.
+
+Aceite:
+- nova dimensao de auditoria "conservacao economica por evento" em
+  `ReconciliationAuditService`;
+- `assertConsistent()` (ou equivalente) obrigatorio no fechamento de dia,
+  bloqueando dia com evento que nao fecha;
+- teste de regressao por categoria (financeiro puro, patrimonial puro, misto).
+
+### 19.2 Diferenca de caixa desconhecida e lancamento, nunca tolerancia
+
+Regra: diferenca entre saldo do sistema e saldo da corretora SEM lancamento
+correspondente deve virar evento `cash_balance_gap` (kind `cash_movement`,
+`unknown_invest_event`), visivel e filtravel, para o usuario investigar. E
+proibido absorver a diferenca em tolerancia, arredondamento, ancora ou ajuste
+silencioso.
+
+Estado atual (confirmado):
+- `cash_balance_gap` existe no catalogo/migration 51 mas NAO ha codigo de runtime
+  que o gere; a divergencia hoje aparece so como `status: 'error'` em
+  `ReconciliationDiagnosticsService.buildCashRows` (diagnostico, nao pendencia no
+  livro). Ver `tasks/implementation_plan.md` 18.2 (fase 2 pendente).
+- `MONTH_IMPORT_CASH_TOLERANCE = 20` (`src/core/invest/btgExtractBatchReconcile.ts:10`)
+  permite ate R$ 20 de diferenca de abertura/fechamento no `financialOk` do mes.
+  Tolerancia e criterio de CASAMENTO, nao licenca para descartar diferenca: todo
+  residuo que nao concilia, mesmo dentro da tolerancia, deve gerar
+  `cash_balance_gap` visivel.
+- Plugs silenciosos legados (`injectCashAdjustment`, `AJUSTE DE DIVERGENCIA`)
+  estao desativados — manter desativados.
+
+Status: aberto (geracao automatica de `cash_balance_gap`).
+
+Aceite:
+- residuo confirmado contra snapshot da corretora gera `cash_balance_gap`
+  automaticamente (a partir de `ReconciliationDiagnosticsService`);
+- nenhuma diferenca de caixa fica apenas em diagnostico;
+- tolerancia de mes documentada e, se mantida, acompanhada de pendencia para o
+  residuo.
+
+### 19.3 Calibracao por ancora nao pode mascarar erro de base
+
+Regra: a calibracao por ancora do home broker so pode ajustar o item que
+legitimamente nao tem preco observado (opcao sem cotacao, RF estimada). E
+proibido empurrar erro de caixa, quantidade ou cotacao obrigatoria para dentro
+do residuo de opcoes para "bater" o patrimonio com a ancora.
+
+Estado atual (confirmado): em modo `calibrate`/`initialLoad`,
+`PatrimonyMtmDailyEngine` (`src/core/invest/PatrimonyMtmDailyEngine.ts:546` e
+`:554`) calcula `residual = target - base - pending - optionsFromMarket` e joga
+tudo em `optionsValue`; se ainda nao bate, sobrescreve
+`optionsValue = target - base - pending`. Qualquer erro em `base` (caixa, acoes,
+RF) fica escondido no valor das opcoes. `assertPatrimonyCoherent` valida total vs
+ancora, nao a corretude por componente.
+
+Status: aberto.
+
+Aceite:
+- antes de calibrar, `base` (caixa + acoes B3 obrigatorias + RF com PU) deve
+  conciliar independentemente; so o gap de opcoes/RF estimavel entra no residuo;
+- residuo plugado marcado com confidence/price_source proprio (ex.
+  `anchor_residual`) e limitado a opcoes/itens estimaveis;
+- divergencia de base vira pendencia auditavel, nao plug.
+
+### 19.4 Calendario de mercado unico (fechamento, nao so liquidacao)
+
+Regra: dias sem pregao (sabado, domingo e feriado nacional/B3) nao geram ponto de
+patrimonio nem linha de relatorio (ver 8.1). O calendario deve ser fonte unica e
+catalogada, aplicada tanto a liquidacao (D+N) quanto ao fechamento diario e ao
+audit de gaps.
+
+Estado atual (confirmado): feriados B3 existem so para liquidacao
+(`src/core/invest/settlementCalendar.ts`, com feriados e regras D+N HARDCODED no
+codigo). O fechamento/rebuild de patrimonio e o audit de gaps pulam apenas
+sabado/domingo, NAO feriados (`PatrimonyDailyRecorder`, `PatrimonyDailyRebuildService`,
+`ReconciliationAuditService.checkPortfolioDailyGaps`). Resultado: fechamentos
+fantasma e falsos gaps em feriados.
+
+Status: aberto.
+
+Aceite:
+- calendario de feriados vindo de catalogo/DB (nao hardcoded);
+- fechamento diario, rebuild e audit de gaps usam o mesmo calendario;
+- nenhum ponto de patrimonio em feriado.
+
+### 19.5 Resultado por ativo deve atribuir 100% do ganho/perda
+
+Regra (reforca 4.0.10): a pivot de resultado por ativo
+(`StockUnderlyingPivotEngine`, tela `Resultados por acao`) deve cobrir todos os
+ganhos e perdas de cada acao/RF, sem buraco silencioso. O total tem que conciliar
+com um resultado economico independente (realizado + nao realizado).
+
+Gaps confirmados (`src/core/invest/StockUnderlyingPivotEngine.ts`):
+1. Opcao COMPRADA (long) que vira po sem trade de fechamento nao gera perda
+   (abertura long e so capital, `:327`); o vencimento a zero nao e lancado.
+2. `applyCustody` (`:168`) trata `bonus` como compra mas NAO trata `split` —
+   quantidade/custo medio nao sao ajustados, distorcendo P&L de trades pos-split.
+3. `amortization` cai no default e so entra se `net != 0`.
+4. MTM nao realizado fica fora de `ganho_aproximado` (so exibido em
+   `preco_estrito`/`cotacao_atual`) — aceitavel como coluna informativa, mas deve
+   ser coluna explicita, nao buraco.
+5. Mapa underlying `UNDERLYING_BY_ROOT` (`src/core/invest/assetClassifier.ts:1`)
+   tem 6 tickers HARDCODED (viola secao 2/4.0.3); fora deles usa heuristica
+   `XXXX3`. O underlying canonico deve vir de catalogo/`invest_position_ext`,
+   com o mapa hardcoded so como ultimo fallback marcado como debito.
+6. `PnLPivotEngine` (segunda pivot) nao usa `inferUnderlyingTicker` e pode
+   orfanar opcao na linha do proprio ticker da opcao.
+
+Status: aberto.
+
+Aceite:
+- vencimento de opcao long sem exercicio lanca a perda do premio;
+- `split` ajusta custodia na pivot (mesma logica de `CustodyEngine`);
+- `amortization` mapeada explicitamente;
+- teste de conservacao: soma das linhas da pivot == resultado economico
+  independente (realizado + nao realizado) por periodo;
+- underlying resolvido por catalogo; mapa hardcoded marcado como fallback/debito.
+
+### 19.6 Evento de tipo desconhecido sempre vira pendencia
+
+Regra (reforca 9): linha de extrato/nota nao classificada gera
+`extract_divergence` -> `unknown_invest_event` (ja implementado em
+`BtgExtractLineParser` fallback `:593` e `inferBusinessEventKind:24`), visivel via
+`GET /api/invest/cash/extract?type=extract_divergence` com `isUnknownDifference`.
+E proibido cair em caminho que vira `fee`/`cash` generico sem decisao do usuario.
+
+Revisar (confirmado como risco): custody fee sem casamento caindo em `fee`
+(`BtgExtractLineParser` rateio), e `keepUnmatchedLiqBolsaAsCash` mantendo LIQ sem
+casamento como caixa em vez de evento desconhecido. Toda classificacao "por
+descarte" deve preferir `extract_divergence` a um tipo plausivel inventado.
+
+Status: parcialmente implementado; revisar caminhos de descarte.
+
+## 20. Execucao com validacao independente (gate anti-marra)
+
+Motivacao: a exigencia aqui e de qualidade contabil e precisao de estoque, nao
+de "tela que abre". Agentes tendem a alargar tolerancia, plugar diferenca,
+enfraquecer teste ou hardcodar dado para fechar a task. Por isso, TODA tarefa
+desta secao tem dois papeis obrigatorios e separados: **executor** e
+**validador**. A task so e `done` quando o validador aprova com evidencia
+propria. Sem validador aprovando, nao integra em `main`.
+
+### 20.1 Papel do validador (independente do executor)
+
+O validador NAO e o mesmo agente/sessao/branch que executou. Ele desconfia do
+resumo do executor por principio e reproduz tudo do zero. Funcoes:
+
+1. Rodar o criterio de aceite a partir de checkout limpo do trabalho do executor.
+2. Provar que o teste de aceite era VERMELHO antes do fix e VERDE depois
+   (red->green real). Teste que ja passava sem o fix nao prova nada.
+3. Construir uma checagem INDEPENDENTE do invariante (script/query proprio), nao
+   apenas reler o teste do executor. Ex.: somar pernas no banco e conferir
+   conservacao, em vez de confiar no assert do PR.
+4. Caçar atalho: aceite enfraquecido, tolerancia alargada, plug/ajuste
+   silencioso, dado/regra/ticker/feriado/strike hardcoded, escopo expandido,
+   `--no-verify`, mock que esconde o caminho real.
+5. Conferir que dado global nao recebeu `organization_id` e vice-versa.
+6. Conferir que nenhum dado de runtime entrou no repo (regra
+   `no-runtime-data-files`).
+
+Saida do validador (registrar no resumo):
+
+```text
+Validacao: <ID>
+Veredito: APROVADO | REPROVADO
+Aceite reproduzido (comando + saida):
+Red->green comprovado: sim/nao (como)
+Checagem independente do invariante:
+Hardcode/tolerancia/plug: nenhum | <onde>
+Escopo respeitado: sim/nao
+Pendencias:
+```
+
+`REPROVADO` volta para o executor; o trabalho NAO entra em `main`. Reprovacao
+nao e negociavel por "esta quase".
+
+### 20.2 Criterios de reprovacao automatica (qualquer um reprova)
+
+- Tolerancia numerica alargada para o teste passar (ex.: subir
+  `MONTH_IMPORT_CASH_TOLERANCE`, `0.02`, `0.05`, `> 1`).
+- Diferenca de caixa/quantidade/patrimonio absorvida em plug, residuo, ancora,
+  arredondamento ou `outros_ganhos` sem evento explicito.
+- String/ticker/strike/data/feriado/saldo hardcoded fora de
+  parser/seed/migration/teste.
+- Aceite original trocado por um mais fraco.
+- Teste novo que nao falha quando o fix e revertido.
+- Fechamento de dia/evento passando com perna orfa ou evento que nao concilia.
+- Mock/fixture cobrindo o caminho que deveria ser exercido de verdade.
+
+### 20.3 Classe de executor e validador
+
+Vale a tabela de classes da secao 14.1 (S/M/A). Regra adicional desta secao:
+
+- O validador deve ser de classe **>=** a do executor.
+- Tarefa que altera regra contabil, fechamento diario, valuation, PM/PU,
+  conciliacao ou tolerancia: executor M sob contrato A aprovado; validador **A**.
+- Tarefa de teste/inventario/texto: executor S; validador M.
+- Mudanca de schema/migration/contrato: executor A; validador A (outro agente).
+
+### 20.4 Backlog derivado da secao 19
+
+Formato por tarefa: `ID | tema | classe executor | classe validador | depende de`.
+Cada `Aceite` e o contrato objetivo; cada `Validacao independente` e o que o
+revisor deve provar por conta propria.
+
+#### EV-A01 - Contrato de conservacao economica por evento (19.1)
+
+Classe executor: A. Classe validador: A. Depende de: nenhum. Precede: EV-M01.
+
+Entregas: definicao formal de
+`delta_patrimonial_economico + movimento_caixa + variacao_transito = 0`, sinais
+por `movement_type`, e catalogo explicito das excecoes (financeiro puro,
+patrimonial puro, provento, MTM). Sem implementacao.
+
+Aceite: decisao escrita nesta secao com a tabela de sinais e excecoes.
+
+Validacao independente: validador reescreve a formula a partir de 3 eventos reais
+(compra de acao, dividendo, split) e confirma que a regra fecha para os tres.
+
+#### EV-M01 - Auditoria de conservacao + bloqueio no fechamento (19.1)
+
+Classe executor: M (sob EV-A01). Classe validador: A. Depende de: EV-A01.
+
+Arquivos provaveis: `src/core/business-events/BusinessEventReconciler.ts`,
+`src/core/invest/reconcile/ReconciliationAuditService.ts`,
+`src/core/invest/reconcile/DailyCloseMaterializeService.ts`.
+
+Entregas: nova dimensao de auditoria "conservacao economica por evento";
+`assertConsistent` (ou equivalente) chamado no fechamento de dia, bloqueando dia
+com evento que nao fecha.
+
+Aceite:
+```powershell
+node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\core\business-events\BusinessEventReconciler.test.ts tests\unit\invest\reconcile\ReconciliationAuditService.test.ts --runInBand
+node .\node_modules\typescript\bin\tsc --noEmit
+```
+
+Validacao independente: validador injeta um evento propositalmente desbalanceado
+num fixture e prova que o fechamento BLOQUEIA; reverte o fix e prova que passava.
+
+#### EV-S01 - Regressao por categoria de evento (19.1)
+
+Classe executor: S. Classe validador: M. Depende de: EV-M01.
+
+Entregas: testes para financeiro puro, patrimonial puro e misto, cada um
+fechando a conservacao.
+
+Aceite: testes verdes; cada teste falha se a regra de conservacao for removida.
+
+#### GAP-M01 - Gerar `cash_balance_gap` automatico (19.2)
+
+Classe executor: M. Classe validador: A. Depende de: nenhum.
+
+Arquivos provaveis: `src/core/invest/reconcile/ReconciliationDiagnosticsService.ts`,
+`src/core/invest/cashInvestLedger.ts`, controller de extrato.
+
+Entregas: residuo confirmado contra snapshot da corretora vira evento
+`cash_balance_gap` (`unknown_invest_event`), visivel em
+`GET /api/invest/cash/extract?type=cash_balance_gap`.
+
+Aceite: cenario com saldo sistema != saldo corretora gera 1 evento
+`cash_balance_gap`; sem residuo, gera zero.
+
+Validacao independente: validador cria um caso com diferenca de R$ 3,00 sem
+lancamento e prova que aparece pendencia filtravel; confirma que nada foi plugado
+em ancora/ajuste.
+
+#### GAP-S01 - Residuo dentro da tolerancia ainda vira pendencia (19.2)
+
+Classe executor: S. Classe validador: M. Depende de: GAP-M01.
+
+Arquivos provaveis: `src/core/invest/btgExtractBatchReconcile.ts`,
+`src/core/invest/btgMonthImportService.ts`.
+
+Entregas: diferenca de abertura/fechamento dentro de `MONTH_IMPORT_CASH_TOLERANCE`
+nao e descartada — gera `cash_balance_gap`. Tolerancia segue so como criterio de
+casamento, nunca de descarte.
+
+Aceite: mes com diferenca de R$ 10 importa, mas registra pendencia de R$ 10.
+
+Validacao independente: validador confirma que reduzir a tolerancia para 0 nao
+muda o saldo final do livro (a diferenca ja virou evento, nao sumiu).
+
+#### CAL-M01 - Calibracao nao mascara erro de base (19.3)
+
+Classe executor: M (sob revisao A). Classe validador: A. Depende de: nenhum.
+
+Arquivos provaveis: `src/core/invest/PatrimonyMtmDailyEngine.ts`,
+`src/core/invest/PatrimonyDailyRecorder.ts`,
+`src/core/invest/reconcile/DailyCloseMaterializeService.ts`.
+
+Entregas: antes de calibrar, `base` (caixa + acoes B3 obrigatorias + RF com PU)
+concilia independentemente; so o gap de opcao/RF estimavel entra no residuo, com
+`price_source = anchor_residual`. Erro de base vira pendencia, nao plug.
+
+Aceite: dia com erro proposital de caixa NAO e calibrado a zero; gera pendencia.
+```powershell
+node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\invest\PatrimonyMtmDailyEngine.test.ts --runInBand
+node .\node_modules\typescript\bin\tsc --noEmit
+```
+
+Validacao independente: validador injeta R$ 1.000 de erro em `cash` e prova que o
+residuo de opcao NAO absorve; o patrimonio diverge da ancora e isso vira flag.
+
+#### CLD-A01 - Calendario de mercado em catalogo (19.4)
+
+Classe executor: A. Classe validador: A. Depende de: nenhum. Precede: CLD-M01.
+
+Entregas: modelo (migration/seed) de feriados B3 e regras D+N fora do codigo;
+hoje estao hardcoded em `settlementCalendar.ts`.
+
+Aceite: schema + seed inicial; decisao escrita de onde o calendario e lido.
+
+Validacao independente: validador confere que nenhum feriado novo exige mudar
+codigo (so dado).
+
+#### CLD-M01 - Calendario unico no fechamento e audit (19.4)
+
+Classe executor: M. Classe validador: M. Depende de: CLD-A01.
+
+Arquivos provaveis: `src/core/invest/PatrimonyDailyRecorder.ts`,
+`src/core/invest/PatrimonyDailyRebuildService.ts`,
+`src/core/invest/reconcile/ReconciliationAuditService.ts`,
+`src/core/invest/settlementCalendar.ts`.
+
+Entregas: fechamento, rebuild e audit de gaps usam o mesmo calendario; nenhum
+ponto de patrimonio em feriado; nenhum falso gap em feriado.
+
+Aceite: rebuild num intervalo com feriado nao cria ponto no feriado; audit nao
+acusa gap nesse dia.
+
+Validacao independente: validador escolhe um feriado real do periodo e prova
+ausencia de ponto e ausencia de gap.
+
+#### PIV-M01 - Vencimento de opcao long lanca perda (19.5)
+
+Classe executor: M (sob revisao A). Classe validador: A. Depende de: nenhum.
+
+Arquivos provaveis: `src/core/invest/StockUnderlyingPivotEngine.ts`.
+
+Entregas: opcao comprada que expira sem exercicio lanca a perda do premio na
+coluna correta do subjacente.
+
+Aceite: fixture com CALL long expirada a zero reduz o resultado do subjacente
+pelo premio pago.
+
+Validacao independente: validador monta o caso e confere que a perda aparece e
+que o total da pivot cai exatamente pelo premio.
+
+#### PIV-M02 - `split` ajusta custodia na pivot (19.5)
+
+Classe executor: M. Classe validador: A. Depende de: nenhum.
+
+Arquivos provaveis: `src/core/invest/StockUnderlyingPivotEngine.ts`
+(`applyCustody`), alinhar com `src/core/invest/CustodyEngine.ts`.
+
+Entregas: `split` ajusta quantidade/custo medio na pivot (paridade com
+`CustodyEngine`).
+
+Aceite: trade apos split mostra P&L correto (sem distorcao de custo medio).
+
+Validacao independente: validador compara a custodia da pivot apos split com a
+custodia do `CustodyEngine` para o mesmo ledger; devem bater.
+
+#### PIV-S01 - Mapear `amortization` (19.5)
+
+Classe executor: S. Classe validador: M. Depende de: nenhum.
+
+Entregas: `amortization` mapeada explicitamente (nao via default por `net != 0`).
+
+Aceite: evento de amortizacao cai na coluna definida, nunca silenciosamente.
+
+#### PIV-A01 - Underlying por catalogo, nao hardcode (19.5)
+
+Classe executor: A/M. Classe validador: A. Depende de: nenhum.
+
+Arquivos provaveis: `src/core/invest/assetClassifier.ts`,
+`src/modules/invest/sync/LedgerEventProjection.ts`, `market_instruments`.
+
+Entregas: underlying da opcao resolvido por catalogo/`invest_position_ext`; o mapa
+`UNDERLYING_BY_ROOT` (6 tickers hardcoded) vira so fallback marcado como debito.
+
+Aceite: opcao de ticker fora do mapa resolve o subjacente correto via catalogo.
+
+Validacao independente: validador adiciona uma opcao de papel novo (fora dos 6)
+e prova que cai no subjacente certo sem editar codigo.
+
+#### PIV-S02 - Teste de conservacao da pivot (19.5)
+
+Classe executor: S. Classe validador: M. Depende de: PIV-M01, PIV-M02, PIV-S01.
+
+Entregas: teste que soma todas as linhas da pivot e compara com resultado
+economico independente (realizado + nao realizado) do periodo.
+
+Aceite: `soma das linhas == resultado independente` dentro de R$ 0,01.
+
+Validacao independente: validador roda o teste com um ledger real de 1 mes e
+confere o batimento; remove uma coluna e prova que o teste quebra.
+
+#### UNK-M01 - Caminhos de descarte preferem evento desconhecido (19.6)
+
+Classe executor: M. Classe validador: A. Depende de: nenhum.
+
+Arquivos provaveis: `src/core/invest/BtgExtractLineParser.ts`,
+`src/core/invest/btgUploadImportService.ts`.
+
+Entregas: custody fee sem casamento e LIQ sem casamento (`keepUnmatchedLiqBolsaAsCash`)
+preferem `extract_divergence`/`unknown_invest_event` a um tipo plausivel inventado.
+
+Aceite: linha ambigua vira pendencia desconhecida, nunca `fee`/`cash` chutado.
+
+Validacao independente: validador injeta uma linha de custody fee sem match e
+prova que vira pendencia investigavel, nao `fee`.
+
+### 20.5 Matriz resumida
+
+| ID | Tema (19.x) | Exec | Valid | Depende de |
+|---|---|---|---|---|
+| EV-A01 | conservacao contrato | A | A | - |
+| EV-M01 | conservacao auditoria | M | A | EV-A01 |
+| EV-S01 | conservacao testes | S | M | EV-M01 |
+| GAP-M01 | cash_balance_gap auto | M | A | - |
+| GAP-S01 | tolerancia nao descarta | S | M | GAP-M01 |
+| CAL-M01 | calibracao sem mascara | M | A | - |
+| CLD-A01 | calendario catalogo | A | A | - |
+| CLD-M01 | calendario unico | M | M | CLD-A01 |
+| PIV-M01 | opcao long expira | M | A | - |
+| PIV-M02 | split na pivot | M | A | - |
+| PIV-S01 | amortization | S | M | - |
+| PIV-A01 | underlying catalogo | A | A | - |
+| PIV-S02 | conservacao pivot | S | M | PIV-M01,M02,S01 |
+| UNK-M01 | descarte->desconhecido | M | A | - |
+
+### 20.6 Claim do par executor + validador
+
+Como `tasks` tem so este arquivo, cada agente declara no resumo:
+
+```text
+Claim: <ID>
+Papel: executor | validador
+Par: <branch do outro papel>
+Base commit:
+Arquivos tocados:
+Aceite rodado (comando + resultado):
+Status: done (executor) | APROVADO/REPROVADO (validador) | blocked
+```
+
+Regras:
+- Executor e validador em sessoes/branches diferentes (ver
+  `git-two-agents-same-machine.mdc`). Nunca o mesmo agente nos dois papeis.
+- Executor abre PR/integra somente apos `APROVADO` do validador.
+- Validador que aprovar sem reproduzir o aceite e sem a checagem independente
+  esta violando esta secao.
+- Lotes paralelizaveis: EV-A01, GAP-M01, CAL-M01, CLD-A01, PIV-M01, PIV-M02,
+  PIV-S01, PIV-A01, UNK-M01 nao tem dependencia entre si e podem ser distribuidos;
+  cuidar so de nao editar o mesmo arquivo em paralelo (PIV-M01 e PIV-M02 tocam
+  `StockUnderlyingPivotEngine.ts` — sequenciar ou coordenar).
 
