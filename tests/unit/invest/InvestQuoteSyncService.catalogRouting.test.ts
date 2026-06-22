@@ -92,7 +92,7 @@ describe('InvestQuoteSyncService catalog routing', () => {
 
     jest.mocked(fetchB3Quotes).mockResolvedValue([
       { ticker: 'BOVA11', price: 120, asOf: '2026-06-05', source: 'brapi', kind: 'close' },
-      { ticker: 'ITUB4', price: 39.5, asOf: '2026-06-05', source: 'brapi', kind: 'close' },
+      { ticker: 'ITUB3', price: 39.5, asOf: '2026-06-05', source: 'brapi', kind: 'close' },
     ]);
     jest.mocked(fetchOptionQuotesWithFallback).mockResolvedValue([
       {
@@ -102,7 +102,7 @@ describe('InvestQuoteSyncService catalog routing', () => {
         strikePrice: 42,
         expirationDate: '2026-06-19',
         optionType: 'CALL',
-        underlyingTicker: 'ITUB4',
+        underlyingTicker: 'ITUB3',
         source: 'opcoes_net',
       },
     ]);
@@ -123,7 +123,7 @@ describe('InvestQuoteSyncService catalog routing', () => {
     );
 
     expect(fetchB3Quotes).toHaveBeenCalledWith(
-      expect.arrayContaining(['BOVA11', 'ITUB4']),
+      expect.arrayContaining(['BOVA11', 'ITUB3']),
       expect.objectContaining({ asOfDate: '2026-06-05' })
     );
     expect(fetchOptionQuotesWithFallback).toHaveBeenCalledWith(
@@ -138,7 +138,7 @@ describe('InvestQuoteSyncService catalog routing', () => {
     expect(report.missing).toEqual([]);
     expect(gw.dump('market_quotes_daily').map((r) => r.ticker).sort()).toEqual([
       'BOVA11',
-      'ITUB4',
+      'ITUB3',
       'ITUBF420',
       'LFT-20310301',
     ]);

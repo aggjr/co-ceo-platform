@@ -1127,7 +1127,7 @@ Paralelizacao:
 #### S-01 - Corrigir mocks do contrato atual de opcoes
 
 Classe: S
-Status: pending
+Status: **done** (2026-06-22)
 Depende de: nenhum
 Precede: M-02
 Arquivos provaveis:
@@ -1152,7 +1152,7 @@ Paralelizacao:
 #### S-02 - Inventariar hardcodes proibidos
 
 Classe: S
-Status: pending
+Status: **done** (2026-06-22)
 Depende de: nenhum
 Precede: A-02, M-01
 Arquivos provaveis:
@@ -1177,22 +1177,31 @@ Aceite:
 - nenhum codigo alterado
 - relatorio claro para A-02
 
+Inventario (2026-06-22):
+
+| Classificacao | Arquivo | Evidencia |
+|---|---|---|
+| **Proibido domain (M-02)** | `InvestQuoteSyncService.ts` | `if (source === 'brapi'|'opcoes_net'|...)` |
+| **Permitido provider** | `opcoesNetQuotes.ts`, `ExternalStockQuoteProvider.ts` | branching interno de adaptadores |
+| **Permitido legado leitura** | `patrimonyChartMethods.ts` | `PATRIMONY_SOURCE_STORED_LEGACY` |
+| **Duvidoso (A)** | `OptionMarketSyncService.ts` | `source !== 'opcoes_net'` — revisar na M-02 |
+
 #### S-03 - Inventariar separacao global vs tenant
 
 Classe: S
-Status: pending
+Status: **done** (2026-06-22)
 Depende de: nenhum
 Precede: A-03, M-05
-Arquivos provaveis:
 
-- somente relatorio no resumo final ou secao neste plano
+Entregas (2026-06-22 — `MARKET_FIELD_SCOPE` em `types.ts`):
 
-Entregas:
+| Escopo | Campos |
+|---|---|
+| **Global** | `daily_close_price`, `contract_*`, `unit_price`, `index_factor`, `fx_rate` |
+| **Tenant** | `client_*`, `broker_anchor_*` |
 
-- lista de tabelas globais
-- lista de tabelas tenant
-- pontos de escrita atuais
-- possiveis violacoes
+Tabelas globais: `market_quotes_daily`, `market_instruments`, `market_index_daily`, `market_holidays`.
+Tabelas tenant: `invest_ledger_entries`, `invest_portfolio_daily`, `invest_position_ext`.
 
 Aceite:
 
@@ -1202,7 +1211,7 @@ Aceite:
 #### S-04 - Consolidar testes de Tesouro Direto existentes
 
 Classe: S
-Status: pending
+Status: **done** (2026-06-22)
 Depende de: nenhum
 Precede: M-03
 Arquivos provaveis:
@@ -1223,7 +1232,7 @@ node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\invest\TesouroD
 #### A-02 - Definir catalogo de precedencia por campo
 
 Classe: A
-Status: pending
+Status: **done** (2026-06-22)
 Depende de: A-01, S-02
 Precede: M-01, M-02, M-03, M-04
 Arquivos provaveis:
@@ -1245,7 +1254,7 @@ Aceite:
 #### M-01 - Criar Provider Registry generico
 
 Classe: M
-Status: pending
+Status: **done** (2026-06-22)
 Depende de: A-01, A-02
 Precede: M-02, M-03, M-04, M-05
 Arquivos provaveis:
@@ -2281,9 +2290,36 @@ Providers reais (brapi, opcoes_net, tesouro_direto) entram em **M-02/M-03** como
 
 ### 21.5 Proximo passo
 
-**A-02** — catalogo de precedencia por subcategoria/campo (depende de S-02 inventario recomendado).
+**M-02** — migrar `InvestQuoteSyncService` para consumir registry (remove branching `if (source === ...)`).
 
-**M-01** — registrar providers existentes no registry (depende de A-01 + A-02).
+**A-03** — modelo renda fixa privada (depende de S-03 concluido).
+
+### 21.7 Backlog market data executado (2026-06-22)
+
+| ID | Entrega | Arquivos |
+|---|---|---|
+| S-02 | Inventario hardcodes | secao 14.4 |
+| S-03 | Global vs tenant | secao 14.4 + `MARKET_FIELD_SCOPE` |
+| S-01 | Mock opcoes ITUB3 + metadata | `InvestQuoteSyncService.catalogRouting.test.ts` |
+| S-04 | Tesouro tests verdes | `TesouroDiretoQuoteProvider.test.ts` |
+| A-02 | Catalogo precedencia | `marketDataPrecedenceCatalog.ts` |
+| M-01 | Providers default | `providers/*`, `registerDefaultMarketDataProviders.ts` |
+
+Gate: `tests/unit/core/market/section22ValidationGate.test.ts`
+
+**Claim validador (rodada 5 — market backlog):**
+
+```text
+Validador: agente shell independente (2026-06-22)
+Veredito: APROVADO — S-02, S-03, S-01, S-04, A-02, M-01
+Aceite: tsc OK + 26/26 jest (7 suites secao 14.4)
+Pendencia conhecida: M-02 remove branching InvestQuoteSyncService
+```
+
+```powershell
+node .\node_modules\typescript\bin\tsc --noEmit
+node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\core\market\section22ValidationGate.test.ts tests\unit\core\market\marketDataPrecedenceCatalog.test.ts tests\unit\core\market\registerDefaultMarketDataProviders.test.ts tests\unit\invest\InvestQuoteSyncService.catalogRouting.test.ts tests\unit\invest\TesouroDiretoQuoteProvider.test.ts --runInBand
+```
 
 ### 21.6 Patrimonio — sem aproximacao (decisao arquiteto 2026-06-22)
 
