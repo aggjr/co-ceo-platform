@@ -2165,3 +2165,37 @@ Regras:
   cuidar so de nao editar o mesmo arquivo em paralelo (PIV-M01 e PIV-M02 tocam
   `StockUnderlyingPivotEngine.ts` — sequenciar ou coordenar).
 
+### 20.7 Status de execucao (2026-06-22, release V0.0.422)
+
+Implementacao dos 14 itens da secao 20.4 integrada em `main` (commit
+`a5fbd7f`, release `V0.0.422`). **Validacao independente (secao 20.1) ainda
+pendente** — proximo passo obrigatorio antes de considerar fechado.
+
+| ID | Exec | Validacao independente |
+|---|---|---|
+| EV-A01 | done | pendente |
+| EV-M01 | done | pendente |
+| EV-S01 | done | pendente |
+| GAP-M01 | done | pendente |
+| GAP-S01 | done | pendente |
+| CAL-M01 | done | pendente |
+| CLD-A01 | done | pendente |
+| CLD-M01 | done | pendente |
+| PIV-M01 | done | pendente |
+| PIV-M02 | done | pendente |
+| PIV-S01 | done | pendente |
+| PIV-A01 | done (fallback legacy mantido) | pendente |
+| PIV-S02 | done | pendente |
+| UNK-M01 | done | pendente |
+
+Comandos de aceite do executor (53 testes verdes na integracao):
+
+```powershell
+node .\node_modules\typescript\bin\tsc --noEmit
+node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\invest\CashBalanceGapService.test.ts tests\unit\invest\StockUnderlyingPivotEngine.test.ts tests\unit\core\business-events\BusinessEventReconciler.test.ts tests\unit\invest\PatrimonyMtmDailyEngine.test.ts tests\unit\invest\MarketCalendarService.test.ts tests\unit\invest\reconcile\ReconciliationAuditService.test.ts --runInBand
+```
+
+Proxima frente apos validacao: secao 14 (market data registry A-01/M-01, refresh
+M-05, renda fixa privada A-03/M-04) e homologacao BTG mes a mes com as novas
+regras (reimport janeiro/2026).
+
