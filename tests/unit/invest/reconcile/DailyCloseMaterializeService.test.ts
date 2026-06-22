@@ -26,7 +26,7 @@ function makeResult(overrides: Partial<StoredPortfolioDay>, btgPatrimony: number
     daily_return_twr: null,
     cumulative_twr: null,
     quotes_as_of: '2026-04-17',
-    source: 'mtm_btg_calibrated',
+    source: 'mtm_economic',
     metadata: null,
     ...overrides,
   };
@@ -82,16 +82,20 @@ describe('DailyCloseMaterializeService patrimonio coherence', () => {
     ).toThrow(GatewayError);
   });
 
-  it('bloqueia fechamento quando patrimonio fica fora da ancora do homebroker', () => {
+  it('aceita fechamento fora da ancora BTG (divergencia vira evento)', () => {
     const service = makeService() as unknown as {
       assertPatrimonyCoherent: (day: string, result: RecordDailyPatrimonyResult) => unknown;
     };
 
-    expect(() =>
-      service.assertPatrimonyCoherent(
-        '2026-04-17',
-        makeResult({}, 1200)
-      )
-    ).toThrow(GatewayError);
+    const validation = service.assertPatrimonyCoherent(
+      '2026-04-17',
+      makeResult({}, 1200)
+    );
+
+    expect(validation).toMatchObject({
+      recordedPatrimony: 1125,
+      anchorPatrimony: 1200,
+      anchorDelta: -75,
+    });
   });
 });

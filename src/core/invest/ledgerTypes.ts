@@ -48,6 +48,11 @@ export const LEDGER_TRANSACTION_TYPES = [
    * usuário investigue e questione a corretora. Ver migration 51.
    */
   'cash_balance_gap',
+  /**
+   * Divergencia entre patrimonio economico calculado e ancora mensal BTG sem
+   * lancamento explicativo. Nao ajusta patrimonio — marca pendencia auditavel.
+   */
+  'patrimony_anchor_divergence',
 ] as const;
 
 /** Ticker sintético por corretora para lançamentos de extrato (caixa). */

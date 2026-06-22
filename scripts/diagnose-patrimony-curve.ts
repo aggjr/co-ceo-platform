@@ -44,12 +44,12 @@ async function main() {
   const economic = buildDailyPatrimonyMtmSeries(events, FROM, TO, {
     anchors,
     fixedIncomeTotal: fixedIncomeTotalFromLedger(events),
-    calibrateToAnchors: false,
+    compareAnchor: false,
   });
   const btg = buildDailyPatrimonyMtmSeries(events, FROM, TO, {
     anchors,
     fixedIncomeTotal: Number(anchors.fixed_income_total ?? 0),
-    calibrateToAnchors: calibrate,
+    compareAnchor: calibrate,
   });
 
   console.log('Âncoras:', anchors.month_ends.length, 'pontos; RF', brl(Number(anchors.fixed_income_total ?? 0)));

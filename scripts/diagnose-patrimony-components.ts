@@ -66,14 +66,14 @@ async function main() {
     stockQuotes,
     quoteForDate,
     fixedIncomeTotal: rfLedger,
-    calibrateToAnchors: false,
+    compareAnchor: false,
   });
   const calibrated = buildDailyPatrimonyMtmSeries(events, FROM, TO, {
     anchors,
     stockQuotes,
     quoteForDate,
     fixedIncomeTotal: rfAnchor,
-    calibrateToAnchors: shouldUseBtgAnchorCalibration(events) && anchors.month_ends.length > 0,
+    compareAnchor: shouldUseBtgAnchorCalibration(events) && anchors.month_ends.length > 0,
   });
 
   const ecoDay = economic.series.find((p) => p.date === TO);

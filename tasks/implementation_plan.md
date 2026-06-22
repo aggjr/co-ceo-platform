@@ -1092,26 +1092,32 @@ Regra:
 #### A-01 - Definir contratos canonicos de market data
 
 Classe: A
-Status: pending
+Status: **done** (2026-06-22)
 Depende de: nenhum
 Precede: M-01, M-02, M-03, M-04, S-05
-Arquivos provaveis:
+Arquivos:
 
-- `src/core/market/MarketDataProviderRegistry.ts`
-- `src/core/market/types.ts`
-- `tasks/implementation_plan.md`
+- `src/core/market/types.ts` — tipos canonicos, campos, confidence, regras fallback
+- `src/core/market/MarketDataProviderRegistry.ts` — registry (sem providers reais)
+- `tests/unit/core/market/MarketDataProviderRegistry.test.ts`
 
 Entregas:
 
 - tipos canonicos `MarketDataRequest`, `MarketDataResult`, `MarketDataProvider`
-- lista de `CanonicalMarketField`
-- definicao de `confidence`
-- regra de erro/fallback
+- lista de `CanonicalMarketField` (`CANONICAL_MARKET_FIELDS`)
+- definicao de `confidence` (`MarketDataConfidence` + rank)
+- regra de erro/fallback (`MARKET_DATA_FALLBACK_RULES_VERSION`, `fetchWithPrecedence`)
 
 Aceite:
 
-- contrato documentado
-- nenhum provider implementado diretamente nesta tarefa
+- contrato documentado nesta secao e em comentarios de `types.ts`
+- nenhum provider de producao implementado nesta tarefa
+- testes:
+
+```powershell
+node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\core\market\MarketDataProviderRegistry.test.ts --runInBand
+node .\node_modules\typescript\bin\tsc --noEmit
+```
 
 Paralelizacao:
 
@@ -1496,7 +1502,7 @@ subtarefa A para sequenciar a edicao.
 
 | ID | Classe | Depende de | Pode paralelizar com | Entrega |
 |---|---|---|---|---|
-| A-01 | A | - | S-01,S-02,S-03,S-04 | contratos canonicos |
+| A-01 | A | - | S-01,S-02,S-03,S-04 | contratos canonicos **done** |
 | S-01 | S | - | A-01,S-02,S-03,S-04 | mock opcoes atualizado |
 | S-02 | S | - | A-01,S-01,S-03,S-04 | inventario hardcodes |
 | S-03 | S | - | A-01,S-01,S-02,S-04 | inventario global/tenant |
@@ -1745,29 +1751,24 @@ Aceite:
 - tolerancia de mes documentada e, se mantida, acompanhada de pendencia para o
   residuo.
 
-### 19.3 Calibracao por ancora nao pode mascarar erro de base
+### 19.3 Divergencia patrimonial vs ancora — evento explicito (sem plug)
 
-Regra: a calibracao por ancora do home broker so pode ajustar o item que
-legitimamente nao tem preco observado (opcao sem cotacao, RF estimada). E
-proibido empurrar erro de caixa, quantidade ou cotacao obrigatoria para dentro
-do residuo de opcoes para "bater" o patrimonio com a ancora.
+Regra (decisao arquiteto 2026-06-22): **proibido** qualquer aproximacao, plug ou
+residual (`anchor_residual`) para fechar patrimonio com ancora BTG. Patrimonio
+gravado = economico (`mtm_economic`) sempre.
 
-Estado atual (confirmado): em modo `calibrate`/`initialLoad`,
-`PatrimonyMtmDailyEngine` (`src/core/invest/PatrimonyMtmDailyEngine.ts:546` e
-`:554`) calcula `residual = target - base - pending - optionsFromMarket` e joga
-tudo em `optionsValue`; se ainda nao bate, sobrescreve
-`optionsValue = target - base - pending`. Qualquer erro em `base` (caixa, acoes,
-RF) fica escondido no valor das opcoes. `assertPatrimonyCoherent` valida total vs
-ancora, nao a corretude por componente.
+Estado atual (implementado): `PatrimonyMtmDailyEngine` compara ancora em meta
+(`patrimonyAnchorDivergence`) sem alterar `patrimony`. `PatrimonyDailyRecorder`
+grava economico e chama `ensurePatrimonyAnchorDivergence` quando diverge.
+`DailyCloseMaterializeService` nao bloqueia fechamento por delta de ancora.
 
-Status: aberto.
+Status: **fechado** (ver §21.6).
 
 Aceite:
-- antes de calibrar, `base` (caixa + acoes B3 obrigatorias + RF com PU) deve
-  conciliar independentemente; so o gap de opcoes/RF estimavel entra no residuo;
-- residuo plugado marcado com confidence/price_source proprio (ex.
-  `anchor_residual`) e limitado a opcoes/itens estimaveis;
-- divergencia de base vira pendencia auditavel, nao plug.
+- divergencia > tolerancia (`PATRIMONY_ANCHOR_DIVERGENCE_TOLERANCE`) gera operacao
+  `patrimony_anchor_divergence` (`PatrimonyAnchorDivergenceService`, migration 55);
+- evento filtravel em `UNKNOWN_DIFFERENCE_OPS`; nao move carteira nem caixa;
+- idempotencia por `event_source_ref` (`PAT-DIV:<data>:delta:<centavos>`).
 
 ### 19.4 Calendario de mercado unico (fechamento, nao so liquidacao)
 
@@ -2087,7 +2088,7 @@ Arquivos provaveis: `src/core/invest/assetClassifier.ts`,
 `src/modules/invest/sync/LedgerEventProjection.ts`, `market_instruments`.
 
 Entregas: underlying da opcao resolvido por catalogo/`invest_position_ext`; o mapa
-`UNDERLYING_BY_ROOT` (6 tickers hardcoded) vira so fallback marcado como debito.
+Underlying de opcoes via `loadOptionUnderlyingMap` (`invest_options_market` + `market_instruments`); heuristica root+3/11 so sem catalogo.
 
 Aceite: opcao de ticker fora do mapa resolve o subjacente correto via catalogo.
 
@@ -2165,22 +2166,39 @@ Regras:
   cuidar so de nao editar o mesmo arquivo em paralelo (PIV-M01 e PIV-M02 tocam
   `StockUnderlyingPivotEngine.ts` — sequenciar ou coordenar).
 
-### 20.7 Status de execucao (2026-06-22, release V0.0.422+)
+### 20.7 Fluxo obrigatorio em todo o plano (decisao arquiteto 2026-06-22)
 
-Implementacao dos 14 itens da secao 20.4 integrada em `main` (release `V0.0.423`).
-Validacao independente concluida em 2026-06-22 (release alvo `V0.0.424`).
+Ciclo fechado — repetir ate **APROVADO** sem bloqueantes:
 
-Gate de validacao: `tests/unit/invest/section20ValidationGate.test.ts` (8 checagens
-adversariais separadas dos testes do executor).
+```
+Executor → Validador (agente/sessao diferente) → [REPROVADO?] → Executor corrige → Novo Validador → ...
+                                                                                              ↓
+                                                                                        APROVADO → Commit
+```
 
-Comandos de aceite (61 testes verdes na validacao):
+Regras:
+
+1. **Executor** — classe S/M/A conforme secao 14.1; testes unitarios + gate adversarial + integracao quando houver wiring.
+2. **Validador** — outro agente/sessao; **obrigatorio** reproduzir aceite (`tsc` + suites da task); checagem adversarial estatica; **nao edita codigo**.
+3. **Reprovacao** — validador lista bloqueantes; executor corrige e **novo validador** (nao reutilizar o mesmo para aprovar propria correcao).
+4. **Commit** — somente apos validador **APROVADO** (sem bloqueantes; ressalvas cosmeticas documentadas).
+
+Sem aproximacao/plug: divergencia → evento explicito (`extract_divergence`, `cash_balance_gap`, `patrimony_anchor_divergence`).
+
+### 20.8 Status de execucao (2026-06-22, release V0.0.422+)
+
+Implementacao dos 14 itens da secao 20.4 + decisao §21.6 (sem plug patrimonial).
+Gate §20: `section20ValidationGate.test.ts` (12 checagens adversariais, incl. PAT-M01).
+Gate §21 A-01: `section21ValidationGate.test.ts`.
+
+Comandos de aceite (96 testes verdes, 2026-06-22):
 
 ```powershell
 node .\node_modules\typescript\bin\tsc --noEmit
-node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\invest\section20ValidationGate.test.ts tests\unit\invest\CashBalanceGapService.test.ts tests\unit\invest\StockUnderlyingPivotEngine.test.ts tests\unit\core\business-events\BusinessEventReconciler.test.ts tests\unit\invest\PatrimonyMtmDailyEngine.test.ts tests\unit\invest\MarketCalendarService.test.ts tests\unit\invest\reconcile\ReconciliationAuditService.test.ts --runInBand
+node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\invest\section20ValidationGate.test.ts tests\unit\core\market\section21ValidationGate.test.ts tests\unit\core\market\MarketDataProviderRegistry.test.ts tests\unit\invest\PatrimonyAnchorDivergenceService.test.ts tests\unit\invest\PatrimonyMtmDailyEngine.test.ts tests\unit\invest\PatrimonyDailyRebuildService.test.ts tests\unit\invest\reconcile\DailyCloseMaterializeService.test.ts tests\unit\invest\CashBalanceGapService.test.ts tests\unit\invest\StockUnderlyingPivotEngine.test.ts tests\unit\core\business-events\BusinessEventReconciler.test.ts tests\unit\invest\MarketCalendarService.test.ts tests\unit\invest\reconcile\ReconciliationAuditService.test.ts --runInBand
 ```
 
-### 20.8 Resultado da validacao independente (2026-06-22)
+### 20.9 Resultado da validacao independente (2026-06-22)
 
 Validador: sessao codex-guto | Base: `ae63e6f` | Gate: `section20ValidationGate.test.ts`
 
@@ -2191,35 +2209,87 @@ Validador: sessao codex-guto | Base: `ae63e6f` | Gate: `section20ValidationGate.
 | EV-S01 | **APROVADO** | 4 casos red/green em `BusinessEventReconciler.test.ts` | — |
 | GAP-M01 | **APROVADO** | `settled + gap == broker`; operacao `cash_balance_gap` + `unknown_invest_event` | Gap **ajusta** caixa (plug explicito filtravel, nao silencioso) |
 | GAP-S01 | **APROVADO** | Residuo R$10 dentro tolerancia mensal gera 2 linhas de gap | Residuo > R$20 ainda bloqueia import (nao gera gap) |
-| CAL-M01 | **APROVADO COM RESSALVA** | Teste `calibration_blocked_base_error` quando caixa diverge > R$1 | So valida drift de **caixa** vs ancora derivada; erro em acoes/RF que compense no caixa ainda e risco |
-| CLD-A01 | **APROVADO COM RESSALVA** | Migration `54_market_calendar.sql` + seed 2025-2027 | Fallback hardcoded `b3HolidaySet` permanece (debito ate catalogo ser unica fonte) |
+| CAL-M01 | **APROVADO** | Patrimonio economico sem plug; divergencia vs ancora → `patrimony_anchor_divergence` | — |
+| CAL-A01 | **APROVADO** | Nomenclatura canonica: `compareAnchor`, `mtm_btg_interpolated`, `resolvePatrimonyChartQuery` | Legado DB `mtm_btg_calibrated` so leitura via `PATRIMONY_SOURCE_STORED_LEGACY` |
+| PAT-M01 | **APROVADO** | Gate: evento auditavel + idempotencia `ensurePatrimonyAnchorDivergence` | — |
+| CLD-A01 | **APROVADO** | `MarketCalendarService` usa so `market_holidays`; sem fallback `b3HolidaySet` em runtime | — |
 | CLD-M01 | **APROVADO** | `2026-01-01` feriado; `2026-06-17` dia util via `MarketCalendarService` | — |
 | PIV-M01 | **APROVADO** | CALL long expirada via `revaluation` → `compra_call` negativo | So cobre caminho com evento `revaluation` no ledger |
 | PIV-M02 | **APROVADO** | Gate: split 100→200 + sell → trade=200 (custo medio correto) | — |
 | PIV-S01 | **APROVADO** | Teste explicito `amortization` → `outros_ganhos` | — |
-| PIV-A01 | **REPROVADO** | Explicit vence mapa (`PETR4` sobre `PRION410`) | **Catalogo de underlying ausente**; `UNDERLYING_BY_ROOT` (6 tickers) ainda hardcoded — aceite pedia resolver fora do mapa via catalogo |
-| PIV-S02 | **APROVADO COM RESSALVA** | Gate: `ganho_aproximado == ledgerCashNet - feesOnTrades` em fixture fechado | Batimento independente so em fixture simples; falta teste com opcoes/dividendos/mes real |
+| PIV-A01 | **APROVADO** | `loadOptionUnderlyingMap` + catalogo no pivot; `UNDERLYING_BY_ROOT` removido | — |
+| PIV-S02 | **APROVADO** | Gate: fixture simples + fixture opcao/dividendo/trade vs ledger | — |
 | UNK-M01 | **APROVADO** | Custody unmatched → `extract_divergence`; default LIQ → unknown | Rateio com `resolveCustodyFeeAllocation` ainda vira `cost_adjustment` (aceitavel quando ha alocacao) |
 
 **Anti-marra (secao 20.2):** nenhum `injectCashAdjustment` ativo; tolerancia mensal
-nao descarta residuo dentro de R$20 (vira gap); plugs silenciosos de patrimonio
-bloqueados quando caixa diverge.
+nao descarta residuo dentro de R$20 (vira gap); **zero plug/residual patrimonial**
+(§21.6) — divergencia vira `patrimony_anchor_divergence`.
 
-**Proximo passo obrigatorio pos-validacao:**
+**Proximo passo pos-validacao:**
 
-1. **PIV-A01** — catalogo de underlying (resolver via `market_instruments` /
-   `invest_position_ext`, retirar dependencia de `UNDERLYING_BY_ROOT`).
-2. **Homologacao BTG** — reimport janeiro/2026 e validar gaps/pendencias na UI.
-3. **Secao 14** — market data registry (A-01, M-01).
+1. **Homologacao BTG** — reimport janeiro/2026 e validar gaps/pendencias na UI.
+2. **Secao 14** — market data registry (A-01, M-01).
 
-**Claim validador:**
+**Claim validador (rodada 4 — ressalvas cosmeticas fechadas):**
 
 ```text
-Validacao: secao-20-completa
-Veredito: APROVADO COM RESSALVAS (13/14; PIV-A01 REPROVADO)
-Aceite reproduzido: 61/61 testes verdes + 8 gate adversariais
-Red->green comprovado: sim (BusinessEventReconciler, PatrimonyMtm calibracao)
-Hardcode/tolerancia/plug: PIV-A01 mapa 6 tickers; CLD fallback feriado; GAP ajusta caixa explicito
-Pendencias: PIV-A01 catalogo; homologacao BTG mes a mes
+Validacao: secao-20 + §21.6 + CAL-A01 nomenclatura + jest teardown
+Validador: agente shell independente (rodada 4, 2026-06-22)
+Veredito: APROVADO (sem ressalvas bloqueantes nem cosmeticas pendentes)
+Aceite executor: tsc OK + 96/96 jest (15 suites, exit limpo sem --forceExit)
+Grep: calibrateToAnchors=0 em src/; mtm_btg_calibrated so em PATRIMONY_SOURCE_STORED_LEGACY
+Pendencias operacionais: homologacao BTG mes a mes na UI
 ```
+
+---
+
+## 21. Contratos A-01 — market data (implementado)
+
+Referencia de codigo: `src/core/market/types.ts`, `MarketDataProviderRegistry.ts`.
+
+### 21.1 Tipos principais
+
+| Tipo | Papel |
+|------|--------|
+| `CanonicalMarketField` | Campo unificado (preco, metadata, cliente, ancora) |
+| `MarketDataRequest` | `asOfDate` + `asset` + `fields[]` + `tenant?` |
+| `MarketDataResult` | Valor normalizado + `sourceCode` + `confidence` + metadata |
+| `MarketDataProvider` | Adaptador por fonte (`sourceCode`, `capabilities`, `canHandle`, `fetch`) |
+| `MarketDataFetchReport` | Resultado de orquestracao com `failures[]` e `missingFields[]` |
+
+### 21.2 Confidence (ordem decrescente de preferencia)
+
+`exact` > `official` > `external` > `estimated` > `manual`
+
+Todo fechamento diario deve persistir `confidence` junto ao preco (ja parcialmente via `price_source` — convergencia em M-01+).
+
+### 21.3 Escopo global vs tenant
+
+- **Global:** precos, metadata de contrato, indices, FX — sem `organization_id`.
+- **Tenant:** quantidade, PM, taxas, ancoras de corretora — exige `request.tenant`.
+
+### 21.4 Fallback (registry)
+
+`MarketDataProviderRegistry.fetchWithPrecedence(request, precedence[])`:
+
+1. Por campo, tenta fontes na ordem do catalogo.
+2. Falha de uma fonte nao aborta as demais.
+3. Primeira fonte com valor nao-nulo e confidence >= minimo vence.
+4. Campos tenant sem `organizationId` → `invalid_request`.
+
+Providers reais (brapi, opcoes_net, tesouro_direto) entram em **M-02/M-03** como wrappers.
+
+### 21.5 Proximo passo
+
+**A-02** — catalogo de precedencia por subcategoria/campo (depende de S-02 inventario recomendado).
+
+**M-01** — registrar providers existentes no registry (depende de A-01 + A-02).
+
+### 21.6 Patrimonio — sem aproximacao (decisao arquiteto 2026-06-22)
+
+- Proibido plug/residual em opcoes ou `anchor_residual` para fechar ancora BTG.
+- Patrimonio gravado = **economico** (`mtm_economic`) sempre.
+- Divergencia vs ancora → operacao `patrimony_anchor_divergence` (`PatrimonyAnchorDivergenceService`).
+- Fechamento diario **nao bloqueia** por delta de ancora; registra evento e segue.
+- Eventos de diferenca nao explicada filtravel: `extract_divergence`, `cash_balance_gap`, `patrimony_anchor_divergence`.
 

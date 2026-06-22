@@ -48,8 +48,8 @@ export type PatrimonyMtmOptions = {
   stockQuotes?: StockQuoteMap;
   /** Fallback legado para bases sem posicao RF detalhada; a fonte primaria eh qty x cotacao no livro. */
   fixedIncomeTotal?: number;
-  /** Se false, patrimônio econômico real (sem ajuste às âncoras BTG). Usado na gravação diária. */
-  calibrateToAnchors?: boolean;
+  /** Quando true, compara patrimonio economico vs ancora BTG em meta (sem ajustar valor). */
+  compareAnchor?: boolean;
   /**
    * Cotação de fechamento por (ticker, date). Quando presente tem prioridade sobre stockQuotes.
    * Alimentado por market_quotes_daily para séries históricas (Fase B).
@@ -82,8 +82,7 @@ export type PositionDailySnapshot = {
     | 'black_scholes'
     | 'estimated_decay'
     | 'expired_zero'
-    | 'cost'
-    | 'anchor_residual';
+    | 'cost';
 };
 
 function isCash(
@@ -366,9 +365,9 @@ function optionTimeMark(
 }
 
 /**
- * Patrimônio diário 2026: ações e RF pelo livro + cotações;
- * opções com decaimento linear até vencimento (zero no expiry);
- * calibração residual nas opções para aproximar âncoras mensais BTG.
+ * Patrimonio diario economico: acoes e RF pelo livro + cotacoes;
+ * opcoes com decaimento linear ate vencimento (zero no expiry).
+ * Divergencia vs ancora BTG e exposta em meta — nunca ajusta patrimonio gravado.
  */
 export function buildDailyPatrimonyMtmSeries(
   entries: LedgerEvent[],
@@ -377,7 +376,7 @@ export function buildDailyPatrimonyMtmSeries(
   options?: PatrimonyMtmOptions
 ): PatrimonyDailyResult {
   const anchors = options?.anchors ?? loadPatrimonyAnchors();
-  const calibrate = options?.calibrateToAnchors === true;
+  const compareAnchor = options?.compareAnchor === true;
   const fixedIncome =
     options?.fixedIncomeTotal ?? Number(anchors.fixed_income_total ?? 0);
   const stockQuotes = options?.stockQuotes ?? {};
@@ -411,7 +410,7 @@ export function buildDailyPatrimonyMtmSeries(
     patrimonyGross: number;
     patrimony: number;
     target: number;
-    calibrationBlockedBaseError: boolean;
+    patrimonyAnchorDivergence: number;
   }> = [];
 
   const applyPortfolioEvent = (e: LedgerEvent, date: string): void => {
@@ -487,7 +486,6 @@ export function buildDailyPatrimonyMtmSeries(
     applyPortfolioEvent(e, day);
   }
 
-  let lastResidual = 0;
   for (const date of calendar) {
     for (const e of byDay.get(date) || []) {
       applyPortfolioEvent(e, date);
@@ -541,37 +539,20 @@ export function buildDailyPatrimonyMtmSeries(
     const currentFixedIncome = hasOpenFixedIncome ? fixedIncomeDynamic : fixedIncome;
     const base = stocksValue + cash + currentFixedIncome;
     const pending = Math.round(scheduledCashPending * 100) / 100;
-    const lastAnchorDate = anchors.month_ends.length > 0 
-      ? anchors.month_ends[anchors.month_ends.length - 1]!.date 
+    const lastAnchorDate = anchors.month_ends.length > 0
+      ? anchors.month_ends[anchors.month_ends.length - 1]!.date
       : '';
-    const shouldCalibrate = calibrate && date <= lastAnchorDate;
-    const target = shouldCalibrate ? interpolatePatrimonyTarget(date, anchors, flowsByDate) : 0;
-    
-    let optionsValue: number;
-    let calibrationBlockedBaseError = false;
-    if (!shouldCalibrate) {
-      optionsValue = Math.round((optionsFromMarket + optionsStructural + lastResidual) * 100) / 100;
-    } else {
-      const expectedCashFromAnchor = Math.round(
-        (target - stocksValue - currentFixedIncome - optionsFromMarket - pending) * 100
-      ) / 100;
-      if (Math.abs(cash - expectedCashFromAnchor) > 1) {
-        calibrationBlockedBaseError = true;
-        optionsValue = Math.round((optionsFromMarket + optionsStructural) * 100) / 100;
-      } else {
-        const residual = Math.round((target - base - pending - optionsFromMarket) * 100) / 100;
-        optionsValue = Math.round((optionsFromMarket + residual) * 100) / 100;
-        lastResidual = residual;
-      }
-    }
-    let patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
-    let patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
+    const shouldCompareAnchor = compareAnchor && date <= lastAnchorDate;
+    const anchorTarget = shouldCompareAnchor
+      ? interpolatePatrimonyTarget(date, anchors, flowsByDate)
+      : 0;
 
-    if (shouldCalibrate && !calibrationBlockedBaseError && Math.abs(patrimony - target) > 1) {
-      optionsValue = Math.round((target - base - pending) * 100) / 100;
-      patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
-      patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
-    }
+    const optionsValue = Math.round((optionsFromMarket + optionsStructural) * 100) / 100;
+    const patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
+    const patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
+    const patrimonyAnchorDivergence = shouldCompareAnchor
+      ? Math.round((patrimony - anchorTarget) * 100) / 100
+      : 0;
 
     rawPoints.push({
       date,
@@ -584,8 +565,8 @@ export function buildDailyPatrimonyMtmSeries(
       scheduledCashPending: Math.round(scheduledCashPending * 100) / 100,
       patrimonyGross,
       patrimony,
-      target: shouldCalibrate ? Math.round(target * 100) / 100 : patrimony,
-      calibrationBlockedBaseError,
+      target: shouldCompareAnchor ? Math.round(anchorTarget * 100) / 100 : patrimony,
+      patrimonyAnchorDivergence,
     });
   }
 
@@ -622,15 +603,8 @@ export function buildDailyPatrimonyMtmSeries(
         periodReturnTwrDaily: performanceDaily.periodReturnTwr,
         monthAnchorTwr: monthLinked?.periodReturnTwr,
         monthAnchorBreakdown: monthLinked?.months,
-        periodReturnTwr: calibrate && monthLinked ? monthLinked.periodReturnTwr : performanceDaily.periodReturnTwr,
-        periodGainBrl: monthLinked && calibrate
-          ? Math.round(
-              ((monthLinked.months[monthLinked.months.length - 1]?.endPatrimony ?? performanceDaily.endPatrimony) -
-                (monthLinked.months[0]?.startPatrimony ?? performanceDaily.startPatrimony) -
-                performanceDaily.totalExternalFlows) *
-                100
-            ) / 100
-          : performanceDaily.periodGainBrl,
+        periodReturnTwr: performanceDaily.periodReturnTwr,
+        periodGainBrl: performanceDaily.periodGainBrl,
       }
     : null;
   const returnsForSharpe =
@@ -642,11 +616,6 @@ export function buildDailyPatrimonyMtmSeries(
   });
 
   const lastPoint = rawPoints[rawPoints.length - 1];
-  let optionsPlugTarget: number | undefined;
-  if (lastPoint && calibrate && !lastPoint.calibrationBlockedBaseError) {
-    const base = lastPoint.stocksValue + lastPoint.cash + lastPoint.fixedIncome;
-    optionsPlugTarget = lastPoint.target - base - lastPoint.pendingSettlements;
-  }
 
   const positionSnapshots = snapshotOpenPositions(
     positions,
@@ -654,7 +623,6 @@ export function buildDailyPatrimonyMtmSeries(
     to,
     quoteForDate,
     lastKnownPrices,
-    optionsPlugTarget,
     options
   );
 
@@ -666,13 +634,13 @@ export function buildDailyPatrimonyMtmSeries(
     performance,
     positionSnapshots,
     meta: {
-      method: calibrate ? 'mtm_btg_calibrated' : 'mtm_economic',
+      method: 'mtm_economic',
       settlement_rules: 'configured_contract_rules',
-      calibration_blocked_base_error: lastPoint?.calibrationBlockedBaseError === true,
-      note: calibrate
-        ? 'Patrimônio econômico: posições × cotação atual + caixa liquidado e trânsito conforme regras contratuais configuradas. ' +
-          'TWR diário: só capital_deposit/withdrawal como fluxo externo.'
-        : 'Patrimônio econômico do dia (cotações do fechamento, caixa liquidado + trânsito conforme regras contratuais configuradas).',
+      compare_anchor: compareAnchor,
+      patrimony_anchor_divergence: lastPoint?.patrimonyAnchorDivergence ?? 0,
+      anchor_target: compareAnchor && lastPoint ? lastPoint.target : null,
+      note:
+        'Patrimonio economico (cotacoes + caixa + transito). Divergencia vs ancora BTG gera evento patrimony_anchor_divergence — sem plug/residual.',
     },
   };
 }
@@ -683,50 +651,13 @@ function snapshotOpenPositions(
   asOf: string,
   quoteForDate: PatrimonyMtmOptions['quoteForDate'] | undefined,
   lastKnownPrices: Map<string, number>,
-  optionsPlugTarget?: number,
   options?: PatrimonyMtmOptions
 ): PositionDailySnapshot[] {
-  let optionsFromMarket = 0;
-  let optionsStructural = 0;
-  const estimatedOptions: DayPosition[] = [];
-
-  for (const p of positions.values()) {
-    if (Math.abs(p.qty) < 0.0001) continue;
-    if (isOptionType(p.assetType, options?.valuationContext)) {
-      const dailyMark = resolvePositionMark(
-        p,
-        asOf,
-        quoteForDate,
-        stockQuotes,
-        lastKnownPrices,
-        options,
-        options?.valuationContext
-      );
-      if (dailyMark != null) {
-        optionsFromMarket += valueInBaseCurrency(p.qty * dailyMark, p.assetType, asOf, options);
-      } else {
-        optionsStructural += valueInBaseCurrency(optionTimeMark(p, asOf), p.assetType, asOf, options);
-        estimatedOptions.push(p);
-      }
-    }
-  }
-
-  let plugFactor = 1;
-  let plugOffset = 0;
-  if (optionsPlugTarget !== undefined && estimatedOptions.length > 0) {
-    const residualToDistribute = optionsPlugTarget - optionsFromMarket;
-    if (Math.abs(optionsStructural) > 0.01) {
-      plugFactor = residualToDistribute / optionsStructural;
-    } else {
-      plugOffset = residualToDistribute / estimatedOptions.length;
-    }
-  }
-
   const out: PositionDailySnapshot[] = [];
   for (const p of positions.values()) {
     if (Math.abs(p.qty) < 0.0001) continue;
     if (isCash(p.assetType, p.ticker, options?.valuationContext)) continue;
-    
+
     let resolved = resolvePositionMarkWithSource(
       p,
       asOf,
@@ -741,19 +672,12 @@ function snapshotOpenPositions(
     if (closing == null || !Number.isFinite(closing)) {
       if (isOptionType(p.assetType, options?.valuationContext)) {
         priceSource = p.expiry && asOf >= p.expiry ? 'expired_zero' : 'estimated_decay';
-        if (optionsPlugTarget !== undefined) {
-          const baseVal = optionTimeMark(p, asOf);
-          const adjustedVal = (baseVal * plugFactor) + plugOffset;
-          closing = Math.abs(adjustedVal) / Math.max(Math.abs(p.qty), 1);
-          priceSource = 'anchor_residual';
-        } else {
-          closing = Math.abs(optionTimeMark(p, asOf)) / Math.max(Math.abs(p.qty), 1);
-        }
+        closing = Math.abs(optionTimeMark(p, asOf)) / Math.max(Math.abs(p.qty), 1);
       } else {
         closing = p.unitCost;
       }
     }
-    
+
     const marketValue = roundMoney(valueInBaseCurrency(p.qty * closing, p.assetType, asOf, options));
     const managerialValue = roundMoney(valueInBaseCurrency(p.qty * p.unitCost, p.assetType, asOf, options));
     out.push({

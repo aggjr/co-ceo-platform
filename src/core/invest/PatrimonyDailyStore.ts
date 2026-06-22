@@ -6,6 +6,7 @@ import { StorageMeter } from '../dal/StorageMeter';
 import { isMissingSchemaError } from '../dal/mysqlErrors';
 import type { DailyPatrimonyPoint } from './PatrimonyDailyEngine';
 import type { PositionDailySnapshot } from './PatrimonyMtmDailyEngine';
+import { storedSourceMatchesChartMethod } from './patrimonyChartMethods';
 
 export type StoredPortfolioDay = {
   id: string;
@@ -594,16 +595,7 @@ export function filterStoredDaysForChartMethod(
   stored: StoredPortfolioDay[],
   method: string
 ): StoredPortfolioDay[] {
-  const m = method.toLowerCase();
-  if (m === 'mtm_btg' || m === 'mtm_recorded') {
-    return stored.filter((s) => s.source === 'mtm_btg_calibrated');
-  }
-  if (m === 'mtm_economic') {
-    return stored.filter(
-      (s) => s.source === 'mtm_economic' || s.source === 'mtm_btg_calibrated'
-    );
-  }
-  return stored;
+  return stored.filter((s) => storedSourceMatchesChartMethod(String(s.source ?? ''), method));
 }
 
 /** Substitui dias gravados na serie calculada; inclui dias so em invest_portfolio_daily. */

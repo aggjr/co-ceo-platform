@@ -22,6 +22,10 @@ import { buildExtractReconciliationSummary } from '../core/invest/btgExtractCash
 import { compareToBtgPublished } from '../core/invest/btgPerformanceReference';
 import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
 import { fixedIncomeTotalFromLedger } from '../core/invest/patrimonyLedgerGates';
+import {
+  PATRIMONY_CHART_METHOD_BTG,
+  resolvePatrimonyChartQuery,
+} from '../core/invest/patrimonyChartMethods';
 import { InvestQuoteSyncService } from '../core/invest/InvestQuoteSyncService';
 import { PatrimonyDailyRecorder } from '../core/invest/PatrimonyDailyRecorder';
 import {
@@ -72,7 +76,7 @@ import {
 import { resolveCashInvestDisplayBalance } from '../core/invest/cashInvestLedger';
 import { buildCashInTransitSummary } from '../core/invest/cashInTransit';
 import { AUTO_D2_REF_PREFIX } from '../core/invest/AutoPendingSettlementSync';
-import { loadOptionMarketCatalog } from '../core/invest/optionMarketCatalog';
+import { loadOptionMarketCatalog, loadOptionUnderlyingMap } from '../core/invest/optionMarketCatalog';
 import { buildOptionStrikeMapFromLedgerEvents } from '../core/invest/optionStrikeFromLedger';
 import {
   applyAllocationPercents,
@@ -764,12 +768,15 @@ export class InvestController {
     const riskFreeAnnual = Number(req.query.risk_free ?? 0);
 
     const events = await this.ledger.listLedgerEvents(ctx, bounds.periodMin, to);
-    const method = String(req.query.method || 'mtm_btg').toLowerCase();
+    const { method, compareAnchor } = resolvePatrimonyChartQuery(
+      String(req.query.method || PATRIMONY_CHART_METHOD_BTG),
+      req.query.compare_anchor as string | undefined
+    );
 
     // Cotações estáticas por cliente (invest_position_ext) — usadas como fallback e para
     // o snapshot do dia mais recente quando market_quotes_daily ainda não foi populado.
     let stockQuotes: Record<string, number> | undefined;
-    if (method === 'mtm_btg') {
+    if (method === PATRIMONY_CHART_METHOD_BTG) {
       const assets = await this.assetProjection.listActiveAssets(ctx);
       stockQuotes = {};
       for (const row of assets) {
@@ -804,8 +811,7 @@ export class InvestController {
     }
 
     const anchors = await this.patrimonyAnchorsRepo.loadForOrganization(ctx);
-    const useBtgAnchorCurve = method === 'mtm_btg' && anchors.month_ends.length > 0;
-    const calibrateToAnchors = useBtgAnchorCurve;
+    const useBtgAnchorCurve = method === PATRIMONY_CHART_METHOD_BTG && anchors.month_ends.length > 0;
     const fixedIncomeTotal = fixedIncomeTotalFromLedger(events);
     const valuationSnapshot = await this.valuationContext.load(ctx);
     const optionCatalog = await loadOptionMarketCatalog(this.gateway, ctx.organizationId);
@@ -835,7 +841,7 @@ export class InvestController {
               anchors,
               stockQuotes,
               fixedIncomeTotal,
-              calibrateToAnchors: method === 'mtm_btg_calibrated' || method === 'mtm_economic_calibrated',
+              compareAnchor,
               quoteForDate,
               valuationContext: valuationSnapshot,
               optionContractForTicker: (ticker: string) => {
@@ -1118,9 +1124,11 @@ export class InvestController {
         quoteForDate
           ? `Cotações históricas: ${quoteMap.size} ticker(s), ${marketQuoteRows} preço/dia em market_quotes_daily.`
           : 'Sem cotações em market_quotes_daily no período — rode sync:market:quotes:stocks e backfill:market:quotes.',
-        calibrateToAnchors
-          ? 'Série com calibração às âncoras mensais BTG.'
-          : 'Série econômica: livro-razão × cotação do dia (ou PM quando sem cotação).',
+        useBtgAnchorCurve
+          ? 'Curva BTG: interpolação entre fechamentos mensais de custódia (overlay de referência, não patrimônio econômico).'
+          : compareAnchor
+            ? 'Série econômica com comparação às âncoras BTG em meta (sem ajuste de patrimônio).'
+            : 'Série econômica: livro-razão × cotação do dia (ou PM quando sem cotação).',
         'Gráfico da carteira: TWR diário (rentab. acumulada), descontando aportes e retiradas (TEDs).',
         result.performance?.externalFlows?.length
           ? `${result.performance.externalFlows.length} fluxo(s) externo(s) no período (capital_deposit/withdrawal).`
@@ -1134,11 +1142,13 @@ export class InvestController {
             ? `${chartStock} sem histórico — rode npm run seed:market:benchmarks.`
             : 'Benchmark de ação não definido (sem posição em ações/FIIs no livro).',
       ],
-      patrimonySource: calibrateToAnchors
-        ? 'ledger_plus_btg_anchors'
-        : quoteForDate
-          ? 'ledger_plus_market_quotes'
-          : 'ledger_only',
+      patrimonySource: useBtgAnchorCurve
+        ? 'btg_anchor_interpolation'
+        : compareAnchor
+          ? 'ledger_with_anchor_comparison'
+          : quoteForDate
+            ? 'ledger_plus_market_quotes'
+            : 'ledger_only',
     });
   };
 
@@ -1293,7 +1303,15 @@ export class InvestController {
     // Reconstrói custódia desde periodMin para evitar "lote nascendo" no meio do período.
     // O engine usa `from..to` apenas para colunas do período.
     const events = await this.ledger.listLedgerEvents(ctx, bounds.periodMin, to);
-    let pivot = buildStockUnderlyingPivot(events, from, to);
+    const optionTickers = events
+      .map((e) => String(e.asset_ticker || '').toUpperCase())
+      .filter((t) => isOptionTicker(t));
+    const underlyingCatalog = await loadOptionUnderlyingMap(
+      this.gateway,
+      ctx.organizationId,
+      optionTickers
+    );
+    let pivot = buildStockUnderlyingPivot(events, from, to, { underlyingCatalog });
 
     const underlyings = [
       ...new Set(pivot.rows.map((r) => String(r.underlying || '').toUpperCase()).filter(Boolean)),
@@ -1471,7 +1489,11 @@ export class InvestController {
             .filter(Boolean)
         )
       : null;
-    const UNKNOWN_DIFFERENCE_OPS = new Set(['extract_divergence', 'cash_balance_gap']);
+    const UNKNOWN_DIFFERENCE_OPS = new Set([
+      'extract_divergence',
+      'cash_balance_gap',
+      'patrimony_anchor_divergence',
+    ]);
     const events = await this.ledger.listLedgerEvents(
       ctx,
       await this.ledgerStartDateFor(ctx),

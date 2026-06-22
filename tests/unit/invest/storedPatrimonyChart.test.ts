@@ -2,6 +2,7 @@ import {
   buildStoredTwrChartSeries,
   resolvePortfolioIndexedForChart,
 } from '../../../src/core/invest/storedPatrimonyChart';
+import { PATRIMONY_SOURCE_STORED_LEGACY } from '../../../src/core/invest/patrimonyChartMethods';
 import type { StoredPortfolioDay } from '../../../src/core/invest/PatrimonyDailyStore';
 
 function storedRow(
@@ -24,7 +25,7 @@ function storedRow(
     daily_return_twr: daily,
     cumulative_twr: cumulative,
     quotes_as_of: null,
-    source: 'mtm_btg_calibrated',
+    source: PATRIMONY_SOURCE_STORED_LEGACY,
     metadata: null,
   };
 }

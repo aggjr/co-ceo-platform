@@ -1,3 +1,6 @@
+import {
+  PATRIMONY_META_BTG_INTERPOLATED,
+} from './patrimonyChartMethods';
 import type { DailyPatrimonyPoint, PatrimonyDailyResult } from './PatrimonyDailyEngine';
 import type { LedgerEvent } from './CustodyEngine';
 import {
@@ -94,7 +97,7 @@ export function buildBtgAnchorPatrimonyDailyResult(
     sharpe,
     performance,
     meta: {
-      method: 'mtm_btg_calibrated',
+      method: PATRIMONY_META_BTG_INTERPOLATED,
       stock_cash_settlement_days: 0,
       note:
         'Patrimônio diário: interpolação entre fechamentos mensais BTG (custódia). ' +

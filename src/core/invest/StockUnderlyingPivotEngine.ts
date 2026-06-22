@@ -78,7 +78,7 @@ function tradeCashBeforeExpenses(e: LedgerEvent, type: string): number {
   return netCash(e);
 }
 
-function underlyingOf(e: LedgerEvent): string {
+function underlyingOf(e: LedgerEvent, catalog?: Map<string, string>): string {
   const ticker = String(e.asset_ticker || '').toUpperCase();
   const assetType = String(e.asset_type || inferAssetType(ticker));
   if (assetType === 'fixed_income' || isFixedIncomeTicker(ticker)) {
@@ -87,10 +87,14 @@ function underlyingOf(e: LedgerEvent): string {
   const explicit = e.underlying_ticker?.trim();
   if (explicit) return explicit.toUpperCase();
   if (assetType === 'option_call' || assetType === 'option_put') {
-    return inferUnderlyingTicker(ticker, explicit);
+    return inferUnderlyingTicker(ticker, explicit, catalog);
   }
   return ticker;
 }
+
+export type StockUnderlyingPivotOptions = {
+  underlyingCatalog?: Map<string, string>;
+};
 
 /** Linha do pivot: ações B3 (PN/ON/FII) e renda fixa (LFT, CDB, Tesouro). */
 function isPivotAssetKey(ticker: string): boolean {
@@ -123,8 +127,10 @@ export type StockUnderlyingPivotResult = {
 export function buildStockUnderlyingPivot(
   entries: LedgerEvent[],
   from: string,
-  to: string
+  to: string,
+  opts?: StockUnderlyingPivotOptions
 ): StockUnderlyingPivotResult {
+  const underlyingCatalog = opts?.underlyingCatalog;
   const rowsMap = new Map<string, StockPivotRow>();
   const custodyStates = new Map<string, { qty: number; totalCost: number }>();
   const sameDayBuys = new Map<string, Map<string, number>>();
@@ -246,7 +252,7 @@ export function buildStockUnderlyingPivot(
 
   for (const e of entries) {
     const day = String(e.transaction_date || '').slice(0, 10);
-    const und = underlyingOf(e);
+    const und = underlyingOf(e, underlyingCatalog);
     if (!isPivotAssetKey(und)) continue;
 
     const row = getRow(und);

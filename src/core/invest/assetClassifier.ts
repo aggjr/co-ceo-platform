@@ -1,13 +1,3 @@
-/** Raiz do ticker de opção → papel negociado na B3 (PN vs ON). */
-const UNDERLYING_BY_ROOT: Record<string, string> = {
-  ITUB: 'ITUB4',
-  BBAS: 'BBAS3',
-  WEGE: 'WEGE3',
-  PRIO: 'PRIO3',
-  PETR: 'PETR4',
-  VALE: 'VALE3',
-};
-
 export function isFixedIncomeTicker(ticker: string): boolean {
   const t = ticker.trim().toUpperCase();
   return (
@@ -39,15 +29,19 @@ export function inferAssetType(ticker: string): string {
   return 'stock';
 }
 
-/** Ticker da ação mãe para opções (heurística). */
-export function inferUnderlyingTicker(ticker: string, explicit?: string): string {
+/** Ticker da ação mãe para opções: explicit > catalogo DB > heuristica B3 (root+3/11). */
+export function inferUnderlyingTicker(
+  ticker: string,
+  explicit?: string,
+  catalog?: Map<string, string>
+): string {
   if (explicit?.trim()) return explicit.trim().toUpperCase();
   const t = ticker.trim().toUpperCase();
+  const fromCatalog = catalog?.get(t);
+  if (fromCatalog) return fromCatalog;
   const assetType = inferAssetType(t);
   if (assetType === 'option_call' || assetType === 'option_put') {
     const root = t.slice(0, 4);
-    // UNDERLYING_BY_ROOT: fallback legado (6 raízes hardcoded) quando catalogo/explicito ausente.
-    if (UNDERLYING_BY_ROOT[root]) return UNDERLYING_BY_ROOT[root];
     return root + (t.endsWith('11') ? '11' : '3');
   }
   return t;

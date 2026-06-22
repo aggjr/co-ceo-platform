@@ -4,9 +4,10 @@ import { GatewayError } from '../dal/errors';
 import { LedgerImportService } from './LedgerImportService';
 import { InvestBookPeriodService } from './InvestBookPeriodService';
 import { buildDailyPatrimonyMtmSeries } from './PatrimonyMtmDailyEngine';
+import { ensurePatrimonyAnchorDivergence } from './PatrimonyAnchorDivergenceService';
 import { interpolatePatrimonyTarget } from './patrimonyAnchors';
 import { PatrimonyMonthlyAnchorsRepository } from './PatrimonyMonthlyAnchorsRepository';
-import { fixedIncomeTotalFromLedger, shouldUseBtgAnchorCalibration } from './patrimonyLedgerGates';
+import { fixedIncomeTotalFromLedger } from './patrimonyLedgerGates';
 import { resolveInvestPeriodBounds } from './investPeriodBounds';
 import { PatrimonyDailyStore, type StoredPortfolioDay } from './PatrimonyDailyStore';
 import { aggregateExternalFlowsByDate } from './portfolioPerformance';
@@ -215,19 +216,9 @@ export class PatrimonyDailyRecorder {
    * - Modo padrão ("diário"/econômico): usado pelo job diário e por qualquer
    *   recálculo recorrente. Valora exclusivamente por dado real de mercado
    *   (cotações em `market_quotes_daily`, alimentadas pelas fontes mapeadas em
-   *   ordem de prioridade). Opção sem cotação cai para Black-Scholes/decaimento
-   *   no motor — NUNCA usa "plug" de âncora. É o estado canônico do dia.
-   *
-   * - Modo carga inicial (`opts.initialLoad === true`): EXCLUSIVO da primeira
-   *   carga de dados de um cliente. Permite a calibração por âncoras mensais do
-   *   home broker para reconstruir o histórico passado quando não há cotação
-   *   real disponível na web para aquele dia. A estimativa é apenas o resíduo
-   *   (alvo da âncora menos o que já foi marcado a mercado), distribuído nas
-   *   opções estimadas. Não deve rodar no fluxo recorrente.
-   *
-   * Regra de prioridade da valoração (ambos os modos): cotação real do dia >
-   * último mercado conhecido > Black-Scholes (opção) > custo. Só no modo carga
-   * inicial, após essa cadeia, entra a estimativa por âncora.
+   * Grava patrimonio economico real (cotacoes + caixa + transito).
+   * Quando existem ancoras BTG e o patrimonio economico diverge, registra
+   * `patrimony_anchor_divergence` idempotente — sem plug/residual em opcoes.
    */
   async recordDay(
     ctx: UserContext,
@@ -268,10 +259,7 @@ export class PatrimonyDailyRecorder {
     const rfAnchor = Number(anchors.fixed_income_total ?? 0);
     const rfForEconomic = rfLedger;
 
-    const useCalibration =
-      opts?.initialLoad === true &&
-      hasAnchors &&
-      (await shouldUseBtgAnchorCalibration(ctx, events, this.policyService));
+    const compareAnchor = hasAnchors;
     const valuationSnapshot = await this.valuationContext.load(ctx);
     const optionCatalog = ctx.organizationId
       ? await loadOptionMarketCatalog(this.gateway, ctx.organizationId)
@@ -291,7 +279,7 @@ export class PatrimonyDailyRecorder {
       anchors,
       stockQuotes,
       fixedIncomeTotal: rfForEconomic,
-      calibrateToAnchors: useCalibration,
+      compareAnchor,
       quoteForDate,
       valuationContext: valuationSnapshot,
       optionContractForTicker: (ticker: string) => {
@@ -315,20 +303,25 @@ export class PatrimonyDailyRecorder {
       throw new Error(`Sem patrimônio econômico calculado para ${date}.`);
     }
 
-    let economicMtm = mtm;
-    let economicPoint = recordPoint;
-    if (useCalibration) {
-      economicMtm = buildDailyPatrimonyMtmSeries(events, ledgerFrom, date, {
-        ...mtmOpts,
-        calibrateToAnchors: false,
-      });
-      economicPoint = economicMtm.series[economicMtm.series.length - 1] ?? recordPoint;
-    }
+    const economicPoint = recordPoint;
 
-    const source = useCalibration ? 'mtm_btg_calibrated' : 'mtm_economic';
-    const btgPatrimony = useCalibration
+    const anchorPatrimony = compareAnchor
       ? Math.round(interpolatePatrimonyTarget(date, anchors) * 100) / 100
       : null;
+
+    if (anchorPatrimony != null) {
+      await ensurePatrimonyAnchorDivergence(
+        ctx,
+        this.ledger,
+        events,
+        date,
+        economicPoint.patrimony,
+        anchorPatrimony
+      );
+    }
+
+    const source = 'mtm_economic';
+    const btgPatrimony = anchorPatrimony;
 
     const patrimonyGross = recordPoint.patrimonyGross;
 
@@ -353,7 +346,7 @@ export class PatrimonyDailyRecorder {
       cumulativeTwr = 0;
     }
 
-    const positions = (useCalibration ? economicMtm.positionSnapshots : mtm.positionSnapshots) ?? [];
+    const positions = mtm.positionSnapshots ?? [];
     const fixedIncomePositions = positions.filter(
       (p) => String(p.assetType) === 'fixed_income'
     );
@@ -387,7 +380,8 @@ export class PatrimonyDailyRecorder {
         rf_anchor: rfAnchor,
         rf_marked: markedFixedIncomeTotal,
         rf_anchor_delta: Math.round((markedFixedIncomeTotal - rfAnchor) * 100) / 100,
-        calibration_blocked_base_error: mtm.meta?.calibration_blocked_base_error === true,
+        patrimony_anchor_divergence: mtm.meta?.patrimony_anchor_divergence ?? null,
+        anchor_target: anchorPatrimony,
       },
     });
 

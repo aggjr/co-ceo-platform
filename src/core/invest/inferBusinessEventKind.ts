@@ -23,6 +23,7 @@ export function inferBusinessEventKind(
 
   if (line.operation === 'extract_divergence') return 'unknown_invest_event';
   if (line.operation === 'cash_balance_gap') return 'unknown_invest_event';
+  if (line.operation === 'patrimony_anchor_divergence') return 'unknown_invest_event';
 
   if (line.source_system === 'btg_extract') {
     if (line.operation === 'cash_yield') return 'cash_yield_event';

@@ -1,3 +1,6 @@
+import {
+  PATRIMONY_SOURCE_STORED_LEGACY,
+} from '../../../src/core/invest/patrimonyChartMethods';
 import { HOLDING_BTG_PATRIMONY_ANCHORS } from '../../../src/core/invest/btgPatrimonyAnchorReference';
 import { interpolatePatrimonyTarget } from '../../../src/core/invest/patrimonyAnchors';
 import { filterStoredDaysForChartMethod } from '../../../src/core/invest/PatrimonyDailyStore';
@@ -50,15 +53,15 @@ describe('filterStoredDaysForChartMethod', () => {
       daily_return_twr: null,
       cumulative_twr: null,
       quotes_as_of: null,
-      source: 'mtm_btg_calibrated',
+      source: PATRIMONY_SOURCE_STORED_LEGACY,
       metadata: null,
     },
   ];
 
-  it('mescla apenas fechamento calibrado na curva mtm_btg', () => {
+  it('mescla fechamento legado BTG na curva mtm_btg', () => {
     const filtered = filterStoredDaysForChartMethod(stored, 'mtm_btg');
     expect(filtered).toHaveLength(1);
-    expect(filtered[0]!.source).toBe('mtm_btg_calibrated');
+    expect(filtered[0]!.source).toBe(PATRIMONY_SOURCE_STORED_LEGACY);
   });
 
   it('mantem fechamentos gravados autoritativos no modo economico', () => {

@@ -121,7 +121,7 @@ function main() {
     if (at === 'stock' || at === 'fii') stockQuotes[t] = Number(p.avg_price);
   }
   const mtm = buildDailyPatrimonyMtmSeries(events, OPENING_DATE, OPENING_DATE, {
-    calibrateToAnchors: false,
+    compareAnchor: false,
     fixedIncomeTotal: fixedIncomeTotalFromLedger(events),
     stockQuotes,
   });

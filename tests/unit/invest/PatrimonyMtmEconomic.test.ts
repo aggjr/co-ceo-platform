@@ -10,7 +10,7 @@ const anchors = {
 };
 
 describe('PatrimonyMtmDailyEngine economic mode', () => {
-  it('não calibra patrimônio às âncoras BTG quando calibrateToAnchors=false', () => {
+  it('nao ajusta patrimonio as ancoras BTG quando compareAnchor=false', () => {
     const entries: LedgerEvent[] = [
       {
         asset_id: 's1',
@@ -28,7 +28,7 @@ describe('PatrimonyMtmDailyEngine economic mode', () => {
       anchors,
       stockQuotes: { PRIO3: 50 },
       fixedIncomeTotal: 0,
-      calibrateToAnchors: false,
+      compareAnchor: false,
     });
     expect(r.series[r.series.length - 1]!.patrimony).toBeCloseTo(50_000, 0);
     expect(r.meta.method).toBe('mtm_economic');

@@ -13,9 +13,20 @@ import {
 import { inferUnderlyingTicker } from '../../../src/core/invest/assetClassifier';
 import { inferBusinessEventKind } from '../../../src/core/invest/inferBusinessEventKind';
 import { buildStockUnderlyingPivot } from '../../../src/core/invest/StockUnderlyingPivotEngine';
-import { isB3WeekendOrHoliday } from '../../../src/core/invest/MarketCalendarService';
+import { MarketCalendarService, DEFAULT_B3_EXCHANGE_CODE } from '../../../src/core/invest/MarketCalendarService';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 import { settledCashBalanceFromLedger } from '../../../src/core/invest/cashInvestLedger';
+import {
+  buildPatrimonyAnchorDivergenceLine,
+  ensurePatrimonyAnchorDivergence,
+  PATRIMONY_ANCHOR_DIVERGENCE_TOLERANCE,
+} from '../../../src/core/invest/PatrimonyAnchorDivergenceService';
+import {
+  PATRIMONY_META_BTG_INTERPOLATED,
+  resolvePatrimonyChartQuery,
+} from '../../../src/core/invest/patrimonyChartMethods';
+import fs from 'fs';
+import path from 'path';
 
 describe('section20 validation gate (independente)', () => {
   describe('GAP-M01 — gap explicito fecha saldo com corretora', () => {
@@ -128,18 +139,63 @@ describe('section20 validation gate (independente)', () => {
     });
   });
 
-  describe('PIV-A01 — underlying explicito prevalece', () => {
-    it('explicit vence mapa hardcoded PRIO->PRIO3', () => {
-      expect(inferUnderlyingTicker('PRION410', 'PETR4')).toBe('PETR4');
+  describe('PIV-A01 — underlying via catalogo', () => {
+    it('explicit vence catalogo e heuristica', () => {
+      const catalog = new Map([['PRION410', 'PRIO3']]);
+      expect(inferUnderlyingTicker('PRION410', 'PETR4', catalog)).toBe('PETR4');
+    });
+
+    it('catalogo resolve underlying fora do mapa hardcoded', () => {
+      const catalog = new Map([['PRIOA100', 'PRIO3']]);
+      expect(inferUnderlyingTicker('PRIOA100', undefined, catalog)).toBe('PRIO3');
+      const entries: LedgerEvent[] = [
+        {
+          asset_id: 'o1',
+          asset_ticker: 'PRIOA100',
+          asset_type: 'option_call',
+          transaction_type: 'call_sell',
+          transaction_date: '2026-03-05',
+          quantity: -10,
+          unit_price: 0.5,
+          total_net_value: 500,
+          impacts_managerial_price: true,
+        } as LedgerEvent,
+      ];
+      const r = buildStockUnderlyingPivot(entries, '2026-03-01', '2026-03-31', {
+        underlyingCatalog: catalog,
+      });
+      expect(r.rows.find((x) => x.underlying === 'PRIO3')).toBeDefined();
     });
   });
 
   describe('CLD-M01 — feriado B3 conhecido', () => {
-    it('2026-01-01 e feriado (nao dia util)', () => {
-      expect(isB3WeekendOrHoliday('2026-01-01')).toBe(true);
+    const ctx = { organizationId: 'org1', userId: 'u1' } as never;
+    const holidays = [
+      '2026-01-01',
+      '2026-02-16',
+      '2026-02-17',
+      '2026-04-03',
+      '2026-04-21',
+      '2026-05-01',
+      '2026-06-04',
+      '2026-09-07',
+      '2026-10-12',
+      '2026-11-02',
+      '2026-11-15',
+      '2026-12-25',
+    ].map((holiday_date) => ({ holiday_date, exchange_code: DEFAULT_B3_EXCHANGE_CODE }));
+
+    it('2026-01-01 e feriado via catalogo (nao dia util)', async () => {
+      const svc = new MarketCalendarService({
+        findWhere: jest.fn(async () => holidays),
+      } as never);
+      expect(await svc.isWeekendOrHoliday(ctx, '2026-01-01')).toBe(true);
     });
-    it('2026-06-17 e dia util', () => {
-      expect(isB3WeekendOrHoliday('2026-06-17')).toBe(false);
+    it('2026-06-17 e dia util', async () => {
+      const svc = new MarketCalendarService({
+        findWhere: jest.fn(async () => holidays),
+      } as never);
+      expect(await svc.isWeekendOrHoliday(ctx, '2026-06-17')).toBe(false);
     });
   });
 
@@ -185,6 +241,133 @@ describe('section20 validation gate (independente)', () => {
       const economicFromLedger = ledgerCashNet - feesOnTrades;
       expect(row.trade + row.taxas).toBeCloseTo(economicFromLedger, 0);
       expect(row.ganho_aproximado).toBeCloseTo(economicFromLedger, 0);
+    });
+
+    it('fixture com opcao, dividendo e trade fecha ganho_aproximado vs ledger', () => {
+      const catalog = new Map([['PRIOA100', 'PRIO3']]);
+      const entries: LedgerEvent[] = [
+        {
+          asset_id: 's1',
+          asset_ticker: 'PRIO3',
+          asset_type: 'stock',
+          transaction_type: 'buy',
+          transaction_date: '2026-03-01',
+          quantity: 100,
+          unit_price: 40,
+          total_net_value: -4010,
+          brokerage_fee: 10,
+          impacts_managerial_price: true,
+        } as LedgerEvent,
+        {
+          asset_id: 'o1',
+          asset_ticker: 'PRIOA100',
+          asset_type: 'option_call',
+          transaction_type: 'call_sell',
+          transaction_date: '2026-03-05',
+          quantity: -1000,
+          unit_price: 0.5,
+          total_net_value: 500,
+          impacts_managerial_price: true,
+        } as LedgerEvent,
+        {
+          asset_id: 's1',
+          asset_ticker: 'PRIO3',
+          asset_type: 'stock',
+          transaction_type: 'dividend',
+          transaction_date: '2026-03-08',
+          quantity: 0,
+          unit_price: 0,
+          total_net_value: 300,
+          impacts_managerial_price: false,
+        } as LedgerEvent,
+        {
+          asset_id: 's1',
+          asset_ticker: 'PRIO3',
+          asset_type: 'stock',
+          transaction_type: 'sell',
+          transaction_date: '2026-03-10',
+          quantity: 100,
+          unit_price: 42,
+          total_net_value: 4190,
+          brokerage_fee: 10,
+          impacts_managerial_price: true,
+        } as LedgerEvent,
+      ];
+      const r = buildStockUnderlyingPivot(entries, '2026-03-01', '2026-03-31', {
+        underlyingCatalog: catalog,
+      });
+      const row = r.rows.find((x) => x.underlying === 'PRIO3')!;
+      const ledgerCashNet = entries
+        .filter((e) => {
+          const d = String(e.transaction_date ?? '').slice(0, 10);
+          return d >= '2026-03-01' && d <= '2026-03-31';
+        })
+        .reduce((s, e) => s + Number(e.total_net_value ?? 0), 0);
+      expect(row.venda_call).toBeCloseTo(500, 0);
+      expect(row.dividendos).toBeCloseTo(300, 0);
+      expect(row.trade).toBeCloseTo(200, 0);
+      expect(row.ganho_aproximado).toBeCloseTo(ledgerCashNet, 0);
+    });
+  });
+
+  describe('PAT-M01 — divergencia patrimonial vs ancora vira evento auditavel', () => {
+    it('nao ajusta patrimonio: linha explicita com kind unknown_invest_event', () => {
+      const line = buildPatrimonyAnchorDivergenceLine('2026-01-31', 1_000_000, 1_100_000);
+      expect(line).not.toBeNull();
+      expect(line!.operation).toBe('patrimony_anchor_divergence');
+      expect(line!.impacts_managerial_price).toBe(false);
+      expect(inferBusinessEventKind(line!, 'cash_movement')).toBe('unknown_invest_event');
+      expect(Math.abs(line!.total_net_value!)).toBeGreaterThan(PATRIMONY_ANCHOR_DIVERGENCE_TOLERANCE);
+    });
+
+    it('ensurePatrimonyAnchorDivergence e idempotente por event_source_ref', async () => {
+      const asOf = '2026-01-31';
+      const line = buildPatrimonyAnchorDivergenceLine(asOf, 1_000_000, 1_100_000)!;
+      const events = [
+        {
+          asset_ticker: line.ticker,
+          broker_note_ref: line.event_source_ref,
+          transaction_date: asOf,
+        },
+      ] as never[];
+      const ledger = { importEntriesOnly: jest.fn() };
+      const ctx = { organizationId: 'org1' } as never;
+
+      const first = await ensurePatrimonyAnchorDivergence(
+        ctx,
+        ledger as never,
+        events,
+        asOf,
+        1_000_000,
+        1_100_000
+      );
+      expect(first.created).toBe(0);
+      expect(first.skipped).toBe(1);
+      expect(ledger.importEntriesOnly).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('CAL-A01 — nomenclatura canonica (sem calibrateToAnchors)', () => {
+    it('alias legado mtm_btg_calibrated vira mtm_economic + compareAnchor', () => {
+      const legacy = resolvePatrimonyChartQuery('mtm_btg_calibrated');
+      expect(legacy.method).toBe('mtm_economic');
+      expect(legacy.compareAnchor).toBe(true);
+      const canonical = resolvePatrimonyChartQuery('mtm_economic', 'true');
+      expect(canonical.compareAnchor).toBe(true);
+    });
+
+    it('engine e controller nao expoem calibrateToAnchors', () => {
+      const engineSrc = fs.readFileSync(
+        path.join(__dirname, '../../../src/core/invest/PatrimonyMtmDailyEngine.ts'),
+        'utf8'
+      );
+      const controllerSrc = fs.readFileSync(
+        path.join(__dirname, '../../../src/controllers/InvestController.ts'),
+        'utf8'
+      );
+      expect(engineSrc).not.toMatch(/calibrateToAnchors/);
+      expect(controllerSrc).not.toMatch(/calibrateToAnchors/);
+      expect(PATRIMONY_META_BTG_INTERPOLATED).toBe('mtm_btg_interpolated');
     });
   });
 });

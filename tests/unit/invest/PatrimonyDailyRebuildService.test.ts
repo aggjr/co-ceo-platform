@@ -48,6 +48,13 @@ jest.mock('../../../src/modules/invest/sync/InvestAssetProjection', () => ({
   })),
 }));
 
+jest.mock('../../../src/core/invest/MarketCalendarService', () => ({
+  MarketCalendarService: jest.fn().mockImplementation(() => ({
+    isHoliday: jest.fn(async (_ctx: unknown, day: string) => day === '2026-01-01'),
+    isWeekendOrHoliday: jest.fn(async (_ctx: unknown, day: string) => day === '2026-01-01'),
+  })),
+}));
+
 import { PatrimonyDailyRebuildService } from '../../../src/core/invest/PatrimonyDailyRebuildService';
 
 const ctx: UserContext = {
@@ -95,19 +102,38 @@ describe('PatrimonyDailyRebuildService', () => {
     recalcThreePricesPublic.mockResolvedValue({ positionsUpdated: 1, positionsZeroed: 0 });
   });
 
-  it('invalida, grava dias úteis com calibração BTG quando houver âncoras e reconcilia custódia', async () => {
+  it('invalida, grava dias uteis com fechamento economico quando houver ancoras e reconcilia custodia', async () => {
     const svc = new PatrimonyDailyRebuildService(mockGateway());
     const result = await svc.rebuild(ctx, { from: '2026-01-01', to: '2026-01-05' });
 
     expect(invalidateFromDate).toHaveBeenCalledWith(ctx, '2026-01-02');
     expect(recordDay).toHaveBeenCalled();
     for (const call of recordDay.mock.calls) {
-      expect(call[2]).toBeUndefined();
+      expect(call[2]).toEqual({ initialLoad: false });
     }
     expect(result.daysWritten).toBeGreaterThan(0);
     expect(reconcileCustody).toHaveBeenCalledWith(ctx);
     expect(recalcThreePricesPublic).toHaveBeenCalledWith(ctx, expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
     expect(result.threePricesUpdated).toBe(1);
+  });
+
+  it('pula feriado B3 no rebuild (nao chama recordDay)', async () => {
+    listLedgerEvents.mockResolvedValue([
+      {
+        transaction_date: '2026-01-01',
+        asset_ticker: 'PRIO3',
+        asset_type: 'stock',
+        transaction_type: 'opening_balance',
+        quantity: 100,
+        unit_price: 10,
+        total_net_value: 0,
+      },
+    ]);
+    const svc = new PatrimonyDailyRebuildService(mockGateway());
+    const result = await svc.rebuild(ctx, { from: '2026-01-01', to: '2026-01-01' });
+
+    expect(result.daysSkipped).toBe(1);
+    expect(recordDay).not.toHaveBeenCalled();
   });
 
   it('limita rebuild pela ultima cotacao confiavel', async () => {

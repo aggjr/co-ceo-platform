@@ -40,11 +40,13 @@ export type PatrimonyDailyResult = {
   /** Posições abertas no último dia do intervalo (motor MTM). */
   positionSnapshots?: import('./PatrimonyMtmDailyEngine').PositionDailySnapshot[];
   meta: {
-    method: 'mtm_replay' | 'mtm_btg_calibrated' | 'mtm_economic';
+    method: 'mtm_replay' | 'mtm_btg_interpolated' | 'mtm_economic';
     note: string;
     stock_cash_settlement_days?: number;
     settlement_rules?: string;
-    calibration_blocked_base_error?: boolean;
+    compare_anchor?: boolean;
+    patrimony_anchor_divergence?: number;
+    anchor_target?: number | null;
   };
 };
 

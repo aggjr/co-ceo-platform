@@ -238,7 +238,7 @@ export async function buildGeneralAuditMatrix(input: {
   const mtm = buildDailyPatrimonyMtmSeries(events, from, to, {
     stockQuotes: {},
     fixedIncomeTotal,
-    calibrateToAnchors: false,
+    compareAnchor: false,
     quoteForDate,
     valuationContext: valuationSnapshot,
     optionContractForTicker: (ticker: string) => {

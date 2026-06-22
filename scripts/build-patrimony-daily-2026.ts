@@ -81,7 +81,7 @@ async function main() {
     anchors,
     stockQuotes,
     fixedIncomeTotal: Number(anchors.fixed_income_total ?? 0),
-    calibrateToAnchors: calibrate,
+    compareAnchor: calibrate,
   });
 
   const monthEnds = ['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30', '2026-05-18', '2026-05-19', '2026-05-31'];

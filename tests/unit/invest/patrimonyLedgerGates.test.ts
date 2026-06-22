@@ -37,7 +37,7 @@ describe('patrimonyLedgerGates', () => {
     const r = buildDailyPatrimonyMtmSeries([], '2026-01-01', '2026-01-05', {
       anchors,
       fixedIncomeTotal: 0,
-      calibrateToAnchors: false,
+      compareAnchor: false,
     });
     for (const p of r.series) {
       expect(p.patrimony).toBe(0);

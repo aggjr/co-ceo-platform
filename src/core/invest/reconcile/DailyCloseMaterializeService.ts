@@ -262,16 +262,6 @@ export class DailyCloseMaterializeService {
         : null;
     const anchorDelta =
       anchorPatrimony != null ? round2(recordedPatrimony - anchorPatrimony) : null;
-    if (anchorPatrimony != null && anchorDelta != null) {
-      const anchorTolerance = Math.max(1, Math.abs(anchorPatrimony) * 0.0005);
-      if (Math.abs(anchorDelta) > anchorTolerance) {
-        throw new GatewayError(
-          'FINANCIAL_RULE_VIOLATION',
-          `Fechamento ${day} fora da ancora BTG: patrimonio=${recordedPatrimony}, ancora=${anchorPatrimony}, delta=${anchorDelta}, tolerancia=${round2(anchorTolerance)}.`,
-          409
-        );
-      }
-    }
 
     return {
       recordedPatrimony,

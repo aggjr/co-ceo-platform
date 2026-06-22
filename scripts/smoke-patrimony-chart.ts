@@ -52,7 +52,7 @@ async function main() {
     anchors: loadPatrimonyAnchors(),
     stockQuotes: {},
     fixedIncomeTotal: fixedIncomeTotalFromLedger(events),
-    calibrateToAnchors: false,
+    compareAnchor: false,
     quoteForDate,
   });
 

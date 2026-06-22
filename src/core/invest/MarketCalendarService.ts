@@ -1,5 +1,4 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
-import { isB3BusinessHoliday } from './settlementCalendar';
 
 export const DEFAULT_B3_EXCHANGE_CODE = 'B3_BR';
 
@@ -8,15 +7,13 @@ function isWeekendUtc(isoDate: string): boolean {
   return dow === 0 || dow === 6;
 }
 
-/** Fallback sincrono (sem DB) — mesmo algoritmo de settlementCalendar. */
-export function isB3WeekendOrHoliday(isoDate: string): boolean {
-  const day = isoDate.slice(0, 10);
-  return isWeekendUtc(day) || isB3BusinessHoliday(day);
+/** Apenas fim de semana (sem DB). Feriados: use MarketCalendarService.isHoliday. */
+export function isB3Weekend(isoDate: string): boolean {
+  return isWeekendUtc(isoDate.slice(0, 10));
 }
 
 /**
- * Calendario de mercado canonico: feriados em market_holidays (catalogo global),
- * com fallback para o algoritmo B3 em settlementCalendar.ts.
+ * Calendario de mercado canonico: feriados exclusivamente em market_holidays (catalogo global).
  */
 export class MarketCalendarService {
   private readonly holidayCache = new Map<string, Set<string>>();
@@ -35,11 +32,7 @@ export class MarketCalendarService {
       yearSet = await this.loadHolidaySetForYear(ctx, exchangeCode, day.slice(0, 4));
       this.holidayCache.set(cacheKey, yearSet);
     }
-    if (yearSet.has(day)) return true;
-    if (exchangeCode === DEFAULT_B3_EXCHANGE_CODE) {
-      return isB3BusinessHoliday(day);
-    }
-    return false;
+    return yearSet.has(day);
   }
 
   async isWeekendOrHoliday(

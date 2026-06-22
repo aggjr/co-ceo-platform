@@ -46,7 +46,7 @@ function shortPut(
 }
 
 describe('PatrimonyMtmDailyEngine', () => {
-  it('alinha patrimônio às âncoras mensais BTG', () => {
+  it('nao alinha patrimonio a ancora — expoe divergencia economica', () => {
     const entries: LedgerEvent[] = [
       stockOpen(1000, 50),
       {
@@ -61,14 +61,16 @@ describe('PatrimonyMtmDailyEngine', () => {
         impacts_managerial_price: false,
       },
     ];
-    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-31', {
+    const r = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-15', {
       anchors,
       stockQuotes: { PRIO3: 50 },
       fixedIncomeTotal: 100_000,
-      calibrateToAnchors: true,
+      compareAnchor: true,
     });
-    const last = r.series[r.series.length - 1]!;
-    expect(last.patrimony).toBeCloseTo(1_100_000, 0);
+    const mid = r.series.find((p) => p.date === '2026-01-15')!;
+    expect(mid.patrimony).toBeCloseTo(1_100_000, 0);
+    expect(r.meta.method).toBe('mtm_economic');
+    expect(Math.abs(r.meta.patrimony_anchor_divergence ?? 0)).toBeGreaterThan(1);
   });
 
   it('zera marcação de opção após vencimento', () => {
@@ -80,9 +82,9 @@ describe('PatrimonyMtmDailyEngine', () => {
       anchors,
       stockQuotes: { PRIO3: 40 },
       fixedIncomeTotal: 0,
-      calibrateToAnchors: true,
+      compareAnchor: true,
     });
-    expect(r.meta.method).toBe('mtm_btg_calibrated');
+    expect(r.meta.method).toBe('mtm_economic');
     expect(r.series.length).toBeGreaterThan(0);
   });
 
@@ -410,7 +412,7 @@ describe('PatrimonyMtmDailyEngine', () => {
     expect(day.patrimony).toBeLessThan(2_000_000);
   });
 
-  it('nao calibra quando caixa diverge da ancora (erro de base)', () => {
+  it('registra divergencia patrimonial vs ancora sem plug economico', () => {
     const entries: LedgerEvent[] = [
       stockOpen(1000, 50),
       {
@@ -424,35 +426,24 @@ describe('PatrimonyMtmDailyEngine', () => {
         total_net_value: 950_000,
         impacts_managerial_price: false,
       },
-      {
-        asset_id: 'c1',
-        asset_ticker: 'CAIXA-BTG',
-        asset_type: 'cash',
-        transaction_type: 'capital_deposit',
-        transaction_date: '2026-01-15',
-        quantity: 1000,
-        unit_price: 1,
-        total_net_value: 1000,
-        impacts_managerial_price: false,
-      },
     ];
-    const economic = buildDailyPatrimonyMtmSeries(entries, '2026-01-15', '2026-01-15', {
+    const economic = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-15', {
       anchors,
       stockQuotes: { PRIO3: 50 },
       fixedIncomeTotal: 100_000,
-      calibrateToAnchors: false,
+      compareAnchor: false,
     });
-    const calibrated = buildDailyPatrimonyMtmSeries(entries, '2026-01-15', '2026-01-15', {
+    const compared = buildDailyPatrimonyMtmSeries(entries, '2026-01-01', '2026-01-15', {
       anchors,
       stockQuotes: { PRIO3: 50 },
       fixedIncomeTotal: 100_000,
-      calibrateToAnchors: true,
+      compareAnchor: true,
     });
-    const ecoDay = economic.series[0]!;
-    const calDay = calibrated.series[0]!;
-    expect(calibrated.meta?.calibration_blocked_base_error).toBe(true);
-    expect(calDay.patrimony).toBeCloseTo(ecoDay.patrimony, 0);
+    const ecoDay = economic.series.find((p) => p.date === '2026-01-15')!;
+    const cmpDay = compared.series.find((p) => p.date === '2026-01-15')!;
+    expect(cmpDay.patrimony).toBeCloseTo(ecoDay.patrimony, 0);
+    expect(Math.abs(compared.meta?.patrimony_anchor_divergence ?? 0)).toBeGreaterThan(1);
     const anchorTarget = interpolatePatrimonyTarget('2026-01-15', anchors);
-    expect(Math.abs(calDay.patrimony - anchorTarget)).toBeGreaterThan(1);
+    expect(Math.abs(cmpDay.patrimony - anchorTarget)).toBeGreaterThan(1);
   });
 });

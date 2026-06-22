@@ -7,6 +7,7 @@ module.exports = {
       displayName: 'unit-core',
       preset: 'ts-jest',
       testEnvironment: 'node',
+      setupFilesAfterEnv: ['<rootDir>/tests/setupUnitDatabaseMock.ts'],
       testMatch: [
         '<rootDir>/tests/unit/**/*.test.ts',
         '<rootDir>/tests/parity/**/*.test.ts',
@@ -19,6 +20,7 @@ module.exports = {
       testMatch: ['<rootDir>/tests/middlewares/**/*.test.ts'],
     },
   ],
+  globalTeardown: '<rootDir>/tests/globalTeardown.ts',
   clearMocks: true,
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
