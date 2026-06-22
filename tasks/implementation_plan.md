@@ -2165,37 +2165,61 @@ Regras:
   cuidar so de nao editar o mesmo arquivo em paralelo (PIV-M01 e PIV-M02 tocam
   `StockUnderlyingPivotEngine.ts` — sequenciar ou coordenar).
 
-### 20.7 Status de execucao (2026-06-22, release V0.0.422)
+### 20.7 Status de execucao (2026-06-22, release V0.0.422+)
 
-Implementacao dos 14 itens da secao 20.4 integrada em `main` (commit
-`a5fbd7f`, release `V0.0.422`). **Validacao independente (secao 20.1) ainda
-pendente** — proximo passo obrigatorio antes de considerar fechado.
+Implementacao dos 14 itens da secao 20.4 integrada em `main` (release `V0.0.423`).
+Validacao independente concluida em 2026-06-22 (release alvo `V0.0.424`).
 
-| ID | Exec | Validacao independente |
-|---|---|---|
-| EV-A01 | done | pendente |
-| EV-M01 | done | pendente |
-| EV-S01 | done | pendente |
-| GAP-M01 | done | pendente |
-| GAP-S01 | done | pendente |
-| CAL-M01 | done | pendente |
-| CLD-A01 | done | pendente |
-| CLD-M01 | done | pendente |
-| PIV-M01 | done | pendente |
-| PIV-M02 | done | pendente |
-| PIV-S01 | done | pendente |
-| PIV-A01 | done (fallback legacy mantido) | pendente |
-| PIV-S02 | done | pendente |
-| UNK-M01 | done | pendente |
+Gate de validacao: `tests/unit/invest/section20ValidationGate.test.ts` (8 checagens
+adversariais separadas dos testes do executor).
 
-Comandos de aceite do executor (53 testes verdes na integracao):
+Comandos de aceite (61 testes verdes na validacao):
 
 ```powershell
 node .\node_modules\typescript\bin\tsc --noEmit
-node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\invest\CashBalanceGapService.test.ts tests\unit\invest\StockUnderlyingPivotEngine.test.ts tests\unit\core\business-events\BusinessEventReconciler.test.ts tests\unit\invest\PatrimonyMtmDailyEngine.test.ts tests\unit\invest\MarketCalendarService.test.ts tests\unit\invest\reconcile\ReconciliationAuditService.test.ts --runInBand
+node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\invest\section20ValidationGate.test.ts tests\unit\invest\CashBalanceGapService.test.ts tests\unit\invest\StockUnderlyingPivotEngine.test.ts tests\unit\core\business-events\BusinessEventReconciler.test.ts tests\unit\invest\PatrimonyMtmDailyEngine.test.ts tests\unit\invest\MarketCalendarService.test.ts tests\unit\invest\reconcile\ReconciliationAuditService.test.ts --runInBand
 ```
 
-Proxima frente apos validacao: secao 14 (market data registry A-01/M-01, refresh
-M-05, renda fixa privada A-03/M-04) e homologacao BTG mes a mes com as novas
-regras (reimport janeiro/2026).
+### 20.8 Resultado da validacao independente (2026-06-22)
+
+Validador: sessao codex-guto | Base: `ae63e6f` | Gate: `section20ValidationGate.test.ts`
+
+| ID | Veredito | Checagem independente | Ressalvas / pendencias |
+|---|---|---|---|
+| EV-A01 | **APROVADO** | Contrato formal em §19.1 com tabela de sinais e excecoes | — |
+| EV-M01 | **APROVADO** | Reconciler manual acquisition+out fecha delta=0; dim 22 no audit | Nao valida variacao de transito no delta |
+| EV-S01 | **APROVADO** | 4 casos red/green em `BusinessEventReconciler.test.ts` | — |
+| GAP-M01 | **APROVADO** | `settled + gap == broker`; operacao `cash_balance_gap` + `unknown_invest_event` | Gap **ajusta** caixa (plug explicito filtravel, nao silencioso) |
+| GAP-S01 | **APROVADO** | Residuo R$10 dentro tolerancia mensal gera 2 linhas de gap | Residuo > R$20 ainda bloqueia import (nao gera gap) |
+| CAL-M01 | **APROVADO COM RESSALVA** | Teste `calibration_blocked_base_error` quando caixa diverge > R$1 | So valida drift de **caixa** vs ancora derivada; erro em acoes/RF que compense no caixa ainda e risco |
+| CLD-A01 | **APROVADO COM RESSALVA** | Migration `54_market_calendar.sql` + seed 2025-2027 | Fallback hardcoded `b3HolidaySet` permanece (debito ate catalogo ser unica fonte) |
+| CLD-M01 | **APROVADO** | `2026-01-01` feriado; `2026-06-17` dia util via `MarketCalendarService` | — |
+| PIV-M01 | **APROVADO** | CALL long expirada via `revaluation` → `compra_call` negativo | So cobre caminho com evento `revaluation` no ledger |
+| PIV-M02 | **APROVADO** | Gate: split 100→200 + sell → trade=200 (custo medio correto) | — |
+| PIV-S01 | **APROVADO** | Teste explicito `amortization` → `outros_ganhos` | — |
+| PIV-A01 | **REPROVADO** | Explicit vence mapa (`PETR4` sobre `PRION410`) | **Catalogo de underlying ausente**; `UNDERLYING_BY_ROOT` (6 tickers) ainda hardcoded — aceite pedia resolver fora do mapa via catalogo |
+| PIV-S02 | **APROVADO COM RESSALVA** | Gate: `ganho_aproximado == ledgerCashNet - feesOnTrades` em fixture fechado | Batimento independente so em fixture simples; falta teste com opcoes/dividendos/mes real |
+| UNK-M01 | **APROVADO** | Custody unmatched → `extract_divergence`; default LIQ → unknown | Rateio com `resolveCustodyFeeAllocation` ainda vira `cost_adjustment` (aceitavel quando ha alocacao) |
+
+**Anti-marra (secao 20.2):** nenhum `injectCashAdjustment` ativo; tolerancia mensal
+nao descarta residuo dentro de R$20 (vira gap); plugs silenciosos de patrimonio
+bloqueados quando caixa diverge.
+
+**Proximo passo obrigatorio pos-validacao:**
+
+1. **PIV-A01** — catalogo de underlying (resolver via `market_instruments` /
+   `invest_position_ext`, retirar dependencia de `UNDERLYING_BY_ROOT`).
+2. **Homologacao BTG** — reimport janeiro/2026 e validar gaps/pendencias na UI.
+3. **Secao 14** — market data registry (A-01, M-01).
+
+**Claim validador:**
+
+```text
+Validacao: secao-20-completa
+Veredito: APROVADO COM RESSALVAS (13/14; PIV-A01 REPROVADO)
+Aceite reproduzido: 61/61 testes verdes + 8 gate adversariais
+Red->green comprovado: sim (BusinessEventReconciler, PatrimonyMtm calibracao)
+Hardcode/tolerancia/plug: PIV-A01 mapa 6 tickers; CLD fallback feriado; GAP ajusta caixa explicito
+Pendencias: PIV-A01 catalogo; homologacao BTG mes a mes
+```
 
