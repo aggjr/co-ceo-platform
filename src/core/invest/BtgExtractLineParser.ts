@@ -1182,14 +1182,14 @@ export function btgLinesToImportEntries(
     out.push({
       date: move.date,
       ticker: CASH_TICKER,
-      operation: 'fee',
+      operation: 'extract_divergence',
       quantity: 0,
       unit_price: 0,
       total_net_value: move.signedNet,
       asset_type: 'cash',
       notes: move.description,
       event_source_ref: ref,
-      extract_category: 2,
+      extract_category: 3,
     });
   }
 

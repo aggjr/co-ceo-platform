@@ -44,6 +44,7 @@ export type PatrimonyDailyResult = {
     note: string;
     stock_cash_settlement_days?: number;
     settlement_rules?: string;
+    calibration_blocked_base_error?: boolean;
   };
 };
 

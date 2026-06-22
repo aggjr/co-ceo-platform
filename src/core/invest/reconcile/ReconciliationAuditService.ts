@@ -7,6 +7,7 @@ import { LedgerImportService } from '../LedgerImportService';
 import { buildLedgerDedupIndex } from '../ledgerOperationDedup';
 import { resolveInvestPeriodBounds } from '../investPeriodBounds';
 import { InvestBookPeriodService } from '../InvestBookPeriodService';
+import { MarketCalendarService } from '../MarketCalendarService';
 import { PatrimonyDailyStore } from '../PatrimonyDailyStore';
 import {
   type AuditIssue,
@@ -22,6 +23,7 @@ export class ReconciliationAuditService {
   private readonly reconciler: BusinessEventReconciler;
   private readonly patrimonyStore: PatrimonyDailyStore;
   private readonly periods: InvestBookPeriodService;
+  private readonly marketCalendar: MarketCalendarService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -29,6 +31,7 @@ export class ReconciliationAuditService {
     this.reconciler = new BusinessEventReconciler(gateway, registry);
     this.patrimonyStore = new PatrimonyDailyStore(gateway);
     this.periods = new InvestBookPeriodService(gateway);
+    this.marketCalendar = new MarketCalendarService(gateway);
   }
 
   async run(ctx: UserContext, opts: AuditRunOptions = {}): Promise<AuditReport> {
@@ -142,6 +145,26 @@ export class ReconciliationAuditService {
             severity: 'error',
             summaryKey: `invest.reconcile.audit.${kind}`,
             context: { eventId: row.id, message: msg, delta: report.delta },
+          });
+        }
+      }
+      const conservation = await this.reconciler.reconcileEconomicConservation(
+        ctx,
+        String(row.id)
+      );
+      if (!conservation.skipped && !conservation.conserved) {
+        for (const msg of conservation.issues) {
+          issues.push({
+            dimensionId: 22,
+            kind: 'economic_conservation_violation',
+            severity: 'error',
+            summaryKey: 'invest.reconcile.audit.economic_conservation_violation',
+            context: {
+              eventId: row.id,
+              eventKind: conservation.eventKind,
+              message: msg,
+              delta: conservation.conservationDelta,
+            },
           });
         }
       }
@@ -297,8 +320,13 @@ export class ReconciliationAuditService {
     const issues: AuditIssue[] = [];
     let d = from;
     while (d <= horizon) {
-      const dow = new Date(`${d}T12:00:00Z`).getUTCDay();
-      if (dow !== 0 && dow !== 6 && !dates.has(d)) {
+      if (await this.marketCalendar.isWeekendOrHoliday(ctx, d)) {
+        const next = new Date(`${d}T12:00:00Z`);
+        next.setUTCDate(next.getUTCDate() + 1);
+        d = next.toISOString().slice(0, 10);
+        continue;
+      }
+      if (!dates.has(d)) {
         issues.push({
           dimensionId: 15,
           kind: 'portfolio_daily_gap',

@@ -8,6 +8,7 @@ import { PatrimonyDailyRecorder } from './PatrimonyDailyRecorder';
 import { PatrimonyDailyStore } from './PatrimonyDailyStore';
 import { logReconcileFailure } from './reconcile/reconcileErrorDetail';
 import { DailyCloseMaterializeService } from './reconcile/DailyCloseMaterializeService';
+import { MarketCalendarService } from './MarketCalendarService';
 import { MarketQuoteRepository } from '../market/MarketQuoteRepository';
 import { InvestAssetProjection } from '../../modules/invest/sync/InvestAssetProjection';
 import pool from '../../config/database';
@@ -79,6 +80,7 @@ export class PatrimonyDailyRebuildService {
   private readonly dailyClose: DailyCloseMaterializeService;
   private readonly valuation: AssetValuationContext;
   private readonly periods: InvestBookPeriodService;
+  private readonly marketCalendar: MarketCalendarService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -89,6 +91,7 @@ export class PatrimonyDailyRebuildService {
     this.dailyClose = new DailyCloseMaterializeService(gateway);
     this.valuation = new AssetValuationContext(gateway);
     this.periods = new InvestBookPeriodService(gateway);
+    this.marketCalendar = new MarketCalendarService(gateway);
   }
 
   getStatus(ctx: UserContext): PatrimonyRebuildStatus {
@@ -170,7 +173,7 @@ export class PatrimonyDailyRebuildService {
       }
 
       for (const day of enumerateCalendarDays(from, to)) {
-        if (isWeekend(day)) {
+        if (isWeekend(day) || (await this.marketCalendar.isHoliday(ctx, day))) {
           daysSkipped += 1;
           continue;
         }

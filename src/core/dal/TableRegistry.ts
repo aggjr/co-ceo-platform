@@ -168,6 +168,13 @@ const TABLES: TableDefinition[] = [
     primaryKey: 'counterparty_code',
     countsTowardStorage: false,
   }),
+  def('market_holidays', 'global', {
+    softDelete: false,
+    primaryKey: 'holiday_date',
+    primaryKeyColumns: ['holiday_date', 'exchange_code'],
+    allowHardDelete: true,
+    countsTowardStorage: false,
+  }),
   def('settlement_contract_types', 'global', {
     softDelete: false,
     primaryKey: 'contract_type_code',

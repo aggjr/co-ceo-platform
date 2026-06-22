@@ -1,7 +1,7 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import { GatewayError } from '../dal/errors';
 import type { BusinessEventRegistry } from './BusinessEventRegistry';
-import type { EventReconciliationReport } from './types';
+import type { EconomicConservationReport, EventReconciliationReport } from './types';
 
 /**
  * Conciliacao: verifica que o agregado das pernas (caixa + custodia) bate
@@ -132,6 +132,86 @@ export class BusinessEventReconciler {
     ]);
     return { patrimony, financial };
   }
+
+  /**
+   * Conservacao economica: em eventos mistos (custodia + caixa), a soma assinada
+   * de total_value patrimonial + movimento financeiro deve fechar em zero.
+   * Excecoes declaradas: renda passiva, corporate_action, unknown_invest_event,
+   * eventos puramente patrimoniais ou financeiros.
+   */
+  async reconcileEconomicConservation(
+    ctx: UserContext,
+    eventId: string
+  ): Promise<EconomicConservationReport> {
+    const event = await this.registry.findById(ctx, eventId);
+    if (!event) {
+      throw new GatewayError(
+        'RECORD_NOT_FOUND',
+        `business_events ${eventId} nao encontrado`,
+        404
+      );
+    }
+    const eventKind = String(event.event_kind ?? '');
+    const { patrimonyLegs, financialLegs } = await this.registry.listLegs(ctx, eventId);
+
+    if (isEconomicConservationExempt(eventKind, patrimonyLegs.length, financialLegs.length)) {
+      return {
+        eventId,
+        eventKind,
+        conserved: true,
+        patrimonySignedTotal: 0,
+        financialSignedTotal: 0,
+        conservationDelta: 0,
+        skipped: true,
+        skipReason: `event_kind=${eventKind} isento de conservacao economica`,
+        issues: [],
+      };
+    }
+
+    let patrimonySignedTotal = 0;
+    for (const leg of patrimonyLegs) {
+      patrimonySignedTotal += signedPatrimonyValue(leg);
+    }
+
+    let financialSignedTotal = 0;
+    for (const leg of financialLegs) {
+      const status = String((leg as { status?: string }).status ?? 'cleared');
+      if (status === 'cancelled') continue;
+      financialSignedTotal += signedFinancialValue(leg);
+    }
+
+    const conservationDelta = round2(patrimonySignedTotal + financialSignedTotal);
+    const issues: string[] = [];
+    if (Math.abs(conservationDelta) > TOLERANCE) {
+      issues.push(
+        `Conservacao economica violada: patrimonio=${round2(patrimonySignedTotal)}, ` +
+          `financeiro=${round2(financialSignedTotal)}, delta=${conservationDelta}`
+      );
+    }
+
+    return {
+      eventId,
+      eventKind,
+      conserved: issues.length === 0,
+      patrimonySignedTotal: round2(patrimonySignedTotal),
+      financialSignedTotal: round2(financialSignedTotal),
+      conservationDelta,
+      skipped: false,
+      skipReason: null,
+      issues,
+    };
+  }
+
+  async assertEconomicConservation(ctx: UserContext, eventId: string): Promise<void> {
+    const report = await this.reconcileEconomicConservation(ctx, eventId);
+    if (!report.skipped && !report.conserved) {
+      throw new GatewayError(
+        'FINANCIAL_RULE_VIOLATION',
+        `business_events ${eventId} viola conservacao economica: ${report.issues.join('; ')}`,
+        422
+      );
+    }
+  }
 }
 
 function round2(n: number): number {
@@ -172,4 +252,69 @@ function hasCompleteLegComposition(
     }
   }
   return false;
+}
+
+const PATRIMONIAL_ONLY_EVENT_KINDS = new Set([
+  'corporate_action',
+  'opening_balance',
+]);
+
+const FINANCIAL_ONLY_EVENT_KINDS = new Set([
+  'cash_movement',
+  'cash_yield_event',
+  'broker_note_loan',
+  'unknown_invest_event',
+]);
+
+export function isEconomicConservationExempt(
+  eventKind: string,
+  patrimonyCount: number,
+  financialCount: number
+): boolean {
+  const kind = String(eventKind ?? '');
+  if (PATRIMONIAL_ONLY_EVENT_KINDS.has(kind) && financialCount === 0) return true;
+  if (FINANCIAL_ONLY_EVENT_KINDS.has(kind) && patrimonyCount === 0) return true;
+  if (patrimonyCount >= 1 && financialCount === 0) {
+    if (kind === 'corporate_action') return true;
+  }
+  if (financialCount >= 1 && patrimonyCount === 0) {
+    if (FINANCIAL_ONLY_EVENT_KINDS.has(kind)) return true;
+  }
+  return patrimonyCount === 0 || financialCount === 0;
+}
+
+function signedPatrimonyValue(leg: Record<string, unknown>): number {
+  const movementType = String(
+    (leg as { movement_type?: string }).movement_type ??
+      (leg as { transaction_type?: string }).transaction_type ??
+      ''
+  );
+  const raw = Math.abs(Number((leg as { total_value?: number | string }).total_value ?? 0));
+  if (!Number.isFinite(raw) || raw === 0) return 0;
+
+  switch (movementType) {
+    case 'acquisition':
+    case 'transfer_in':
+    case 'short_close':
+      return raw;
+    case 'disposition':
+    case 'transfer_out':
+    case 'short_open':
+      return -raw;
+    case 'opening_balance':
+    case 'split':
+    case 'bonus':
+    case 'revaluation':
+    case 'write_off':
+    case 'income_in_kind':
+      return 0;
+    default:
+      return Number((leg as { total_value?: number | string }).total_value ?? 0);
+  }
+}
+
+function signedFinancialValue(leg: Record<string, unknown>): number {
+  const direction = String((leg as { direction?: string }).direction ?? 'in');
+  const amount = Number((leg as { amount?: number | string }).amount ?? 0);
+  return direction === 'in' ? amount : -amount;
 }

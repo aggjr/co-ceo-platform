@@ -1323,6 +1323,43 @@ export class InvestOperations {
 
     // Trade ou opcao: precisa de patrimony_item.
     if (isCash) {
+      if (policy.cashDirection === 'signed' && policy.affectsFinancial) {
+        const cashResolution = await this.resolveCashAccount(ctx, {
+          brokerCode: await this.brokerCodeFromLine(ctx, line),
+          sourceSystem: line.source_system,
+          currencyCode: line.currency ?? 'BRL',
+          eventDate: line.date,
+        });
+        const signedCash = Number(
+          line.total_net_value ?? Number(line.quantity) * Number(line.unit_price)
+        );
+        const amount = Math.abs(signedCash);
+        if (amount === 0) return { skipped: true, reason: 'amount zero' };
+        const direction: 'in' | 'out' = signedCash >= 0 ? 'in' : 'out';
+        const finStatus: 'cleared' | 'pending' =
+          String(policy.defaultFinancialStatus) === 'pending' ? 'pending' : 'cleared';
+        await this.financialLedger.record(ctx, {
+          accountId: cashResolution.accountId,
+          transactionDate: line.date,
+          direction,
+          amount,
+          description: line.notes ?? op,
+          status: finStatus,
+          settlementDate: line.settlement_date ?? line.date,
+          businessEventId,
+          externalRef: ref ? `BROKER_REF:${ref}` : null,
+          metadata: {
+            legacy_op: op,
+            broker_note_ref: ref ?? null,
+            total_net_value: signedCash,
+            broker_code: cashResolution.brokerCode,
+            cash_ticker: cashResolution.cashTicker,
+            currency_code: cashResolution.currencyCode,
+            cash_policy_id: cashResolution.policyId,
+          },
+        });
+        return { skipped: false };
+      }
       return { skipped: true, reason: `operacao ${op} nao se aplica a ticker de caixa ${ticker}` };
     }
 

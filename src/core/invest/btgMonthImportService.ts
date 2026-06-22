@@ -15,6 +15,7 @@ import {
   sortParsedExtracts,
   type ParsedExtractForBatch,
 } from './btgExtractBatchReconcile';
+import { ensureMonthImportCashBalanceGaps } from './CashBalanceGapService';
 import {
   dedupeBrokerageNotes,
   parseBtgBrokerageNoteBlocks,
@@ -1056,7 +1057,6 @@ export async function applyBtgMonthImport(
   await ensureExtractDivergenceOperation(pool);
   const extractApply = await applyBtgExtractUpload(ctx, ledger, extractFile, {
     parseOptions: MONTH_IMPORT_EXTRACT_OPTS_APPLY,
-    keepUnmatchedLiqBolsaAsUnknown: false,
     skipUnmatchedLiqBolsa: false,
   });
 
@@ -1066,6 +1066,28 @@ export async function applyBtgMonthImport(
   const extractSkipped = extractApply.skipped ?? 0;
 
   const reconcileAfter = await ledger.reconcileCustody(ctx);
+
+  if (extractApply.importOk && preview.extract.parseOk && preview.extract.preview) {
+    const today = new Date().toISOString().slice(0, 10);
+    const eventsAfter = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+    const freshReconcile = buildExtractReconcileFields(
+      {
+        path: extractFile.name,
+        fileName: extractApply.fileName,
+        preview: preview.extract.preview,
+      },
+      eventsAfter,
+      applyOpts?.previousClosingExtract ?? null,
+      { tolerance: MONTH_IMPORT_CASH_TOLERANCE }
+    );
+    await ensureMonthImportCashBalanceGaps(
+      ctx,
+      ledger,
+      freshReconcile,
+      preview.month,
+      preview.extract.preview.firstDate
+    );
+  }
 
   const afterPreview = await previewBtgMonthImport(ctx, ledger, month, extractFile, noteFilesAll);
   const applied = Boolean(extractApply.importOk);

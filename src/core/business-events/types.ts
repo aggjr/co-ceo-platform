@@ -86,3 +86,16 @@ export type EventReconciliationReport = {
   financialLegCount: number;
   issues: string[];
 };
+
+/** Conservacao economica: patrimonio assinado + caixa assinado ≈ 0 em eventos mistos. */
+export type EconomicConservationReport = {
+  eventId: string;
+  eventKind: string;
+  conserved: boolean;
+  patrimonySignedTotal: number;
+  financialSignedTotal: number;
+  conservationDelta: number;
+  skipped: boolean;
+  skipReason: string | null;
+  issues: string[];
+};

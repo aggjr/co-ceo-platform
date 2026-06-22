@@ -1,6 +1,7 @@
 import {
   buildStockUnderlyingPivot,
   enrichStockPivotWithQuotes,
+  type StockPivotColumnKey,
 } from '../../../src/core/invest/StockUnderlyingPivotEngine';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
 
@@ -15,6 +16,25 @@ function ev(partial: Partial<LedgerEvent> & Pick<LedgerEvent, 'transaction_type'
     impacts_managerial_price: true,
     ...partial,
   } as LedgerEvent;
+}
+
+const GAIN_COLS: StockPivotColumnKey[] = [
+  'venda_call',
+  'compra_call',
+  'venda_put',
+  'compra_put',
+  'dividendos',
+  'jcp',
+  'locacao_acao',
+  'trade',
+  'day_trade',
+  'bonus',
+  'outros_ganhos',
+];
+
+function expectConservation(row: Record<StockPivotColumnKey, number>): void {
+  const gainSum = GAIN_COLS.reduce((acc, col) => acc + row[col], 0);
+  expect(row.ganho_aproximado).toBeCloseTo(gainSum + row.taxas, 2);
 }
 
 describe('buildStockUnderlyingPivot', () => {
@@ -100,6 +120,7 @@ describe('buildStockUnderlyingPivot', () => {
     expect(row!.outros_ganhos).toBeCloseTo(25, 2);
     expect(row!.taxas).toBeCloseTo(-15, 2);
     expect(row!.ganho_aproximado).toBeCloseTo(210, 2);
+    expectConservation(row!);
   });
 
   it('mantém prêmio de put vendida em resultado_custodia até ser fechada', () => {
@@ -221,5 +242,146 @@ describe('buildStockUnderlyingPivot', () => {
 
     expect(row?.preco_estrito).toBeCloseTo(40, 4);
     expect(row?.cotacao_atual).toBeCloseTo(42.5, 4);
+  });
+
+  it('conserva ganho_aproximado como soma das colunas de ganho + taxas', () => {
+    const entries: LedgerEvent[] = [
+      ev({
+        asset_id: 's1',
+        transaction_type: 'buy',
+        transaction_date: '2026-03-10',
+        quantity: 100,
+        unit_price: 40,
+        total_net_value: -4000,
+      }),
+      ev({
+        asset_id: 's1',
+        transaction_type: 'sell',
+        transaction_date: '2026-03-11',
+        quantity: 100,
+        unit_price: 42,
+        total_net_value: 4190,
+        brokerage_fee: 10,
+      }),
+      ev({
+        asset_id: 'o1',
+        asset_ticker: 'PRIOA450',
+        asset_type: 'option_call',
+        underlying_ticker: 'PRIO3',
+        transaction_type: 'call_sell',
+        transaction_date: '2026-03-12',
+        quantity: 100,
+        unit_price: 1,
+        total_net_value: 100,
+      }),
+      ev({
+        asset_id: 'fii1',
+        asset_ticker: 'MXRF11',
+        asset_type: 'fii',
+        transaction_type: 'amortization',
+        transaction_date: '2026-03-13',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 15,
+      }),
+    ];
+
+    const r = buildStockUnderlyingPivot(entries, '2026-01-01', '2026-12-31');
+    for (const row of r.rows) {
+      expectConservation(row);
+    }
+    expectConservation(r.totals);
+  });
+
+  it('calcula P&L correto apos split (custodia mantem custo total)', () => {
+    const entries: LedgerEvent[] = [
+      ev({
+        asset_id: 's1',
+        transaction_type: 'buy',
+        transaction_date: '2026-02-01',
+        quantity: 100,
+        unit_price: 40,
+        total_net_value: -4000,
+      }),
+      ev({
+        asset_id: 's1',
+        transaction_type: 'split',
+        transaction_date: '2026-02-15',
+        quantity: 200,
+        unit_price: 20,
+        total_net_value: 0,
+      }),
+      ev({
+        asset_id: 's1',
+        transaction_type: 'sell',
+        transaction_date: '2026-03-10',
+        quantity: 200,
+        unit_price: 21,
+        total_net_value: 4200,
+      }),
+    ];
+
+    const r = buildStockUnderlyingPivot(entries, '2026-01-01', '2026-12-31');
+    const row = r.rows.find((x) => x.underlying === 'PRIO3');
+    expect(row).toBeDefined();
+    expect(row!.trade).toBeCloseTo(200, 0);
+    expect(row!.ganho_aproximado).toBeCloseTo(200, 0);
+    expectConservation(row!);
+  });
+
+  it('lanca perda de call long expirada a zero via revaluation em compra_call', () => {
+    const entries: LedgerEvent[] = [
+      ev({
+        asset_id: 'oc1',
+        asset_ticker: 'PRIOA450',
+        asset_type: 'option_call',
+        underlying_ticker: 'PRIO3',
+        transaction_type: 'call_buy',
+        transaction_date: '2026-01-15',
+        quantity: 100,
+        unit_price: 2,
+        total_net_value: -200,
+      }),
+      ev({
+        asset_id: 'oc1',
+        asset_ticker: 'PRIOA450',
+        asset_type: 'option_call',
+        underlying_ticker: 'PRIO3',
+        transaction_type: 'revaluation',
+        transaction_date: '2026-02-20',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 0,
+      }),
+    ];
+
+    const r = buildStockUnderlyingPivot(entries, '2026-01-01', '2026-12-31');
+    const row = r.rows.find((x) => x.underlying === 'PRIO3');
+    expect(row).toBeDefined();
+    expect(row!.compra_call).toBeCloseTo(-200, 0);
+    expect(row!.ganho_aproximado).toBeCloseTo(-200, 0);
+    expectConservation(row!);
+  });
+
+  it('mapeia amortization explicitamente em outros_ganhos com sinal liquido', () => {
+    const entries: LedgerEvent[] = [
+      ev({
+        asset_id: 'fii1',
+        asset_ticker: 'MXRF11',
+        asset_type: 'fii',
+        transaction_type: 'amortization',
+        transaction_date: '2026-03-10',
+        quantity: 0,
+        unit_price: 0,
+        total_net_value: 30,
+      }),
+    ];
+
+    const r = buildStockUnderlyingPivot(entries, '2026-01-01', '2026-12-31');
+    const row = r.rows.find((x) => x.underlying === 'MXRF11');
+    expect(row).toBeDefined();
+    expect(row!.outros_ganhos).toBeCloseTo(30, 2);
+    expect(row!.ganho_aproximado).toBeCloseTo(30, 2);
+    expectConservation(row!);
   });
 });

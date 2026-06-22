@@ -1685,7 +1685,28 @@ patrimonio<->caixa. `assertConsistent()` existe mas NAO e chamado na importacao
 `src/core/business-events/BusinessEventReconciler.ts`,
 `src/core/invest/reconcile/ReconciliationAuditService.ts`.
 
-Status: aberto.
+**Contrato formal (EV-A01) — sinais por `movement_type` patrimonial:**
+
+| movement_type | Sinal economico (`total_value`) |
+|---|---|
+| `acquisition`, `transfer_in`, `short_close` | + (entrada de ativo) |
+| `disposition`, `transfer_out`, `short_open` | − (saida de ativo) |
+| `split`, `bonus`, `revaluation`, `write_off`, `income_in_kind`, `opening_balance` | 0 (nao move caixa no evento) |
+
+**Sinal financeiro:** `direction=in` → +`amount`; `direction=out` → −`amount`.
+Pernas `cancelled` ficam fora da soma.
+
+**Excecoes explicitas (nao exigem zero-sum patrimonio+caixa):**
+
+| Categoria | `event_kind` | Condicao |
+|---|---|---|
+| Financeiro puro | `cash_movement`, `cash_yield_event`, `broker_note_loan`, `unknown_invest_event` | sem pernas patrimoniais |
+| Patrimonial puro | `corporate_action`, `opening_balance` | sem pernas financeiras |
+| Provento / MTM | dividendos, `revaluation` | rastreados separadamente (fluxo externo TWR) |
+
+**Regra mista (trade):** `SUM(patrimonio assinado) + SUM(financeiro assinado) ≈ 0` (tolerancia R$ 0,01).
+
+Status: implementado (EV-M01).
 
 Aceite:
 - nova dimensao de auditoria "conservacao economica por evento" em
@@ -1994,6 +2015,8 @@ Classe executor: A. Classe validador: A. Depende de: nenhum. Precede: CLD-M01.
 
 Entregas: modelo (migration/seed) de feriados B3 e regras D+N fora do codigo;
 hoje estao hardcoded em `settlementCalendar.ts`.
+
+**Leitura canonica:** `MarketCalendarService` consulta `market_holidays` (migration `54_market_calendar.sql`) com fallback para `settlementCalendar.b3HolidaySet`. Usado em fechamento, rebuild e audit de gaps.
 
 Aceite: schema + seed inicial; decisao escrita de onde o calendario e lido.
 

@@ -215,7 +215,8 @@ function easterSundayUtc(year: number): Date {
   return new Date(Date.UTC(year, month - 1, day, 12));
 }
 
-function b3HolidaySet(year: number): Set<string> {
+/** Feriados B3 por ano (algoritmo canonico — usado como fallback e para seed de migration). */
+export function b3HolidaySet(year: number): Set<string> {
   const fixed = [
     `${year}-01-01`,
     `${year}-04-21`,

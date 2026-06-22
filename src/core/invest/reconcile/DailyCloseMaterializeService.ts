@@ -1,6 +1,7 @@
 import type { CoCeoDataGateway, UserContext } from '../../dal';
 import { GatewayError } from '../../dal/errors';
 import { authBootstrapContext } from '../../auth/authBootstrapContext';
+import { BusinessEventRegistry, BusinessEventReconciler } from '../../business-events';
 import { InvestQuoteSyncService } from '../InvestQuoteSyncService';
 import { OptionMarketSyncService } from '../OptionMarketSyncService';
 import { PatrimonyDailyRecorder, type RecordDailyPatrimonyResult } from '../PatrimonyDailyRecorder';
@@ -23,6 +24,7 @@ import {
   requiresMarketQuoteForAsset,
 } from '../valuation/AssetValuationContext';
 import { InvestBookPeriodService } from '../InvestBookPeriodService';
+import { MarketCalendarService } from '../MarketCalendarService';
 
 export type QuoteSyncDayReport = {
   date: string;
@@ -71,6 +73,8 @@ export class DailyCloseMaterializeService {
   private readonly valuation: AssetValuationContext;
   private readonly threePricesFactory: ThreePricesContextFactory;
   private readonly periods: InvestBookPeriodService;
+  private readonly eventReconciler: BusinessEventReconciler;
+  private readonly marketCalendar: MarketCalendarService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.quoteSync = new InvestQuoteSyncService(gateway);
@@ -84,6 +88,9 @@ export class DailyCloseMaterializeService {
     this.valuation = new AssetValuationContext(gateway);
     this.threePricesFactory = new ThreePricesContextFactory(gateway);
     this.periods = new InvestBookPeriodService(gateway);
+    const registry = new BusinessEventRegistry(gateway);
+    this.eventReconciler = new BusinessEventReconciler(gateway, registry);
+    this.marketCalendar = new MarketCalendarService(gateway);
   }
 
   async syncQuotesForDate(ctx: UserContext, date: string): Promise<QuoteSyncDayReport> {
@@ -95,6 +102,8 @@ export class DailyCloseMaterializeService {
 
     if (isWeekend(day)) {
       warnings.push(`${day} é fim de semana — cotações de pregão podem repetir último dia útil.`);
+    } else if (await this.marketCalendar.isHoliday(ctx, day)) {
+      warnings.push(`${day} é feriado B3 — cotações de pregão podem repetir último dia útil.`);
     }
 
     const ptax = await fetchPtaxUsdBrl(day).catch(() => null);
@@ -163,6 +172,8 @@ export class DailyCloseMaterializeService {
     });
     const quoteSync = await this.syncQuotesForDate(ctx, day);
 
+    await this.assertEconomicConservationForDay(ctx, day);
+
     await this.store.invalidateFromDate(ctx, day);
 
     let patrimonyRecorded = false;
@@ -212,6 +223,16 @@ export class DailyCloseMaterializeService {
     asOfDate: string
   ): Promise<{ positionsUpdated: number; positionsZeroed: number }> {
     return this.recalcThreePrices(ctx, asOfDate);
+  }
+
+  private async assertEconomicConservationForDay(ctx: UserContext, day: string): Promise<void> {
+    const rows = await this.gateway.findWhere(ctx, 'business_events', {}, { limit: 2000 });
+    for (const row of rows) {
+      const occurred = String(row.occurred_on ?? '').slice(0, 10);
+      if (occurred !== day.slice(0, 10)) continue;
+      if (row.voided_at) continue;
+      await this.eventReconciler.assertEconomicConservation(ctx, String(row.id));
+    }
   }
 
   private assertPatrimonyCoherent(

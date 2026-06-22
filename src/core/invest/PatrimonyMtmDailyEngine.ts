@@ -76,7 +76,14 @@ export type PositionDailySnapshot = {
   unitCost: number;
   marketValue: number;
   managerialValue: number;
-  priceSource: 'market' | 'previous_market' | 'black_scholes' | 'estimated_decay' | 'expired_zero' | 'cost';
+  priceSource:
+    | 'market'
+    | 'previous_market'
+    | 'black_scholes'
+    | 'estimated_decay'
+    | 'expired_zero'
+    | 'cost'
+    | 'anchor_residual';
 };
 
 function isCash(
@@ -404,6 +411,7 @@ export function buildDailyPatrimonyMtmSeries(
     patrimonyGross: number;
     patrimony: number;
     target: number;
+    calibrationBlockedBaseError: boolean;
   }> = [];
 
   const applyPortfolioEvent = (e: LedgerEvent, date: string): void => {
@@ -540,17 +548,26 @@ export function buildDailyPatrimonyMtmSeries(
     const target = shouldCalibrate ? interpolatePatrimonyTarget(date, anchors, flowsByDate) : 0;
     
     let optionsValue: number;
+    let calibrationBlockedBaseError = false;
     if (!shouldCalibrate) {
       optionsValue = Math.round((optionsFromMarket + optionsStructural + lastResidual) * 100) / 100;
     } else {
-      const residual = Math.round((target - base - pending - optionsFromMarket) * 100) / 100;
-      optionsValue = Math.round((optionsFromMarket + residual) * 100) / 100;
-      lastResidual = residual;
+      const expectedCashFromAnchor = Math.round(
+        (target - stocksValue - currentFixedIncome - optionsFromMarket - pending) * 100
+      ) / 100;
+      if (Math.abs(cash - expectedCashFromAnchor) > 1) {
+        calibrationBlockedBaseError = true;
+        optionsValue = Math.round((optionsFromMarket + optionsStructural) * 100) / 100;
+      } else {
+        const residual = Math.round((target - base - pending - optionsFromMarket) * 100) / 100;
+        optionsValue = Math.round((optionsFromMarket + residual) * 100) / 100;
+        lastResidual = residual;
+      }
     }
     let patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
     let patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
 
-    if (shouldCalibrate && Math.abs(patrimony - target) > 1) {
+    if (shouldCalibrate && !calibrationBlockedBaseError && Math.abs(patrimony - target) > 1) {
       optionsValue = Math.round((target - base - pending) * 100) / 100;
       patrimonyGross = Math.round((base + optionsValue) * 100) / 100;
       patrimony = Math.round((patrimonyGross + pending) * 100) / 100;
@@ -568,6 +585,7 @@ export function buildDailyPatrimonyMtmSeries(
       patrimonyGross,
       patrimony,
       target: shouldCalibrate ? Math.round(target * 100) / 100 : patrimony,
+      calibrationBlockedBaseError,
     });
   }
 
@@ -625,7 +643,7 @@ export function buildDailyPatrimonyMtmSeries(
 
   const lastPoint = rawPoints[rawPoints.length - 1];
   let optionsPlugTarget: number | undefined;
-  if (lastPoint && calibrate) {
+  if (lastPoint && calibrate && !lastPoint.calibrationBlockedBaseError) {
     const base = lastPoint.stocksValue + lastPoint.cash + lastPoint.fixedIncome;
     optionsPlugTarget = lastPoint.target - base - lastPoint.pendingSettlements;
   }
@@ -650,6 +668,7 @@ export function buildDailyPatrimonyMtmSeries(
     meta: {
       method: calibrate ? 'mtm_btg_calibrated' : 'mtm_economic',
       settlement_rules: 'configured_contract_rules',
+      calibration_blocked_base_error: lastPoint?.calibrationBlockedBaseError === true,
       note: calibrate
         ? 'Patrimônio econômico: posições × cotação atual + caixa liquidado e trânsito conforme regras contratuais configuradas. ' +
           'TWR diário: só capital_deposit/withdrawal como fluxo externo.'
@@ -726,6 +745,7 @@ function snapshotOpenPositions(
           const baseVal = optionTimeMark(p, asOf);
           const adjustedVal = (baseVal * plugFactor) + plugOffset;
           closing = Math.abs(adjustedVal) / Math.max(Math.abs(p.qty), 1);
+          priceSource = 'anchor_residual';
         } else {
           closing = Math.abs(optionTimeMark(p, asOf)) / Math.max(Math.abs(p.qty), 1);
         }

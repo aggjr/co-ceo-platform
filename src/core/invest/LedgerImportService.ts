@@ -27,6 +27,10 @@ import {
 import { SettlementRulesService } from './SettlementRulesService';
 import type { LiqBolsaPoolEntry } from './noteEventSettlement';
 import { isoDateFromRow } from './isoDateFromRow';
+import {
+  ensureCashBalanceGapsFromSnapshot as ensureCashBalanceGapsFromSnapshotImpl,
+} from './CashBalanceGapService';
+import type { BrokerCustodySnapshotRecord } from './brokerCustodySnapshotTypes';
 
 /** Abertura de custódia — referência única usada para idempotência. */
 
@@ -569,6 +573,15 @@ export class LedgerImportService {
     const { assets, processedEntries } = rebuildCustodyFromLedger(events);
     const pendingSync = await this.syncAutoPendingSettlements(ctx);
     return { processedEntries, positions: assets.length, pendingSync };
+  }
+
+  async ensureCashBalanceGapsFromSnapshot(
+    ctx: UserContext,
+    events: LedgerEvent[],
+    snapshot: BrokerCustodySnapshotRecord | null,
+    asOf: string
+  ) {
+    return ensureCashBalanceGapsFromSnapshotImpl(ctx, this, events, snapshot, asOf);
   }
 }
 

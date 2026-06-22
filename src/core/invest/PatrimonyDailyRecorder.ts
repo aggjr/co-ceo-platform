@@ -25,6 +25,7 @@ import { FxRateRepository } from '../market/FxRateRepository';
 import { InvestOperationPolicyService } from './InvestOperationPolicyService';
 import { inferOptionExpiryDate } from './optionExpiry';
 import { loadOptionMarketCatalog } from './optionMarketCatalog';
+import { MarketCalendarService } from './MarketCalendarService';
 
 export type RecordDailyPatrimonyResult = {
   snapshotDate: string;
@@ -45,6 +46,7 @@ export class PatrimonyDailyRecorder {
   private readonly fxRates: FxRateRepository;
   private readonly policyService: InvestOperationPolicyService;
   private readonly periods: InvestBookPeriodService;
+  private readonly marketCalendar: MarketCalendarService;
 
   constructor(private readonly gateway: CoCeoDataGateway) {
     this.ledger = new LedgerImportService(gateway);
@@ -56,11 +58,11 @@ export class PatrimonyDailyRecorder {
     this.fxRates = new FxRateRepository(gateway);
     this.policyService = new InvestOperationPolicyService(gateway);
     this.periods = new InvestBookPeriodService(gateway);
+    this.marketCalendar = new MarketCalendarService(gateway);
   }
 
-  private isWeekend(iso: string): boolean {
-    const dow = new Date(`${iso}T12:00:00Z`).getUTCDay();
-    return dow === 0 || dow === 6;
+  private async isWeekendOrHoliday(ctx: UserContext, iso: string): Promise<boolean> {
+    return this.marketCalendar.isWeekendOrHoliday(ctx, iso);
   }
 
   /**
@@ -129,7 +131,7 @@ export class PatrimonyDailyRecorder {
     events: Array<Record<string, unknown>>,
     date: string
   ): Promise<void> {
-    if (this.isWeekend(date)) return;
+    if (await this.isWeekendOrHoliday(ctx, date)) return;
     const openQuotedAssets = await this.quotedTickersOpenOnDate(ctx, events, date);
     const missing = openQuotedAssets.filter((ticker) => {
       const exact = quoteMap.get(ticker)?.get(date);
@@ -385,6 +387,7 @@ export class PatrimonyDailyRecorder {
         rf_anchor: rfAnchor,
         rf_marked: markedFixedIncomeTotal,
         rf_anchor_delta: Math.round((markedFixedIncomeTotal - rfAnchor) * 100) / 100,
+        calibration_blocked_base_error: mtm.meta?.calibration_blocked_base_error === true,
       },
     });
 

@@ -315,4 +315,121 @@ describe('BusinessEventReconciler', () => {
     expect(report.consistent).toBe(false);
     expect(report.issues.some((i) => /voided/i.test(i))).toBe(true);
   });
+
+  it('evento misto com pernas balanceadas fecha conservacao economica', async () => {
+    const { gw, reg, rec } = makeTriple();
+    const ev = await reg.create(ctx, {
+      sourceModule: 'INVEST',
+      eventKind: 'broker_note_spot',
+      occurredOn: '2026-04-17',
+      sourceRef: 'NOTA-CONS-OK',
+      sourceSystem: 'parser',
+      totalNet: -1000,
+    });
+    await gw.insert(ctx, 'patrimony_ledger_entries', {
+      id: 'p-buy',
+      patrimony_item_id: 'item-prio3',
+      business_event_id: ev.id,
+      transaction_date: '2026-04-17',
+      movement_type: 'acquisition',
+      total_value: 1000,
+    });
+    await gw.insert(ctx, 'financial_ledger_entries', {
+      id: 'f-out',
+      account_id: 'acc-1',
+      business_event_id: ev.id,
+      transaction_date: '2026-04-22',
+      direction: 'out',
+      amount: 1000,
+      status: 'cleared',
+    });
+    const report = await rec.reconcileEconomicConservation(ctx, ev.id);
+    expect(report.skipped).toBe(false);
+    expect(report.conserved).toBe(true);
+    expect(report.conservationDelta).toBe(0);
+  });
+
+  it('evento financeiro puro isenta conservacao economica', async () => {
+    const { gw, reg, rec } = makeTriple();
+    const ev = await reg.create(ctx, {
+      sourceModule: 'INVEST',
+      eventKind: 'cash_yield_event',
+      occurredOn: '2026-04-17',
+      sourceRef: 'DIV-1',
+      sourceSystem: 'parser',
+      totalNet: 50,
+    });
+    await gw.insert(ctx, 'financial_ledger_entries', {
+      id: 'f-div',
+      account_id: 'acc-1',
+      business_event_id: ev.id,
+      transaction_date: '2026-04-17',
+      direction: 'in',
+      amount: 50,
+      status: 'cleared',
+    });
+    const report = await rec.reconcileEconomicConservation(ctx, ev.id);
+    expect(report.skipped).toBe(true);
+    expect(report.conserved).toBe(true);
+  });
+
+  it('evento patrimonial puro isenta conservacao economica', async () => {
+    const { gw, reg, rec } = makeTriple();
+    const ev = await reg.create(ctx, {
+      sourceModule: 'INVEST',
+      eventKind: 'corporate_action',
+      occurredOn: '2026-04-17',
+      sourceRef: 'SPLIT-1',
+      sourceSystem: 'parser',
+      totalNet: 0,
+    });
+    await gw.insert(ctx, 'patrimony_ledger_entries', {
+      id: 'p-split',
+      patrimony_item_id: 'item-prio3',
+      business_event_id: ev.id,
+      transaction_date: '2026-04-17',
+      movement_type: 'split',
+      total_value: 0,
+    });
+    const report = await rec.reconcileEconomicConservation(ctx, ev.id);
+    expect(report.skipped).toBe(true);
+    expect(report.conserved).toBe(true);
+  });
+
+  it('evento misto desbalanceado viola conservacao economica', async () => {
+    const { gw, reg, rec } = makeTriple();
+    const ev = await reg.create(ctx, {
+      sourceModule: 'INVEST',
+      eventKind: 'broker_note_spot',
+      occurredOn: '2026-04-17',
+      sourceRef: 'NOTA-CONS-BAD',
+      sourceSystem: 'parser',
+      totalNet: -1000,
+    });
+    await gw.insert(ctx, 'patrimony_ledger_entries', {
+      id: 'p-buy-bad',
+      patrimony_item_id: 'item-prio3',
+      business_event_id: ev.id,
+      transaction_date: '2026-04-17',
+      movement_type: 'acquisition',
+      total_value: 1000,
+    });
+    await gw.insert(ctx, 'financial_ledger_entries', {
+      id: 'f-out-bad',
+      account_id: 'acc-1',
+      business_event_id: ev.id,
+      transaction_date: '2026-04-22',
+      direction: 'out',
+      amount: 900,
+      status: 'cleared',
+    });
+    const report = await rec.reconcileEconomicConservation(ctx, ev.id);
+    expect(report.skipped).toBe(false);
+    expect(report.conserved).toBe(false);
+    expect(report.conservationDelta).toBe(100);
+    await expect(rec.assertEconomicConservation(ctx, ev.id)).rejects.toMatchObject({
+      code: 'FINANCIAL_RULE_VIOLATION',
+      httpStatus: 422,
+    });
+  });
 });

@@ -12,6 +12,7 @@ const ctx: UserContext = {
 const listLedgerEvents = jest.fn();
 const findOrphanLegs = jest.fn();
 const reconcileEvent = jest.fn();
+const reconcileEconomicConservation = jest.fn();
 
 jest.mock('../../../../src/core/invest/LedgerImportService', () => ({
   LedgerImportService: jest.fn().mockImplementation(() => ({
@@ -23,6 +24,7 @@ jest.mock('../../../../src/core/business-events/BusinessEventReconciler', () => 
   BusinessEventReconciler: jest.fn().mockImplementation(() => ({
     findOrphanLegs,
     reconcileEvent,
+    reconcileEconomicConservation,
   })),
 }));
 
@@ -66,8 +68,14 @@ describe('ReconciliationAuditService', () => {
     listLedgerEvents.mockReset();
     findOrphanLegs.mockReset();
     reconcileEvent.mockReset();
+    reconcileEconomicConservation.mockReset();
     findOrphanLegs.mockResolvedValue({ patrimony: [], financial: [] });
     reconcileEvent.mockResolvedValue({ consistent: true, issues: [] });
+    reconcileEconomicConservation.mockResolvedValue({
+      conserved: true,
+      skipped: true,
+      issues: [],
+    });
   });
 
   it('canProceedToNextDay quando livro limpo', async () => {

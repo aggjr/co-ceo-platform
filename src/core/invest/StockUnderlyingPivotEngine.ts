@@ -162,6 +162,25 @@ export function buildStockUnderlyingPivot(
     const qty = Math.abs(Number(e.quantity));
     const price = Number(e.unit_price);
 
+    if (type === 'split' && Number(e.quantity) > 0 && s.qty > 0) {
+      s.qty = Number(e.quantity);
+      return { closedQty, costBasisClosed, wasLong };
+    }
+
+    if (type === 'revaluation') {
+      const assetType = String(e.asset_type || inferAssetType(String(e.asset_ticker)));
+      const isOption = assetType === 'option_call' || assetType === 'option_put';
+      const newPrice = Number(e.unit_price ?? 0);
+      if (isOption && s.qty > 0 && newPrice <= 0) {
+        wasLong = true;
+        closedQty = s.qty;
+        costBasisClosed = s.totalCost;
+        s.qty = 0;
+        s.totalCost = 0;
+      }
+      return { closedQty, costBasisClosed, wasLong };
+    }
+
     // option_exercise num SHORT fecha a posição (o comprador exerceu contra nós);
     // numa posição LONG, o option_exercise é equivalente a vender (exercemos o direito).
     const isExerciseOnShort = type === 'option_exercise' && s.qty < 0;
@@ -261,8 +280,20 @@ export function buildStockUnderlyingPivot(
       case 'penalty_b3':
         addToRow(row, 'taxas', signedExpense(net));
         break;
-      case 'revaluation':
+      case 'amortization':
         addToRow(row, 'outros_ganhos', net);
+        break;
+      case 'revaluation':
+        if (assetType === 'option_call' || assetType === 'option_put') {
+          if (closedQty > 0 && wasLong) {
+            const colLong = assetType === 'option_call' ? 'compra_call' : 'compra_put';
+            addToRow(row, colLong, net - costBasisClosed);
+          } else {
+            addToRow(row, 'outros_ganhos', net);
+          }
+        } else {
+          addToRow(row, 'outros_ganhos', net);
+        }
         break;
       case 'cost_adjustment':
         addToRow(row, 'taxas', signedExpense(net !== 0 ? net : Number(e.unit_price ?? 0)));

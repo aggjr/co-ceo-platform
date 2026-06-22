@@ -900,7 +900,8 @@ export async function applyBtgExtractUpload(
     );
     const liqBolsaSettlement = await settleLiqBolsaEntries(ctx, ledger, entries, {
       keepUnmatchedAsCash: options?.keepUnmatchedLiqBolsaAsCash === true,
-      keepUnmatchedAsUnknown: options?.keepUnmatchedLiqBolsaAsUnknown === true,
+      /** Default true: LIQ sem casamento vira extract_divergence investigavel. */
+      keepUnmatchedAsUnknown: options?.keepUnmatchedLiqBolsaAsUnknown !== false,
       skipUnmatched: options?.skipUnmatchedLiqBolsa === true,
     });
     entries = liqBolsaSettlement.entries;

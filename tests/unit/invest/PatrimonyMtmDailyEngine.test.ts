@@ -1,5 +1,6 @@
 import { buildDailyPatrimonyMtmSeries } from '../../../src/core/invest/PatrimonyMtmDailyEngine';
 import type { LedgerEvent } from '../../../src/core/invest/CustodyEngine';
+import { interpolatePatrimonyTarget } from '../../../src/core/invest/patrimonyAnchors';
 import { emptyAssetValuationSnapshot } from '../../../src/core/invest/valuation/AssetValuationContext';
 
 const anchors = {
@@ -54,9 +55,9 @@ describe('PatrimonyMtmDailyEngine', () => {
         asset_type: 'cash',
         transaction_type: 'opening_balance',
         transaction_date: '2026-01-01',
-        quantity: 200_000,
+        quantity: 950_000,
         unit_price: 1,
-        total_net_value: 200_000,
+        total_net_value: 950_000,
         impacts_managerial_price: false,
       },
     ];
@@ -407,5 +408,51 @@ describe('PatrimonyMtmDailyEngine', () => {
     const day = r.series[0]!;
     expect(day.patrimony).toBeCloseTo(58 * openPm + 24, 0);
     expect(day.patrimony).toBeLessThan(2_000_000);
+  });
+
+  it('nao calibra quando caixa diverge da ancora (erro de base)', () => {
+    const entries: LedgerEvent[] = [
+      stockOpen(1000, 50),
+      {
+        asset_id: 'c1',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'opening_balance',
+        transaction_date: '2026-01-01',
+        quantity: 950_000,
+        unit_price: 1,
+        total_net_value: 950_000,
+        impacts_managerial_price: false,
+      },
+      {
+        asset_id: 'c1',
+        asset_ticker: 'CAIXA-BTG',
+        asset_type: 'cash',
+        transaction_type: 'capital_deposit',
+        transaction_date: '2026-01-15',
+        quantity: 1000,
+        unit_price: 1,
+        total_net_value: 1000,
+        impacts_managerial_price: false,
+      },
+    ];
+    const economic = buildDailyPatrimonyMtmSeries(entries, '2026-01-15', '2026-01-15', {
+      anchors,
+      stockQuotes: { PRIO3: 50 },
+      fixedIncomeTotal: 100_000,
+      calibrateToAnchors: false,
+    });
+    const calibrated = buildDailyPatrimonyMtmSeries(entries, '2026-01-15', '2026-01-15', {
+      anchors,
+      stockQuotes: { PRIO3: 50 },
+      fixedIncomeTotal: 100_000,
+      calibrateToAnchors: true,
+    });
+    const ecoDay = economic.series[0]!;
+    const calDay = calibrated.series[0]!;
+    expect(calibrated.meta?.calibration_blocked_base_error).toBe(true);
+    expect(calDay.patrimony).toBeCloseTo(ecoDay.patrimony, 0);
+    const anchorTarget = interpolatePatrimonyTarget('2026-01-15', anchors);
+    expect(Math.abs(calDay.patrimony - anchorTarget)).toBeGreaterThan(1);
   });
 });

@@ -312,6 +312,9 @@ export class ReconciliationDiagnosticsService {
     );
     const eventRows = this.buildBusinessEventRows(events);
     const cashRows = this.buildCashRows(events, latestSnapshot, asOf);
+    if (latestSnapshot) {
+      await this.ledger.ensureCashBalanceGapsFromSnapshot(ctx, events, latestSnapshot, asOf);
+    }
     const dailyAudit = this.buildDailyAuditRows(events, asOf, period?.openingDate ?? null);
     const resetRows = await this.buildResetRows(ctx);
     const critical = this.buildCriticalFindings(assetRows, eventRows, cashRows, resetRows);

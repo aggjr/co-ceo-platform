@@ -63,6 +63,7 @@ export function allowedActionsForKind(kind: string): ReconcileAction[] {
     case 'orphan_financial_leg':
     case 'header_without_legs':
     case 'legs_sum_mismatch':
+    case 'economic_conservation_violation':
       return ['void_ledger', 'defer'];
     case 'zero_fees':
       return ['insert_from_file', 'void_ledger', 'defer'];
