@@ -2334,3 +2334,68 @@ node .\node_modules\jest\bin\jest.js --runTestsByPath tests\unit\core\market\sec
 - Fechamento diario **nao bloqueia** por delta de ancora; registra evento e segue.
 - Eventos de diferenca nao explicada filtravel: `extract_divergence`, `cash_balance_gap`, `patrimony_anchor_divergence`.
 
+### 21.8 Onda 1 — erradicacao de hardcodes de cliente (2026-06-23)
+
+Status: **concluida** nos alvos com fonte canonica clara.
+
+| Lote | Entrega | Versao |
+|---|---|---|
+| 1 | Remocao de ancoras/benchmark BTG hardcoded (`btgPatrimonyAnchorReference`, `btgPerformanceReference`, `btgPublishedPerformanceSeries`), org-holding-001 fallback do cron | <= V0.0.427 |
+| 2 | Inferencia generica de ticker B3/LFT (`extractLedgerEnrichment`), janela movel de 24m no quote sync, LFT sem defaults de data/VNA/Selic, mes-fim generico no `btgExtractCashSeries` | V0.0.428 |
+| 3 | `clientCode` da nota vem da propria nota (`/^\d{6,}$/` + guarda `noteNumber`); `INVEST_OPENING_*` (exports mortos) removidos — abertura vem de `InvestBookPeriodService.resolveDefault` | V0.0.429 |
+
+Triagem de regressao (agente independente): lote 2 e lote 3 **sem regressao**; baseline de 15 falhas em 12 suites e **pre-existente** ao V0.0.427 (catalogo em §21.9).
+
+#### B-02 — ticker de caixa por organizacao (backlog, decisao arquiteto)
+
+Os 3 itens escalados pela Onda 1 tem a mesma causa: o ticker de caixa nao e resolvido por org.
+
+- `MAIN_CASH_TICKER='CAIXA-BTG'` em `ledgerTypes.ts` — consumido por 8 arquivos (`btgUploadImportService`, `btgMonthImportService`, `CashBalanceGapService`, `portfolioMapper`, `custodyFeeNetting`, `AutoPendingSettlementSync`, `applyBrokerHoldingSnapshot`, `BtgExtractLineParser`). **Gap multi-tenant real.**
+- `'CAIXA-BTG'` em `InvestCashAccountPolicy.ts:213` — fallback de boot espelhando o seed; inocuo enquanto DB migrado.
+- `'CAIXA-BTG'` em `ledgerOperationDedup.ts:253,270` — apenas label de relatorio de dedup (nao entra no livro); cosmetico.
+
+Decisao: tarefa dedicada para tornar o ticker de caixa resolvido via `InvestCashAccountPolicy` (threading de `organizationId`) nos 8 consumidores, eliminando a constante do core. **Nao** e patch da Onda 1 (refator invasivo). Prioridade media — so trava cliente cujo caixa nao se chame `CAIXA-BTG`.
+
+#### Fora de escopo Onda 1 (resolve na Onda 3 / onboarding)
+
+- `PRIO3` embutido no `BtgExtractLineParser` (a nota de BTC pode nao nomear o ticker) — exige config de underlying por org ou inferencia de contexto.
+- `src/database/seeds/invest_migration.json` — livro inteiro do cliente versionado no repo (viola `no-runtime-data-files`). Substituido pelo caminho upload/translator quando a Onda 3 estiver pronta.
+
+### 21.9 Baseline vermelho pre-existente (15 falhas / 12 suites) — tarefa propria
+
+Catalogo levantado pela triagem (2026-06-23). Temas recorrentes:
+
+1. **Correcao `ITUB3 -> ITUB4` em exercicio de PUT** — `btgHomeBrokerImport`, `threePricesEngine`, `brokerOrderMapper`.
+2. **Transito de caixa D+2 / `settledCashBalance`** — `cashInTransit`, `cashInvestLedger`.
+3. **Contexto de patrimonio com `categories`/`series` undefined** — `PatrimonyDailyRecorder`, `PatrimonyDailyEngine`, `AssetValuationContext`.
+4. **Outros** — `ReconciliationDiagnosticsService.dailyAudit` (delta 400 no openingCash), `btgUploadImportService` (LIQ BOLSA unresolved), `BtgExtractLineParser` (custodia mensal sem ticker / fee em credito), `portfolioMapper` (opcao zerada), `callCoverage` (agregacao por underlying).
+
+A ser tratado como tarefa separada das Ondas, em grupos de suite, antes de declarar "sistema redondo".
+
+### 21.10 Re-import 2026 — runbook de homologacao (Opcao C)
+
+Objetivo: re-importar 2026 da org existente e comparar patrimonio economico vs ancoras, validando que divergencia vira **evento** (sem plug).
+
+**Pre-requisitos:**
+
+1. Config de LFT no `.env` (valores reais de mercado — fornecidos pelo usuario; o estimador retorna `null` sem eles e a valorizacao da LFT por API do Tesouro cobre os dias disponiveis):
+
+```env
+TESOURO_LFT_REF_DATE=AAAA-MM-DD     # data com VNA conhecido (Tesouro Transparente)
+TESOURO_LFT_REF_VNA=<vna>           # VNA da LFT nessa data
+TESOURO_LFT_SELIC_ANUAL=0.NN        # Selic anual em decimal
+```
+
+2. Schema migrado; org alvo definida; arquivos de 2026 (notas BTG + extratos) disponiveis localmente.
+
+**Fluxo:** ingestao via upload/translator -> livro razao -> fechamento diario (`DailyCloseMaterializeService`) -> comparacao patrimonio x ancoras (`PatrimonyAnchorDivergenceService`).
+
+**Checklist de aceite ("redondo"):**
+
+1. Patrimonio economico mes a mes x ancora: residual vira `patrimony_anchor_divergence` (nenhum plug/calibracao).
+2. LFT valorizada (nao-nula) em todos os dias -> confirma config/API de LFT.
+3. Tres precos (Estrito/B3/Gerencial) coerentes por posicao.
+4. Premios de opcao sem multiplicador x100 (quantidade = livro).
+5. Continuidade de caixa sem `cash_balance_gap` inexplicado.
+6. Idempotencia: nenhum lancamento duplicado no re-import.
+
