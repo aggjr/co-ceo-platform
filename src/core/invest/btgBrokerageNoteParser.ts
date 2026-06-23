@@ -443,7 +443,7 @@ function parseLoanBlock(block: string[], sourceFile: string): BtgBrokerageNote |
     pregaoDate,
     category: 'LOAN',
     sourceFile,
-    clientCode: '004176105',
+    clientCode: '',
     trades,
     fees,
     netOperations: noteNet > 0 ? noteNet : trades.reduce((s, t) => s + t.grossValue, 0),
@@ -510,7 +510,7 @@ export function parseBtgBrokerageNoteBlocks(
     let noteNumber = firstDigits(block[1] || '');
     let sheet = '';
     let pregaoRaw = '';
-    let clientCode = '004176105';
+    let clientCode = '';
     const trades: BtgBrokerageNoteTrade[] = [];
     const fees: BtgBrokerageNoteFee[] = [];
     let inTrades = false;
@@ -535,7 +535,7 @@ export function parseBtgBrokerageNoteBlocks(
       const dateInline = line!.match(/^(\d{2}\/\d{2}\/\d{4})\s+Data\s+preg[aã]o/i);
       if (dateInline) pregaoRaw = dateInline[1]!;
       if (line === 'Data pregão' && block[i - 1]) pregaoRaw = block[i - 1];
-      if (/^004176105$/.test(line!)) clientCode = line!;
+      if (/^\d{6,}$/.test(line!) && line !== noteNumber) clientCode = line!;
       if (line!.startsWith('Negócios realizados')) {
         inTrades = true;
         inFeeSection = false;

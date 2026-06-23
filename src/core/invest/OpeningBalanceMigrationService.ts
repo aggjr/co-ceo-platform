@@ -3,11 +3,6 @@ import type { CoCeoDataGateway, SecurePayload, UserContext } from '../dal';
 import { BusinessEventRegistry } from '../business-events';
 import { InvestBookPeriodService } from './InvestBookPeriodService';
 
-/** @deprecated Use InvestBookPeriodService. */
-export const INVEST_OPENING_SOURCE_REF = 'INVEST-OPENING-2026-01-01';
-/** @deprecated Use InvestBookPeriodService. */
-export const INVEST_OPENING_DATE = '2026-01-01';
-
 const MONEY_TOL = 0.01;
 
 export type OpeningMigrationReport = {
