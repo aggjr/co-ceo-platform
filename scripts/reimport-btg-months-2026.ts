@@ -35,6 +35,7 @@ import {
 } from '../src/core/invest/btgMonthImportService';
 import type { LedgerEvent } from '../src/core/invest/CustodyEngine';
 import type { BtgUploadFileInput } from '../src/core/invest/btgUploadImportService';
+import { previewBtgExtractUpload } from '../src/core/invest/btgUploadImportService';
 import { settledCashBalanceFromLedger } from '../src/core/invest/cashInvestLedger';
 import {
   BTG_MONTHS_2026,
@@ -81,6 +82,34 @@ function toUpload(filePath: string, relBase: string): BtgUploadFileInput {
     name: path.relative(relBase, filePath).replace(/\\/g, '/'),
     contentBase64: fs.readFileSync(filePath).toString('base64'),
   };
+}
+
+/** Com --from após 2026-01: reconstrói o livro-simulação (extrato) dos meses já importados. */
+async function seedSkippedMonthsChain(
+  fromMonth: string,
+  dbLedger: LedgerEvent[]
+): Promise<{ workingLedger: LedgerEvent[]; prevClosing: number | null }> {
+  if (fromMonth <= '2026-01') {
+    return { workingLedger: filterLedgerOpeningOnly(dbLedger), prevClosing: null };
+  }
+
+  const base = btgSourcesBase();
+  const extDir = extractsDir(base);
+  let workingLedger = filterLedgerOpeningOnly(dbLedger);
+  let prevClosing: number | null = null;
+
+  for (const spec of BTG_MONTHS_2026) {
+    if (spec.month >= fromMonth) break;
+    const extractFile = toUpload(resolveExtractPath(base, spec), extDir);
+    const parsed = await previewBtgExtractUpload(extractFile);
+    if (parsed.preview?.lastExtractBalance != null) {
+      prevClosing = parsed.preview.lastExtractBalance;
+    }
+    // Mesma cadeia do apply contínuo: livro de batimento = projeção do extrato (não o DB bruto).
+    workingLedger = await buildMonthReconcileLedger(spec.month, extractFile, workingLedger);
+  }
+
+  return { workingLedger, prevClosing };
 }
 
 function brl(n: number | null | undefined): string {
@@ -284,7 +313,7 @@ async function applyMonth(
   const allNoteUploads = listAllNoteUploads(base);
 
   console.log(`\n========== ${spec.label} ==========`);
-  execSync(`npx ts-node scripts/purge-invest-month.ts ${spec.month} --confirm`, {
+  execSync(`node ./node_modules/ts-node/dist/bin.js scripts/purge-invest-month.ts ${spec.month} --confirm`, {
     stdio: 'inherit',
     cwd: ROOT,
   });
@@ -330,13 +359,17 @@ async function applyMonth(
 
   const closingDate = applied.extract.closingDate || `${spec.month}-28`;
   const reconcileLedger = await buildMonthReconcileLedger(spec.month, extractFile, workingLedger);
-  const cashEnd = settledCashBalanceFromLedger(reconcileLedger, closingDate);
+  // Gate §4: caixa medido contra o livro REAL relido (persistido), nao a projecao
+  // da serie do extrato (buildMonthReconcileLedger), que bate por construcao.
+  const today = new Date().toISOString().slice(0, 10);
+  const persistedLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
+  const cashEnd = settledCashBalanceFromLedger(persistedLedger, closingDate);
   const closingExtract = applied.extract.closingExtract ?? null;
   const delta = closingExtract != null ? closingExtract - cashEnd : 0;
 
   console.log('Notas +', applied.notesInserted, 'Extrato +', applied.extractInserted);
   console.log(
-    'Saldo caixa (série extrato):',
+    'Saldo caixa (livro persistido):',
     brl(cashEnd),
     '| extrato:',
     brl(closingExtract),
@@ -384,9 +417,15 @@ async function main() {
       console.log('\n=== Reimportação (--apply) ===');
       const today = new Date().toISOString().slice(0, 10);
       const dbLedger = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
-      let workingLedger = filterLedgerOpeningOnly(dbLedger);
+      const seeded = await seedSkippedMonthsChain(FROM, dbLedger);
+      let workingLedger = seeded.workingLedger;
       const results = [];
-      let prevClosing: number | null = null;
+      let prevClosing = seeded.prevClosing;
+      if (FROM > '2026-01' && prevClosing != null) {
+        console.log(
+          `Cadeia retomada: livro com ${workingLedger.length} lanç. até ${FROM}; saldo fim extrato anterior: ${brl(prevClosing)}`
+        );
+      }
       for (const spec of BTG_MONTHS_2026) {
         if (spec.month < FROM) {
           console.log(`Pulando ${spec.label} (--from ${FROM})`);

@@ -1,6 +1,7 @@
 import {
   assessLiqBolsaFromPendingPools,
   buildMonthReconcileLedger,
+  evaluatePersistedCashGate,
   filterFilesForMonth,
   isMonthBtgImportCashEvent,
   resolveLiqBolsaMonthPreview,
@@ -197,5 +198,55 @@ describe('btgMonthImportService', () => {
       ]
     );
     expect(assessment.ok).toBe(true);
+  });
+});
+
+describe('evaluatePersistedCashGate — gate contra o livro persistido (§4)', () => {
+  it('bloqueia o mes quando o caixa persistido diverge do extrato, mesmo com a previa projetada OK', () => {
+    // Previa projetada (buildMonthReconcileLedger) bate por construcao — gate antigo passaria.
+    const previewFinancialOk = true;
+    const previewResultOk = true;
+
+    // Antes do fix: o criterio "mes OK" era so a previa projetada.
+    expect(previewResultOk).toBe(true);
+
+    // Depois do fix: o livro REAL relido (eventsAfter) nao bate com o fechamento do extrato.
+    const gate = evaluatePersistedCashGate({
+      previewFinancialOk,
+      previewResultOk,
+      persistedClosingLedgerOk: false,
+      persistedClosingLedgerDelta: -55145.27,
+    });
+
+    expect(gate.persistedCashOk).toBe(false);
+    expect(gate.financialOk).toBe(false);
+    expect(gate.resultOk).toBe(false);
+    expect(gate.gateDetail).toContain('nao bate com o extrato');
+  });
+
+  it('aprova o mes quando o caixa persistido bate com o extrato', () => {
+    const gate = evaluatePersistedCashGate({
+      previewFinancialOk: true,
+      previewResultOk: true,
+      persistedClosingLedgerOk: true,
+      persistedClosingLedgerDelta: 0,
+    });
+
+    expect(gate.persistedCashOk).toBe(true);
+    expect(gate.financialOk).toBe(true);
+    expect(gate.resultOk).toBe(true);
+    expect(gate.gateDetail).toBeNull();
+  });
+
+  it('nao mascara: previa projetada OK + persistido ausente (null) nao aprova o mes', () => {
+    const gate = evaluatePersistedCashGate({
+      previewFinancialOk: true,
+      previewResultOk: true,
+      persistedClosingLedgerOk: null,
+      persistedClosingLedgerDelta: null,
+    });
+
+    expect(gate.persistedCashOk).toBe(false);
+    expect(gate.resultOk).toBe(false);
   });
 });

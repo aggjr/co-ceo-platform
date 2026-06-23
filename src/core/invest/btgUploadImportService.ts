@@ -282,6 +282,31 @@ function signedCashValue(line: LedgerImportLine): number {
   return Math.round(Number(line.total_net_value ?? 0) * 100) / 100;
 }
 
+/**
+ * Operacoes de caixa do extrato que podem ser, na verdade, a chegada no banco de
+ * uma liquidacao ja registrada pela nota (credito/debito generico sem rotulo LIQ
+ * BOLSA). Rendimento real, dividendo, JCP etc. nao tem perna pending de nota
+ * casavel, entao mesmo passando aqui o matcher nao casa e a linha permanece.
+ */
+const NOTE_SETTLEMENT_CANDIDATE_OPS: ReadonlySet<string> = new Set([
+  'capital_deposit',
+  'capital_withdrawal',
+  'cash_yield',
+]);
+
+function isCashLine(line: LedgerImportLine): boolean {
+  return (
+    String(line.asset_type) === 'cash' ||
+    String(line.ticker || '').toUpperCase() === MAIN_CASH_TICKER.toUpperCase()
+  );
+}
+
+/** Linha de caixa do extrato (nao-LIQ) que pode duplicar uma liquidacao de nota. */
+function isNoteSettlementCandidateLine(line: LedgerImportLine): boolean {
+  if (!isCashLine(line)) return false;
+  return NOTE_SETTLEMENT_CANDIDATE_OPS.has(String(line.operation));
+}
+
 /** PDF/extrato pode repetir a mesma operacao patrimonial — dedup antes de refs sequenciais. */
 export function dedupeExtractPatrimonyLines(lines: LedgerImportLine[]): LedgerImportLine[] {
   const seen = new Set<string>();
@@ -372,7 +397,7 @@ export function liqBolsaUnknownEventLine(
       `LIQ sem casamento com pending settlement. Motivo: ${reason}`,
   };
 }
-async function settleLiqBolsaEntries(
+export async function settleLiqBolsaEntries(
   ctx: UserContext,
   ledger: Pick<LedgerImportService, 'settleLiqBolsa'>,
   entries: LedgerImportLine[],
@@ -394,6 +419,23 @@ async function settleLiqBolsaEntries(
 
   for (const line of entries) {
     if (!isLiqBolsaLine(line)) {
+      // Extrato e a verdade do caixa: credito/debito que corresponde a liquidacao
+      // de uma nota (mesma data de liquidacao + valor assinado) baixa a pendencia
+      // existente sem criar nova perna. Nao-casado permanece como fluxo legitimo.
+      if (isNoteSettlementCandidateLine(line)) {
+        const net = signedCashValue(line);
+        if (Math.abs(net) >= 0.01) {
+          const result = await ledger.settleLiqBolsa(ctx, {
+            extractLineRef: line.broker_note_ref || `BTG-EXT-${line.date}`,
+            settlementDate: line.date,
+            valueSignedCents: Math.round(net * 100),
+          });
+          if (result.status === 'matched') {
+            matched += result.settledEvents.length;
+            continue;
+          }
+        }
+      }
       out.push(line);
       continue;
     }

@@ -13,6 +13,7 @@ import {
   isExtractMonthInLedger,
   MONTH_IMPORT_CASH_TOLERANCE,
   sortParsedExtracts,
+  type ExtractReconcileFields,
   type ParsedExtractForBatch,
 } from './btgExtractBatchReconcile';
 import { ensureMonthImportCashBalanceGaps } from './CashBalanceGapService';
@@ -469,6 +470,42 @@ function evaluateMonthPreview(
   }
 
   return { notesOk, financialOk, resultOk, notesDetail, financialDetail, resultDetail };
+}
+
+export type PersistedCashGateInput = {
+  /** Flags da previa projetada (buildMonthReconcileLedger) — bate por construcao. */
+  previewFinancialOk: boolean;
+  previewResultOk: boolean;
+  /** Batimento do livro REAL relido (eventsAfter) contra o fechamento do extrato. */
+  persistedClosingLedgerOk: boolean | null;
+  persistedClosingLedgerDelta: number | null;
+};
+
+export type PersistedCashGateResult = {
+  persistedCashOk: boolean;
+  financialOk: boolean;
+  resultOk: boolean;
+  gateDetail: string | null;
+};
+
+/**
+ * Gate de batimento contra o PERSISTIDO (nao contra projecao). A previa usa o livro
+ * projetado da serie do extrato, que bate por construcao e mascara duplicidade ja
+ * gravada. Aqui o mes so e "OK" se o caixa liquidado do livro REAL relido
+ * (settledCashBalanceFromLedger sobre eventsAfter) bater com o fechamento do extrato.
+ */
+export function evaluatePersistedCashGate(
+  input: PersistedCashGateInput
+): PersistedCashGateResult {
+  const persistedCashOk = input.persistedClosingLedgerOk === true;
+  const financialOk = input.previewFinancialOk && persistedCashOk;
+  const resultOk = input.previewResultOk && persistedCashOk;
+  const gateDetail = persistedCashOk
+    ? null
+    : `Caixa do livro gravado nao bate com o extrato (Δ fim R$ ${
+        input.persistedClosingLedgerDelta?.toFixed(2) ?? '?'
+      }). Importacao do mes bloqueada ate reconciliar o caixa persistido.`;
+  return { persistedCashOk, financialOk, resultOk, gateDetail };
 }
 
 export type PreviewBtgMonthImportOptions = {
@@ -1067,10 +1104,11 @@ export async function applyBtgMonthImport(
 
   const reconcileAfter = await ledger.reconcileCustody(ctx);
 
+  let freshReconcile: ExtractReconcileFields | null = null;
   if (extractApply.importOk && preview.extract.parseOk && preview.extract.preview) {
     const today = new Date().toISOString().slice(0, 10);
     const eventsAfter = await ledger.listLedgerEvents(ctx, '2000-01-01', today);
-    const freshReconcile = buildExtractReconcileFields(
+    freshReconcile = buildExtractReconcileFields(
       {
         path: extractFile.name,
         fileName: extractApply.fileName,
@@ -1092,19 +1130,30 @@ export async function applyBtgMonthImport(
   const afterPreview = await previewBtgMonthImport(ctx, ledger, month, extractFile, noteFilesAll);
   const applied = Boolean(extractApply.importOk);
 
+  // Gate §4: o mes so fecha se o caixa do livro PERSISTIDO (eventsAfter relido) bate
+  // com o fechamento do extrato — nao a projecao da previa, que bate por construcao.
+  const gate = evaluatePersistedCashGate({
+    previewFinancialOk: preview.financialOk,
+    previewResultOk: preview.resultOk,
+    persistedClosingLedgerOk: freshReconcile?.closingLedgerOk ?? null,
+    persistedClosingLedgerDelta: freshReconcile?.closingLedgerDelta ?? null,
+  });
+
   const pendingNote = reconcileAfter.pendingSync
     ? ` trânsito: +${reconcileAfter.pendingSync.created}/-${reconcileAfter.pendingSync.cleared}.`
     : '';
 
   const resultDetail = applied
-    ? `Importado: notas +${notesInserted}/-${notesSkipped}, extrato +${extractInserted}/-${extractSkipped}.${pendingNote}`
+    ? gate.gateDetail ??
+      `Importado: notas +${notesInserted}/-${notesSkipped}, extrato +${extractInserted}/-${extractSkipped}.${pendingNote}`
     : extractApply.importError || 'Falha ao gravar extrato.';
 
   logInvestStdout(
     'btg-import',
     ctx.organizationId,
     `${applied ? 'APPLIED' : 'FAILED'} month=${month} notes=+${notesInserted}/-${notesSkipped} ` +
-      `extract=+${extractInserted}/-${extractSkipped} pdfs=${noteFiles.length} detail=${resultDetail}`
+      `extract=+${extractInserted}/-${extractSkipped} pdfs=${noteFiles.length} ` +
+      `persistedCashOk=${gate.persistedCashOk} detail=${resultDetail}`
   );
 
   return {
@@ -1114,8 +1163,8 @@ export async function applyBtgMonthImport(
     notesSkipped,
     extractInserted,
     extractSkipped,
-    financialOk: applied ? preview.financialOk : afterPreview.financialOk,
-    resultOk: applied && preview.resultOk,
+    financialOk: applied ? gate.financialOk : afterPreview.financialOk,
+    resultOk: applied && gate.resultOk,
     resultDetail,
   };
 }
