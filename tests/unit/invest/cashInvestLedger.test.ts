@@ -2,6 +2,7 @@ import { rebuildCustodyFromLedger } from '../../../src/core/invest/CustodyEngine
 import {
   cashBalanceFromLedger,
   resolveCashInvestDisplayBalance,
+  settledCashBalanceFromLedger,
 } from '../../../src/core/invest/cashInvestLedger';
 import { AUTO_D2_REF_PREFIX } from '../../../src/core/invest/AutoPendingSettlementSync';
 
@@ -172,5 +173,121 @@ describe('cashInvestLedger', () => {
 
     expect(resolveCashInvestDisplayBalance(entries, '2026-05-12')).toBeCloseTo(0, 2);
     expect(resolveCashInvestDisplayBalance(entries, '2026-05-14')).toBeCloseTo(-4000, 2);
+  });
+
+  const cashLeg = (o: {
+    id: string;
+    type: string;
+    value: number;
+    date: string;
+    ref?: string;
+    eventId?: string;
+    notes?: string;
+  }) => ({
+    id: o.id,
+    asset_id: o.id,
+    asset_ticker: 'CAIXA-BTG',
+    asset_type: 'cash',
+    transaction_type: o.type,
+    quantity: 0,
+    unit_price: 0,
+    total_net_value: o.value,
+    transaction_date: o.date,
+    broker_note_ref: o.ref,
+    business_event_id: o.eventId,
+    notes: o.notes,
+  });
+
+  it('opcao: pending da nota + capital_deposit do extrato (mesmo evento) conta o caixa uma vez', () => {
+    const eventId = 'evt-opt-venda';
+    const entries = [
+      cashLeg({ id: 'open', type: 'opening_balance', value: 1_000, date: '2026-01-01' }),
+      cashLeg({
+        id: 'note-premio',
+        type: 'pending_settlement',
+        value: 400,
+        date: '2026-01-05',
+        ref: 'B3-NOTA-27421483#2026-01-05#1',
+        eventId,
+      }),
+      cashLeg({
+        id: 'note-fee',
+        type: 'pending_settlement',
+        value: -0.52,
+        date: '2026-01-05',
+        ref: 'B3-NOTA-27421483#2026-01-05#1#FEE-EMOL',
+        eventId,
+      }),
+      cashLeg({
+        id: 'ext-liq',
+        type: 'capital_deposit',
+        value: 399.48,
+        date: '2026-01-06',
+        ref: 'BTG-EXT-2026-01-06#01#B3-NOTA-27421483#1',
+        eventId,
+        notes: 'LIQ BOLSA',
+      }),
+    ];
+    // Extrato e a verdade: abertura 1000 + 399,48 do extrato. O pending da nota (400 - 0,52)
+    // e so transito e nao pode somar por cima (senao daria ~1799).
+    expect(settledCashBalanceFromLedger(entries, '2026-01-31')).toBeCloseTo(1_399.48, 2);
+  });
+
+  it('tesouro: AUTO-D2 (transito) + buy do extrato (mesmo evento) nao dobra a saida', () => {
+    const eventId = 'evt-tesouro-compra';
+    const entries = [
+      cashLeg({ id: 'open', type: 'opening_balance', value: 200_000, date: '2026-01-01' }),
+      cashLeg({
+        id: 'auto-open',
+        type: 'pending_settlement',
+        value: -54_160.08,
+        date: '2026-01-09',
+        ref: `${AUTO_D2_REF_PREFIX}fin-leg-1`,
+        eventId,
+      }),
+      cashLeg({
+        id: 'auto-clear',
+        type: 'pending_settlement',
+        value: 54_160.08,
+        date: '2026-01-12',
+        ref: `${AUTO_D2_REF_PREFIX}fin-leg-1:CLEAR`,
+        eventId,
+      }),
+      cashLeg({
+        id: 'ext-buy',
+        type: 'buy',
+        value: -54_160.08,
+        date: '2026-01-12',
+        ref: 'BTG-EXT-2026-01-09#01',
+        eventId,
+      }),
+    ];
+    // Compra debita o caixa uma vez (-54.160,08). A baixa AUTO-D2 nao soma por cima
+    // (senao daria ~91.679 — saida dobrada).
+    expect(settledCashBalanceFromLedger(entries, '2026-01-31')).toBeCloseTo(145_839.92, 2);
+  });
+
+  it('AUTO-D2 sem perna realizada do extrato: baixa do transito ainda conta', () => {
+    const entries = [
+      cashLeg({ id: 'open', type: 'opening_balance', value: 10_000, date: '2026-01-01' }),
+      cashLeg({
+        id: 'auto-open',
+        type: 'pending_settlement',
+        value: -4_000,
+        date: '2026-01-05',
+        ref: `${AUTO_D2_REF_PREFIX}só-transito`,
+        eventId: 'evt-sem-extrato',
+      }),
+      cashLeg({
+        id: 'auto-clear',
+        type: 'pending_settlement',
+        value: 4_000,
+        date: '2026-01-07',
+        ref: `${AUTO_D2_REF_PREFIX}só-transito:CLEAR`,
+        eventId: 'evt-sem-extrato',
+      }),
+    ];
+    // Sem perna realizada do extrato, o trânsito AUTO-D2 é o único registro: conta -4000.
+    expect(settledCashBalanceFromLedger(entries, '2026-01-31')).toBeCloseTo(6_000, 2);
   });
 });
