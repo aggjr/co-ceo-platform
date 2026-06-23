@@ -1,6 +1,6 @@
 {
   "name": "co-ceo-core",
-  "version": "0.0.426",
+  "version": "0.0.427",
   "description": "co-CEO Platform Core API",
   "main": "dist/index.js",
   "scripts": {
