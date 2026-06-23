@@ -39,6 +39,18 @@ describe('lftInvestmentStatementLots', () => {
     });
   });
 
+  it('deriva o ticker do vencimento da linha (sem hardcode de titulo)', () => {
+    const snippet =
+      'LFT   08/01/25   01/09/29   15/02/26   Não   -   -   SELIC +  0,10%   3,0   18.200,0000   54.600,00   18.300,000000   54.900,00';
+    const lots = parseLftInvestmentLotsInline(snippet);
+    expect(lots.length).toBe(1);
+    expect(lots[0]).toMatchObject({
+      acquisitionDate: '2026-02-15',
+      quantity: 3,
+      ticker: 'LFT-20290901',
+    });
+  });
+
   it('parseLftInvestmentLotsFromLines extrai formato linha separada', () => {
     const lots = parseLftInvestmentLotsFromLines([
       'LFT 08/01/25 01/03/31 21/01/26',

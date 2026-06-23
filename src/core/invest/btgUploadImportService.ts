@@ -18,11 +18,7 @@ import { normalizeBtgExtractPdfText } from './btgExtractPdfText';
 import { pdfBufferToLines, pdfBufferToText } from './btgPdfTextExtract';
 import { LedgerImportService } from './LedgerImportService';
 import { buildBtgExtractResolvers } from './buildBtgExtractResolvers';
-import {
-  cloneLftInvestmentLots,
-  loadLftInvestmentLotsFromDados,
-  type LftInvestmentLot,
-} from './lftInvestmentStatementLots';
+import { parseLftInvestmentLotsFromText } from './lftInvestmentStatementLots';
 import type { LedgerImportLine, LedgerTransactionType } from './ledgerTypes';
 import { MAIN_CASH_TICKER } from './ledgerTypes';
 import { parsePregaoDateFromLiqNotes } from './noteEventSettlement';
@@ -220,17 +216,6 @@ async function rawTextFromExtractUpload(file: BtgUploadFileInput): Promise<{
     return { raw: await pdfBufferToText(buf), format };
   }
   return { raw: buf.toString('utf8'), format };
-}
-
-let cachedLftInvestmentLotsTemplate: LftInvestmentLot[] | null = null;
-
-async function resolveLftInvestmentLotsForParse(): Promise<LftInvestmentLot[] | undefined> {
-  if (!cachedLftInvestmentLotsTemplate) {
-    const loaded = await loadLftInvestmentLotsFromDados();
-    if (!loaded.length) return undefined;
-    cachedLftInvestmentLotsTemplate = loaded;
-  }
-  return cloneLftInvestmentLots(cachedLftInvestmentLotsTemplate);
 }
 
 function normalizeExtractLines(raw: string, format: BtgExtractFileFormat): string[] {
@@ -813,11 +798,15 @@ export async function parseExtractUploadImportLines(
   }
   const importRules =
     importRulesRepo && ctx ? await importRulesRepo.loadForBroker(ctx, 'BTG') : [];
-  const lftInvestmentLots = await resolveLftInvestmentLotsForParse();
+  // Lotes LFT vem do arquivo enviado (extrato de investimento) ou de lotes
+  // passados pelo orquestrador do lote; nunca de leitura de disco/cache global.
+  const lftInvestmentLots = options?.lftInvestmentLots?.length
+    ? options.lftInvestmentLots
+    : parseLftInvestmentLotsFromText(raw);
   const mergedOptions = {
     ...options,
     importRules,
-    ...(lftInvestmentLots?.length ? { lftInvestmentLots } : {}),
+    ...(lftInvestmentLots.length ? { lftInvestmentLots } : {}),
   };
   let resolvers: import('./BtgExtractLineParser').BtgExtractResolvers | undefined;
   if (ledger && ctx?.organizationId && typeof ledger.listLedgerEvents === 'function') {
