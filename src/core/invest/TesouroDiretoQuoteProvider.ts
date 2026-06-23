@@ -54,9 +54,10 @@ const CKAN_PACKAGE_SEARCH_URL =
   'https://www.tesourotransparente.gov.br/ckan/api/3/action/package_search' +
   '?q=Precos%20e%20taxas%20dos%20titulos%20publicos%20Tesouro%20Direto&rows=10';
 
-const DEFAULT_LFT_REF_DATE = '2026-01-01';
-const DEFAULT_LFT_REF_VNA = 1_000_341.65;
-const DEFAULT_LFT_SELIC_ANUAL = 0.1475;
+// Sem ancora de cliente/periodo no codigo: a estimativa de LFT exige
+// referencia (data/VNA/Selic) via option ou env (TESOURO_LFT_*). Sem isso,
+// o estimador nao opera e a cotacao fica como ausente (caminho oficial e o
+// Tesouro Transparente).
 const PRICE_HEADER_CANDIDATES = [
   'PU Base Manha',
   'PU Venda Manha',
@@ -280,12 +281,16 @@ function estimateLftQuote(
 ): TesouroDiretoQuote | null {
   const parsed = parseTicker(ticker);
   if (!parsed || parsed.family !== 'SELIC') return null;
-  const refDate = (options.lftRefDate || process.env.TESOURO_LFT_REF_DATE || DEFAULT_LFT_REF_DATE).slice(0, 10);
-  const refVna = Number(options.lftRefVna ?? process.env.TESOURO_LFT_REF_VNA ?? DEFAULT_LFT_REF_VNA);
-  const selicAnual = Number(
-    options.lftSelicAnual ?? process.env.TESOURO_LFT_SELIC_ANUAL ?? DEFAULT_LFT_SELIC_ANUAL
-  );
-  if (!Number.isFinite(refVna) || refVna <= 0 || !Number.isFinite(selicAnual) || selicAnual <= 0) {
+  const refDate = (options.lftRefDate || process.env.TESOURO_LFT_REF_DATE || '').slice(0, 10);
+  const refVna = Number(options.lftRefVna ?? process.env.TESOURO_LFT_REF_VNA ?? NaN);
+  const selicAnual = Number(options.lftSelicAnual ?? process.env.TESOURO_LFT_SELIC_ANUAL ?? NaN);
+  if (
+    !refDate ||
+    !Number.isFinite(refVna) ||
+    refVna <= 0 ||
+    !Number.isFinite(selicAnual) ||
+    selicAnual <= 0
+  ) {
     return null;
   }
   return {

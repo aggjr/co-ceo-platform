@@ -81,8 +81,9 @@ export function buildCostAdjustmentIndex(
   return byDate;
 }
 
-const TICKER_IN_TEXT =
-  /\b(PRIO3|PRIO[A-Z0-9]{2,6}|ITUB[A-Z0-9]{2,6}|BBAS[A-Z0-9]{2,6}|WEGE[A-Z0-9]{2,6}|LFT-\d{8})\b/i;
+// Padrao generico de ticker B3 (4 letras + 1-2 digitos, ex. PRIO3, ITUB4) ou
+// titulo publico (LFT-AAAAMMDD). Nao usar lista fixa de tickers de um cliente.
+const TICKER_IN_TEXT = /\b([A-Z]{4}\d{1,2}|LFT-\d{8})\b/i;
 
 /** Infere ativo e data operação a partir da descrição do extrato. */
 export function inferFromCashDescription(
@@ -105,7 +106,8 @@ export function inferFromCashDescription(
 
   if (/BTC|ALUGUEL|LOCAÇÃO|LOCACAO/i.test(upper)) {
     const tm = upper.match(TICKER_IN_TEXT);
-    const ticker = tm ? tm[1].toUpperCase() : 'PRIO3';
+    if (!tm) return null;
+    const ticker = tm[1].toUpperCase();
     const pregao = d.match(/Preg[aã]o:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
     const originDate = pregao
       ? `${pregao[3]}-${pregao[2]}-${pregao[1]}`
@@ -115,8 +117,9 @@ export function inferFromCashDescription(
 
   if (/IR\s*-\s*BTC|CORRETAGEM\s+BTC/i.test(upper)) {
     const tm = upper.match(TICKER_IN_TEXT);
+    if (!tm) return null;
     return {
-      ticker: tm ? tm[1].toUpperCase() : 'PRIO3',
+      ticker: tm[1].toUpperCase(),
       originDate: cashDate,
     };
   }

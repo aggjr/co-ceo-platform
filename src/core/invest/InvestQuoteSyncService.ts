@@ -328,8 +328,15 @@ export class InvestQuoteSyncService {
       });
       updated++;
     }
-    const from = (process.env.INVEST_QUOTES_HISTORY_FROM || '2026-01-01').slice(0, 10);
     const to = new Date().toISOString().slice(0, 10);
+    // Sem data de cliente no codigo: janela movel padrao (24 meses) quando o
+    // override de ambiente nao esta definido.
+    const defaultHistoryFrom = (() => {
+      const d = new Date();
+      d.setUTCMonth(d.getUTCMonth() - 24);
+      return d.toISOString().slice(0, 10);
+    })();
+    const from = (process.env.INVEST_QUOTES_HISTORY_FROM || defaultHistoryFrom).slice(0, 10);
     for (const ticker of tickers) {
       const bars = await fetchExternalStockHistory(ticker, from, to).catch(() => []);
       for (const q of bars) {

@@ -21,9 +21,9 @@ export type BtgExtractSourceSpec = {
   openingBalance?: number;
 };
 
-/** Extrato único jan–mai/2026 (PDF → Extrato-normalized.txt). Arquivos 1_2/3_4/6 mantidos só como referência. */
+/** Espelho de origem do extrato (PDF → Extrato-normalized.txt). Sem rotulo de periodo fixo. */
 export const BTG_EXTRACT_SOURCES: BtgExtractSourceSpec[] = [
-  { file: 'Extrato-normalized.txt', periodLabel: '2026-01..05' },
+  { file: 'Extrato-normalized.txt', periodLabel: '' },
 ];
 
 export function defaultBtgExtractDir(): string {
@@ -139,12 +139,9 @@ export function monthEndExtractBalances(
   }
   return months.map((month) => {
     const last = byMonth.get(month);
-    const endDate =
-      month === '2026-02'
-        ? '2026-02-28'
-        : month === '2026-04'
-          ? '2026-04-30'
-          : `${month}-31`;
+    const [yy, mm] = month.split('-').map(Number);
+    const lastDay = new Date(Date.UTC(yy!, mm!, 0)).getUTCDate();
+    const endDate = `${month}-${String(lastDay).padStart(2, '0')}`;
     const point =
       last && last.date <= endDate
         ? last
@@ -172,7 +169,7 @@ export function buildExtractReconciliationSummary(
 ): ExtractReconciliationSummary {
   const { sources, series } = loadBtgExtractCashDailySeries(srcDir);
   const last = lastExtractCashPoint(series);
-  const months = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05'];
+  const months = [...new Set(series.map((p) => p.date.slice(0, 7)))].sort();
 
   return {
     extractFiles: sources.map((s) => s.file),
