@@ -203,7 +203,6 @@
         "tests/unit/invest/btgExtractCashSeries.test.ts",
         "tests/unit/invest/btgExtractPdfText.test.ts",
         "tests/unit/invest/btgHomeBrokerImport.test.ts",
-        "tests/unit/invest/btgPerformanceReference.test.ts",
         "tests/unit/invest/callCoverage.test.ts",
         "tests/unit/invest/cashInTransit.test.ts",
         "tests/unit/invest/cashInvestLedger.test.ts",
@@ -281,7 +280,7 @@
     }
   ],
   "stats": {
-    "totalTestFiles": 72,
+    "totalTestFiles": 71,
     "totalUnits": 7,
     "unitsWithTests": 6,
     "unitsWithoutTests": 1,

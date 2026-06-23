@@ -207,7 +207,6 @@ function bindPatrimonyChart(container, initialBounds) {
         summaryHost.innerHTML = renderHoldingPatrimonySummary(
           series,
           data.performance,
-          data.btgReference,
           data.cashInTransit,
           data.cdiComparison,
           data.stockBenchmark

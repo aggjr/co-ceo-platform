@@ -1628,11 +1628,16 @@ Decisao aplicada:
     custodia por `homeBrokerPortfolioTranslator.ts`, ligada no
     `HomeBrokerSnapshotUploadService` (3o formato aceito) ->
     `applyBrokerHoldingSnapshot` (cotacoes, `patrimony_items`, ancora do dia + RF).
-  - **Pendente:** (a) aposentar `btgPatrimonyAnchorReference.ts` (ancoras hardcoded
-    para `org-holding-001`) depois que o seed por upload virar o caminho padrao;
-    (b) movimentacao transacional (livro) continua vindo das notas de corretagem
+  - **Feito (Onda 1):** `btgPatrimonyAnchorReference.ts` removido. `PatrimonyMonthlyAnchorsRepository`
+    le so do banco (`invest_patrimony_monthly_anchors`); ancoras entram por upload de snapshot
+    (`HomeBrokerSnapshotUploadService.seedFromFile`). Endpoint `seed-btg` agora exige upload.
+  - **Pendente:** (b) movimentacao transacional (livro) continua vindo das notas de corretagem
     (`btgBrokerageNoteLedgerTranslator`) — o snapshot de carteira semeia
     posicao/cotacao/ancora, nao transacoes.
+- **B-01 (Onda 1, decisao do arquiteto):** linha de benchmark "BTG publicado" (retornos mensais
+  hardcoded de um cliente em `btgPerformanceReference.ts`) REMOVIDA do grafico. Reintroduzir
+  depois como benchmark de retorno publicado **por organizacao**, alimentado por upload/API
+  (nao hardcode). O grafico mantem patrimonio + CDI (CDI ja e generico via indice de mercado).
 - **U-03** Job diario com horario alvo ~19h parametrizado (envs
   `INVEST_CRON_*_AT`) e ordem de prioridade de fontes por ativo (ligado a M-01).
 

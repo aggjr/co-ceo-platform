@@ -1,14 +1,12 @@
 import type { CoCeoDataGateway, UserContext } from '../../../src/core/dal';
 import {
   PatrimonyMonthlyAnchorsSeedService,
-  HOME_BROKER_ANCHOR_REFERENCE,
 } from '../../../src/core/invest/PatrimonyMonthlyAnchorsSeedService';
-import { HOLDING_ORG_ID } from '../../../src/core/invest/btgPatrimonyAnchorReference';
 import { normalizePatrimonyAnchorInput } from '../../../src/core/invest/patrimonyAnchors';
 
 const ctx: UserContext = {
   userId: 'u1',
-  organizationId: HOLDING_ORG_ID,
+  organizationId: 'org-sample',
   impersonatorId: null,
   scope: 'node',
 };
@@ -43,21 +41,6 @@ function mockGateway(): CoCeoDataGateway {
 }
 
 describe('PatrimonyMonthlyAnchorsSeedService', () => {
-  it('grava fechamentos e aberturas homebroker via gateway', async () => {
-    const gateway = mockGateway();
-    const svc = new PatrimonyMonthlyAnchorsSeedService(gateway);
-
-    const result = await svc.seedFromHomebrokerReference(ctx);
-
-    expect(result.upserted).toBe(
-      HOME_BROKER_ANCHOR_REFERENCE.month_ends.length + 1
-    );
-    expect(result.points.some((p) => p.date === '2026-01-31')).toBe(true);
-    expect(result.points.some((p) => p.date === '2026-05-29')).toBe(true);
-    expect(result.fixedIncomeTotal).toBe(HOME_BROKER_ANCHOR_REFERENCE.fixed_income_total);
-    expect(gateway.insert).toHaveBeenCalled();
-  });
-
   it('normaliza JSON mensal simples do homebroker para aberturas e fechamentos', async () => {
     const gateway = mockGateway();
     const svc = new PatrimonyMonthlyAnchorsSeedService(gateway);

@@ -33,7 +33,7 @@ export function resolveInvestCronOrganizationIds(): string[] {
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
-  return ids.length ? ids : ['org-holding-001'];
+  return ids;
 }
 
 /**

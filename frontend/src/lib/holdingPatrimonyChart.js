@@ -147,7 +147,6 @@ function renderCashTransitBlock(cashInTransit) {
 export function renderHoldingPatrimonySummary(
   series,
   performance,
-  btgReference,
   cashInTransit,
   cdiComparison,
   stockBenchmark
@@ -168,14 +167,6 @@ export function renderHoldingPatrimonySummary(
       performance.externalFlows?.length > 0
         ? `${performance.externalFlows.length} fluxo(s) externo(s) ajustado(s)`
         : 'sem aportes/retiradas no período';
-    const btgLine =
-      btgReference && btgReference.btgPublishedTwr != null
-        ? `<span class="muted" style="font-size:12px;display:block;margin-top:6px">
-            BTG (tabela mensal): <strong>${formatPct(btgReference.btgPublishedTwr)}</strong>
-            · sistema: ${formatPct(twr)}
-            · diferença: ${btgReference.gapPctPoints >= 0 ? '+' : ''}${btgReference.gapPctPoints.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} p.p.
-          </span>`
-        : '';
     const anchorLine =
       performance.monthAnchorTwr != null
         ? `<span class="muted" style="font-size:12px;display:block;margin-top:2px">
@@ -198,7 +189,6 @@ export function renderHoldingPatrimonySummary(
         <span class="holding-summary-change ${positive ? 'is-positive' : 'is-negative'}">
           Ganho ${positive ? '+' : ''}${formatBrl(gain)} · rentab. ${formatPct(twr)} (TWR)
         </span>
-        ${btgLine}
       </div>
       <div class="holding-summary-side muted">
         <span>${formatDateBr(first.date)} → ${formatDateBr(last.date)}</span>

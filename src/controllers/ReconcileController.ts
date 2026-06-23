@@ -328,13 +328,7 @@ export class ReconcileController {
         homeBrokerFiles: homeBrokerFiles.length,
       });
 
-      const existingAnchors = await this.anchorsRepo.loadForOrganization(ctx);
-      let anchorsSeeded = false;
-      if (existingAnchors.month_ends.length === 0 && this.anchorSeed.resolveReference(ctx)) {
-        console.log(`[OptionC] org=${orgId} gravando âncoras BTG (tabela vazia)`);
-        await this.anchorSeed.seedFromHomebrokerReference(ctx);
-        anchorsSeeded = true;
-      }
+      const anchorsSeeded = false;
 
       const state = await this.optionC.start(ctx, {
         notesFiles,
@@ -456,12 +450,6 @@ export class ReconcileController {
         homeBrokerFiles: homeBrokerFiles.length,
         delayMs,
       });
-
-      const existingAnchors = await this.anchorsRepo.loadForOrganization(ctx);
-      if (existingAnchors.month_ends.length === 0 && this.anchorSeed.resolveReference(ctx)) {
-        await this.anchorSeed.seedFromHomebrokerReference(ctx);
-        console.log(`[OptionC/run-all] org=${orgId} âncoras BTG gravadas`);
-      }
 
       if (req.body?.async === true) {
         const started = await this.optionC.start(ctx, {
@@ -596,21 +584,14 @@ export class ReconcileController {
     }
   };
 
-  /** POST /api/invest/reconcile/patrimony-anchors/seed-btg — grava âncoras homebroker (sem migration SQL) */
-  seedBtgPatrimonyAnchors = async (req: Request, res: Response): Promise<Response> => {
+  /** POST /api/invest/reconcile/patrimony-anchors/seed-btg — seed por referência hardcoded removido */
+  seedBtgPatrimonyAnchors = async (_req: Request, res: Response): Promise<Response> => {
     try {
-      const ctx = req.userContext!;
-      if (!ctx.organizationId) {
-        return res.status(400).json({ success: false, error: 'Personifique a holding.' });
-      }
-      const result = await this.anchorSeed.seedFromHomebrokerReference(ctx);
-      const loaded = await this.anchorsRepo.loadForOrganization(ctx);
-      return res.json({
-        success: true,
-        message: `${result.upserted} âncora(s) BTG gravada(s) — calibração ativa no fechamento diário.`,
-        seed: result,
-        anchors: loaded,
-      });
+      throw new GatewayError(
+        'RECORD_NOT_FOUND',
+        'Seed de âncoras agora é só por upload de snapshot do home broker (use o endpoint de upload de snapshot). Envie o arquivo JSON de patrimônio.',
+        400
+      );
     } catch (error: unknown) {
       const status = error instanceof GatewayError ? error.httpStatus : 500;
       const message = error instanceof Error ? error.message : 'Falha ao gravar âncoras BTG.';

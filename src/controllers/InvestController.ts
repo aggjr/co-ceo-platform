@@ -19,7 +19,6 @@ import { buildDailyPatrimonyMtmSeries } from '../core/invest/PatrimonyMtmDailyEn
 import { buildGeneralAuditMatrix } from '../core/invest/GeneralAuditMatrixService';
 import { buildBrokerageNoteReviewRows } from '../core/invest/brokerageNotesReviewFromLedger';
 import { buildExtractReconciliationSummary } from '../core/invest/btgExtractCashSeries';
-import { compareToBtgPublished } from '../core/invest/btgPerformanceReference';
 import { PatrimonyMonthlyAnchorsRepository } from '../core/invest/PatrimonyMonthlyAnchorsRepository';
 import { fixedIncomeTotalFromLedger } from '../core/invest/patrimonyLedgerGates';
 import {
@@ -944,17 +943,6 @@ export class InvestController {
       };
     }
 
-    const fromMonth = from.slice(0, 7);
-    const toMonth = to.slice(0, 7);
-    const btgReference =
-      result.performance != null
-        ? compareToBtgPublished(
-            result.performance.periodReturnTwr,
-            fromMonth,
-            toMonth
-          )
-        : null;
-
     const extractReconciliation = buildExtractReconciliationSummary();
     const ledgerFlows = listExternalFlows(events, from, to);
     const tedsMatched =
@@ -1100,7 +1088,6 @@ export class InvestController {
       cdiComparison,
       cashInTransit,
       dailyAudit,
-      btgReference,
       extractReconciliation: {
         ...extractReconciliation,
         tedsMatchedWithLedger: tedsMatched,

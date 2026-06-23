@@ -1,9 +1,5 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import { GatewayError } from '../dal/errors';
-import {
-  btgPatrimonyAnchorReferenceForOrg,
-  HOLDING_BTG_PATRIMONY_ANCHORS,
-} from './btgPatrimonyAnchorReference';
 import type { PatrimonyAnchorFile } from './patrimonyAnchors';
 
 export type SeedPatrimonyAnchorsResult = {
@@ -19,26 +15,10 @@ function anchorSourceForDate(date: string): string {
 
 /**
  * Grava âncoras mensais BTG via gateway (sem migration SQL).
- * Fonte: referência homebroker da org ou payload explícito.
+ * Fonte: payload explícito enviado via upload de snapshot homebroker.
  */
 export class PatrimonyMonthlyAnchorsSeedService {
   constructor(private readonly gateway: CoCeoDataGateway) {}
-
-  resolveReference(ctx: UserContext): PatrimonyAnchorFile | null {
-    return btgPatrimonyAnchorReferenceForOrg(ctx.organizationId) ?? null;
-  }
-
-  async seedFromHomebrokerReference(ctx: UserContext): Promise<SeedPatrimonyAnchorsResult> {
-    const ref = this.resolveReference(ctx);
-    if (!ref?.month_ends?.length) {
-      throw new GatewayError(
-        'RECORD_NOT_FOUND',
-        'Sem referência BTG homebroker para esta organização.',
-        404
-      );
-    }
-    return this.seedFromFile(ctx, ref);
-  }
 
   async seedFromFile(ctx: UserContext, file: PatrimonyAnchorFile): Promise<SeedPatrimonyAnchorsResult> {
     if (!ctx.organizationId) {
@@ -112,6 +92,3 @@ export class PatrimonyMonthlyAnchorsSeedService {
     await this.gateway.insert(ctx, 'invest_patrimony_monthly_anchors', { id, ...payload });
   }
 }
-
-/** Referência canônica exportada para testes e documentação. */
-export const HOME_BROKER_ANCHOR_REFERENCE = HOLDING_BTG_PATRIMONY_ANCHORS;

@@ -1,6 +1,5 @@
 import type { CoCeoDataGateway, UserContext } from '../dal';
 import { isMissingSchemaError } from '../dal/mysqlErrors';
-import { btgPatrimonyAnchorReferenceForOrg } from './btgPatrimonyAnchorReference';
 import type { PatrimonyAnchorFile } from './patrimonyAnchors';
 
 const FIXED_INCOME_SOURCE = 'fixed_income_total';
@@ -59,11 +58,6 @@ export class PatrimonyMonthlyAnchorsRepository {
       if (!isMissingSchemaError(err)) throw err;
     }
 
-    return (
-      btgPatrimonyAnchorReferenceForOrg(ctx.organizationId) ?? {
-        month_ends: [],
-        fixed_income_total: 0,
-      }
-    );
+    return { month_ends: [], fixed_income_total: 0 };
   }
 }

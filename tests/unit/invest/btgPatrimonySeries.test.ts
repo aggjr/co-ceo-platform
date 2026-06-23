@@ -1,4 +1,4 @@
-import { HOLDING_BTG_PATRIMONY_ANCHORS } from '../../../src/core/invest/btgPatrimonyAnchorReference';
+import { SAMPLE_PATRIMONY_ANCHORS } from '../../fixtures/patrimonyAnchorsSample';
 import { buildBtgInterpolatedPatrimonySeries } from '../../../src/core/invest/btgPatrimonySeries';
 
 describe('buildBtgInterpolatedPatrimonySeries', () => {
@@ -6,7 +6,7 @@ describe('buildBtgInterpolatedPatrimonySeries', () => {
     const series = buildBtgInterpolatedPatrimonySeries(
       '2026-01-01',
       '2026-01-31',
-      HOLDING_BTG_PATRIMONY_ANCHORS
+      SAMPLE_PATRIMONY_ANCHORS
     );
     const jan1 = series.find((p) => p.date === '2026-01-01');
     expect(jan1?.patrimony).toBeCloseTo(1_212_435.41, 0);
@@ -16,7 +16,7 @@ describe('buildBtgInterpolatedPatrimonySeries', () => {
     const series = buildBtgInterpolatedPatrimonySeries(
       '2026-01-01',
       '2026-01-31',
-      HOLDING_BTG_PATRIMONY_ANCHORS
+      SAMPLE_PATRIMONY_ANCHORS
     );
     const jan31 = series.find((p) => p.date === '2026-01-31');
     expect(jan31?.patrimony).toBeCloseTo(1_320_481.6, 0);

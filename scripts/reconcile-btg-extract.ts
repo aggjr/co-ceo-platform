@@ -13,7 +13,6 @@ import {
   listExtractTeds,
 } from '../src/core/invest/btgExtractCashSeries';
 import { listExternalFlows } from '../src/core/invest/portfolioPerformance';
-import { compareToBtgPublished, btgPublishedTwr } from '../src/core/invest/btgPerformanceReference';
 import { loadPatrimonyAnchors } from '../src/core/invest/patrimonyAnchors';
 
 dotenv.config();
@@ -53,9 +52,6 @@ async function main() {
       console.log(m.date, m.patrimony.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
     }
   }
-
-  const btgTwr = btgPublishedTwr('2026-01', '2026-05');
-  console.log('\nRentab. BTG publicada Jan–Mai:', btgTwr != null ? `${(btgTwr * 100).toFixed(2)}%` : '—');
 
   const pool = mysql.createPool({
     host: process.env.DB_HOST || '127.0.0.1',
