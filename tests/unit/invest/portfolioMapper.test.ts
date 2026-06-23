@@ -101,7 +101,7 @@ describe('portfolioMapper', () => {
     });
     expect(openOpt.optionMonthName).toBe('Junho');
     expect(isClosedOptionPosition(closedOpt)).toBe(true);
-    const { open, closedOptions } = partitionPortfolioPositions([openOpt, closedOpt]);
+    const { open, closedOptions } = partitionPortfolioPositions([openOpt, closedOpt], '2026-06-10');
     expect(open).toHaveLength(1);
     expect(closedOptions).toHaveLength(1);
     expect(closedOptions[0]!.ticker).toBe('PRIOE263');

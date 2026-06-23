@@ -222,10 +222,11 @@ export function buildDailyPatrimonySeries(
       const type = String(e.transaction_type);
       if (type === 'pending_settlement') {
         const ref = String(e.broker_note_ref || '');
-        if (ref.startsWith(AUTO_D2_REF_PREFIX)) {
+        if (
+          ref.startsWith(AUTO_D2_REF_PREFIX) ||
+          isCashAsset(String(e.asset_type), String(e.asset_ticker))
+        ) {
           pendingSettlements += Number(e.total_net_value ?? 0);
-        } else if (isCashAsset(String(e.asset_type), String(e.asset_ticker))) {
-          applyCashNow(cash, Number(e.total_net_value ?? 0));
         }
         continue;
       }

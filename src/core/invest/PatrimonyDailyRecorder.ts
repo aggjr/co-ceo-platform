@@ -73,9 +73,9 @@ export class PatrimonyDailyRecorder {
    * Opções e renda fixa são estimáveis e não bloqueiam o fechamento.
    */
   private requiresExactDailyQuote(
-    snapshot: AssetValuationSnapshot,
     assetType: string,
-    ticker: string
+    ticker: string,
+    snapshot?: AssetValuationSnapshot
   ): boolean {
     if (isOptionCategory(snapshot, assetType) || isOptionTicker(ticker)) return false;
     if (isFixedIncomeCategory(snapshot, assetType)) return false;
@@ -103,7 +103,7 @@ export class PatrimonyDailyRecorder {
         : null;
       if (expiry && date >= expiry) continue;
       if (!requiresMarketQuoteForAsset(valuationSnapshot, assetType, ticker)) continue;
-      if (!this.requiresExactDailyQuote(valuationSnapshot, assetType, ticker)) continue;
+      if (!this.requiresExactDailyQuote(assetType, ticker, valuationSnapshot)) continue;
       const type = String(e.transaction_type ?? '');
       const qty = Math.abs(Number(e.quantity ?? 0));
       if (!Number.isFinite(qty) || qty <= 0) continue;

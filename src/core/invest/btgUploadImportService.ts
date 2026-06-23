@@ -898,11 +898,19 @@ export async function applyBtgExtractUpload(
       ctx,
       ledger
     );
+    const keepUnmatchedAsCash = options?.keepUnmatchedLiqBolsaAsCash === true;
+    const skipUnmatched = options?.skipUnmatchedLiqBolsa === true;
     const liqBolsaSettlement = await settleLiqBolsaEntries(ctx, ledger, entries, {
-      keepUnmatchedAsCash: options?.keepUnmatchedLiqBolsaAsCash === true,
-      /** Default true: LIQ sem casamento vira extract_divergence investigavel. */
-      keepUnmatchedAsUnknown: options?.keepUnmatchedLiqBolsaAsUnknown !== false,
-      skipUnmatched: options?.skipUnmatchedLiqBolsa === true,
+      keepUnmatchedAsCash,
+      /**
+       * Default true (LIQ sem casamento vira evento desconhecido investigavel),
+       * exceto quando o chamador pediu explicitamente manter como caixa ou pular.
+       */
+      keepUnmatchedAsUnknown:
+        options?.keepUnmatchedLiqBolsaAsUnknown != null
+          ? options.keepUnmatchedLiqBolsaAsUnknown
+          : !keepUnmatchedAsCash && !skipUnmatched,
+      skipUnmatched,
     });
     entries = liqBolsaSettlement.entries;
     if (liqBolsaSettlement.matched || liqBolsaSettlement.keptAsCash || liqBolsaSettlement.keptAsUnknown || liqBolsaSettlement.skipped || liqBolsaSettlement.unresolved.length) {

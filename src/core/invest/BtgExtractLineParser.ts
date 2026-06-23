@@ -1179,17 +1179,19 @@ export function btgLinesToImportEntries(
       }
     }
 
+    // Sem posicao para ratear (ou credito/estorno): despesa de custodia agregada
+    // por mes no caixa. Custodia e gasto explicado, nao divergencia.
     out.push({
       date: move.date,
       ticker: CASH_TICKER,
-      operation: 'extract_divergence',
+      operation: 'fee',
       quantity: 0,
       unit_price: 0,
       total_net_value: move.signedNet,
       asset_type: 'cash',
       notes: move.description,
       event_source_ref: ref,
-      extract_category: 3,
+      extract_category: 2,
     });
   }
 

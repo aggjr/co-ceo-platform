@@ -71,13 +71,48 @@ function sumOpenPendingOnCash(
   return Math.round(sum * 100) / 100;
 }
 
-/** Saldo em conta corrente liquidado (extrato; sem previsões em trânsito abertas). */
+/**
+ * Soma das pernas de pending auto (D+2) que já liquidaram: a perna aberta entra
+ * no saldo liquidado somente quando existe a perna `:CLEAR` com data <= asOf.
+ */
+function sumClearedPendingOnCash(
+  entries: LedgerEvent[] | null | undefined,
+  asOfDate: string
+): number {
+  const openByRef = new Map<string, number>();
+  const clearDateByRef = new Map<string, string>();
+
+  for (const e of cashLedgerEventsForBalance(entries, { includeAutoPending: true })) {
+    if (String(e.transaction_type) !== 'pending_settlement') continue;
+    const ref = String(e.broker_note_ref || '');
+    if (!ref.startsWith(AUTO_D2_REF_PREFIX)) continue;
+    const d = String(e.transaction_date || '').slice(0, 10);
+    if (ref.endsWith(':CLEAR')) {
+      const base = ref.slice(0, -':CLEAR'.length);
+      const prev = clearDateByRef.get(base);
+      if (!prev || d < prev) clearDateByRef.set(base, d);
+    } else {
+      openByRef.set(ref, (openByRef.get(ref) ?? 0) + Number(e.total_net_value ?? 0));
+    }
+  }
+
+  let sum = 0;
+  for (const [base, amount] of openByRef) {
+    const clearDate = clearDateByRef.get(base);
+    if (clearDate && clearDate <= asOfDate && Math.abs(amount) >= 0.005) sum += amount;
+  }
+  return Math.round(sum * 100) / 100;
+}
+
+/** Saldo em conta corrente liquidado (extrato): caixa regular + pending já liquidado. */
 export function settledCashBalanceFromLedger(
   entries: LedgerEvent[] | null | undefined,
   asOfDate?: string
 ): number {
   const asOf = (asOfDate || new Date().toISOString()).slice(0, 10);
-  return cashBalanceFromLedger(entries, asOf);
+  const base = cashBalanceFromLedger(entries, asOf);
+  const clearedPending = sumClearedPendingOnCash(entries, asOf);
+  return Math.round((base + clearedPending) * 100) / 100;
 }
 
 /** Saldo para exibição = conta corrente liquidada. */

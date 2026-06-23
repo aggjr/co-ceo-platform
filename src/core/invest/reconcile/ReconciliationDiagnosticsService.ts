@@ -842,7 +842,9 @@ export class ReconciliationDiagnosticsService {
         }
       }
       const openingTransit = transitTotal();
-      const openingCash = money(grossCash - openingTransit);
+      // grossCash ja exclui as pernas AUTO_D2 (transito vai para pendingByRef);
+      // o caixa liquidado de abertura e o proprio grossCash.
+      const openingCash = money(grossCash);
       const openingPortfolioValue = portfolioTotal();
       const openingPatrimonyValue = money(openingCash + openingTransit + openingPortfolioValue);
       const assetMovementValue = { value: 0 };
